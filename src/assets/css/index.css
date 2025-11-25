@@ -573,12 +573,29 @@ input.success {
   width: 80px;
 }
 
+.sidebar.closed .brand {
+  display: none;
+}
+
+.sidebar.closed .nav-label {
+  display: none;
+}
+
+.sidebar.closed .user-info {
+  display: none;
+}
+
 .sidebar-header {
   padding: var(--spacing-lg);
   border-bottom: 1px solid var(--gray-200);
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.sidebar.closed .sidebar-header {
+  justify-content: center;
+  padding: var(--spacing-md);
 }
 
 .brand h2 {
@@ -594,12 +611,20 @@ input.success {
 }
 
 .sidebar-toggle {
-  background: none;
-  border: none;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
   font-size: 1.25rem;
   cursor: pointer;
   color: var(--gray-600);
-  padding: 0.25rem;
+  padding: 0.5rem;
+  transition: all var(--transition-base);
+  flex-shrink: 0;
+}
+
+.sidebar-toggle:hover {
+  background: var(--gray-200);
+  color: var(--gray-900);
 }
 
 .sidebar-nav {

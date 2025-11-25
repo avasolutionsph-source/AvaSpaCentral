@@ -1,0 +1,334 @@
+/* ============================================================================
+   EXPENSES PAGE SPECIFIC STYLES
+   ============================================================================ */
+.expenses-page {
+  padding: var(--spacing-lg);
+}
+
+/* Summary Cards */
+.expenses-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.expense-summary-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.expense-summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--primary);
+}
+
+.expense-summary-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.expense-summary-card.total::before {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+}
+
+.expense-summary-card.monthly::before {
+  background: linear-gradient(135deg, var(--info) 0%, var(--info-dark) 100%);
+}
+
+.expense-summary-card.categories::before {
+  background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%);
+}
+
+.expense-summary-icon {
+  font-size: 2rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.expense-summary-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: var(--spacing-xs);
+}
+
+.expense-summary-label {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Filters */
+.expenses-filters {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.expenses-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+/* Expenses Table */
+.expenses-table-container {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.expenses-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.expenses-table thead {
+  background: var(--gray-50);
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.expenses-table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  color: var(--gray-700);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.expenses-table tbody tr {
+  border-bottom: 1px solid var(--gray-200);
+  transition: background var(--transition-fast);
+}
+
+.expenses-table tbody tr:hover {
+  background: var(--gray-50);
+}
+
+.expenses-table td {
+  padding: var(--spacing-md);
+  color: var(--gray-700);
+  font-size: 0.875rem;
+}
+
+.expense-date-cell {
+  color: var(--gray-900);
+  font-weight: 500;
+}
+
+.expense-description-cell {
+  color: var(--gray-900);
+}
+
+.expense-vendor-cell {
+  color: var(--gray-600);
+  font-size: 0.8rem;
+}
+
+.expense-amount-cell {
+  font-weight: 700;
+  color: var(--gray-900);
+  font-size: 1rem;
+}
+
+.expense-category-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.expense-category-badge.office-supplies {
+  background: #E3F2FD;
+  color: #1565C0;
+}
+
+.expense-category-badge.utilities {
+  background: #FFF3E0;
+  color: #E65100;
+}
+
+.expense-category-badge.salaries {
+  background: #F3E5F5;
+  color: #6A1B9A;
+}
+
+.expense-category-badge.maintenance {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.expense-category-badge.marketing {
+  background: #FCE4EC;
+  color: #C2185B;
+}
+
+.expense-category-badge.inventory {
+  background: #FFF9C4;
+  color: #F57F17;
+}
+
+.expense-category-badge.rent {
+  background: #E0F2F1;
+  color: #00695C;
+}
+
+.expense-category-badge.other {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.expense-payment-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.expense-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.expense-actions .btn {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+}
+
+/* Expense Modal */
+.expense-modal {
+  max-width: 600px;
+}
+
+.expense-modal .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+/* Receipt Upload Area */
+.receipt-upload-area {
+  border: 2px dashed var(--gray-300);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-xl);
+  text-align: center;
+  background: var(--gray-50);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.receipt-upload-area:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.receipt-upload-icon {
+  font-size: 2.5rem;
+  margin-bottom: var(--spacing-sm);
+  color: var(--gray-400);
+}
+
+.receipt-upload-text {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-xs);
+}
+
+.receipt-upload-hint {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+/* Empty State */
+.empty-expenses {
+  text-align: center;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  color: var(--gray-500);
+}
+
+.empty-expenses-icon {
+  font-size: 4rem;
+  margin-bottom: var(--spacing-md);
+}
+
+/* Export Button */
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--success);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.export-btn:hover {
+  background: var(--success-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .expenses-table-container {
+    overflow-x: auto;
+  }
+
+  .expenses-table {
+    min-width: 800px;
+  }
+
+  .expenses-filters-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .expenses-page {
+    padding: var(--spacing-md);
+  }
+
+  .expenses-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-modal .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-table th,
+  .expenses-table td {
+    padding: var(--spacing-sm);
+    font-size: 0.75rem;
+  }
+
+  .expense-actions {
+    flex-direction: column;
+  }
+}

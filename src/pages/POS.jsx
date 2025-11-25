@@ -1,0 +1,1010 @@
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../context/AppContext';
+import mockApi from '../mockApi/mockApi';
+import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
+
+const POS = () => {
+  const { showToast } = useApp();
+
+  // State
+  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [cart, setCart] = useState([]);
+  const [showCheckout, setShowCheckout] = useState(false);
+
+  // Checkout state
+  const [employees, setEmployees] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerType, setCustomerType] = useState('walk-in'); // walk-in, existing, new
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [amountReceived, setAmountReceived] = useState('');
+  const [cardTransactionId, setCardTransactionId] = useState('');
+  const [gcashReference, setGcashReference] = useState('');
+  const [discountType, setDiscountType] = useState(null); // senior, pwd, promo, gc
+  const [discountValue, setDiscountValue] = useState(0);
+  const [bookingSource, setBookingSource] = useState('Walk-in');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // Gift Certificate state
+  const [showGCModal, setShowGCModal] = useState(false);
+  const [gcCode, setGcCode] = useState('');
+  const [gcValidation, setGcValidation] = useState(null);
+  const [appliedGC, setAppliedGC] = useState(null);
+
+  // Advance booking state
+  const [isAdvanceBooking, setIsAdvanceBooking] = useState(false);
+  const [advanceBookingData, setAdvanceBookingData] = useState(null);
+
+  useEffect(() => {
+    loadPOSData();
+  }, []);
+
+  useEffect(() => {
+    filterProducts();
+  }, [products, selectedCategory, searchTerm]);
+
+  const loadPOSData = async () => {
+    try {
+      setLoading(true);
+      const [productsData, employeesData, customersData, roomsData] = await Promise.all([
+        mockApi.products.getProducts({ active: true }),
+        mockApi.employees.getEmployees({ status: 'active' }),
+        mockApi.customers.getCustomers({ status: 'active' }),
+        mockApi.rooms.getRooms()
+      ]);
+
+      setProducts(productsData);
+      setEmployees(employeesData);
+      setCustomers(customersData);
+      setRooms(roomsData);
+
+      // Extract unique categories
+      const uniqueCategories = [...new Set(productsData.map(p => p.category))];
+      setCategories(uniqueCategories);
+
+      setLoading(false);
+    } catch (error) {
+      showToast('Failed to load POS data', 'error');
+      setLoading(false);
+    }
+  };
+
+  const filterProducts = () => {
+    let filtered = products;
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => p.category === selectedCategory);
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.category.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredProducts(filtered);
+  };
+
+  const addToCart = (product) => {
+    // Check if product is already in cart
+    const existingIndex = cart.findIndex(item => item.id === product._id);
+
+    if (existingIndex >= 0) {
+      // Increase quantity
+      const newCart = [...cart];
+      const newQuantity = newCart[existingIndex].quantity + 1;
+
+      // Check stock for products
+      if (product.type === 'product' && newQuantity > product.stock) {
+        showToast(`Only ${product.stock} units available in stock`, 'error');
+        return;
+      }
+
+      newCart[existingIndex].quantity = newQuantity;
+      newCart[existingIndex].subtotal = product.price * newQuantity;
+      setCart(newCart);
+      showToast(`${product.name} quantity increased`, 'info');
+    } else {
+      // Add new item
+      if (product.type === 'product' && product.stock <= 0) {
+        showToast('Item out of stock', 'error');
+        return;
+      }
+
+      setCart([...cart, {
+        id: product._id,
+        name: product.name,
+        type: product.type,
+        price: product.price,
+        quantity: 1,
+        subtotal: product.price,
+        commission: product.commission,
+        duration: product.duration || null
+      }]);
+      showToast(`${product.name} added to cart`, 'success');
+    }
+  };
+
+  const updateCartQuantity = (index, newQuantity) => {
+    if (newQuantity < 1) {
+      removeFromCart(index);
+      return;
+    }
+
+    const item = cart[index];
+    const product = products.find(p => p._id === item.id);
+
+    // Check stock
+    if (product.type === 'product' && newQuantity > product.stock) {
+      showToast(`Only ${product.stock} units available`, 'error');
+      return;
+    }
+
+    const newCart = [...cart];
+    newCart[index].quantity = newQuantity;
+    newCart[index].subtotal = item.price * newQuantity;
+    setCart(newCart);
+  };
+
+  const removeFromCart = (index) => {
+    const newCart = cart.filter((_, i) => i !== index);
+    setCart(newCart);
+    showToast('Item removed from cart', 'info');
+  };
+
+  const clearCart = () => {
+    if (cart.length === 0) return;
+
+    if (window.confirm('Are you sure you want to clear the cart?')) {
+      setCart([]);
+      showToast('Cart cleared', 'info');
+    }
+  };
+
+  const getCartSubtotal = () => {
+    return cart.reduce((sum, item) => sum + item.subtotal, 0);
+  };
+
+  const getDiscount = () => {
+    const subtotal = getCartSubtotal();
+    if (!discountType) return 0;
+
+    if (discountType === 'senior' || discountType === 'pwd') {
+      return subtotal * 0.2; // 20% discount
+    }
+
+    if (discountType === 'gc' && appliedGC) {
+      // Gift certificate discount - use min of GC balance or cart subtotal
+      return Math.min(appliedGC.balance, subtotal);
+    }
+
+    return discountValue;
+  };
+
+  const getTotal = () => {
+    return getCartSubtotal() - getDiscount();
+  };
+
+  const getChange = () => {
+    if (paymentMethod !== 'Cash') return 0;
+    const received = parseFloat(amountReceived) || 0;
+    return Math.max(0, received - getTotal());
+  };
+
+  const openCheckout = () => {
+    if (cart.length === 0) {
+      showToast('Cart is empty. Add items first.', 'error');
+      return;
+    }
+    setShowCheckout(true);
+  };
+
+  const applyDiscount = (type) => {
+    if (discountType) {
+      showToast('Please clear existing discount first', 'error');
+      return;
+    }
+
+    if (type === 'senior' || type === 'pwd') {
+      setDiscountType(type);
+      showToast(`${type === 'senior' ? 'Senior Citizen' : 'PWD'} discount applied (20%)`, 'success');
+    }
+  };
+
+  const openGCModal = () => {
+    if (discountType) {
+      showToast('Please clear existing discount first', 'error');
+      return;
+    }
+    setGcCode('');
+    setGcValidation(null);
+    setShowGCModal(true);
+  };
+
+  const validateGC = async () => {
+    if (!gcCode.trim()) {
+      showToast('Please enter a gift certificate code', 'error');
+      return;
+    }
+
+    try {
+      const result = await mockApi.giftCertificates.validateGiftCertificate(gcCode.trim());
+      setGcValidation(result);
+
+      if (result.valid) {
+        showToast('Gift certificate is valid!', 'success');
+      } else {
+        showToast(result.message, 'error');
+      }
+    } catch (error) {
+      setGcValidation({ valid: false, message: 'Invalid code' });
+      showToast('Invalid gift certificate code', 'error');
+    }
+  };
+
+  const applyGC = () => {
+    if (!gcValidation || !gcValidation.valid) {
+      showToast('Please validate the gift certificate first', 'error');
+      return;
+    }
+
+    setDiscountType('gc');
+    setAppliedGC(gcValidation.giftCertificate);
+    setShowGCModal(false);
+
+    const discount = Math.min(gcValidation.giftCertificate.balance, getCartSubtotal());
+    showToast(`Gift certificate applied: ₱${discount.toLocaleString()} discount`, 'success');
+  };
+
+  const clearDiscounts = () => {
+    setDiscountType(null);
+    setDiscountValue(0);
+    setAppliedGC(null);
+    setGcValidation(null);
+    showToast('Discounts cleared', 'info');
+  };
+
+  const validateCheckout = () => {
+    const errors = [];
+
+    if (!selectedEmployee) {
+      errors.push('Please select an employee');
+    }
+
+    if (!paymentMethod) {
+      errors.push('Please select a payment method');
+    }
+
+    if (paymentMethod === 'Cash') {
+      const received = parseFloat(amountReceived) || 0;
+      if (received < getTotal()) {
+        errors.push('Amount received must be at least equal to total');
+      }
+    }
+
+    if (errors.length > 0) {
+      showToast(errors[0], 'error');
+      return false;
+    }
+
+    return true;
+  };
+
+  const processCheckout = async () => {
+    if (!validateCheckout()) return;
+
+    setCheckoutLoading(true);
+
+    try {
+      const employee = employees.find(e => e._id === selectedEmployee);
+
+      // If advance booking is enabled, create booking instead of transaction
+      if (isAdvanceBooking && advanceBookingData) {
+        // Validate advance booking data
+        if (!advanceBookingData.bookingDateTime) {
+          showToast('Please select booking date and time', 'error');
+          setCheckoutLoading(false);
+          return;
+        }
+
+        if (!advanceBookingData.clientName) {
+          showToast('Please enter client name', 'error');
+          setCheckoutLoading(false);
+          return;
+        }
+
+        if (advanceBookingData.isHomeService && !advanceBookingData.clientAddress) {
+          showToast('Please enter client address for home service', 'error');
+          setCheckoutLoading(false);
+          return;
+        }
+
+        if (!advanceBookingData.isHomeService && !advanceBookingData.roomId) {
+          showToast('Please select a room', 'error');
+          setCheckoutLoading(false);
+          return;
+        }
+
+        // Generate transaction ID
+        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const sequence = Math.floor(Math.random() * 9999) + 1;
+        const transactionId = `txn_adv_${today}_${sequence.toString().padStart(4, '0')}`;
+
+        // Get room details if applicable
+        let roomName = null;
+        if (advanceBookingData.roomId) {
+          const room = rooms.find(r => r._id === advanceBookingData.roomId);
+          roomName = room ? room.name : null;
+        }
+
+        // Build service name from cart items
+        const serviceName = cart.map(item => item.name).join(' + ');
+
+        // Calculate total duration (estimated from cart items)
+        const estimatedDuration = cart.reduce((total, item) => {
+          // Assume services take 60 minutes each by default
+          return total + (item.type === 'service' ? 60 * item.quantity : 0);
+        }, 0);
+
+        // Create advance booking
+        const bookingData = {
+          bookingDateTime: advanceBookingData.bookingDateTime,
+          employeeId: employee._id,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+          serviceName: serviceName,
+          estimatedDuration: estimatedDuration || 60,
+          servicePrice: getTotal(),
+          roomId: advanceBookingData.roomId || null,
+          roomName: roomName,
+          isHomeService: advanceBookingData.isHomeService,
+          clientName: advanceBookingData.clientName,
+          clientPhone: advanceBookingData.clientPhone || null,
+          clientEmail: advanceBookingData.clientEmail || null,
+          clientAddress: advanceBookingData.clientAddress || null,
+          paymentMethod: paymentMethod,
+          paymentTiming: advanceBookingData.paymentTiming,
+          paymentStatus: advanceBookingData.paymentTiming === 'pay-now' ? 'paid' : 'pending',
+          transactionId: transactionId,
+          status: 'scheduled',
+          specialRequests: advanceBookingData.specialRequests || null
+        };
+
+        await mockApi.advanceBooking.createAdvanceBooking(bookingData);
+        showToast('Advance booking created successfully!', 'success');
+
+      } else {
+        // Regular checkout (immediate transaction)
+        // Generate receipt number
+        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const sequence = Math.floor(Math.random() * 9999) + 1;
+        const receiptNumber = `RCP-${today}-${sequence.toString().padStart(4, '0')}`;
+
+        // Calculate commission
+        const commissionAmount = cart.reduce((sum, item) => {
+          const commission = item.commission.type === 'percentage'
+            ? (item.subtotal * item.commission.value / 100)
+            : item.commission.value;
+          return sum + commission;
+        }, 0);
+
+        // Build transaction
+        const transaction = {
+          businessId: 'biz_001',
+          receiptNumber,
+          date: new Date().toISOString(),
+          items: cart.map(item => ({
+            id: item.id,
+            name: item.name,
+            type: item.type,
+            price: item.price,
+            quantity: item.quantity,
+            subtotal: item.subtotal
+          })),
+          subtotal: getCartSubtotal(),
+          discount: getDiscount(),
+          discountType: discountType,
+          tax: 0,
+          totalAmount: getTotal(),
+          paymentMethod: paymentMethod,
+          amountReceived: paymentMethod === 'Cash' ? parseFloat(amountReceived) : getTotal(),
+          change: getChange(),
+          cardTransactionId: cardTransactionId || null,
+          gcashReference: gcashReference || null,
+          employee: {
+            id: employee._id,
+            name: `${employee.firstName} ${employee.lastName}`,
+            position: employee.position,
+            commission: commissionAmount
+          },
+          customer: customerType === 'walk-in'
+            ? { name: 'Walk-in' }
+            : selectedCustomer
+              ? {
+                  id: selectedCustomer._id,
+                  name: selectedCustomer.name,
+                  phone: selectedCustomer.phone,
+                  email: selectedCustomer.email
+                }
+              : { name: 'Walk-in' },
+          bookingSource: bookingSource,
+          status: 'completed'
+        };
+
+        // Save transaction
+        await mockApi.transactions.createTransaction(transaction);
+
+        // If gift certificate was used, redeem it
+        if (discountType === 'gc' && appliedGC) {
+          try {
+            const gcDiscount = getDiscount();
+            await mockApi.giftCertificates.redeemGiftCertificate(appliedGC._id, gcDiscount);
+          } catch (error) {
+            console.error('Failed to redeem gift certificate:', error);
+            // Continue anyway - transaction already saved
+          }
+        }
+
+        showToast('Transaction completed successfully!', 'success');
+      }
+
+      // Reset everything
+      setCart([]);
+      setShowCheckout(false);
+      resetCheckoutForm();
+
+      // Reload products (for updated stock)
+      loadPOSData();
+
+    } catch (error) {
+      showToast('Failed to process transaction', 'error');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  const resetCheckoutForm = () => {
+    setSelectedEmployee(null);
+    setSelectedCustomer(null);
+    setCustomerType('walk-in');
+    setIsAdvanceBooking(false);
+    setAdvanceBookingData(null);
+    setPaymentMethod('');
+    setAmountReceived('');
+    setCardTransactionId('');
+    setGcashReference('');
+    setDiscountType(null);
+    setDiscountValue(0);
+    setAppliedGC(null);
+    setGcValidation(null);
+    setGcCode('');
+    setBookingSource('Walk-in');
+  };
+
+  if (loading) {
+    return (
+      <div className="page-loading">
+        <div className="spinner"></div>
+        <p>Loading POS...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pos-page">
+      <div className="pos-container">
+        {/* Left Panel - Products */}
+        <div className="pos-products-panel">
+          {/* Search Bar */}
+          <div className="pos-search">
+            <input
+              type="text"
+              placeholder="Search products and services..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pos-search-input"
+            />
+          </div>
+
+          {/* Category Filters */}
+          <div className="pos-categories">
+            <button
+              className={`category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
+              onClick={() => setSelectedCategory('all')}
+            >
+              All
+            </button>
+            {categories.map(category => (
+              <button
+                key={category}
+                className={`category-btn ${selectedCategory === category ? 'active' : ''}`}
+                onClick={() => setSelectedCategory(category)}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+
+          {/* Products Grid */}
+          <div className="pos-products-grid">
+            {filteredProducts.length === 0 ? (
+              <div className="empty-state">
+                <p>No products found</p>
+              </div>
+            ) : (
+              filteredProducts.map(product => (
+                <div
+                  key={product._id}
+                  className="product-card"
+                  onClick={() => addToCart(product)}
+                >
+                  <div className="product-category-badge">{product.category}</div>
+                  <h4 className="product-name">{product.name}</h4>
+                  <p className="product-price">₱{product.price.toLocaleString()}</p>
+                  {product.type === 'service' && product.duration && (
+                    <p className="product-duration">{product.duration} min</p>
+                  )}
+                  {product.type === 'product' && (
+                    <p className="product-stock">
+                      Stock: {product.stock}
+                      {product.stock <= product.lowStockAlert && (
+                        <span className="low-stock-badge">Low</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel - Cart */}
+        <div className="pos-cart-panel">
+          <div className="cart-header">
+            <h3>Shopping Cart</h3>
+            <span className="cart-count">{cart.length} items</span>
+          </div>
+
+          <div className="cart-items">
+            {cart.length === 0 ? (
+              <div className="empty-cart">
+                <p>🛒</p>
+                <p>Your cart is empty</p>
+                <p className="empty-cart-subtitle">Add items to get started</p>
+              </div>
+            ) : (
+              cart.map((item, index) => (
+                <div key={index} className="cart-item">
+                  <div className="cart-item-details">
+                    <h4>{item.name}</h4>
+                    <p className="cart-item-price">₱{item.price.toLocaleString()}</p>
+                  </div>
+                  <div className="cart-item-controls">
+                    <button
+                      className="qty-btn"
+                      onClick={() => updateCartQuantity(index, item.quantity - 1)}
+                    >
+                      −
+                    </button>
+                    <span className="qty-display">{item.quantity}</span>
+                    <button
+                      className="qty-btn"
+                      onClick={() => updateCartQuantity(index, item.quantity + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="cart-item-total">
+                    <p>₱{item.subtotal.toLocaleString()}</p>
+                    <button
+                      className="remove-btn"
+                      onClick={() => removeFromCart(index)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {cart.length > 0 && (
+            <>
+              <div className="cart-summary">
+                <div className="summary-row">
+                  <span>Subtotal:</span>
+                  <span>₱{getCartSubtotal().toLocaleString()}</span>
+                </div>
+                {discountType && (
+                  <div className="summary-row discount">
+                    <span>Discount ({
+                      discountType === 'senior' ? 'Senior' :
+                      discountType === 'pwd' ? 'PWD' :
+                      discountType === 'gc' ? `GC ${appliedGC?.code}` :
+                      'Promo'
+                    }):</span>
+                    <span>-₱{getDiscount().toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="summary-row total">
+                  <span>Total:</span>
+                  <span>₱{getTotal().toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="cart-actions">
+                <button className="btn btn-secondary btn-block" onClick={clearCart}>
+                  Clear Cart
+                </button>
+                <button className="btn btn-primary btn-block" onClick={openCheckout}>
+                  Checkout
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Checkout Modal */}
+      {showCheckout && (
+        <div className="modal-overlay" onClick={() => setShowCheckout(false)}>
+          <div className="modal checkout-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Checkout</h2>
+              <button className="modal-close" onClick={() => setShowCheckout(false)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* Cart Summary */}
+              <div className="checkout-section">
+                <h4>📋 Cart Summary</h4>
+                <div className="checkout-cart-summary">
+                  {cart.map((item, index) => (
+                    <div key={index} className="checkout-item">
+                      <span>{item.name} x{item.quantity}</span>
+                      <span>₱{item.subtotal.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div className="checkout-total">
+                    <strong>Subtotal:</strong>
+                    <strong>₱{getCartSubtotal().toLocaleString()}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Employee Selection */}
+              <div className="checkout-section">
+                <h4>👤 Select Employee *</h4>
+                <select
+                  value={selectedEmployee || ''}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  className="form-control"
+                  required
+                >
+                  <option value="">Select employee...</option>
+                  {employees.map(emp => (
+                    <option key={emp._id} value={emp._id}>
+                      {emp.firstName} {emp.lastName} - {emp.position}
+                    </option>
+                  ))}
+                </select>
+                {selectedEmployee && (
+                  <p className="employee-commission">
+                    Commission: {employees.find(e => e._id === selectedEmployee)?.commission.value}
+                    {employees.find(e => e._id === selectedEmployee)?.commission.type === 'percentage' ? '%' : ' PHP'}
+                  </p>
+                )}
+              </div>
+
+              {/* Customer Selection */}
+              <div className="checkout-section">
+                <h4>👥 Customer</h4>
+                <div className="customer-type-selector">
+                  <label>
+                    <input
+                      type="radio"
+                      value="walk-in"
+                      checked={customerType === 'walk-in'}
+                      onChange={(e) => setCustomerType(e.target.value)}
+                    />
+                    Walk-in
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      value="existing"
+                      checked={customerType === 'existing'}
+                      onChange={(e) => setCustomerType(e.target.value)}
+                    />
+                    Existing Customer
+                  </label>
+                </div>
+                {customerType === 'existing' && (
+                  <select
+                    value={selectedCustomer?._id || ''}
+                    onChange={(e) => setSelectedCustomer(customers.find(c => c._id === e.target.value))}
+                    className="form-control"
+                  >
+                    <option value="">Select customer...</option>
+                    {customers.map(customer => (
+                      <option key={customer._id} value={customer._id}>
+                        {customer.name} - {customer.phone}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Payment Method */}
+              <div className="checkout-section">
+                <h4>💳 Payment Method *</h4>
+                <div className="payment-methods">
+                  <button
+                    className={`payment-btn ${paymentMethod === 'Cash' ? 'active' : ''}`}
+                    onClick={() => setPaymentMethod('Cash')}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    className={`payment-btn ${paymentMethod === 'Card' ? 'active' : ''}`}
+                    onClick={() => setPaymentMethod('Card')}
+                  >
+                    Card
+                  </button>
+                  <button
+                    className={`payment-btn ${paymentMethod === 'GCash' ? 'active' : ''}`}
+                    onClick={() => setPaymentMethod('GCash')}
+                  >
+                    GCash
+                  </button>
+                </div>
+
+                {paymentMethod === 'Cash' && (
+                  <div className="payment-details">
+                    <label>Amount Received:</label>
+                    <input
+                      type="number"
+                      value={amountReceived}
+                      onChange={(e) => setAmountReceived(e.target.value)}
+                      placeholder="Enter amount"
+                      className="form-control"
+                    />
+                    <div className="change-display">
+                      <span>Change:</span>
+                      <span className={getChange() < 0 ? 'negative' : 'positive'}>
+                        ₱{getChange().toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === 'Card' && (
+                  <div className="payment-details">
+                    <label>Card Transaction ID (Optional):</label>
+                    <input
+                      type="text"
+                      value={cardTransactionId}
+                      onChange={(e) => setCardTransactionId(e.target.value)}
+                      placeholder="Enter transaction ID"
+                      className="form-control"
+                    />
+                  </div>
+                )}
+
+                {paymentMethod === 'GCash' && (
+                  <div className="payment-details">
+                    <label>GCash Reference # (Optional):</label>
+                    <input
+                      type="text"
+                      value={gcashReference}
+                      onChange={(e) => setGcashReference(e.target.value)}
+                      placeholder="Enter reference number"
+                      className="form-control"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Discounts */}
+              <div className="checkout-section">
+                <h4>🎟️ Discounts</h4>
+                <div className="discount-buttons">
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => applyDiscount('senior')}
+                    disabled={discountType !== null}
+                  >
+                    Senior (20%)
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => applyDiscount('pwd')}
+                    disabled={discountType !== null}
+                  >
+                    PWD (20%)
+                  </button>
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={openGCModal}
+                    disabled={discountType !== null}
+                  >
+                    🎁 Gift Certificate
+                  </button>
+                  {discountType && (
+                    <button className="btn btn-secondary btn-sm" onClick={clearDiscounts}>
+                      Clear Discounts
+                    </button>
+                  )}
+                </div>
+                {discountType && (
+                  <p className="discount-applied">
+                    ✓ {
+                      discountType === 'senior' ? 'Senior Citizen' :
+                      discountType === 'pwd' ? 'PWD' :
+                      discountType === 'gc' ? `Gift Certificate (${appliedGC?.code})` :
+                      'Discount'
+                    } applied (-₱{getDiscount().toLocaleString()})
+                  </p>
+                )}
+              </div>
+
+              {/* Booking Source */}
+              <div className="checkout-section">
+                <h4>📊 Booking Source</h4>
+                <select
+                  value={bookingSource}
+                  onChange={(e) => setBookingSource(e.target.value)}
+                  className="form-control"
+                >
+                  <option>Walk-in</option>
+                  <option>Phone</option>
+                  <option>Facebook</option>
+                  <option>Instagram</option>
+                  <option>Website</option>
+                  <option>Referral</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              {/* Advance Booking Section */}
+              <AdvanceBookingCheckout
+                enabled={isAdvanceBooking}
+                onToggle={setIsAdvanceBooking}
+                value={advanceBookingData}
+                onChange={setAdvanceBookingData}
+                employees={employees}
+                rooms={rooms}
+              />
+
+              {/* Final Total */}
+              <div className="checkout-section final-total">
+                <h3>💰 Total to Pay</h3>
+                <h2>₱{getTotal().toLocaleString()}</h2>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowCheckout(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={processCheckout}
+                disabled={checkoutLoading}
+              >
+                {checkoutLoading ? (
+                  <>
+                    <span className="spinner-small"></span>
+                    Processing...
+                  </>
+                ) : (
+                  'Confirm Checkout'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gift Certificate Validation Modal */}
+      {showGCModal && (
+        <div className="modal-overlay" onClick={() => setShowGCModal(false)}>
+          <div className="modal gc-validate-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Apply Gift Certificate</h2>
+              <button className="modal-close" onClick={() => setShowGCModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Gift Certificate Code *</label>
+                <input
+                  type="text"
+                  value={gcCode}
+                  onChange={(e) => setGcCode(e.target.value.toUpperCase())}
+                  placeholder="ENTER CODE"
+                  className="form-control"
+                  maxLength="12"
+                  style={{ textAlign: 'center', fontSize: '1.2rem', letterSpacing: '2px' }}
+                />
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={validateGC}
+                style={{ width: '100%', marginTop: 'var(--spacing-md)' }}
+              >
+                Validate Code
+              </button>
+
+              {gcValidation && (
+                <div className={`gc-validation-result ${gcValidation.valid ? 'valid' : 'invalid'}`}
+                  style={{
+                    marginTop: 'var(--spacing-lg)',
+                    padding: 'var(--spacing-lg)',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: gcValidation.valid ? 'var(--success-light)' : 'var(--error-light)',
+                    border: `2px solid ${gcValidation.valid ? 'var(--success)' : 'var(--error)'}`,
+                    textAlign: 'center'
+                  }}
+                >
+                  <div style={{ fontSize: '2rem', marginBottom: 'var(--spacing-sm)' }}>
+                    {gcValidation.valid ? '✓' : '✕'}
+                  </div>
+                  <div style={{ fontWeight: 600, marginBottom: 'var(--spacing-sm)' }}>
+                    {gcValidation.message}
+                  </div>
+                  {gcValidation.valid && gcValidation.giftCertificate && (
+                    <div style={{ marginTop: 'var(--spacing-md)', textAlign: 'left' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0' }}>
+                        <span>Code:</span>
+                        <span style={{ fontWeight: 600 }}>{gcValidation.giftCertificate.code}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0' }}>
+                        <span>Balance:</span>
+                        <span style={{ fontWeight: 700, color: 'var(--success)' }}>
+                          ₱{gcValidation.giftCertificate.balance.toLocaleString()}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0' }}>
+                        <span>Original Amount:</span>
+                        <span>₱{gcValidation.giftCertificate.amount.toLocaleString()}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0' }}>
+                        <span>Discount to Apply:</span>
+                        <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                          ₱{Math.min(gcValidation.giftCertificate.balance, getCartSubtotal()).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowGCModal(false)}>
+                Cancel
+              </button>
+              {gcValidation && gcValidation.valid && (
+                <button className="btn btn-primary" onClick={applyGC}>
+                  Apply Gift Certificate
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default POS;

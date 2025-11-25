@@ -1,0 +1,21 @@
+# Netlify Configuration for DEMO SPA ERP 2
+
+[build]
+  # Build command
+  command = "npm run build"
+
+  # Publish directory (Vite outputs to 'dist')
+  publish = "dist"
+
+  # Base directory - leave empty since package.json is at root
+  base = ""
+
+# Redirect all requests to index.html for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Build environment settings
+[build.environment]
+  NODE_VERSION = "18"

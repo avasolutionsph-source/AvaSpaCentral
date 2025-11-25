@@ -210,50 +210,91 @@ const Products = () => {
       <div className="products-grid">
         {filteredProducts.length === 0 ? (
           <div className="empty-state">
-            <p>No products found</p>
+            <div className="empty-icon">📦</div>
+            <h3>No products found</h3>
+            <p>Try adjusting your filters or search term</p>
             {canEdit() && (
-              <button className="btn btn-primary" onClick={openCreateModal}>Add Your First Product</button>
+              <button className="btn btn-primary" onClick={openCreateModal}>+ Add Your First Product</button>
             )}
           </div>
         ) : (
           filteredProducts.map(product => (
             <div key={product._id} className={`product-item-card ${!product.active ? 'inactive' : ''}`}>
-              <div className="product-header">
-                <div className="product-type-badge">{product.type}</div>
-                <div className="product-status-badge">{product.active ? '✓ Active' : '✕ Inactive'}</div>
+              {/* Quick Status Indicator */}
+              <div className="product-quick-status">
+                <span className={`status-dot ${product.active ? 'active' : 'inactive'}`}></span>
+                <span className="product-type-badge">{product.type.toUpperCase()}</span>
               </div>
-              <h3 className="product-title">{product.name}</h3>
-              <p className="product-category">{product.category}</p>
-              <div className="product-details">
-                <div className="detail-row">
-                  <span className="label">Price:</span>
-                  <span className="value price">₱{product.price.toLocaleString()}</span>
+
+              {/* Main Content */}
+              <div className="product-main-content">
+                <h3 className="product-title">{product.name}</h3>
+                <p className="product-category">{product.category}</p>
+
+                {/* Key Info - Large and Prominent */}
+                <div className="product-price-section">
+                  <span className="price-label">Price</span>
+                  <span className="price-value">₱{product.price.toLocaleString()}</span>
                 </div>
-                {product.type === 'service' && product.duration && (
-                  <div className="detail-row"><span className="label">Duration:</span><span className="value">{product.duration} min</span></div>
-                )}
-                {product.type === 'product' && (
-                  <>
-                    <div className="detail-row"><span className="label">Cost:</span><span className="value">₱{product.cost?.toLocaleString() || 0}</span></div>
-                    <div className="detail-row">
-                      <span className="label">Stock:</span>
-                      <span className={`value ${product.stock <= product.lowStockAlert ? 'low-stock' : ''}`}>
-                        {product.stock}{product.stock <= product.lowStockAlert && ' ⚠️'}
-                      </span>
+
+                {/* Secondary Info - Compact Grid */}
+                <div className="product-meta-grid">
+                  {product.type === 'service' && product.duration && (
+                    <div className="meta-item">
+                      <span className="meta-icon">⏱️</span>
+                      <span className="meta-text">{product.duration} min</span>
                     </div>
-                  </>
-                )}
-                <div className="detail-row">
-                  <span className="label">Commission:</span>
-                  <span className="value">{product.commission.value}{product.commission.type === 'percentage' ? '%' : ' PHP'}</span>
+                  )}
+                  {product.type === 'product' && (
+                    <>
+                      <div className="meta-item">
+                        <span className="meta-icon">📦</span>
+                        <span className={`meta-text ${product.stock <= product.lowStockAlert ? 'stock-warning' : ''}`}>
+                          {product.stock} {product.stock <= product.lowStockAlert && '⚠️'}
+                        </span>
+                      </div>
+                      <div className="meta-item">
+                        <span className="meta-icon">💰</span>
+                        <span className="meta-text">Cost: ₱{product.cost?.toLocaleString() || 0}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="meta-item">
+                    <span className="meta-icon">💵</span>
+                    <span className="meta-text">
+                      {product.commission.value}{product.commission.type === 'percentage' ? '%' : 'PHP'} comm.
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* Actions - More Prominent */}
               {canEdit() && (
-                <div className="product-actions">
-                  <button className="btn btn-sm btn-secondary" onClick={() => openEditModal(product)}>Edit</button>
-                  <button className={`btn btn-sm ${product.active ? 'btn-warning' : 'btn-success'}`}
-                    onClick={() => handleToggleStatus(product)}>{product.active ? 'Deactivate' : 'Activate'}</button>
-                  <button className="btn btn-sm btn-error" onClick={() => handleDelete(product)}>Delete</button>
+                <div className="product-actions-enhanced">
+                  <button
+                    className="action-btn edit-btn"
+                    onClick={() => openEditModal(product)}
+                    title="Edit product"
+                  >
+                    <span className="btn-icon">✏️</span>
+                    <span className="btn-text">Edit</span>
+                  </button>
+                  <button
+                    className={`action-btn ${product.active ? 'deactivate-btn' : 'activate-btn'}`}
+                    onClick={() => handleToggleStatus(product)}
+                    title={product.active ? 'Deactivate' : 'Activate'}
+                  >
+                    <span className="btn-icon">{product.active ? '⏸️' : '▶️'}</span>
+                    <span className="btn-text">{product.active ? 'Pause' : 'Activate'}</span>
+                  </button>
+                  <button
+                    className="action-btn delete-btn"
+                    onClick={() => handleDelete(product)}
+                    title="Delete product"
+                  >
+                    <span className="btn-icon">🗑️</span>
+                    <span className="btn-text">Delete</span>
+                  </button>
                 </div>
               )}
             </div>

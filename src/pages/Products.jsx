@@ -219,81 +219,68 @@ const Products = () => {
           </div>
         ) : (
           filteredProducts.map(product => (
-            <div key={product._id} className={`product-item-card ${!product.active ? 'inactive' : ''}`}>
-              {/* Quick Status Indicator */}
-              <div className="product-quick-status">
-                <span className={`status-dot ${product.active ? 'active' : 'inactive'}`}></span>
-                <span className="product-type-badge">{product.type.toUpperCase()}</span>
+            <div key={product._id} className={`product-card-compact ${!product.active ? 'inactive' : ''}`}>
+              {/* Header Row - Status, Title, Type Badge */}
+              <div className="product-card-header">
+                <div className="product-header-left">
+                  <span className={`status-dot ${product.active ? 'active' : 'inactive'}`}></span>
+                  <h3 className="product-name">{product.name}</h3>
+                </div>
+                <span className="type-badge">{product.type.toUpperCase()}</span>
               </div>
 
-              {/* Main Content */}
-              <div className="product-main-content">
-                <h3 className="product-title">{product.name}</h3>
-                <p className="product-category">{product.category}</p>
-
-                {/* Key Info - Large and Prominent */}
-                <div className="product-price-section">
-                  <span className="price-label">Price</span>
-                  <span className="price-value">₱{product.price.toLocaleString()}</span>
+              {/* Body - Price and Info in Compact Rows */}
+              <div className="product-card-body">
+                <div className="product-info-row">
+                  <span className="info-label">Category:</span>
+                  <span className="info-value">{product.category}</span>
+                  <span className="info-label">Price:</span>
+                  <span className="info-value price-highlight">₱{product.price.toLocaleString()}</span>
                 </div>
 
-                {/* Secondary Info - Compact Grid */}
-                <div className="product-meta-grid">
+                <div className="product-info-row">
                   {product.type === 'service' && product.duration && (
-                    <div className="meta-item">
-                      <span className="meta-icon">⏱️</span>
-                      <span className="meta-text">{product.duration} min</span>
-                    </div>
+                    <>
+                      <span className="info-tag">⏱️ {product.duration}m</span>
+                    </>
                   )}
                   {product.type === 'product' && (
                     <>
-                      <div className="meta-item">
-                        <span className="meta-icon">📦</span>
-                        <span className={`meta-text ${product.stock <= product.lowStockAlert ? 'stock-warning' : ''}`}>
-                          {product.stock} {product.stock <= product.lowStockAlert && '⚠️'}
-                        </span>
-                      </div>
-                      <div className="meta-item">
-                        <span className="meta-icon">💰</span>
-                        <span className="meta-text">Cost: ₱{product.cost?.toLocaleString() || 0}</span>
-                      </div>
+                      <span className={`info-tag ${product.stock <= product.lowStockAlert ? 'stock-warning' : ''}`}>
+                        📦 {product.stock} {product.stock <= product.lowStockAlert && '⚠️'}
+                      </span>
+                      <span className="info-tag">💰 ₱{product.cost?.toLocaleString() || 0}</span>
                     </>
                   )}
-                  <div className="meta-item">
-                    <span className="meta-icon">💵</span>
-                    <span className="meta-text">
-                      {product.commission.value}{product.commission.type === 'percentage' ? '%' : 'PHP'} comm.
-                    </span>
-                  </div>
+                  <span className="info-tag">
+                    💵 {product.commission.value}{product.commission.type === 'percentage' ? '%' : 'PHP'}
+                  </span>
                 </div>
               </div>
 
-              {/* Actions - More Prominent */}
+              {/* Actions - Icon Buttons */}
               {canEdit() && (
-                <div className="product-actions-enhanced">
+                <div className="product-card-actions">
                   <button
-                    className="action-btn edit-btn"
+                    className="action-icon-btn edit-btn"
                     onClick={() => openEditModal(product)}
                     title="Edit product"
                   >
-                    <span className="btn-icon">✏️</span>
-                    <span className="btn-text">Edit</span>
+                    ✏️
                   </button>
                   <button
-                    className={`action-btn ${product.active ? 'deactivate-btn' : 'activate-btn'}`}
+                    className={`action-icon-btn ${product.active ? 'pause-btn' : 'activate-btn'}`}
                     onClick={() => handleToggleStatus(product)}
                     title={product.active ? 'Deactivate' : 'Activate'}
                   >
-                    <span className="btn-icon">{product.active ? '⏸️' : '▶️'}</span>
-                    <span className="btn-text">{product.active ? 'Pause' : 'Activate'}</span>
+                    {product.active ? '⏸️' : '▶️'}
                   </button>
                   <button
-                    className="action-btn delete-btn"
+                    className="action-icon-btn delete-btn"
                     onClick={() => handleDelete(product)}
                     title="Delete product"
                   >
-                    <span className="btn-icon">🗑️</span>
-                    <span className="btn-text">Delete</span>
+                    🗑️
                   </button>
                 </div>
               )}

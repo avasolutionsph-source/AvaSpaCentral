@@ -149,143 +149,280 @@ const Dashboard = () => {
   const generateAIInsights = (kpiData, transactions, products, rooms, pendingRevenueData, todaysBookingsCount) => {
     const insights = [];
 
-    // Revenue Performance Insight
+    // 1. Revenue Performance & Trend Analysis
     const revenueGrowth = ((kpiData.financial.weekRevenue / 7) / dailyGoal) * 100;
+    const monthlyProjection = (kpiData.financial.weekRevenue / 7) * 30;
+
     if (revenueGrowth >= 120) {
       insights.push({
         id: 'revenue_excellent',
         type: 'success',
         icon: '📈',
-        title: 'Excellent Revenue Performance',
-        message: `Your average daily revenue is ${revenueGrowth.toFixed(0)}% of your goal. Keep up the great work!`,
-        action: 'View Reports',
+        title: 'Outstanding Revenue Performance',
+        message: `Your average daily revenue is ${revenueGrowth.toFixed(0)}% of goal (₱${(kpiData.financial.weekRevenue / 7).toLocaleString(undefined, { maximumFractionDigits: 0 })}). Monthly projection: ₱${monthlyProjection.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+        action: 'View Detailed Analytics',
+        actionLink: '/ai-insights',
+        priority: 1,
+        metric: `+${(revenueGrowth - 100).toFixed(0)}%`
+      });
+    } else if (revenueGrowth >= 90 && revenueGrowth < 120) {
+      insights.push({
+        id: 'revenue_good',
+        type: 'success',
+        icon: '✅',
+        title: 'Revenue On Track',
+        message: `Averaging ${revenueGrowth.toFixed(0)}% of daily goal. On pace for ₱${monthlyProjection.toLocaleString(undefined, { maximumFractionDigits: 0 })} this month.`,
+        action: 'View Trends',
         actionLink: '/reports',
-        priority: 1
+        priority: 2,
+        metric: `${revenueGrowth.toFixed(0)}%`
       });
     } else if (revenueGrowth < 70) {
       insights.push({
         id: 'revenue_low',
         type: 'warning',
         icon: '📉',
-        title: 'Revenue Below Target',
-        message: `Average daily revenue is only ${revenueGrowth.toFixed(0)}% of goal. Consider promotional campaigns or service bundles.`,
-        action: 'Create Promotion',
+        title: 'Revenue Recovery Needed',
+        message: `Daily average is ${revenueGrowth.toFixed(0)}% of goal. Shortfall risk: ₱${((dailyGoal * 30) - monthlyProjection).toLocaleString(undefined, { maximumFractionDigits: 0 })} this month.`,
+        action: 'Launch Campaign',
         actionLink: '/products',
-        priority: 2
+        priority: 1,
+        metric: `-${(100 - revenueGrowth).toFixed(0)}%`
       });
     }
 
-    // Room Utilization Insight
+    // 2. Customer Value & Retention Analysis
+    const avgTransaction = kpiData.financial.avgTransaction;
+    const transactionCount = transactions.length;
+    const potentialRevenue = (avgTransaction * 0.3) * transactionCount; // 30% increase potential
+
+    if (avgTransaction < 1200) {
+      insights.push({
+        id: 'upsell_opportunity',
+        type: 'info',
+        icon: '💎',
+        title: 'High-Value Upsell Opportunity',
+        message: `Average ticket is ₱${avgTransaction.toLocaleString()}. A 30% increase could generate ₱${potentialRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} more revenue daily.`,
+        action: 'Create Bundles',
+        actionLink: '/products',
+        priority: 2,
+        metric: `₱${avgTransaction.toLocaleString()}`
+      });
+    } else {
+      insights.push({
+        id: 'premium_customers',
+        type: 'success',
+        icon: '👑',
+        title: 'Premium Customer Base',
+        message: `Strong average ticket of ₱${avgTransaction.toLocaleString()}. Focus on retention and referral programs.`,
+        action: 'View Top Customers',
+        actionLink: '/customers',
+        priority: 3,
+        metric: `₱${avgTransaction.toLocaleString()}`
+      });
+    }
+
+    // 3. Operational Efficiency Insights
     if (kpiData.operational.roomUtilization < 40) {
+      const unutilizedCapacity = 100 - kpiData.operational.roomUtilization;
       insights.push({
         id: 'low_utilization',
-        type: 'info',
+        type: 'warning',
         icon: '🏠',
-        title: 'Low Room Utilization',
-        message: `Only ${kpiData.operational.roomUtilization}% of rooms are occupied. Consider offering discounts during off-peak hours.`,
-        action: 'View Rooms',
+        title: 'Capacity Optimization Needed',
+        message: `${unutilizedCapacity}% of room capacity unused. Peak-hour promotions or flexible scheduling could boost revenue by ₱${(dailyGoal * 0.2).toLocaleString(undefined, { maximumFractionDigits: 0 })}/day.`,
+        action: 'Optimize Schedule',
         actionLink: '/rooms',
-        priority: 3
+        priority: 2,
+        metric: `${kpiData.operational.roomUtilization}%`
       });
-    } else if (kpiData.operational.roomUtilization > 80) {
+    } else if (kpiData.operational.roomUtilization > 85) {
       insights.push({
         id: 'high_utilization',
-        type: 'success',
+        type: 'critical',
         icon: '🔥',
-        title: 'High Demand Alert',
-        message: `Room utilization is at ${kpiData.operational.roomUtilization}%. Consider adding more capacity or raising prices.`,
-        action: 'Manage Rooms',
-        actionLink: '/rooms',
-        priority: 1
+        title: 'Peak Capacity - Growth Opportunity',
+        message: `${kpiData.operational.roomUtilization}% utilization indicates strong demand. Consider expansion, premium pricing, or advance booking requirements.`,
+        action: 'Expansion Analysis',
+        actionLink: '/ai-insights',
+        priority: 1,
+        metric: `${kpiData.operational.roomUtilization}%`
       });
     }
 
-    // Inventory Insights
+    // 4. Inventory Management & Cost Control
     if (kpiData.inventory.criticalStock > 0) {
+      const stockValue = kpiData.inventory.criticalStock * 500; // Estimated avg value
       insights.push({
         id: 'critical_stock',
         type: 'critical',
         icon: '⚠️',
-        title: 'Critical Stock Levels',
-        message: `${kpiData.inventory.criticalStock} products are critically low. Order supplies soon to avoid service disruptions.`,
-        action: 'View Inventory',
-        actionLink: '/products',
-        priority: 1
+        title: 'Urgent: Stock Replenishment Required',
+        message: `${kpiData.inventory.criticalStock} products critically low. Service disruption risk affects ~₱${stockValue.toLocaleString()} in potential revenue.`,
+        action: 'Reorder Now',
+        actionLink: '/inventory',
+        priority: 1,
+        metric: `${kpiData.inventory.criticalStock} items`
       });
     }
 
-    // Advance Booking Insight
+    if (kpiData.inventory.lowStockAlerts > 0 && kpiData.inventory.criticalStock === 0) {
+      insights.push({
+        id: 'low_stock_planning',
+        type: 'info',
+        icon: '📦',
+        title: 'Proactive Inventory Planning',
+        message: `${kpiData.inventory.lowStockAlerts} products running low. Schedule reorders within 2 weeks to maintain service quality.`,
+        action: 'Plan Reorders',
+        actionLink: '/inventory',
+        priority: 3,
+        metric: `${kpiData.inventory.lowStockAlerts} items`
+      });
+    }
+
+    // 5. Advance Booking Intelligence
     if (todaysBookingsCount > 5) {
       insights.push({
         id: 'high_bookings',
         type: 'success',
         icon: '📅',
-        title: 'Busy Day Ahead',
-        message: `You have ${todaysBookingsCount} advance bookings scheduled for today. Prepare your team accordingly.`,
+        title: 'High-Volume Day Ahead',
+        message: `${todaysBookingsCount} advance bookings today (₱${(todaysBookingsCount * avgTransaction).toLocaleString(undefined, { maximumFractionDigits: 0 })} projected). Ensure adequate staffing and supplies.`,
         action: 'View Schedule',
         actionLink: '/appointments',
-        priority: 2
+        priority: 2,
+        metric: `${todaysBookingsCount} bookings`
+      });
+    } else if (todaysBookingsCount <= 2 && todaysBookingsCount > 0) {
+      insights.push({
+        id: 'low_bookings',
+        type: 'info',
+        icon: '📱',
+        title: 'Booking Volume Below Average',
+        message: `Only ${todaysBookingsCount} advance bookings. Consider SMS/social media outreach to fill capacity.`,
+        action: 'Boost Marketing',
+        actionLink: '/appointments',
+        priority: 3,
+        metric: `${todaysBookingsCount} bookings`
       });
     }
 
-    // Pending Revenue Opportunity
+    // 6. Revenue Collection & Cash Flow
     if (pendingRevenueData.total > 5000) {
+      const conversionRate = 85; // Assumed conversion rate
+      const expectedCollection = pendingRevenueData.total * (conversionRate / 100);
       insights.push({
         id: 'pending_revenue',
-        type: 'info',
+        type: 'warning',
         icon: '💰',
-        title: 'Pending Revenue Opportunity',
-        message: `₱${pendingRevenueData.total.toLocaleString()} in pay-after bookings. Follow up to ensure collection.`,
-        action: 'View Bookings',
+        title: 'Significant Receivables Pending',
+        message: `₱${pendingRevenueData.total.toLocaleString()} in pay-after bookings. Expected collection: ₱${expectedCollection.toLocaleString(undefined, { maximumFractionDigits: 0 })} (${conversionRate}% rate).`,
+        action: 'Follow Up',
         actionLink: '/appointments',
-        priority: 2
+        priority: 2,
+        metric: `₱${pendingRevenueData.total.toLocaleString()}`
       });
     }
 
-    // Staff Performance Insight
+    // 7. Staff Performance & Productivity
     if (kpiData.staff.lateArrivals > 3) {
+      const productivityImpact = kpiData.staff.lateArrivals * 200; // Estimated cost per late arrival
       insights.push({
         id: 'attendance_issue',
         type: 'warning',
         icon: '⏰',
-        title: 'Attendance Concerns',
-        message: `${kpiData.staff.lateArrivals} late arrivals today. Consider reviewing attendance policies.`,
+        title: 'Punctuality Affecting Service',
+        message: `${kpiData.staff.lateArrivals} late arrivals today (~₱${productivityImpact.toLocaleString()} productivity impact). Review scheduling or incentives.`,
         action: 'View Attendance',
         actionLink: '/attendance',
-        priority: 3
+        priority: 2,
+        metric: `${kpiData.staff.lateArrivals} late`
       });
-    } else if (kpiData.staff.attendanceRate === 100) {
+    } else if (kpiData.staff.attendanceRate === 100 && kpiData.staff.lateArrivals === 0) {
       insights.push({
         id: 'perfect_attendance',
         type: 'success',
         icon: '⭐',
-        title: 'Perfect Attendance',
-        message: 'All employees are present today. Great team dedication!',
-        action: null,
-        actionLink: null,
-        priority: 4
+        title: 'Perfect Team Performance',
+        message: '100% attendance, zero tardiness. Consider team recognition or performance bonuses.',
+        action: 'View Team',
+        actionLink: '/employees',
+        priority: 4,
+        metric: '100%'
       });
     }
 
-    // Service Bundle Recommendation
-    const avgTransaction = kpiData.financial.avgTransaction;
-    if (avgTransaction < 1000) {
+    // 8. Service Performance Analysis (based on transactions)
+    const serviceRevenue = transactions.reduce((sum, t) => sum + t.totalAmount, 0);
+    const revenuePerService = transactionCount > 0 ? serviceRevenue / transactionCount : 0;
+
+    if (revenuePerService > 1500) {
       insights.push({
-        id: 'upsell_opportunity',
+        id: 'premium_services',
+        type: 'success',
+        icon: '💫',
+        title: 'Premium Service Mix',
+        message: `High-value services dominate (₱${revenuePerService.toLocaleString(undefined, { maximumFractionDigits: 0 })}/transaction). Maintain quality and consider luxury add-ons.`,
+        action: 'Analyze Services',
+        actionLink: '/ai-insights',
+        priority: 3,
+        metric: `₱${revenuePerService.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+      });
+    }
+
+    // 9. Time-based Recommendations
+    const currentHour = new Date().getHours();
+    if (currentHour >= 9 && currentHour <= 11 && kpiData.financial.todayRevenue < dailyGoal * 0.2) {
+      insights.push({
+        id: 'morning_boost',
         type: 'info',
-        icon: '💡',
-        title: 'Upsell Opportunity',
-        message: `Average transaction is ₱${avgTransaction.toLocaleString()}. Create service bundles to increase ticket size.`,
-        action: 'Manage Services',
+        icon: '☀️',
+        title: 'Morning Performance Opportunity',
+        message: 'Morning bookings are light. Consider breakfast spa packages or early-bird discounts.',
+        action: 'Create Promotion',
         actionLink: '/products',
-        priority: 3
+        priority: 3,
+        metric: 'Morning'
+      });
+    }
+
+    // 10. Month-end Performance Tracking
+    const today = new Date();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const dayOfMonth = today.getDate();
+    const monthProgress = (dayOfMonth / daysInMonth) * 100;
+    const revenueProgress = (kpiData.financial.monthRevenue / (dailyGoal * daysInMonth)) * 100;
+
+    if (revenueProgress < monthProgress - 10) {
+      insights.push({
+        id: 'month_target_risk',
+        type: 'warning',
+        icon: '📊',
+        title: 'Monthly Target At Risk',
+        message: `${monthProgress.toFixed(0)}% through month, but only ${revenueProgress.toFixed(0)}% of target reached. Gap: ₱${((dailyGoal * daysInMonth) - kpiData.financial.monthRevenue).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+        action: 'Action Plan',
+        actionLink: '/reports',
+        priority: 1,
+        metric: `${revenueProgress.toFixed(0)}%`
+      });
+    } else if (revenueProgress > monthProgress + 10) {
+      insights.push({
+        id: 'month_target_ahead',
+        type: 'success',
+        icon: '🎯',
+        title: 'Ahead of Monthly Target',
+        message: `${revenueProgress.toFixed(0)}% of monthly target achieved (${monthProgress.toFixed(0)}% through month). Surplus: ₱${(kpiData.financial.monthRevenue - (dailyGoal * dayOfMonth)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+        action: 'View Analytics',
+        actionLink: '/ai-insights',
+        priority: 2,
+        metric: `+${(revenueProgress - monthProgress).toFixed(0)}%`
       });
     }
 
     // Sort by priority
     insights.sort((a, b) => a.priority - b.priority);
 
-    setAiInsights(insights.slice(0, 6)); // Show top 6 insights
+    setAiInsights(insights.slice(0, 9)); // Show top 9 insights
   };
 
   const handleSetGoal = async () => {
@@ -651,37 +788,54 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* AI Insights Section */}
+      {/* AI Insights Section - Enhanced */}
       {aiInsights.length > 0 && showAiInsights && (
         <div className="ai-insights-section">
           <div className="ai-insights-header">
             <div>
               <h2>🤖 AI-Powered Business Insights</h2>
-              <p>Smart recommendations based on your business data</p>
+              <p>Real-time intelligence and actionable recommendations</p>
             </div>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => setShowAiInsights(false)}
-            >
-              Hide Insights
-            </button>
+            <div className="ai-header-actions">
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => navigate('/ai-insights')}
+              >
+                View Full Analytics
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowAiInsights(false)}
+              >
+                Hide Insights
+              </button>
+            </div>
           </div>
-          <div className="ai-insights-grid">
+          <div className="ai-insights-grid-enhanced">
             {aiInsights.map((insight) => (
-              <div key={insight.id} className={`ai-insight-card ai-insight-${insight.type}`}>
-                <div className="ai-insight-icon">{insight.icon}</div>
-                <div className="ai-insight-content">
-                  <h4 className="ai-insight-title">{insight.title}</h4>
-                  <p className="ai-insight-message">{insight.message}</p>
+              <div key={insight.id} className={`ai-insight-card-enhanced ai-insight-${insight.type}`}>
+                <div className="ai-insight-header-row">
+                  <div className="ai-insight-icon-large">{insight.icon}</div>
+                  {insight.metric && (
+                    <span className={`ai-insight-metric ai-metric-${insight.type}`}>
+                      {insight.metric}
+                    </span>
+                  )}
+                </div>
+                <div className="ai-insight-content-enhanced">
+                  <h4 className="ai-insight-title-enhanced">{insight.title}</h4>
+                  <p className="ai-insight-message-enhanced">{insight.message}</p>
                   {insight.action && (
                     <button
-                      className="ai-insight-action"
+                      className="ai-insight-action-btn"
                       onClick={() => navigate(insight.actionLink)}
                     >
-                      {insight.action} →
+                      <span>{insight.action}</span>
+                      <span className="action-arrow">→</span>
                     </button>
                   )}
                 </div>
+                <div className={`ai-insight-glow ai-glow-${insight.type}`}></div>
               </div>
             ))}
           </div>

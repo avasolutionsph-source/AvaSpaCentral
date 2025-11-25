@@ -6,11 +6,11 @@ const Settings = () => {
 
   // Business Info
   const [businessInfo, setBusinessInfo] = useState({
-    name: 'Daet Massage & Spa',
-    address: '123 Wellness Street, Daet, Camarines Norte',
+    name: 'Ava Solutions Demo SPA',
+    address: 'Demo Address, Philippines',
     phone: '+63 912 345 6789',
-    email: 'info@daetspa.com',
-    website: 'www.daetspa.com'
+    email: 'info@avasolutions.ph',
+    website: 'www.avasolutions.ph'
   });
 
   // Business Hours
@@ -37,7 +37,7 @@ const Settings = () => {
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || 'Admin',
     lastName: user?.lastName || 'User',
-    email: user?.email || 'admin@daetspa.com',
+    email: user?.email || 'admin@avasolutions.ph',
     phone: '',
     currentPassword: '',
     newPassword: '',
@@ -65,7 +65,7 @@ const Settings = () => {
       id: 1,
       date: '2025-01-25 09:30 AM',
       device: 'Windows 10 - Chrome',
-      location: 'Daet, Camarines Norte',
+      location: 'Philippines',
       ip: '192.168.1.100',
       status: 'Success'
     },
@@ -73,7 +73,7 @@ const Settings = () => {
       id: 2,
       date: '2025-01-24 02:15 PM',
       device: 'iPhone 13 - Safari',
-      location: 'Daet, Camarines Norte',
+      location: 'Philippines',
       ip: '192.168.1.105',
       status: 'Success'
     },
@@ -81,7 +81,7 @@ const Settings = () => {
       id: 3,
       date: '2025-01-24 08:45 AM',
       device: 'Windows 10 - Chrome',
-      location: 'Daet, Camarines Norte',
+      location: 'Philippines',
       ip: '192.168.1.100',
       status: 'Success'
     },
@@ -97,7 +97,7 @@ const Settings = () => {
       id: 5,
       date: '2025-01-23 09:00 AM',
       device: 'Windows 10 - Chrome',
-      location: 'Daet, Camarines Norte',
+      location: 'Philippines',
       ip: '192.168.1.100',
       status: 'Success'
     }

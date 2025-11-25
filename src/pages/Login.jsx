@@ -115,8 +115,8 @@ const Login = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1 className="brand-logo">Daet Massage & Spa</h1>
-          <p className="brand-tagline">Ava Solutions AI Business Assistant</p>
+          <h1 className="brand-logo">Ava Solutions Demo SPA</h1>
+          <p className="brand-tagline">SPA Management System</p>
         </div>
 
         <div className="auth-card">

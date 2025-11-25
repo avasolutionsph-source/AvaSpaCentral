@@ -7,7 +7,7 @@ const AIChatbot = () => {
     {
       id: 1,
       type: 'bot',
-      text: 'Hello! I\'m your AI assistant for Daet Massage & Spa. I can help you with business insights, analytics, and quick actions. How can I assist you today?',
+      text: 'Hello! I\'m your AI assistant for Ava Solutions Demo SPA. I can help you with business insights, analytics, and quick actions. How can I assist you today?',
       timestamp: new Date().toISOString(),
       suggestions: [
         'Show today\'s sales summary',

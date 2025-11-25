@@ -61,7 +61,7 @@ const initializeDemoData = () => {
       clientName: 'John Smith',
       clientPhone: '+63 923 456 7890',
       clientEmail: null,
-      clientAddress: '123 Main St, Daet, Camarines Norte',
+      clientAddress: '123 Main St, Philippines',
       paymentMethod: 'cash',
       paymentTiming: 'pay-after',
       paymentStatus: 'pending',

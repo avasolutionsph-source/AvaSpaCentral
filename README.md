@@ -1,4 +1,4 @@
-# SPA Demo ERP - Daet Massage & Spa Management System
+# SPA Demo ERP - Ava Solutions Demo SPA Management System
 
 **Version:** 3.0.0
 **Brand:** Ava Solutions AI Business Assistant
@@ -259,7 +259,7 @@ For questions or issues:
 
 ## 🎉 Acknowledgments
 
-Built following the complete specification document for the Daet Massage & Spa Management System (Version 3.0.0).
+Built following the complete specification document for the SPA Management System (Version 3.0.0) by Ava Solutions.
 
 ---
 

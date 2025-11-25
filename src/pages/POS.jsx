@@ -725,7 +725,12 @@ const POS = () => {
                       type="radio"
                       value="existing"
                       checked={customerType === 'existing'}
-                      onChange={(e) => setCustomerType(e.target.value)}
+                      onChange={(e) => {
+                        setCustomerType(e.target.value);
+                        // Reset advance booking when switching to existing customer
+                        setIsAdvanceBooking(false);
+                        setAdvanceBookingData(null);
+                      }}
                     />
                     Existing Customer
                   </label>
@@ -877,15 +882,17 @@ const POS = () => {
                 </select>
               </div>
 
-              {/* Advance Booking Section */}
-              <AdvanceBookingCheckout
-                enabled={isAdvanceBooking}
-                onToggle={setIsAdvanceBooking}
-                value={advanceBookingData}
-                onChange={setAdvanceBookingData}
-                employees={employees}
-                rooms={rooms}
-              />
+              {/* Advance Booking Section - Only show for walk-in customers */}
+              {customerType === 'walk-in' && (
+                <AdvanceBookingCheckout
+                  enabled={isAdvanceBooking}
+                  onToggle={setIsAdvanceBooking}
+                  value={advanceBookingData}
+                  onChange={setAdvanceBookingData}
+                  employees={employees}
+                  rooms={rooms}
+                />
+              )}
 
               {/* Final Total */}
               <div className="checkout-section final-total">

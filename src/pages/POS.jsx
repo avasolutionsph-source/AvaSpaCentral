@@ -42,6 +42,14 @@ const POS = () => {
   const [isAdvanceBooking, setIsAdvanceBooking] = useState(false);
   const [advanceBookingData, setAdvanceBookingData] = useState(null);
 
+  // Walk-in customer form state
+  const [walkInCustomerData, setWalkInCustomerData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: ''
+  });
+
   useEffect(() => {
     loadPOSData();
   }, []);
@@ -308,6 +316,25 @@ const POS = () => {
     try {
       const employee = employees.find(e => e._id === selectedEmployee);
 
+      // If walk-in customer with provided info, save customer first
+      let customerData = null;
+      if (customerType === 'walk-in' && walkInCustomerData.name && walkInCustomerData.phone) {
+        try {
+          const newCustomer = await mockApi.customers.createCustomer({
+            name: walkInCustomerData.name.trim(),
+            phone: walkInCustomerData.phone.trim(),
+            email: walkInCustomerData.email.trim() || null,
+            address: walkInCustomerData.address.trim() || null,
+            status: 'active'
+          });
+          customerData = newCustomer;
+          showToast('Customer saved to database', 'success');
+        } catch (error) {
+          console.error('Failed to save customer:', error);
+          // Continue with transaction even if customer save fails
+        }
+      }
+
       // If advance booking is enabled, create booking instead of transaction
       if (isAdvanceBooking && advanceBookingData) {
         // Validate advance booking data
@@ -427,7 +454,14 @@ const POS = () => {
             commission: commissionAmount
           },
           customer: customerType === 'walk-in'
-            ? { name: 'Walk-in' }
+            ? (customerData
+                ? {
+                    id: customerData._id,
+                    name: customerData.name,
+                    phone: customerData.phone,
+                    email: customerData.email
+                  }
+                : { name: 'Walk-in' })
             : selectedCustomer
               ? {
                   id: selectedCustomer._id,
@@ -478,6 +512,7 @@ const POS = () => {
     setCustomerType('walk-in');
     setIsAdvanceBooking(false);
     setAdvanceBookingData(null);
+    setWalkInCustomerData({ name: '', phone: '', email: '', address: '' });
     setPaymentMethod('');
     setAmountReceived('');
     setCardTransactionId('');
@@ -727,19 +762,83 @@ const POS = () => {
                       checked={customerType === 'existing'}
                       onChange={(e) => {
                         setCustomerType(e.target.value);
-                        // Reset advance booking when switching to existing customer
+                        // Reset advance booking and walk-in data when switching to existing customer
                         setIsAdvanceBooking(false);
                         setAdvanceBookingData(null);
+                        setWalkInCustomerData({ name: '', phone: '', email: '', address: '' });
                       }}
                     />
                     Existing Customer
                   </label>
                 </div>
+
+                {/* Walk-in Customer Information Form */}
+                {customerType === 'walk-in' && (
+                  <div className="walk-in-customer-form" style={{
+                    marginTop: 'var(--spacing-md)',
+                    padding: 'var(--spacing-md)',
+                    backgroundColor: 'var(--gray-50)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--gray-200)'
+                  }}>
+                    <p style={{ marginBottom: 'var(--spacing-sm)', fontSize: '0.9rem', color: 'var(--gray-600)' }}>
+                      📝 Customer Information (Optional - will be saved to database)
+                    </p>
+                    <div className="form-group">
+                      <label>Customer Name</label>
+                      <input
+                        type="text"
+                        value={walkInCustomerData.name}
+                        onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, name: e.target.value })}
+                        placeholder="Enter customer name"
+                        className="form-control"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Phone Number</label>
+                      <input
+                        type="tel"
+                        value={walkInCustomerData.phone}
+                        onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, phone: e.target.value })}
+                        placeholder="Enter phone number"
+                        className="form-control"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Email (Optional)</label>
+                      <input
+                        type="email"
+                        value={walkInCustomerData.email}
+                        onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, email: e.target.value })}
+                        placeholder="Enter email address"
+                        className="form-control"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Address (Optional)</label>
+                      <textarea
+                        value={walkInCustomerData.address}
+                        onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, address: e.target.value })}
+                        placeholder="Enter address"
+                        className="form-control"
+                        rows="2"
+                      ></textarea>
+                    </div>
+                    {walkInCustomerData.name && walkInCustomerData.phone && (
+                      <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 500 }}>
+                        ✓ Customer will be saved to database
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Existing Customer Selector */}
                 {customerType === 'existing' && (
                   <select
                     value={selectedCustomer?._id || ''}
                     onChange={(e) => setSelectedCustomer(customers.find(c => c._id === e.target.value))}
                     className="form-control"
+                    style={{ marginTop: 'var(--spacing-md)' }}
                   >
                     <option value="">Select customer...</option>
                     {customers.map(customer => (

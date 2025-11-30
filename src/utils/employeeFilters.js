@@ -4,20 +4,38 @@
  */
 
 /**
+ * Check if employee is active
+ * Supports both 'active' boolean and status: 'active' string formats
+ */
+const isActive = (e) => e.active === true || e.status === 'active';
+
+/**
+ * Check if employee is a service provider (therapist, specialist, etc.)
+ * Matches: Therapist, Senior Therapist, Junior Therapist, Facial Specialist, etc.
+ */
+const isServiceProvider = (e) => {
+  const position = (e.position || '').toLowerCase();
+  return position.includes('therapist') ||
+         position.includes('specialist') ||
+         e.department === 'Massage' ||
+         e.department === 'Facial';
+};
+
+/**
  * Get all active employees
  * @param {Array} employees - Array of employee objects
  * @returns {Array} Active employees only
  */
 export const getActiveEmployees = (employees) =>
-  employees.filter(e => e.active);
+  employees.filter(e => isActive(e));
 
 /**
- * Get active therapists only
+ * Get active therapists/service providers
  * @param {Array} employees - Array of employee objects
- * @returns {Array} Active employees with position === 'Therapist'
+ * @returns {Array} Active employees who provide services
  */
 export const getTherapists = (employees) =>
-  employees.filter(e => e.active && e.position === 'Therapist');
+  employees.filter(e => isActive(e) && isServiceProvider(e));
 
 /**
  * Get employees qualified for a specific service
@@ -29,7 +47,7 @@ export const getEmployeesForService = (employees, service) => {
   if (!service) return getTherapists(employees);
 
   return employees.filter(e => {
-    if (!e.active || e.position !== 'Therapist') return false;
+    if (!isActive(e) || !isServiceProvider(e)) return false;
     // If employee has skills array, check if service category matches
     if (e.skills && e.skills.length > 0) {
       return e.skills.includes(service.category);
@@ -61,4 +79,4 @@ export const getAllForAttendance = (employees) =>
  * @returns {Array} Active employees only
  */
 export const getActiveForClockIn = (employees) =>
-  employees.filter(e => e.active);
+  employees.filter(e => isActive(e));

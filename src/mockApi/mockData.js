@@ -358,7 +358,10 @@ export const mockDatabase = {
       commission: { type: 'percentage', value: 15 },
       description: 'Classic relaxation massage with gentle strokes',
       stock: null,
-      active: true
+      active: true,
+      itemsUsed: [
+        { productId: 'prod_022', productName: 'Massage Oil - Lavender', quantity: 0.05, unit: 'bottle' }
+      ]
     },
     {
       _id: 'prod_002',
@@ -371,7 +374,10 @@ export const mockDatabase = {
       commission: { type: 'percentage', value: 15 },
       description: 'Therapeutic massage using heated stones',
       stock: null,
-      active: true
+      active: true,
+      itemsUsed: [
+        { productId: 'prod_022', productName: 'Massage Oil - Lavender', quantity: 0.07, unit: 'bottle' }
+      ]
     },
     {
       _id: 'prod_003',
@@ -384,7 +390,10 @@ export const mockDatabase = {
       commission: { type: 'percentage', value: 15 },
       description: 'Intense pressure for chronic muscle tension',
       stock: null,
-      active: true
+      active: true,
+      itemsUsed: [
+        { productId: 'prod_023', productName: 'Massage Oil - Eucalyptus', quantity: 0.06, unit: 'bottle' }
+      ]
     },
     {
       _id: 'prod_004',
@@ -397,7 +406,8 @@ export const mockDatabase = {
       commission: { type: 'percentage', value: 15 },
       description: 'Traditional stretching and pressure point massage',
       stock: null,
-      active: true
+      active: true,
+      itemsUsed: []
     },
     {
       _id: 'prod_005',
@@ -410,7 +420,11 @@ export const mockDatabase = {
       commission: { type: 'percentage', value: 15 },
       description: 'Relaxing massage with essential oils',
       stock: null,
-      active: true
+      active: true,
+      itemsUsed: [
+        { productId: 'prod_022', productName: 'Massage Oil - Lavender', quantity: 0.05, unit: 'bottle' },
+        { productId: 'prod_026', productName: 'Essential Oil Set', quantity: 0.02, unit: 'bottle' }
+      ]
     },
     {
       _id: 'prod_006',
@@ -423,7 +437,10 @@ export const mockDatabase = {
       commission: { type: 'percentage', value: 15 },
       description: 'Targeted massage for athletes',
       stock: null,
-      active: true
+      active: true,
+      itemsUsed: [
+        { productId: 'prod_023', productName: 'Massage Oil - Eucalyptus', quantity: 0.06, unit: 'bottle' }
+      ]
     },
     {
       _id: 'prod_007',
@@ -436,7 +453,10 @@ export const mockDatabase = {
       commission: { type: 'percentage', value: 15 },
       description: 'Safe massage for expecting mothers',
       stock: null,
-      active: true
+      active: true,
+      itemsUsed: [
+        { productId: 'prod_022', productName: 'Massage Oil - Lavender', quantity: 0.04, unit: 'bottle' }
+      ]
     },
     {
       _id: 'prod_008',
@@ -1454,5 +1474,90 @@ function generateAttendance() {
 mockDatabase.transactions = generateHistoricalTransactions();
 mockDatabase.appointments = generateAppointments();
 mockDatabase.attendance = generateAttendance();
+
+// =============================================================================
+// PRODUCT CONSUMPTION TRACKING
+// =============================================================================
+// Tracks actual product usage when inventory is updated
+// This allows AI to learn real consumption patterns
+
+mockDatabase.productConsumption = [];
+
+// Generate historical consumption data based on transactions
+function generateConsumptionHistory() {
+  const consumption = [];
+  const services = mockDatabase.products.filter(p => p.type === 'service' && p.itemsUsed?.length > 0);
+
+  // Get last 90 days of transactions
+  const now = new Date();
+
+  // Generate consumption logs for each month
+  for (let monthsAgo = 0; monthsAgo < 3; monthsAgo++) {
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 0);
+
+    // Track product usage per month
+    const monthlyUsage = {};
+
+    // Simulate service counts for the month
+    services.forEach(service => {
+      // Random number of times this service was performed (5-25 times per month)
+      const serviceCount = Math.floor(Math.random() * 20) + 5;
+
+      service.itemsUsed.forEach(item => {
+        if (!monthlyUsage[item.productId]) {
+          monthlyUsage[item.productId] = {
+            productId: item.productId,
+            productName: item.productName,
+            services: [],
+            totalQuantityUsed: 0,
+            totalServiceCount: 0
+          };
+        }
+
+        monthlyUsage[item.productId].services.push({
+          serviceId: service._id,
+          serviceName: service.name,
+          quantityPerService: item.quantity,
+          serviceCount: serviceCount
+        });
+
+        monthlyUsage[item.productId].totalQuantityUsed += item.quantity * serviceCount;
+        monthlyUsage[item.productId].totalServiceCount += serviceCount;
+      });
+    });
+
+    // Create consumption log entries
+    Object.values(monthlyUsage).forEach(usage => {
+      // Each bottle/unit consumed creates a log entry
+      const unitsConsumed = Math.ceil(usage.totalQuantityUsed);
+
+      for (let i = 0; i < unitsConsumed; i++) {
+        const randomDay = Math.floor(Math.random() * 28) + 1;
+        const logDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), randomDay);
+
+        consumption.push({
+          _id: `cons_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          productId: usage.productId,
+          productName: usage.productName,
+          quantityUsed: 1,
+          unit: 'bottle',
+          servicesDone: Math.round(usage.totalServiceCount / unitsConsumed),
+          date: logDate.toISOString(),
+          month: logDate.toISOString().substring(0, 7), // YYYY-MM format
+          note: `Used for ${usage.services.map(s => s.serviceName).slice(0, 2).join(', ')}`,
+          createdAt: logDate.toISOString()
+        });
+      }
+    });
+  }
+
+  // Sort by date descending
+  consumption.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return consumption;
+}
+
+mockDatabase.productConsumption = generateConsumptionHistory();
 
 export default mockDatabase;

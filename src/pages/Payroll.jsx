@@ -226,13 +226,37 @@ const Payroll = () => {
       totalHours += hours;
       lateMinutes += record.lateMinutes || 0;
 
-      // Check for night differential hours (10PM - 6AM)
-      const clockInHour = clockIn.getHours();
-      const clockOutHour = clockOut.getHours();
-      if (clockOutHour >= 22 || clockOutHour <= 6 || clockInHour >= 22) {
-        // Simplified: if any part of shift is in night hours, add some ND hours
-        nightDiffHours += Math.min(hours * 0.3, 4); // Estimate night hours
-      }
+      // Calculate actual night differential hours (10PM - 6AM)
+      // Night differential applies only to hours worked between 10:00 PM and 6:00 AM
+      const calculateNightHours = (start, end) => {
+        let nightHours = 0;
+        const startTime = new Date(start);
+        const endTime = new Date(end);
+
+        // Night period: 10 PM (22:00) to 6 AM (06:00)
+        // We need to check each hour of the shift
+        let current = new Date(startTime);
+
+        while (current < endTime) {
+          const hour = current.getHours();
+          // Night hours are 22, 23, 0, 1, 2, 3, 4, 5 (10 PM to 6 AM)
+          if (hour >= 22 || hour < 6) {
+            // Add partial hour or full hour
+            const nextHour = new Date(current);
+            nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+            const hoursInThisSlot = Math.min(
+              (nextHour - current) / (1000 * 60 * 60),
+              (endTime - current) / (1000 * 60 * 60)
+            );
+            nightHours += hoursInThisSlot;
+          }
+          current.setHours(current.getHours() + 1, 0, 0, 0);
+        }
+
+        return nightHours;
+      };
+
+      nightDiffHours += calculateNightHours(clockIn, clockOut);
 
       if (hours > 8) {
         regularHours += 8;

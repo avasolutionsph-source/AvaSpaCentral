@@ -21,6 +21,17 @@ const MySchedule = () => {
   const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Time Off Request Modal State
+  const [showTimeOffModal, setShowTimeOffModal] = useState(false);
+  const [timeOffRequests, setTimeOffRequests] = useState([]);
+  const [timeOffForm, setTimeOffForm] = useState({
+    startDate: '',
+    endDate: '',
+    type: 'vacation',
+    reason: ''
+  });
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+
   // Get week dates
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 }); // Sunday
@@ -29,7 +40,34 @@ const MySchedule = () => {
   // Mock API - Fetch schedule data
   useEffect(() => {
     fetchScheduleData();
+    fetchTimeOffRequests();
   }, [currentWeek]);
+
+  const fetchTimeOffRequests = async () => {
+    // Mock existing time off requests
+    const mockRequests = [
+      {
+        id: 1,
+        startDate: '2025-12-20',
+        endDate: '2025-12-25',
+        type: 'vacation',
+        reason: 'Christmas holiday with family',
+        status: 'approved',
+        submittedAt: '2025-11-15',
+        reviewedBy: 'Manager'
+      },
+      {
+        id: 2,
+        startDate: '2025-12-31',
+        endDate: '2026-01-01',
+        type: 'personal',
+        reason: 'New Year celebration',
+        status: 'pending',
+        submittedAt: '2025-11-28'
+      }
+    ];
+    setTimeOffRequests(mockRequests);
+  };
 
   const fetchScheduleData = async () => {
     setLoading(true);
@@ -248,7 +286,68 @@ const MySchedule = () => {
 
   // Request time off
   const handleRequestTimeOff = () => {
-    showToast('Time off request feature coming soon!', 'info');
+    setTimeOffForm({
+      startDate: '',
+      endDate: '',
+      type: 'vacation',
+      reason: ''
+    });
+    setShowTimeOffModal(true);
+  };
+
+  const handleTimeOffFormChange = (e) => {
+    const { name, value } = e.target;
+    setTimeOffForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmitTimeOffRequest = async (e) => {
+    e.preventDefault();
+
+    if (!timeOffForm.startDate) {
+      showToast('Please select a start date', 'error');
+      return;
+    }
+    if (!timeOffForm.endDate) {
+      showToast('Please select an end date', 'error');
+      return;
+    }
+    if (new Date(timeOffForm.endDate) < new Date(timeOffForm.startDate)) {
+      showToast('End date must be after start date', 'error');
+      return;
+    }
+    if (!timeOffForm.reason.trim()) {
+      showToast('Please provide a reason', 'error');
+      return;
+    }
+
+    setSubmittingRequest(true);
+
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const newRequest = {
+      id: Date.now(),
+      startDate: timeOffForm.startDate,
+      endDate: timeOffForm.endDate,
+      type: timeOffForm.type,
+      reason: timeOffForm.reason,
+      status: 'pending',
+      submittedAt: format(new Date(), 'yyyy-MM-dd')
+    };
+
+    setTimeOffRequests(prev => [newRequest, ...prev]);
+    setSubmittingRequest(false);
+    setShowTimeOffModal(false);
+    showToast('Time off request submitted successfully!', 'success');
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'approved': return 'badge-success';
+      case 'rejected': return 'badge-error';
+      case 'pending': return 'badge-warning';
+      default: return 'badge-secondary';
+    }
   };
 
   return (
@@ -464,6 +563,124 @@ const MySchedule = () => {
           </div>
         )}
       </div>
+
+      {/* Time Off Request Modal */}
+      {showTimeOffModal && (
+        <div className="modal-overlay" onClick={() => setShowTimeOffModal(false)}>
+          <div className="modal time-off-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2>Request Time Off</h2>
+              <button className="modal-close" onClick={() => setShowTimeOffModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSubmitTimeOffRequest}>
+              <div className="modal-body">
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Start Date *</label>
+                    <input
+                      type="date"
+                      name="startDate"
+                      value={timeOffForm.startDate}
+                      onChange={handleTimeOffFormChange}
+                      className="form-control"
+                      min={format(new Date(), 'yyyy-MM-dd')}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>End Date *</label>
+                    <input
+                      type="date"
+                      name="endDate"
+                      value={timeOffForm.endDate}
+                      onChange={handleTimeOffFormChange}
+                      className="form-control"
+                      min={timeOffForm.startDate || format(new Date(), 'yyyy-MM-dd')}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Type of Leave *</label>
+                  <select
+                    name="type"
+                    value={timeOffForm.type}
+                    onChange={handleTimeOffFormChange}
+                    className="form-control"
+                  >
+                    <option value="vacation">Vacation Leave</option>
+                    <option value="sick">Sick Leave</option>
+                    <option value="personal">Personal Leave</option>
+                    <option value="emergency">Emergency Leave</option>
+                    <option value="unpaid">Unpaid Leave</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Reason *</label>
+                  <textarea
+                    name="reason"
+                    value={timeOffForm.reason}
+                    onChange={handleTimeOffFormChange}
+                    placeholder="Please provide a reason for your time off request"
+                    className="form-control"
+                    rows="3"
+                    required
+                  ></textarea>
+                </div>
+
+                {/* Existing Requests */}
+                {timeOffRequests.length > 0 && (
+                  <div className="existing-requests" style={{ marginTop: 'var(--spacing-lg)' }}>
+                    <h4 style={{ marginBottom: 'var(--spacing-sm)', color: 'var(--gray-700)' }}>Your Recent Requests</h4>
+                    <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                      {timeOffRequests.slice(0, 3).map(request => (
+                        <div
+                          key={request.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: 'var(--spacing-sm)',
+                            borderBottom: '1px solid var(--gray-200)',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          <div>
+                            <strong>{format(parseISO(request.startDate), 'MMM d')} - {format(parseISO(request.endDate), 'MMM d, yyyy')}</strong>
+                            <div style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>
+                              {request.type.charAt(0).toUpperCase() + request.type.slice(1)} Leave
+                            </div>
+                          </div>
+                          <span className={`badge ${getStatusBadgeClass(request.status)}`}>
+                            {request.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowTimeOffModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submittingRequest}>
+                  {submittingRequest ? (
+                    <>
+                      <span className="spinner-small"></span>
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Request'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

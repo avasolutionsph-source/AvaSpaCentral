@@ -11,12 +11,10 @@ import {
   addWeeks,
   isSameMonth,
   isSameDay,
-  parseISO,
-  startOfDay,
-  setHours,
-  setMinutes
+  parseISO
 } from 'date-fns';
 import { advanceBookingApi } from '../mockApi/advanceBookingApi';
+import mockApi from '../mockApi/mockApi';
 
 const Calendar = () => {
   const { showToast } = useApp();
@@ -26,13 +24,58 @@ const Calendar = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Mock appointments data
+  // Data for form dropdowns
+  const [employees, setEmployees] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [services, setServices] = useState([]);
+  const [rooms, setRooms] = useState([]);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    customerId: '',
+    customerName: '',
+    serviceId: '',
+    employeeId: '',
+    roomId: '',
+    date: '',
+    time: '',
+    duration: 60,
+    notes: ''
+  });
+
+  const timeSlots = [
+    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'
+  ];
+
+  // Load appointments and dropdown data
   useEffect(() => {
     loadAppointments();
+    loadDropdownData();
   }, [currentDate, view]);
+
+  const loadDropdownData = async () => {
+    try {
+      const [emps, custs, prods, rms] = await Promise.all([
+        mockApi.employees.getEmployees(),
+        mockApi.customers.getCustomers(),
+        mockApi.products.getProducts(),
+        mockApi.rooms.getRooms()
+      ]);
+      setEmployees(emps.filter(e => e.status === 'active'));
+      setCustomers(custs);
+      setServices(prods.filter(p => p.type === 'service' && p.active));
+      setRooms(rms);
+    } catch (error) {
+      console.error('Failed to load dropdown data:', error);
+    }
+  };
 
   const loadAppointments = async () => {
     setLoading(true);
@@ -143,6 +186,124 @@ const Calendar = () => {
 
   const goToToday = () => {
     setCurrentDate(new Date());
+  };
+
+  // Modal functions
+  const openCreateModal = (date = null) => {
+    setModalMode('create');
+    const selectedDateStr = date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+    setFormData({
+      customerId: '',
+      customerName: '',
+      serviceId: '',
+      employeeId: '',
+      roomId: '',
+      date: selectedDateStr,
+      time: '',
+      duration: 60,
+      notes: ''
+    });
+    setShowAppointmentModal(true);
+  };
+
+  const openEditModal = (appointment) => {
+    setModalMode('edit');
+    setSelectedAppointment(appointment);
+    const apptDate = parseISO(appointment.date);
+    setFormData({
+      customerId: '',
+      customerName: appointment.customer || '',
+      serviceId: '',
+      employeeId: '',
+      roomId: '',
+      date: format(apptDate, 'yyyy-MM-dd'),
+      time: appointment.startTime,
+      duration: 60,
+      notes: appointment.notes || ''
+    });
+    setShowDetailModal(false);
+    setShowAppointmentModal(true);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'serviceId') {
+      const service = services.find(s => s._id === value);
+      if (service && service.duration) {
+        setFormData(prev => ({ ...prev, duration: service.duration }));
+      }
+    }
+  };
+
+  const validateForm = () => {
+    if (!formData.customerId && !formData.customerName.trim()) {
+      showToast('Customer name is required', 'error');
+      return false;
+    }
+    if (!formData.serviceId) {
+      showToast('Please select a service', 'error');
+      return false;
+    }
+    if (!formData.employeeId) {
+      showToast('Please select a therapist', 'error');
+      return false;
+    }
+    if (!formData.date) {
+      showToast('Please select a date', 'error');
+      return false;
+    }
+    if (!formData.time) {
+      showToast('Please select a time', 'error');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    try {
+      const selectedService = services.find(s => s._id === formData.serviceId);
+      const selectedEmployee = employees.find(e => e._id === formData.employeeId);
+      const selectedRoom = rooms.find(r => r._id === formData.roomId);
+
+      const bookingData = {
+        clientName: formData.customerId
+          ? customers.find(c => c._id === formData.customerId)?.name
+          : formData.customerName.trim(),
+        clientPhone: formData.customerId
+          ? customers.find(c => c._id === formData.customerId)?.phone
+          : '',
+        serviceId: formData.serviceId,
+        serviceName: selectedService?.name || '',
+        servicePrice: selectedService?.price || 0,
+        employeeId: formData.employeeId,
+        employeeName: selectedEmployee ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}` : '',
+        roomId: formData.roomId || null,
+        roomName: selectedRoom?.name || null,
+        bookingDateTime: `${formData.date}T${formData.time}:00`,
+        estimatedDuration: parseInt(formData.duration),
+        specialRequests: formData.notes.trim() || '',
+        status: 'scheduled'
+      };
+
+      if (modalMode === 'create') {
+        await advanceBookingApi.createAdvanceBooking(bookingData);
+        showToast('Appointment created successfully!', 'success');
+      } else {
+        await advanceBookingApi.updateAdvanceBooking(selectedAppointment.id, bookingData);
+        showToast('Appointment updated successfully!', 'success');
+      }
+
+      setShowAppointmentModal(false);
+      loadAppointments();
+    } catch (error) {
+      console.error('Failed to save appointment:', error);
+      showToast('Failed to save appointment', 'error');
+    }
   };
 
   // Get appointments for a specific date
@@ -454,7 +615,7 @@ const Calendar = () => {
         </div>
 
         <div className="calendar-actions">
-          <button className="btn btn-primary" onClick={() => showToast('Add appointment feature coming soon!', 'info')}>
+          <button className="btn btn-primary" onClick={() => openCreateModal(selectedDate || currentDate)}>
             + New Appointment
           </button>
         </div>
@@ -534,10 +695,164 @@ const Calendar = () => {
               <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>
                 Close
               </button>
-              <button className="btn btn-primary" onClick={() => showToast('Edit feature coming soon!', 'info')}>
+              <button className="btn btn-primary" onClick={() => openEditModal(selectedAppointment)}>
                 Edit Appointment
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Appointment Modal */}
+      {showAppointmentModal && (
+        <div className="modal-overlay" onClick={() => setShowAppointmentModal(false)}>
+          <div className="modal appointment-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{modalMode === 'create' ? 'New Appointment' : 'Edit Appointment'}</h2>
+              <button className="modal-close" onClick={() => setShowAppointmentModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Customer *</label>
+                  <select
+                    name="customerId"
+                    value={formData.customerId}
+                    onChange={handleInputChange}
+                    className="form-control"
+                  >
+                    <option value="">Walk-in (or select existing)</option>
+                    {customers.map(c => (
+                      <option key={c._id} value={c._id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {!formData.customerId && (
+                  <div className="form-group">
+                    <label>Walk-in Customer Name *</label>
+                    <input
+                      type="text"
+                      name="customerName"
+                      value={formData.customerName}
+                      onChange={handleInputChange}
+                      placeholder="Enter customer name"
+                      className="form-control"
+                    />
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label>Service *</label>
+                  <select
+                    name="serviceId"
+                    value={formData.serviceId}
+                    onChange={handleInputChange}
+                    className="form-control"
+                    required
+                  >
+                    <option value="">Select service...</option>
+                    {services.map(s => (
+                      <option key={s._id} value={s._id}>{s.name} - ₱{s.price}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Therapist *</label>
+                    <select
+                      name="employeeId"
+                      value={formData.employeeId}
+                      onChange={handleInputChange}
+                      className="form-control"
+                      required
+                    >
+                      <option value="">Select therapist...</option>
+                      {employees.filter(e => e.department === 'Massage' || e.department === 'Facial' || e.department === 'Body Treatments' || e.position?.toLowerCase().includes('therapist')).map(e => (
+                        <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Room</label>
+                    <select
+                      name="roomId"
+                      value={formData.roomId}
+                      onChange={handleInputChange}
+                      className="form-control"
+                    >
+                      <option value="">No room</option>
+                      {rooms.filter(r => r.status === 'available').map(r => (
+                        <option key={r._id} value={r._id}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Date *</label>
+                    <input
+                      type="date"
+                      name="date"
+                      value={formData.date}
+                      onChange={handleInputChange}
+                      className="form-control"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Duration (min)</label>
+                    <input
+                      type="number"
+                      name="duration"
+                      value={formData.duration}
+                      onChange={handleInputChange}
+                      className="form-control"
+                      min="15"
+                      step="15"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Time *</label>
+                  <div className="time-slot-grid">
+                    {timeSlots.map(slot => (
+                      <button
+                        key={slot}
+                        type="button"
+                        className={`time-slot-btn ${formData.time === slot ? 'selected' : ''}`}
+                        onClick={() => setFormData(prev => ({ ...prev, time: slot }))}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Notes</label>
+                  <textarea
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleInputChange}
+                    placeholder="Special requests or notes"
+                    className="form-control"
+                    rows="3"
+                  ></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAppointmentModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  {modalMode === 'create' ? 'Create Appointment' : 'Update Appointment'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -65,80 +65,114 @@ const AIInsights = () => {
     }
   };
 
-  // Product Usage Analysis (like your image example)
-  const analyzeProductUsage = (txns, prods) => {
-    const usageData = [];
+  // Product Usage Analysis - Now uses REAL consumption data!
+  const analyzeProductUsage = async (txns, prods) => {
+    try {
+      // Get real consumption analysis from API
+      const consumptionAnalyses = await mockApi.productConsumption.getAllProductsAnalysis();
 
-    // Get last 100 service transactions
-    const serviceTxns = txns
-      .filter(t => t.items?.some(item => item.type === 'service'))
-      .slice(0, 100);
+      const usageData = [];
 
-    // Analyze product consumption per service
-    const productConsumption = {};
+      // Count total services for estimating days remaining
+      const serviceTxns = txns.filter(t => t.items?.some(item => item.type === 'service'));
+      const totalServices = serviceTxns.reduce((sum, txn) => {
+        return sum + txn.items.filter(i => i.type === 'service').reduce((s, i) => s + (i.quantity || 1), 0);
+      }, 0);
+      const avgServicesPerDay = Math.max(totalServices / 30, 5);
 
-    serviceTxns.forEach(txn => {
-      txn.items.forEach(item => {
-        if (item.type === 'service') {
-          const serviceName = item.name;
+      // Process each product with consumption data
+      consumptionAnalyses.forEach(analysis => {
+        const product = prods.find(p => p._id === analysis.productId);
+        if (!product) return;
 
-          // Find related products used in this transaction
-          txn.items
-            .filter(i => i.type === 'product')
-            .forEach(product => {
-              const key = `${serviceName}:${product.name}`;
-              if (!productConsumption[key]) {
-                productConsumption[key] = {
-                  serviceName,
-                  productName: product.name,
-                  totalQuantity: 0,
-                  serviceCount: 0
-                };
-              }
-              productConsumption[key].totalQuantity += product.quantity;
-              productConsumption[key].serviceCount += item.quantity;
-            });
-        }
-      });
-    });
+        // Find related services from service itemsUsed
+        const relatedServices = prods
+          .filter(p => p.type === 'service' && p.itemsUsed?.some(i => i.productId === analysis.productId))
+          .map(s => s.name)
+          .slice(0, 3);
 
-    // Calculate averages and create analysis
-    Object.values(productConsumption).forEach(data => {
-      const avgUsage = data.totalQuantity / data.serviceCount;
-      const product = prods.find(p => p.name === data.productName);
-
-      if (product && avgUsage > 0) {
-        // Find unit (L, ml, pcs, etc.)
-        let unit = 'units';
-        let displayValue = avgUsage;
-
-        if (product.name.toLowerCase().includes('oil') || product.name.toLowerCase().includes('lotion')) {
-          unit = 'ml';
-          displayValue = Math.round(avgUsage * 100); // Assume stored in liters
-        } else if (product.name.toLowerCase().includes('towel')) {
-          unit = 'pcs';
-          displayValue = Math.round(avgUsage);
-        }
-
-        const currentStock = product.stock;
-        const estimatedDaysLeft = Math.floor(currentStock / avgUsage);
+        const servicesPerUnit = parseFloat(analysis.avgServicesPerUnit) || 1;
+        const estimatedServicesLeft = analysis.estimatedServicesRemaining;
+        const estimatedDaysLeft = Math.floor(estimatedServicesLeft / avgServicesPerDay);
 
         usageData.push({
-          serviceName: data.serviceName,
-          productName: data.productName,
-          avgUsage: displayValue,
-          unit,
-          currentStock,
+          productId: analysis.productId,
+          productName: analysis.productName,
+          relatedServices: relatedServices.length > 0 ? relatedServices : ['General Services'],
+          servicesPerUnit: Math.round(servicesPerUnit),
+          unit: 'bottle',
+          currentStock: analysis.currentStock,
+          estimatedServicesLeft,
           estimatedDaysLeft,
-          serviceCount: data.serviceCount,
-          totalConsumed: data.totalQuantity,
-          usageRate: avgUsage,
-          alert: currentStock < avgUsage * 7 ? 'HIGH' : currentStock < avgUsage * 14 ? 'MEDIUM' : 'LOW'
+          totalUnitsUsed: analysis.totalUnitsUsed,
+          totalServices: analysis.totalServices,
+          lastLog: analysis.lastLog,
+          hasAnomaly: analysis.hasAnomaly,
+          anomalyWarning: analysis.anomalyWarning,
+          alert: estimatedDaysLeft <= 7 ? 'HIGH' : estimatedDaysLeft <= 14 ? 'MEDIUM' : 'LOW',
+          // NEW: Real data indicator
+          dataSource: 'real',
+          prediction: `Based on ${analysis.totalUnitsUsed} bottles used for ${analysis.totalServices} services`
         });
-      }
-    });
+      });
 
-    setProductUsageAnalysis(usageData.slice(0, 10));
+      // Add products without consumption data (use estimates)
+      const retailProducts = prods.filter(p => p.type === 'product' && p.active);
+      retailProducts.forEach(product => {
+        if (!usageData.find(u => u.productId === product._id)) {
+          // Find related services from itemsUsed
+          const relatedServices = prods
+            .filter(p => p.type === 'service' && p.itemsUsed?.some(i => i.productId === product._id))
+            .map(s => s.name)
+            .slice(0, 3);
+
+          // Estimate based on product type
+          let servicesPerUnit = 10; // Default estimate
+          if (product.name.toLowerCase().includes('oil')) servicesPerUnit = 20;
+          else if (product.name.toLowerCase().includes('cream')) servicesPerUnit = 15;
+          else if (product.name.toLowerCase().includes('lotion')) servicesPerUnit = 18;
+
+          const estimatedServicesLeft = product.stock * servicesPerUnit;
+          const estimatedDaysLeft = Math.floor(estimatedServicesLeft / avgServicesPerDay);
+
+          usageData.push({
+            productId: product._id,
+            productName: product.name,
+            relatedServices: relatedServices.length > 0 ? relatedServices : ['No linked services'],
+            servicesPerUnit,
+            unit: 'bottle',
+            currentStock: product.stock,
+            estimatedServicesLeft,
+            estimatedDaysLeft,
+            totalUnitsUsed: 0,
+            totalServices: 0,
+            hasAnomaly: false,
+            alert: estimatedDaysLeft <= 7 ? 'HIGH' : estimatedDaysLeft <= 14 ? 'MEDIUM' : 'LOW',
+            // NEW: Estimated data indicator
+            dataSource: 'estimated',
+            prediction: 'No consumption data yet - showing estimates'
+          });
+        }
+      });
+
+      // Sort by alert priority (HIGH first), then anomalies, then days left
+      usageData.sort((a, b) => {
+        // Anomalies first
+        if (a.hasAnomaly && !b.hasAnomaly) return -1;
+        if (!a.hasAnomaly && b.hasAnomaly) return 1;
+
+        const alertOrder = { 'HIGH': 0, 'MEDIUM': 1, 'LOW': 2 };
+        if (alertOrder[a.alert] !== alertOrder[b.alert]) {
+          return alertOrder[a.alert] - alertOrder[b.alert];
+        }
+        return a.estimatedDaysLeft - b.estimatedDaysLeft;
+      });
+
+      setProductUsageAnalysis(usageData.slice(0, 12));
+    } catch (error) {
+      console.error('Failed to analyze product usage:', error);
+      setProductUsageAnalysis([]);
+    }
   };
 
   // Inventory Predictions
@@ -702,17 +736,17 @@ const AIInsights = () => {
             <div className="usage-summary-card info">
               <div className="usage-summary-icon">📊</div>
               <div className="usage-summary-content">
-                <div className="usage-summary-value">{productUsageAnalysis.reduce((sum, p) => sum + p.serviceCount, 0)}</div>
-                <div className="usage-summary-label">Services Analyzed</div>
-                <div className="usage-summary-desc">Data points collected</div>
+                <div className="usage-summary-value">{productUsageAnalysis.length}</div>
+                <div className="usage-summary-label">Products Tracked</div>
+                <div className="usage-summary-desc">Consumption analysis</div>
               </div>
             </div>
           </div>
 
           <div className="ai-section">
-            <h3>🧴 Detailed Product Usage Analysis</h3>
+            <h3>🧴 Product Consumption Tracking</h3>
             <p className="ai-section-subtitle">
-              Consumption patterns based on actual service history
+              Track how many services you can perform with your current stock
             </p>
 
             <div className="usage-analysis-grid">
@@ -725,7 +759,7 @@ const AIInsights = () => {
                       </div>
                       <div>
                         <h4 className="usage-product-name">{usage.productName}</h4>
-                        <p className="usage-service-type">{usage.serviceName}</p>
+                        <p className="usage-service-type">{usage.relatedServices.slice(0, 2).join(', ')}</p>
                       </div>
                     </div>
                     <span className={`usage-alert-badge-enhanced ${usage.alert.toLowerCase()}`}>
@@ -733,40 +767,68 @@ const AIInsights = () => {
                     </span>
                   </div>
 
-                  <div className="usage-metrics-grid">
-                    <div className="usage-metric-card">
-                      <div className="usage-metric-icon">📏</div>
-                      <div className="usage-metric-content">
-                        <div className="usage-metric-label">Avg Usage</div>
-                        <div className="usage-metric-value">
-                          {usage.avgUsage} <span className="usage-metric-unit">{usage.unit}/service</span>
-                        </div>
+                  {/* Anomaly Warning */}
+                  {usage.hasAnomaly && (
+                    <div className="usage-anomaly-warning">
+                      <span className="anomaly-icon">🚨</span>
+                      <div className="anomaly-content">
+                        <strong>Suspicious Usage Detected!</strong>
+                        <p>{usage.anomalyWarning}</p>
                       </div>
                     </div>
+                  )}
+
+                  {/* Main Consumption Display */}
+                  <div className={`usage-consumption-highlight ${usage.dataSource === 'real' ? 'real-data' : 'estimated-data'}`}>
+                    <div className="consumption-main">
+                      <span className="consumption-icon">🧴</span>
+                      <div className="consumption-text">
+                        <span className="consumption-formula">
+                          Used <strong>1 {usage.unit}</strong> for <strong>{usage.servicesPerUnit} services</strong>
+                        </span>
+                        <span className="consumption-detail">
+                          {usage.dataSource === 'real'
+                            ? `✓ Based on real data: ${usage.totalUnitsUsed} bottles used for ${usage.totalServices} services`
+                            : '⚠️ Estimated - No consumption data yet'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="usage-metrics-grid">
                     <div className="usage-metric-card">
                       <div className="usage-metric-icon">📦</div>
                       <div className="usage-metric-content">
                         <div className="usage-metric-label">Current Stock</div>
                         <div className="usage-metric-value">
-                          {usage.currentStock} <span className="usage-metric-unit">{usage.unit}</span>
+                          {usage.currentStock} <span className="usage-metric-unit">{usage.unit}s</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="usage-metric-card">
+                      <div className="usage-metric-icon">🎯</div>
+                      <div className="usage-metric-content">
+                        <div className="usage-metric-label">Services Possible</div>
+                        <div className="usage-metric-value">
+                          {usage.estimatedServicesLeft} <span className="usage-metric-unit">services</span>
                         </div>
                       </div>
                     </div>
                     <div className="usage-metric-card">
                       <div className="usage-metric-icon">⏱️</div>
                       <div className="usage-metric-content">
-                        <div className="usage-metric-label">Supply Duration</div>
+                        <div className="usage-metric-label">Days Remaining</div>
                         <div className={`usage-metric-value ${usage.alert === 'HIGH' ? 'critical-text' : ''}`}>
                           {usage.estimatedDaysLeft} <span className="usage-metric-unit">days</span>
                         </div>
                       </div>
                     </div>
                     <div className="usage-metric-card">
-                      <div className="usage-metric-icon">🔢</div>
+                      <div className="usage-metric-icon">📈</div>
                       <div className="usage-metric-content">
-                        <div className="usage-metric-label">Data Points</div>
+                        <div className="usage-metric-label">Rate</div>
                         <div className="usage-metric-value">
-                          {usage.serviceCount} <span className="usage-metric-unit">services</span>
+                          {usage.servicesPerUnit} <span className="usage-metric-unit">srv/{usage.unit}</span>
                         </div>
                       </div>
                     </div>
@@ -775,16 +837,16 @@ const AIInsights = () => {
                   {/* Usage Progress Bar */}
                   <div className="usage-progress-section">
                     <div className="usage-progress-header">
-                      <span className="usage-progress-label">Stock Depletion Timeline</span>
+                      <span className="usage-progress-label">Stock Level</span>
                       <span className="usage-progress-percentage">
-                        {Math.min(100, ((usage.serviceCount / (usage.estimatedDaysLeft + 1)) * 10)).toFixed(0)}% burn rate
+                        {usage.estimatedServicesLeft} services left
                       </span>
                     </div>
                     <div className="usage-progress-bar">
                       <div
                         className={`usage-progress-fill ${usage.alert.toLowerCase()}`}
                         style={{
-                          width: `${Math.min(100, 100 - (usage.estimatedDaysLeft / 30 * 100))}%`
+                          width: `${Math.min(100, (usage.estimatedDaysLeft / 30) * 100)}%`
                         }}
                       ></div>
                     </div>
@@ -795,13 +857,13 @@ const AIInsights = () => {
                     <div className="usage-rec-content">
                       <strong>AI Recommendation:</strong>
                       {usage.alert === 'HIGH' && (
-                        <span> Critical! Order {Math.ceil(usage.avgUsage * 30)} {usage.unit} immediately to avoid service disruption.</span>
+                        <span> Critical! Only {usage.estimatedServicesLeft} services possible. Order {Math.max(5, Math.ceil(30 / usage.servicesPerUnit))} {usage.unit}s immediately.</span>
                       )}
                       {usage.alert === 'MEDIUM' && (
-                        <span> Plan to restock within 2 weeks. Recommended order: {Math.ceil(usage.avgUsage * 30)} {usage.unit}.</span>
+                        <span> Plan to restock within 2 weeks. You can perform ~{usage.estimatedServicesLeft} more services.</span>
                       )}
                       {usage.alert === 'LOW' && (
-                        <span> Stock levels healthy. Next order recommended in {Math.floor(usage.estimatedDaysLeft / 2)} days.</span>
+                        <span> Stock healthy! Can serve {usage.estimatedServicesLeft} more clients. Reorder in {Math.floor(usage.estimatedDaysLeft / 2)} days.</span>
                       )}
                     </div>
                   </div>
@@ -812,15 +874,16 @@ const AIInsights = () => {
             {/* Product Usage Chart */}
             {productUsageAnalysis.length > 0 && (
               <div className="ai-section" style={{ marginTop: 'var(--spacing-xl)' }}>
-                <h3>📊 Product Consumption Overview</h3>
+                <h3>📊 Services Possible per Product</h3>
+                <p className="ai-section-subtitle">How many services you can perform with current stock</p>
                 <div className="chart-container-ai" style={{ height: '350px', marginTop: 'var(--spacing-lg)' }}>
                   <Bar
                     data={{
                       labels: productUsageAnalysis.map(p => p.productName),
                       datasets: [
                         {
-                          label: 'Average Usage per Service',
-                          data: productUsageAnalysis.map(p => p.avgUsage),
+                          label: 'Services Possible',
+                          data: productUsageAnalysis.map(p => p.estimatedServicesLeft),
                           backgroundColor: productUsageAnalysis.map(p =>
                             p.alert === 'HIGH' ? 'rgba(239, 68, 68, 0.8)' :
                             p.alert === 'MEDIUM' ? 'rgba(245, 158, 11, 0.8)' :
@@ -834,7 +897,7 @@ const AIInsights = () => {
                           borderWidth: 2
                         },
                         {
-                          label: 'Current Stock',
+                          label: 'Current Stock (units)',
                           data: productUsageAnalysis.map(p => p.currentStock),
                           backgroundColor: 'rgba(139, 92, 246, 0.5)',
                           borderColor: '#8b5cf6',
@@ -855,9 +918,12 @@ const AIInsights = () => {
                             label: function(context) {
                               const usage = productUsageAnalysis[context.dataIndex];
                               if (context.datasetIndex === 0) {
-                                return `Avg Usage: ${context.parsed.y} ${usage.unit} per service`;
+                                return [
+                                  `Services Possible: ${context.parsed.y}`,
+                                  `Rate: 1 ${usage.unit} = ${usage.servicesPerUnit} services`
+                                ];
                               } else {
-                                return `Current Stock: ${context.parsed.y} ${usage.unit}`;
+                                return `Stock: ${context.parsed.y} ${usage.unit}s`;
                               }
                             }
                           }
@@ -868,7 +934,7 @@ const AIInsights = () => {
                           beginAtZero: true,
                           title: {
                             display: true,
-                            text: 'Quantity (units/ml)'
+                            text: 'Count'
                           }
                         },
                         x: {

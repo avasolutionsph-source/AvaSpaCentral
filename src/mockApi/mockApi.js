@@ -1425,6 +1425,171 @@ export const payrollRequestsApi = {
   }
 };
 
+// =============================================================================
+// PRODUCT CONSUMPTION API
+// =============================================================================
+// Track actual product consumption for AI learning
+
+export const productConsumptionApi = {
+  // Get all consumption logs
+  async getConsumptionLogs(filters = {}) {
+    await delay();
+
+    let logs = clone(mockDatabase.productConsumption || []);
+
+    // Filter by product
+    if (filters.productId) {
+      logs = logs.filter(l => l.productId === filters.productId);
+    }
+
+    // Filter by date range
+    if (filters.startDate) {
+      logs = logs.filter(l => new Date(l.date) >= new Date(filters.startDate));
+    }
+    if (filters.endDate) {
+      logs = logs.filter(l => new Date(l.date) <= new Date(filters.endDate));
+    }
+
+    // Filter by month (YYYY-MM format)
+    if (filters.month) {
+      logs = logs.filter(l => l.month === filters.month);
+    }
+
+    return logs;
+  },
+
+  // Log a consumption event (when inventory is updated)
+  async logConsumption(data) {
+    await delay(200);
+
+    const log = {
+      _id: 'cons_' + Date.now(),
+      productId: data.productId,
+      productName: data.productName,
+      quantityUsed: data.quantityUsed,
+      unit: data.unit || 'units',
+      servicesDone: data.servicesDone || 0,
+      date: data.date || new Date().toISOString(),
+      month: (data.date || new Date().toISOString()).substring(0, 7),
+      note: data.note || '',
+      createdAt: new Date().toISOString()
+    };
+
+    mockDatabase.productConsumption.unshift(log);
+
+    return { success: true, log: clone(log) };
+  },
+
+  // Get AI analysis of consumption patterns
+  async getConsumptionAnalysis(productId) {
+    await delay();
+
+    const logs = mockDatabase.productConsumption.filter(l => l.productId === productId);
+
+    if (logs.length === 0) {
+      return {
+        productId,
+        hasData: false,
+        message: 'No consumption data available yet'
+      };
+    }
+
+    // Group by month
+    const monthlyData = {};
+    logs.forEach(log => {
+      if (!monthlyData[log.month]) {
+        monthlyData[log.month] = {
+          month: log.month,
+          totalUnitsUsed: 0,
+          totalServices: 0,
+          entries: []
+        };
+      }
+      monthlyData[log.month].totalUnitsUsed += log.quantityUsed;
+      monthlyData[log.month].totalServices += log.servicesDone;
+      monthlyData[log.month].entries.push(log);
+    });
+
+    // Calculate averages
+    const months = Object.values(monthlyData);
+    const avgServicesPerUnit = months.reduce((sum, m) => {
+      return sum + (m.totalServices / m.totalUnitsUsed);
+    }, 0) / months.length;
+
+    // Detect anomalies
+    const anomalies = [];
+    months.forEach(m => {
+      const monthAvg = m.totalServices / m.totalUnitsUsed;
+      const deviation = Math.abs(monthAvg - avgServicesPerUnit) / avgServicesPerUnit;
+
+      if (deviation > 0.5) { // More than 50% deviation
+        anomalies.push({
+          month: m.month,
+          servicesPerUnit: monthAvg,
+          expected: avgServicesPerUnit,
+          deviation: (deviation * 100).toFixed(1) + '%',
+          type: monthAvg < avgServicesPerUnit ? 'overuse' : 'underuse',
+          warning: monthAvg < avgServicesPerUnit * 0.3
+            ? 'Suspicious: Product may be wasted, stolen, or incorrectly logged'
+            : monthAvg < avgServicesPerUnit * 0.5
+              ? 'Warning: Usage significantly higher than normal'
+              : 'Notice: Usage lower than expected - verify service counts'
+        });
+      }
+    });
+
+    return {
+      productId,
+      hasData: true,
+      monthlyData: months,
+      avgServicesPerUnit: avgServicesPerUnit.toFixed(1),
+      totalUnitsUsed: logs.reduce((sum, l) => sum + l.quantityUsed, 0),
+      totalServices: logs.reduce((sum, l) => sum + l.servicesDone, 0),
+      anomalies,
+      prediction: `Based on data, 1 unit should last approximately ${Math.round(avgServicesPerUnit)} services`
+    };
+  },
+
+  // Get all products with their consumption analysis
+  async getAllProductsAnalysis() {
+    await delay();
+
+    const products = mockDatabase.products.filter(p => p.type === 'product');
+    const analyses = [];
+
+    for (const product of products) {
+      const logs = mockDatabase.productConsumption.filter(l => l.productId === product._id);
+
+      if (logs.length > 0) {
+        const totalUnits = logs.reduce((sum, l) => sum + l.quantityUsed, 0);
+        const totalServices = logs.reduce((sum, l) => sum + l.servicesDone, 0);
+        const avgServicesPerUnit = totalServices / totalUnits;
+
+        // Check for anomalies in last entry
+        const lastLog = logs[0];
+        const isAnomaly = lastLog && Math.abs(lastLog.servicesDone - avgServicesPerUnit) / avgServicesPerUnit > 0.5;
+
+        analyses.push({
+          productId: product._id,
+          productName: product.name,
+          currentStock: product.stock,
+          totalUnitsUsed: totalUnits,
+          totalServices: totalServices,
+          avgServicesPerUnit: avgServicesPerUnit.toFixed(1),
+          estimatedServicesRemaining: Math.floor(product.stock * avgServicesPerUnit),
+          lastLog: lastLog,
+          hasAnomaly: isAnomaly,
+          anomalyWarning: isAnomaly
+            ? `Last usage (${lastLog.servicesDone} services for 1 unit) differs significantly from average (${avgServicesPerUnit.toFixed(0)} services)`
+            : null
+        });
+      }
+    }
+
+    return analyses;
+  }
+};
+
 // Export all APIs
 export default {
   auth: authApi,
@@ -1443,5 +1608,6 @@ export default {
   serviceRotation: serviceRotationApi,
   payrollRequests: payrollRequestsApi,
   activityLogs: activityLogsApi,
-  cashDrawer: cashDrawerApi
+  cashDrawer: cashDrawerApi,
+  productConsumption: productConsumptionApi
 };

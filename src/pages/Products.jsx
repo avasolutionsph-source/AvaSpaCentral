@@ -27,8 +27,12 @@ const Products = () => {
     stock: '',
     lowStockAlert: '',
     commission: { type: 'percentage', value: '' },
-    description: ''
+    description: '',
+    itemsUsed: [] // For services: products consumed during the service
   });
+
+  // Get retail products for the items used dropdown
+  const retailProducts = products.filter(p => p.type === 'product' && p.active);
 
   const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
 
@@ -73,7 +77,8 @@ const Products = () => {
     setModalMode('create');
     setFormData({
       name: '', category: '', type: 'service', price: '', cost: '', duration: '',
-      stock: '', lowStockAlert: '', commission: { type: 'percentage', value: '' }, description: ''
+      stock: '', lowStockAlert: '', commission: { type: 'percentage', value: '' }, description: '',
+      itemsUsed: []
     });
     setShowModal(true);
   };
@@ -87,7 +92,8 @@ const Products = () => {
       duration: product.duration?.toString() || '', stock: product.stock?.toString() || '',
       lowStockAlert: product.lowStockAlert?.toString() || '',
       commission: { type: product.commission.type, value: product.commission.value.toString() },
-      description: product.description || ''
+      description: product.description || '',
+      itemsUsed: product.itemsUsed || []
     });
     setShowModal(true);
   };
@@ -100,6 +106,52 @@ const Products = () => {
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  // Add item to items used list
+  const handleAddItemUsed = (productId) => {
+    if (!productId) return;
+
+    const product = retailProducts.find(p => p._id === productId);
+    if (!product) return;
+
+    // Check if already added
+    if (formData.itemsUsed.some(item => item.productId === productId)) {
+      showToast('Product already added', 'error');
+      return;
+    }
+
+    const newItem = {
+      productId: product._id,
+      productName: product.name,
+      quantity: 0.05, // Default quantity
+      unit: 'bottle'
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      itemsUsed: [...prev.itemsUsed, newItem]
+    }));
+  };
+
+  // Remove item from items used list
+  const handleRemoveItemUsed = (productId) => {
+    setFormData(prev => ({
+      ...prev,
+      itemsUsed: prev.itemsUsed.filter(item => item.productId !== productId)
+    }));
+  };
+
+  // Update item quantity
+  const handleUpdateItemQuantity = (productId, quantity) => {
+    setFormData(prev => ({
+      ...prev,
+      itemsUsed: prev.itemsUsed.map(item =>
+        item.productId === productId
+          ? { ...item, quantity: parseFloat(quantity) || 0 }
+          : item
+      )
+    }));
   };
 
   const validateForm = () => {
@@ -115,6 +167,10 @@ const Products = () => {
     }
     if (!formData.commission.value || parseFloat(formData.commission.value) <= 0) {
       showToast('Valid commission is required', 'error'); return false;
+    }
+    // Validate commission percentage is between 0-100%
+    if (formData.commission.type === 'percentage' && parseFloat(formData.commission.value) > 100) {
+      showToast('Commission percentage cannot exceed 100%', 'error'); return false;
     }
     return true;
   };
@@ -132,7 +188,8 @@ const Products = () => {
         stock: formData.type === 'product' ? parseInt(formData.stock) : undefined,
         lowStockAlert: formData.type === 'product' && formData.lowStockAlert ? parseInt(formData.lowStockAlert) : undefined,
         commission: { type: formData.commission.type, value: parseFloat(formData.commission.value) },
-        description: formData.description.trim()
+        description: formData.description.trim(),
+        itemsUsed: formData.type === 'service' ? formData.itemsUsed : []
       };
 
       if (modalMode === 'create') {
@@ -339,10 +396,74 @@ const Products = () => {
                   </>
                 )}
                 {formData.type === 'service' && (
-                  <div className="form-group">
-                    <label>Duration (min) *</label>
-                    <input type="number" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="60" className="form-control" min="1" required />
-                  </div>
+                  <>
+                    <div className="form-group">
+                      <label>Duration (min) *</label>
+                      <input type="number" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="60" className="form-control" min="1" required />
+                    </div>
+
+                    {/* Items Used Section */}
+                    <div className="form-group">
+                      <label>Items Used in Service</label>
+                      <p className="form-hint">Select products consumed when performing this service (for AI tracking)</p>
+
+                      {/* Dropdown to add products */}
+                      <div className="items-used-add">
+                        <select
+                          className="form-control"
+                          onChange={(e) => {
+                            handleAddItemUsed(e.target.value);
+                            e.target.value = '';
+                          }}
+                          defaultValue=""
+                        >
+                          <option value="">+ Add product...</option>
+                          {retailProducts
+                            .filter(p => !formData.itemsUsed.some(item => item.productId === p._id))
+                            .map(p => (
+                              <option key={p._id} value={p._id}>{p.name}</option>
+                            ))
+                          }
+                        </select>
+                      </div>
+
+                      {/* List of added items */}
+                      {formData.itemsUsed.length > 0 && (
+                        <div className="items-used-list">
+                          {formData.itemsUsed.map(item => (
+                            <div key={item.productId} className="items-used-item">
+                              <span className="item-name">🧴 {item.productName}</span>
+                              <div className="item-quantity">
+                                <input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => handleUpdateItemQuantity(item.productId, e.target.value)}
+                                  min="0.01"
+                                  step="0.01"
+                                  className="form-control quantity-input"
+                                />
+                                <span className="item-unit">per service</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="btn-remove-item"
+                                onClick={() => handleRemoveItemUsed(item.productId)}
+                                title="Remove"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {formData.itemsUsed.length === 0 && (
+                        <div className="items-used-empty">
+                          No products linked. Add products to enable AI consumption tracking.
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
                 <div className="form-group">
                   <label>Commission *</label>

@@ -344,6 +344,16 @@ const POS = () => {
       }
     }
 
+    // Validate Card transaction ID is provided when paying by card
+    if (paymentMethod === 'Card' && !cardTransactionId.trim()) {
+      errors.push('Card transaction ID is required for card payments');
+    }
+
+    // Validate GCash reference number is provided when paying by GCash
+    if (paymentMethod === 'GCash' && !gcashReference.trim()) {
+      errors.push('GCash reference number is required');
+    }
+
     if (errors.length > 0) {
       showToast(errors[0], 'error');
       return false;
@@ -1071,7 +1081,7 @@ const POS = () => {
                         </>
                       ) : (
                         <>
-                          <label>Card Transaction ID (Optional):</label>
+                          <label>Card Transaction ID *</label>
                           <input
                             type="text"
                             value={cardTransactionId}
@@ -1103,7 +1113,7 @@ const POS = () => {
                         </>
                       ) : (
                         <>
-                          <label>GCash Reference # (Optional):</label>
+                          <label>GCash Reference # *</label>
                           <input
                             type="text"
                             value={gcashReference}

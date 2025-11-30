@@ -15,6 +15,12 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  // Forgot Password Modal State
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+
   // Demo role credentials
   const demoRoles = [
     {
@@ -111,6 +117,41 @@ const Login = () => {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+
+    if (!forgotEmail) {
+      showToast('Please enter your email address', 'error');
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(forgotEmail)) {
+      showToast('Please enter a valid email address', 'error');
+      return;
+    }
+
+    setForgotLoading(true);
+
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    setForgotLoading(false);
+    setForgotSuccess(true);
+    showToast('Password reset link sent to your email!', 'success');
+  };
+
+  const openForgotModal = () => {
+    setForgotEmail(formData.email || '');
+    setForgotSuccess(false);
+    setShowForgotModal(true);
+  };
+
+  const closeForgotModal = () => {
+    setShowForgotModal(false);
+    setForgotEmail('');
+    setForgotSuccess(false);
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-container">
@@ -178,7 +219,7 @@ const Login = () => {
               <button
                 type="button"
                 className="link-button"
-                onClick={() => showToast('Feature coming soon', 'info')}
+                onClick={openForgotModal}
               >
                 Forgot Password?
               </button>
@@ -230,6 +271,72 @@ const Login = () => {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="modal-overlay" onClick={closeForgotModal}>
+          <div className="modal forgot-password-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Reset Password</h2>
+              <button className="modal-close" onClick={closeForgotModal}>✕</button>
+            </div>
+            <div className="modal-body">
+              {!forgotSuccess ? (
+                <>
+                  <p style={{ marginBottom: 'var(--spacing-md)', color: 'var(--gray-600)' }}>
+                    Enter your email address and we'll send you a link to reset your password.
+                  </p>
+                  <form onSubmit={handleForgotPassword}>
+                    <div className="form-group">
+                      <label htmlFor="forgot-email">Email Address</label>
+                      <input
+                        type="email"
+                        id="forgot-email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="Enter your email"
+                        className="form-control"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="modal-footer">
+                      <button type="button" className="btn btn-secondary" onClick={closeForgotModal}>
+                        Cancel
+                      </button>
+                      <button type="submit" className="btn btn-primary" disabled={forgotLoading}>
+                        {forgotLoading ? (
+                          <>
+                            <span className="spinner-small"></span>
+                            Sending...
+                          </>
+                        ) : (
+                          'Send Reset Link'
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <div className="forgot-success">
+                  <div className="success-icon" style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)' }}>✓</div>
+                  <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Check Your Email</h3>
+                  <p style={{ color: 'var(--gray-600)', marginBottom: 'var(--spacing-lg)' }}>
+                    We've sent a password reset link to <strong>{forgotEmail}</strong>
+                  </p>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--gray-500)' }}>
+                    Didn't receive the email? Check your spam folder or try again.
+                  </p>
+                  <div className="modal-footer" style={{ marginTop: 'var(--spacing-lg)' }}>
+                    <button className="btn btn-primary" onClick={closeForgotModal}>
+                      Back to Login
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

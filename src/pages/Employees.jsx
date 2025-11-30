@@ -138,10 +138,19 @@ const Employees = () => {
     if (!formData.commission.value || parseFloat(formData.commission.value) < 0) {
       showToast('Valid commission is required', 'error'); return false;
     }
-    if (!formData.hourlyRate || parseFloat(formData.hourlyRate) < 0) {
-      showToast('Valid hourly rate is required', 'error'); return false;
+    // Validate commission percentage is between 0-100%
+    if (formData.commission.type === 'percentage' && parseFloat(formData.commission.value) > 100) {
+      showToast('Commission percentage cannot exceed 100%', 'error'); return false;
+    }
+    if (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0) {
+      showToast('Hourly rate must be greater than 0', 'error'); return false;
     }
     if (!formData.hireDate) { showToast('Hire date is required', 'error'); return false; }
+    // Validate phone number format (basic check)
+    const phoneRegex = /^[\d\s+\-()]{7,15}$/;
+    if (!phoneRegex.test(formData.phone.trim())) {
+      showToast('Please enter a valid phone number', 'error'); return false;
+    }
     return true;
   };
 

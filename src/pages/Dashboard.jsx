@@ -595,53 +595,7 @@ const Dashboard = () => {
     setAlerts(prev => prev.filter(a => a.id !== alertId));
   }, []);
 
-  const exportDailySales = useCallback(async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const transactions = await mockApi.transactions.getTransactions({
-        startDate: today,
-        endDate: today
-      });
-
-      // Generate CSV
-      let csv = 'Time,Receipt#,Items,Employee,Customer,Payment Method,Subtotal,Discount,Total\n';
-
-      transactions.forEach(t => {
-        const time = new Date(t.date).toLocaleTimeString();
-        const items = t.items.map(i => i.name).join(' + ');
-        csv += `"${time}","${t.receiptNumber}","${items}","${t.employee?.name}","${t.customer?.name || 'Walk-in'}","${t.paymentMethod}","₱${t.subtotal}","₱${t.discount}","₱${t.totalAmount}"\n`;
-      });
-
-      // Add summary
-      const total = transactions.reduce((sum, t) => sum + t.totalAmount, 0);
-      csv += '\nSummary\n';
-      csv += `Total Transactions,${transactions.length}\n`;
-      csv += `Total Sales,"₱${total.toFixed(2)}"\n`;
-
-      // Download
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `daily-sales-${today}.csv`;
-      a.click();
-
-      showToast('Daily sales report downloaded', 'success');
-    } catch (error) {
-      showToast('Failed to export sales', 'error');
-    }
-  }, [showToast]);
-
-  if (loading) {
-    return (
-      <div className="page-loading">
-        <div className="spinner"></div>
-        <p>Loading dashboard...</p>
-      </div>
-    );
-  }
-
-  // Memoized chart data to prevent recreation on every render
+  // Memoized chart data - must be before conditional returns (Rules of Hooks)
   const revenueChartData = useMemo(() => ({
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
@@ -691,6 +645,52 @@ const Dashboard = () => {
     responsive: true,
     maintainAspectRatio: false
   }), []);
+
+  const exportDailySales = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const transactions = await mockApi.transactions.getTransactions({
+        startDate: today,
+        endDate: today
+      });
+
+      // Generate CSV
+      let csv = 'Time,Receipt#,Items,Employee,Customer,Payment Method,Subtotal,Discount,Total\n';
+
+      transactions.forEach(t => {
+        const time = new Date(t.date).toLocaleTimeString();
+        const items = t.items.map(i => i.name).join(' + ');
+        csv += `"${time}","${t.receiptNumber}","${items}","${t.employee?.name}","${t.customer?.name || 'Walk-in'}","${t.paymentMethod}","₱${t.subtotal}","₱${t.discount}","₱${t.totalAmount}"\n`;
+      });
+
+      // Add summary
+      const total = transactions.reduce((sum, t) => sum + t.totalAmount, 0);
+      csv += '\nSummary\n';
+      csv += `Total Transactions,${transactions.length}\n`;
+      csv += `Total Sales,"₱${total.toFixed(2)}"\n`;
+
+      // Download
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `daily-sales-${today}.csv`;
+      a.click();
+
+      showToast('Daily sales report downloaded', 'success');
+    } catch (error) {
+      showToast('Failed to export sales', 'error');
+    }
+  }, [showToast]);
+
+  if (loading) {
+    return (
+      <div className="page-loading">
+        <div className="spinner"></div>
+        <p>Loading dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-page">

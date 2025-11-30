@@ -268,7 +268,8 @@ const Payroll = () => {
     });
 
     // Calculate pay using configurable rates
-    const hourlyRate = employee.dailyRate / 8;
+    // Support both hourlyRate and dailyRate (dailyRate / 8 = hourlyRate)
+    const hourlyRate = employee.hourlyRate || (employee.dailyRate ? employee.dailyRate / 8 : 0);
     const regularPay = regularHours * hourlyRate;
     const overtimeRate = getOvertimeRate();
     const overtimePay = overtimeHours * hourlyRate * overtimeRate;

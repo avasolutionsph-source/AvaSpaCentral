@@ -1439,33 +1439,54 @@ function generateAppointments() {
   return todayAppointments;
 }
 
-// Generate attendance for today
+// Generate attendance for the current pay period (last 15 days)
 function generateAttendance() {
   const attendance = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  mockDatabase.employees.forEach((emp, index) => {
-    const clockIn = new Date(today);
-    clockIn.setHours(9, Math.floor(Math.random() * 30), 0, 0);
+  // Generate attendance for last 15 days for a realistic payroll period
+  for (let dayOffset = 0; dayOffset < 15; dayOffset++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - dayOffset);
 
-    const isLate = clockIn.getMinutes() > 15;
-    const lateMinutes = isLate ? clockIn.getMinutes() - 15 : 0;
+    // Skip weekends (Saturday=6, Sunday=0)
+    if (date.getDay() === 0 || date.getDay() === 6) continue;
 
-    attendance.push({
-      _id: `att_${index + 1}`,
-      businessId: 'biz_001',
-      employeeId: emp._id,
-      employeeName: `${emp.firstName} ${emp.lastName}`,
-      date: today.toISOString(),
-      clockIn: clockIn.toISOString(),
-      clockOut: null,
-      status: 'present',
-      lateMinutes,
-      hoursWorked: 0,
-      notes: isLate ? 'Late arrival' : ''
+    mockDatabase.employees.forEach((emp, index) => {
+      const clockInMinutes = Math.floor(Math.random() * 30);
+      const clockInDate = new Date(date);
+      clockInDate.setHours(9, clockInMinutes, 0, 0);
+
+      // Most employees clock out 8-9 hours after clock in
+      const hoursWorked = 8 + Math.random();
+      const clockOutDate = new Date(clockInDate);
+      clockOutDate.setHours(clockOutDate.getHours() + Math.floor(hoursWorked));
+      clockOutDate.setMinutes(clockOutDate.getMinutes() + Math.floor((hoursWorked % 1) * 60));
+
+      const isLate = clockInMinutes > 15;
+      const lateMinutes = isLate ? clockInMinutes - 15 : 0;
+
+      // Format times as HH:MM for the Payroll component
+      const formatTime = (d) => {
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      };
+
+      attendance.push({
+        _id: `att_${dayOffset}_${index + 1}`,
+        businessId: 'biz_001',
+        employeeId: emp._id,
+        employeeName: `${emp.firstName} ${emp.lastName}`,
+        date: date.toISOString().split('T')[0],
+        clockIn: formatTime(clockInDate),
+        clockOut: formatTime(clockOutDate),
+        status: 'present',
+        lateMinutes,
+        hoursWorked: Math.round(hoursWorked * 10) / 10,
+        notes: isLate ? 'Late arrival' : ''
+      });
     });
-  });
+  }
 
   return attendance;
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import mockApi from '../mockApi/mockApi';
 import { format, parseISO, subDays, startOfDay, endOfDay } from 'date-fns';
 
 const ActivityLogs = () => {
@@ -35,145 +36,25 @@ const ActivityLogs = () => {
   const fetchActivityLogs = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const apiLogs = await mockApi.activityLogs.getLogs();
 
-      // Mock activity logs
-      const mockLogs = [
-        {
-          id: 1,
-          type: 'login',
-          action: 'User Login',
-          description: 'Maria Santos logged into the system',
-          user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' },
-          timestamp: new Date().toISOString(),
-          severity: 'info',
-          ipAddress: '192.168.1.100',
-          details: { method: 'Email/Password', device: 'Chrome on Windows' }
-        },
-        {
-          id: 2,
-          type: 'create',
-          action: 'Customer Created',
-          description: 'New customer "John Smith" added to the system',
-          user: { firstName: 'Anna', lastName: 'Cruz', role: 'Receptionist' },
-          timestamp: subDays(new Date(), 0).toISOString(),
-          severity: 'success',
-          ipAddress: '192.168.1.101',
-          details: { customerId: 'CUST-1234', customerName: 'John Smith', email: 'john@example.com' }
-        },
-        {
-          id: 3,
-          type: 'update',
-          action: 'Product Price Updated',
-          description: 'Updated price for "Swedish Massage (60 min)" from ₱800 to ₱850',
-          user: { firstName: 'Admin', lastName: 'User', role: 'Administrator' },
-          timestamp: subDays(new Date(), 0).toISOString(),
-          severity: 'info',
-          ipAddress: '192.168.1.1',
-          details: { productId: 'PROD-101', oldPrice: 800, newPrice: 850 }
-        },
-        {
-          id: 4,
-          type: 'delete',
-          action: 'Appointment Cancelled',
-          description: 'Appointment #APT-5678 cancelled by customer request',
-          user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' },
-          timestamp: subDays(new Date(), 0).toISOString(),
-          severity: 'warning',
-          ipAddress: '192.168.1.100',
-          details: { appointmentId: 'APT-5678', reason: 'Customer requested cancellation', refundAmount: 500 }
-        },
-        {
-          id: 5,
-          type: 'transaction',
-          action: 'Sale Completed',
-          description: 'Sale transaction of ₱2,450 completed at POS',
-          user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' },
-          timestamp: subDays(new Date(), 1).toISOString(),
-          severity: 'success',
-          ipAddress: '192.168.1.100',
-          details: { transactionId: 'TXN-9012', amount: 2450, items: 3, paymentMethod: 'Cash' }
-        },
-        {
-          id: 6,
-          type: 'update',
-          action: 'Employee Attendance Updated',
-          description: 'Clock-out time adjusted for John Doe',
-          user: { firstName: 'Admin', lastName: 'User', role: 'Administrator' },
-          timestamp: subDays(new Date(), 1).toISOString(),
-          severity: 'info',
-          ipAddress: '192.168.1.1',
-          details: { employeeId: 'EMP-003', date: '2025-01-20', oldClockOut: '17:00', newClockOut: '17:15', reason: 'Overtime adjustment' }
-        },
-        {
-          id: 7,
-          type: 'system',
-          action: 'System Backup Completed',
-          description: 'Automated daily backup completed successfully',
-          user: { firstName: 'System', lastName: 'Automation', role: 'System' },
-          timestamp: subDays(new Date(), 1).toISOString(),
-          severity: 'success',
-          ipAddress: 'localhost',
-          details: { backupSize: '245 MB', duration: '3.5 minutes', location: '/backups/2025-01-20.zip' }
-        },
-        {
-          id: 8,
-          type: 'error',
-          action: 'Payment Processing Failed',
-          description: 'Credit card payment failed - insufficient funds',
-          user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' },
-          timestamp: subDays(new Date(), 2).toISOString(),
-          severity: 'critical',
-          ipAddress: '192.168.1.100',
-          details: { transactionId: 'TXN-9013', amount: 1200, errorCode: 'INSUFFICIENT_FUNDS', cardLast4: '4242' }
-        },
-        {
-          id: 9,
-          type: 'logout',
-          action: 'User Logout',
-          description: 'John Doe logged out of the system',
-          user: { firstName: 'John', lastName: 'Doe', role: 'Therapist' },
-          timestamp: subDays(new Date(), 2).toISOString(),
-          severity: 'info',
-          ipAddress: '192.168.1.102',
-          details: { sessionDuration: '8 hours 15 minutes' }
-        },
-        {
-          id: 10,
-          type: 'create',
-          action: 'Expense Recorded',
-          description: 'New expense "Office Supplies" recorded for ₱1,500',
-          user: { firstName: 'Admin', lastName: 'User', role: 'Administrator' },
-          timestamp: subDays(new Date(), 3).toISOString(),
-          severity: 'info',
-          ipAddress: '192.168.1.1',
-          details: { expenseId: 'EXP-456', category: 'Office Supplies', amount: 1500, vendor: 'ABC Office Mart' }
-        },
-        {
-          id: 11,
-          type: 'security',
-          action: 'Failed Login Attempt',
-          description: 'Multiple failed login attempts detected from IP 203.45.67.89',
-          user: { firstName: 'Unknown', lastName: 'User', role: 'N/A' },
-          timestamp: subDays(new Date(), 3).toISOString(),
-          severity: 'critical',
-          ipAddress: '203.45.67.89',
-          details: { attempts: 5, username: 'admin', action: 'Account temporarily locked' }
-        },
-        {
-          id: 12,
-          type: 'update',
-          action: 'Room Status Changed',
-          description: 'Room 3 status changed from "Occupied" to "Available"',
-          user: { firstName: 'Anna', lastName: 'Cruz', role: 'Receptionist' },
-          timestamp: subDays(new Date(), 4).toISOString(),
-          severity: 'info',
-          ipAddress: '192.168.1.101',
-          details: { roomId: 'ROOM-003', oldStatus: 'Occupied', newStatus: 'Available' }
+      // If no logs in API, seed with demo data
+      if (apiLogs.length === 0) {
+        const demoLogs = [
+          { type: 'login', action: 'User Login', description: 'Maria Santos logged into the system', user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' }, severity: 'info', ipAddress: '192.168.1.100', details: { method: 'Email/Password', device: 'Chrome on Windows' } },
+          { type: 'create', action: 'Customer Created', description: 'New customer "John Smith" added to the system', user: { firstName: 'Anna', lastName: 'Cruz', role: 'Receptionist' }, severity: 'success', ipAddress: '192.168.1.101', details: { customerId: 'CUST-1234', customerName: 'John Smith' } },
+          { type: 'transaction', action: 'Sale Completed', description: 'Sale transaction of ₱2,450 completed at POS', user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' }, severity: 'success', ipAddress: '192.168.1.100', details: { transactionId: 'TXN-9012', amount: 2450, paymentMethod: 'Cash' } },
+          { type: 'update', action: 'Product Price Updated', description: 'Updated price for "Swedish Massage"', user: { firstName: 'Admin', lastName: 'User', role: 'Administrator' }, severity: 'info', ipAddress: '192.168.1.1', details: { productId: 'PROD-101', oldPrice: 800, newPrice: 850 } },
+          { type: 'system', action: 'System Started', description: 'Application initialized successfully', user: { firstName: 'System', lastName: '', role: 'System' }, severity: 'info', ipAddress: 'localhost', details: { version: '3.0.0' } }
+        ];
+        for (const log of demoLogs) {
+          await mockApi.activityLogs.createLog(log);
         }
-      ];
-
-      setLogs(mockLogs);
+        const seededLogs = await mockApi.activityLogs.getLogs();
+        setLogs(seededLogs.map((l, i) => ({ ...l, id: l._id || i + 1 })));
+      } else {
+        setLogs(apiLogs.map((l, i) => ({ ...l, id: l._id || i + 1 })));
+      }
     } catch (error) {
       showToast('Failed to load activity logs', 'error');
     } finally {

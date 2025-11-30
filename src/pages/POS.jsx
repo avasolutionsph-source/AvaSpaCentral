@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
+import { getTherapists } from '../utils/employeeFilters';
 
 const POS = () => {
   const { showToast } = useApp();
@@ -50,8 +51,14 @@ const POS = () => {
     address: ''
   });
 
+  // Service rotation state
+  const [rotationQueue, setRotationQueue] = useState([]);
+  const [nextEmployee, setNextEmployee] = useState(null);
+  const [showRotationQueue, setShowRotationQueue] = useState(true);
+
   useEffect(() => {
     loadPOSData();
+    loadRotationQueue();
   }, []);
 
   useEffect(() => {
@@ -81,6 +88,39 @@ const POS = () => {
     } catch (error) {
       showToast('Failed to load POS data', 'error');
       setLoading(false);
+    }
+  };
+
+  // Load service rotation queue
+  const loadRotationQueue = async () => {
+    try {
+      const rotationData = await mockApi.serviceRotation.getRotationQueue();
+      setRotationQueue(rotationData.queue);
+      setNextEmployee(rotationData.nextEmployee);
+
+      // Auto-select next employee if none selected
+      if (!selectedEmployee && rotationData.nextEmployee) {
+        setSelectedEmployee(rotationData.nextEmployee.employeeId);
+      }
+    } catch (error) {
+      console.error('Failed to load rotation queue:', error);
+    }
+  };
+
+  // Select employee from rotation queue
+  const selectFromRotation = (employeeId) => {
+    setSelectedEmployee(employeeId);
+    showToast('Employee selected from rotation queue', 'info');
+  };
+
+  // Skip current employee in rotation
+  const skipInRotation = async (employeeId) => {
+    try {
+      await mockApi.serviceRotation.skipEmployee(employeeId);
+      await loadRotationQueue();
+      showToast('Employee skipped in rotation', 'info');
+    } catch (error) {
+      showToast('Failed to skip employee', 'error');
     }
   };
 
@@ -293,10 +333,14 @@ const POS = () => {
       errors.push('Please select a payment method');
     }
 
+    // Only validate cash amount received for immediate payment scenarios
     if (paymentMethod === 'Cash') {
-      const received = parseFloat(amountReceived) || 0;
-      if (received < getTotal()) {
-        errors.push('Amount received must be at least equal to total');
+      // Skip validation for pay-after scenario (amount is read-only)
+      if (!isAdvanceBooking || advanceBookingData?.paymentTiming !== 'pay-after') {
+        const received = parseFloat(amountReceived) || 0;
+        if (received < getTotal()) {
+          errors.push('Amount received must be at least equal to total');
+        }
       }
     }
 
@@ -337,27 +381,9 @@ const POS = () => {
 
       // If advance booking is enabled, create booking instead of transaction
       if (isAdvanceBooking && advanceBookingData) {
-        // Validate advance booking data
+        // Basic validation - component handles detailed field validation with inline errors
         if (!advanceBookingData.bookingDateTime) {
-          showToast('Please select booking date and time', 'error');
-          setCheckoutLoading(false);
-          return;
-        }
-
-        if (!advanceBookingData.clientName) {
-          showToast('Please enter client name', 'error');
-          setCheckoutLoading(false);
-          return;
-        }
-
-        if (advanceBookingData.isHomeService && !advanceBookingData.clientAddress) {
-          showToast('Please enter client address for home service', 'error');
-          setCheckoutLoading(false);
-          return;
-        }
-
-        if (!advanceBookingData.isHomeService && !advanceBookingData.roomId) {
-          showToast('Please select a room', 'error');
+          showToast('Please complete all required booking fields', 'error');
           setCheckoutLoading(false);
           return;
         }
@@ -383,6 +409,22 @@ const POS = () => {
           return total + (item.type === 'service' ? 60 * item.quantity : 0);
         }, 0);
 
+        // Use shared customer information
+        let clientName, clientPhone, clientEmail, clientAddress;
+
+        if (customerType === 'existing' && selectedCustomer) {
+          clientName = selectedCustomer.name;
+          clientPhone = selectedCustomer.phone;
+          clientEmail = selectedCustomer.email || null;
+          clientAddress = selectedCustomer.address || null;
+        } else {
+          // Walk-in customer
+          clientName = customerData ? customerData.name : walkInCustomerData.name;
+          clientPhone = customerData ? customerData.phone : walkInCustomerData.phone;
+          clientEmail = customerData ? customerData.email : (walkInCustomerData.email || null);
+          clientAddress = customerData ? customerData.address : (walkInCustomerData.address || null);
+        }
+
         // Create advance booking
         const bookingData = {
           bookingDateTime: advanceBookingData.bookingDateTime,
@@ -394,16 +436,17 @@ const POS = () => {
           roomId: advanceBookingData.roomId || null,
           roomName: roomName,
           isHomeService: advanceBookingData.isHomeService,
-          clientName: advanceBookingData.clientName,
-          clientPhone: advanceBookingData.clientPhone || null,
-          clientEmail: advanceBookingData.clientEmail || null,
-          clientAddress: advanceBookingData.clientAddress || null,
+          clientName: clientName,
+          clientPhone: clientPhone,
+          clientEmail: clientEmail,
+          clientAddress: clientAddress,
           paymentMethod: paymentMethod,
           paymentTiming: advanceBookingData.paymentTiming,
           paymentStatus: advanceBookingData.paymentTiming === 'pay-now' ? 'paid' : 'pending',
           transactionId: transactionId,
           status: 'scheduled',
-          specialRequests: advanceBookingData.specialRequests || null
+          specialRequests: advanceBookingData.specialRequests || null,
+          clientNotes: advanceBookingData.clientNotes || null // Add client notes/preferences
         };
 
         await mockApi.advanceBooking.createAdvanceBooking(bookingData);
@@ -489,6 +532,11 @@ const POS = () => {
         }
 
         showToast('Transaction completed successfully!', 'success');
+
+        // Record service in rotation queue
+        if (selectedEmployee) {
+          await mockApi.serviceRotation.recordService(selectedEmployee);
+        }
       }
 
       // Reset everything
@@ -496,8 +544,9 @@ const POS = () => {
       setShowCheckout(false);
       resetCheckoutForm();
 
-      // Reload products (for updated stock)
+      // Reload products (for updated stock) and rotation queue
       loadPOSData();
+      loadRotationQueue();
 
     } catch (error) {
       showToast('Failed to process transaction', 'error');
@@ -701,7 +750,446 @@ const POS = () => {
             </div>
 
             <div className="modal-body">
-              {/* Cart Summary */}
+              {/* Advance Booking Section - At the very top */}
+              <AdvanceBookingCheckout
+                enabled={isAdvanceBooking}
+                onToggle={(enabled) => {
+                  setIsAdvanceBooking(enabled);
+                  // Initialize advanceBookingData with default values when enabling
+                  if (enabled && !advanceBookingData) {
+                    setAdvanceBookingData({
+                      bookingDateTime: '',
+                      paymentTiming: 'pay-now',
+                      location: 'room',
+                      roomId: '',
+                      isHomeService: false,
+                      specialRequests: '',
+                      clientNotes: ''
+                    });
+                  }
+                }}
+                value={advanceBookingData}
+                onChange={setAdvanceBookingData}
+                employees={employees}
+                rooms={rooms}
+                customers={customers}
+                // Shared customer state
+                customerType={customerType}
+                onCustomerTypeChange={setCustomerType}
+                selectedCustomer={selectedCustomer}
+                onCustomerSelect={setSelectedCustomer}
+                walkInCustomerData={walkInCustomerData}
+                onWalkInDataChange={setWalkInCustomerData}
+              />
+
+              {/* Employee Selection with Rotation Queue */}
+              <div className="checkout-section">
+                <div className="employee-section-header">
+                  <h4>👤 Select Employee *</h4>
+                  {rotationQueue.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => setShowRotationQueue(!showRotationQueue)}
+                    >
+                      {showRotationQueue ? '📋 Hide Queue' : '📋 Show Queue'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Service Rotation Queue */}
+                {showRotationQueue && rotationQueue.length > 0 && (
+                  <div className="rotation-queue-panel">
+                    <div className="rotation-queue-header">
+                      <span className="rotation-queue-title">🔄 Service Rotation Queue</span>
+                      <span className="rotation-queue-count">{rotationQueue.length} clocked in</span>
+                    </div>
+                    <div className="rotation-queue-list">
+                      {rotationQueue.map((emp, index) => (
+                        <div
+                          key={emp.employeeId}
+                          className={`rotation-queue-item ${emp.isNext ? 'next-in-line' : ''} ${selectedEmployee === emp.employeeId ? 'selected' : ''}`}
+                          onClick={() => selectFromRotation(emp.employeeId)}
+                        >
+                          <div className="rotation-queue-position">
+                            {emp.isNext ? '➡️' : `#${index + 1}`}
+                          </div>
+                          <div className="rotation-queue-info">
+                            <div className="rotation-queue-name">{emp.employeeName}</div>
+                            <div className="rotation-queue-details">
+                              <span className="rotation-clock-in">⏰ {emp.clockInTime}</span>
+                              <span className="rotation-services">🎯 {emp.servicesCompleted} services</span>
+                            </div>
+                          </div>
+                          {emp.isNext && (
+                            <button
+                              type="button"
+                              className="rotation-skip-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                skipInRotation(emp.employeeId);
+                              }}
+                              title="Skip to next person"
+                            >
+                              ⏭️
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {nextEmployee && (
+                      <div className="rotation-next-indicator">
+                        <strong>Next to serve:</strong> {nextEmployee.employeeName}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* No employees clocked in warning */}
+                {rotationQueue.length === 0 && (
+                  <div className="rotation-no-queue">
+                    <span>⚠️</span>
+                    <p>No employees clocked in today. Select manually below.</p>
+                  </div>
+                )}
+
+                {/* Standard Employee Dropdown - Therapists Only */}
+                <select
+                  value={selectedEmployee || ''}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  className="form-control"
+                  required
+                >
+                  <option value="">Select therapist...</option>
+                  {getTherapists(employees).map(emp => {
+                    const inQueue = rotationQueue.find(q => q.employeeId === emp._id);
+                    return (
+                      <option key={emp._id} value={emp._id}>
+                        {emp.firstName} {emp.lastName} - {emp.position}
+                        {inQueue ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)` : ' (⚪ Not clocked in)'}
+                      </option>
+                    );
+                  })}
+                </select>
+                {selectedEmployee && (
+                  <p className="employee-commission">
+                    Commission: {employees.find(e => e._id === selectedEmployee)?.commission.value}
+                    {employees.find(e => e._id === selectedEmployee)?.commission.type === 'percentage' ? '%' : ' PHP'}
+                  </p>
+                )}
+              </div>
+
+              {/* Customer Selection - Hidden when advance booking is enabled */}
+              {!isAdvanceBooking && (
+                <div className="checkout-section">
+                  <h4>👥 Customer</h4>
+                  <div className="customer-type-selector">
+                    <label>
+                      <input
+                        type="radio"
+                        value="walk-in"
+                        checked={customerType === 'walk-in'}
+                        onChange={(e) => setCustomerType(e.target.value)}
+                      />
+                      Walk-in
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        value="existing"
+                        checked={customerType === 'existing'}
+                        onChange={(e) => {
+                          setCustomerType(e.target.value);
+                          // Reset advance booking and walk-in data when switching to existing customer
+                          setIsAdvanceBooking(false);
+                          setAdvanceBookingData(null);
+                          setWalkInCustomerData({ name: '', phone: '', email: '', address: '' });
+                        }}
+                      />
+                      Existing Customer
+                    </label>
+                  </div>
+
+                  {/* Walk-in Customer Information Form */}
+                  {customerType === 'walk-in' && (
+                    <div className="walk-in-customer-form" style={{
+                      marginTop: 'var(--spacing-md)',
+                      padding: 'var(--spacing-md)',
+                      backgroundColor: 'var(--gray-50)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--gray-200)'
+                    }}>
+                      <p style={{ marginBottom: 'var(--spacing-sm)', fontSize: '0.9rem', color: 'var(--gray-600)' }}>
+                        📝 Customer Information (Optional - will be saved to database)
+                      </p>
+                      <div className="form-group">
+                        <label>Customer Name</label>
+                        <input
+                          type="text"
+                          value={walkInCustomerData.name}
+                          onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, name: e.target.value })}
+                          placeholder="Enter customer name"
+                          className="form-control"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Phone Number</label>
+                        <input
+                          type="tel"
+                          value={walkInCustomerData.phone}
+                          onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, phone: e.target.value })}
+                          placeholder="Enter phone number"
+                          className="form-control"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Email (Optional)</label>
+                        <input
+                          type="email"
+                          value={walkInCustomerData.email}
+                          onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, email: e.target.value })}
+                          placeholder="Enter email address"
+                          className="form-control"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Address (Optional)</label>
+                        <textarea
+                          value={walkInCustomerData.address}
+                          onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, address: e.target.value })}
+                          placeholder="Enter address"
+                          className="form-control"
+                          rows="2"
+                        ></textarea>
+                      </div>
+                      {walkInCustomerData.name && walkInCustomerData.phone && (
+                        <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 500 }}>
+                          ✓ Customer will be saved to database
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Existing Customer Selector */}
+                  {customerType === 'existing' && (
+                    <select
+                      value={selectedCustomer?._id || ''}
+                      onChange={(e) => setSelectedCustomer(customers.find(c => c._id === e.target.value))}
+                      className="form-control"
+                      style={{ marginTop: 'var(--spacing-md)' }}
+                    >
+                      <option value="">Select customer...</option>
+                      {customers.map(customer => (
+                        <option key={customer._id} value={customer._id}>
+                          {customer.name} - {customer.phone}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Payment Method - Always show except when advance booking without payment timing set */}
+              {(!isAdvanceBooking || (isAdvanceBooking && advanceBookingData?.paymentTiming)) && (
+                <div className="checkout-section">
+                  <h4>💳 Payment Method *</h4>
+                  <div className="payment-methods">
+                    <button
+                      className={`payment-btn ${paymentMethod === 'Cash' ? 'active' : ''}`}
+                      onClick={() => setPaymentMethod('Cash')}
+                    >
+                      Cash
+                    </button>
+                    <button
+                      className={`payment-btn ${paymentMethod === 'Card' ? 'active' : ''}`}
+                      onClick={() => setPaymentMethod('Card')}
+                    >
+                      Card
+                    </button>
+                    <button
+                      className={`payment-btn ${paymentMethod === 'GCash' ? 'active' : ''}`}
+                      onClick={() => setPaymentMethod('GCash')}
+                    >
+                      GCash
+                    </button>
+                  </div>
+
+                  {paymentMethod === 'Cash' && (
+                    <div className="payment-details">
+                      {/* Show different labels based on payment timing */}
+                      {isAdvanceBooking && advanceBookingData?.paymentTiming === 'pay-after' ? (
+                        <>
+                          <label>Amount to Pay (After Service):</label>
+                          <input
+                            type="number"
+                            value={getTotal()}
+                            readOnly
+                            className="form-control"
+                            style={{ backgroundColor: 'var(--gray-100)', cursor: 'not-allowed' }}
+                          />
+                          <p style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 'var(--spacing-sm)' }}>
+                            ℹ️ Payment will be collected after service completion
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <label>Amount Received:</label>
+                          <input
+                            type="number"
+                            value={amountReceived}
+                            onChange={(e) => setAmountReceived(e.target.value)}
+                            placeholder="Enter amount"
+                            className="form-control"
+                          />
+                          <div className="change-display">
+                            <span>Change:</span>
+                            <span className={getChange() < 0 ? 'negative' : 'positive'}>
+                              ₱{getChange().toLocaleString()}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {paymentMethod === 'Card' && (
+                    <div className="payment-details">
+                      {/* Show different fields based on payment timing */}
+                      {isAdvanceBooking && advanceBookingData?.paymentTiming === 'pay-after' ? (
+                        <>
+                          <label>Amount to Pay (After Service):</label>
+                          <input
+                            type="number"
+                            value={getTotal()}
+                            readOnly
+                            className="form-control"
+                            style={{ backgroundColor: 'var(--gray-100)', cursor: 'not-allowed' }}
+                          />
+                          <p style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 'var(--spacing-sm)' }}>
+                            ℹ️ Card payment will be collected after service completion
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <label>Card Transaction ID (Optional):</label>
+                          <input
+                            type="text"
+                            value={cardTransactionId}
+                            onChange={(e) => setCardTransactionId(e.target.value)}
+                            placeholder="Enter transaction ID"
+                            className="form-control"
+                          />
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {paymentMethod === 'GCash' && (
+                    <div className="payment-details">
+                      {/* Show different fields based on payment timing */}
+                      {isAdvanceBooking && advanceBookingData?.paymentTiming === 'pay-after' ? (
+                        <>
+                          <label>Amount to Pay (After Service):</label>
+                          <input
+                            type="number"
+                            value={getTotal()}
+                            readOnly
+                            className="form-control"
+                            style={{ backgroundColor: 'var(--gray-100)', cursor: 'not-allowed' }}
+                          />
+                          <p style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 'var(--spacing-sm)' }}>
+                            ℹ️ GCash payment will be collected after service completion
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <label>GCash Reference # (Optional):</label>
+                          <input
+                            type="text"
+                            value={gcashReference}
+                            onChange={(e) => setGcashReference(e.target.value)}
+                            placeholder="Enter reference number"
+                            className="form-control"
+                          />
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Discounts - Always show except when advance booking without payment timing set */}
+              {(!isAdvanceBooking || (isAdvanceBooking && advanceBookingData?.paymentTiming)) && (
+                <div className="checkout-section">
+                  <h4>🎟️ Discounts</h4>
+                  <div className="discount-buttons">
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => applyDiscount('senior')}
+                      disabled={discountType !== null}
+                    >
+                      Senior (20%)
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => applyDiscount('pwd')}
+                      disabled={discountType !== null}
+                    >
+                      PWD (20%)
+                    </button>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={openGCModal}
+                      disabled={discountType !== null}
+                    >
+                      🎁 Gift Certificate
+                    </button>
+                    {discountType && (
+                      <button className="btn btn-secondary btn-sm" onClick={clearDiscounts}>
+                        Clear Discounts
+                      </button>
+                    )}
+                  </div>
+                  {discountType && (
+                    <p className="discount-applied">
+                      ✓ {
+                        discountType === 'senior' ? 'Senior Citizen' :
+                        discountType === 'pwd' ? 'PWD' :
+                        discountType === 'gc' ? `Gift Certificate (${appliedGC?.code})` :
+                        'Discount'
+                      } applied (-₱{getDiscount().toLocaleString()})
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Booking Source - Hidden when advance booking is enabled */}
+              {!isAdvanceBooking && (
+                <div className="checkout-section">
+                  <h4>📊 Booking Source</h4>
+                  <select
+                    value={bookingSource}
+                    onChange={(e) => setBookingSource(e.target.value)}
+                    className="form-control"
+                  >
+                    <option>Walk-in</option>
+                    <option>Phone</option>
+                    <option>Facebook</option>
+                    <option>Instagram</option>
+                    <option>Website</option>
+                    <option>Referral</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Final Total */}
+              <div className="checkout-section final-total">
+                <h3>💰 Total to Pay</h3>
+                <h2>₱{getTotal().toLocaleString()}</h2>
+              </div>
+
+              {/* Cart Summary - Moved to bottom */}
               <div className="checkout-section">
                 <h4>📋 Cart Summary</h4>
                 <div className="checkout-cart-summary">
@@ -716,287 +1204,6 @@ const POS = () => {
                     <strong>₱{getCartSubtotal().toLocaleString()}</strong>
                   </div>
                 </div>
-              </div>
-
-              {/* Employee Selection */}
-              <div className="checkout-section">
-                <h4>👤 Select Employee *</h4>
-                <select
-                  value={selectedEmployee || ''}
-                  onChange={(e) => setSelectedEmployee(e.target.value)}
-                  className="form-control"
-                  required
-                >
-                  <option value="">Select employee...</option>
-                  {employees.map(emp => (
-                    <option key={emp._id} value={emp._id}>
-                      {emp.firstName} {emp.lastName} - {emp.position}
-                    </option>
-                  ))}
-                </select>
-                {selectedEmployee && (
-                  <p className="employee-commission">
-                    Commission: {employees.find(e => e._id === selectedEmployee)?.commission.value}
-                    {employees.find(e => e._id === selectedEmployee)?.commission.type === 'percentage' ? '%' : ' PHP'}
-                  </p>
-                )}
-              </div>
-
-              {/* Customer Selection */}
-              <div className="checkout-section">
-                <h4>👥 Customer</h4>
-                <div className="customer-type-selector">
-                  <label>
-                    <input
-                      type="radio"
-                      value="walk-in"
-                      checked={customerType === 'walk-in'}
-                      onChange={(e) => setCustomerType(e.target.value)}
-                    />
-                    Walk-in
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      value="existing"
-                      checked={customerType === 'existing'}
-                      onChange={(e) => {
-                        setCustomerType(e.target.value);
-                        // Reset advance booking and walk-in data when switching to existing customer
-                        setIsAdvanceBooking(false);
-                        setAdvanceBookingData(null);
-                        setWalkInCustomerData({ name: '', phone: '', email: '', address: '' });
-                      }}
-                    />
-                    Existing Customer
-                  </label>
-                </div>
-
-                {/* Walk-in Customer Information Form */}
-                {customerType === 'walk-in' && (
-                  <div className="walk-in-customer-form" style={{
-                    marginTop: 'var(--spacing-md)',
-                    padding: 'var(--spacing-md)',
-                    backgroundColor: 'var(--gray-50)',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--gray-200)'
-                  }}>
-                    <p style={{ marginBottom: 'var(--spacing-sm)', fontSize: '0.9rem', color: 'var(--gray-600)' }}>
-                      📝 Customer Information (Optional - will be saved to database)
-                    </p>
-                    <div className="form-group">
-                      <label>Customer Name</label>
-                      <input
-                        type="text"
-                        value={walkInCustomerData.name}
-                        onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, name: e.target.value })}
-                        placeholder="Enter customer name"
-                        className="form-control"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Phone Number</label>
-                      <input
-                        type="tel"
-                        value={walkInCustomerData.phone}
-                        onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, phone: e.target.value })}
-                        placeholder="Enter phone number"
-                        className="form-control"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Email (Optional)</label>
-                      <input
-                        type="email"
-                        value={walkInCustomerData.email}
-                        onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, email: e.target.value })}
-                        placeholder="Enter email address"
-                        className="form-control"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Address (Optional)</label>
-                      <textarea
-                        value={walkInCustomerData.address}
-                        onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, address: e.target.value })}
-                        placeholder="Enter address"
-                        className="form-control"
-                        rows="2"
-                      ></textarea>
-                    </div>
-                    {walkInCustomerData.name && walkInCustomerData.phone && (
-                      <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 500 }}>
-                        ✓ Customer will be saved to database
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Existing Customer Selector */}
-                {customerType === 'existing' && (
-                  <select
-                    value={selectedCustomer?._id || ''}
-                    onChange={(e) => setSelectedCustomer(customers.find(c => c._id === e.target.value))}
-                    className="form-control"
-                    style={{ marginTop: 'var(--spacing-md)' }}
-                  >
-                    <option value="">Select customer...</option>
-                    {customers.map(customer => (
-                      <option key={customer._id} value={customer._id}>
-                        {customer.name} - {customer.phone}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Payment Method */}
-              <div className="checkout-section">
-                <h4>💳 Payment Method *</h4>
-                <div className="payment-methods">
-                  <button
-                    className={`payment-btn ${paymentMethod === 'Cash' ? 'active' : ''}`}
-                    onClick={() => setPaymentMethod('Cash')}
-                  >
-                    Cash
-                  </button>
-                  <button
-                    className={`payment-btn ${paymentMethod === 'Card' ? 'active' : ''}`}
-                    onClick={() => setPaymentMethod('Card')}
-                  >
-                    Card
-                  </button>
-                  <button
-                    className={`payment-btn ${paymentMethod === 'GCash' ? 'active' : ''}`}
-                    onClick={() => setPaymentMethod('GCash')}
-                  >
-                    GCash
-                  </button>
-                </div>
-
-                {paymentMethod === 'Cash' && (
-                  <div className="payment-details">
-                    <label>Amount Received:</label>
-                    <input
-                      type="number"
-                      value={amountReceived}
-                      onChange={(e) => setAmountReceived(e.target.value)}
-                      placeholder="Enter amount"
-                      className="form-control"
-                    />
-                    <div className="change-display">
-                      <span>Change:</span>
-                      <span className={getChange() < 0 ? 'negative' : 'positive'}>
-                        ₱{getChange().toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {paymentMethod === 'Card' && (
-                  <div className="payment-details">
-                    <label>Card Transaction ID (Optional):</label>
-                    <input
-                      type="text"
-                      value={cardTransactionId}
-                      onChange={(e) => setCardTransactionId(e.target.value)}
-                      placeholder="Enter transaction ID"
-                      className="form-control"
-                    />
-                  </div>
-                )}
-
-                {paymentMethod === 'GCash' && (
-                  <div className="payment-details">
-                    <label>GCash Reference # (Optional):</label>
-                    <input
-                      type="text"
-                      value={gcashReference}
-                      onChange={(e) => setGcashReference(e.target.value)}
-                      placeholder="Enter reference number"
-                      className="form-control"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Discounts */}
-              <div className="checkout-section">
-                <h4>🎟️ Discounts</h4>
-                <div className="discount-buttons">
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => applyDiscount('senior')}
-                    disabled={discountType !== null}
-                  >
-                    Senior (20%)
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => applyDiscount('pwd')}
-                    disabled={discountType !== null}
-                  >
-                    PWD (20%)
-                  </button>
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={openGCModal}
-                    disabled={discountType !== null}
-                  >
-                    🎁 Gift Certificate
-                  </button>
-                  {discountType && (
-                    <button className="btn btn-secondary btn-sm" onClick={clearDiscounts}>
-                      Clear Discounts
-                    </button>
-                  )}
-                </div>
-                {discountType && (
-                  <p className="discount-applied">
-                    ✓ {
-                      discountType === 'senior' ? 'Senior Citizen' :
-                      discountType === 'pwd' ? 'PWD' :
-                      discountType === 'gc' ? `Gift Certificate (${appliedGC?.code})` :
-                      'Discount'
-                    } applied (-₱{getDiscount().toLocaleString()})
-                  </p>
-                )}
-              </div>
-
-              {/* Booking Source */}
-              <div className="checkout-section">
-                <h4>📊 Booking Source</h4>
-                <select
-                  value={bookingSource}
-                  onChange={(e) => setBookingSource(e.target.value)}
-                  className="form-control"
-                >
-                  <option>Walk-in</option>
-                  <option>Phone</option>
-                  <option>Facebook</option>
-                  <option>Instagram</option>
-                  <option>Website</option>
-                  <option>Referral</option>
-                  <option>Other</option>
-                </select>
-              </div>
-
-              {/* Advance Booking Section - Only show for walk-in customers */}
-              {customerType === 'walk-in' && (
-                <AdvanceBookingCheckout
-                  enabled={isAdvanceBooking}
-                  onToggle={setIsAdvanceBooking}
-                  value={advanceBookingData}
-                  onChange={setAdvanceBookingData}
-                  employees={employees}
-                  rooms={rooms}
-                />
-              )}
-
-              {/* Final Total */}
-              <div className="checkout-section final-total">
-                <h3>💰 Total to Pay</h3>
-                <h2>₱{getTotal().toLocaleString()}</h2>
               </div>
             </div>
 

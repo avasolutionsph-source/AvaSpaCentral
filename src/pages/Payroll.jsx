@@ -12,6 +12,7 @@ const Payroll = () => {
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [payrollConfig, setPayrollConfig] = useState(null);
 
   const [period, setPeriod] = useState('current');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -29,14 +30,16 @@ const Payroll = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [emps, att, trans] = await Promise.all([
+      const [emps, att, trans, config] = await Promise.all([
         mockApi.employees.getEmployees(),
         mockApi.attendance.getAttendance(),
-        mockApi.transactions.getTransactions()
+        mockApi.transactions.getTransactions(),
+        mockApi.payrollConfig.getPayrollConfig()
       ]);
-      setEmployees(emps.filter(e => e.active));
+      setEmployees(emps.filter(e => e.status === 'active'));
       setAttendance(att);
       setTransactions(trans);
+      setPayrollConfig(config);
       setLoading(false);
     } catch (error) {
       showToast('Failed to load payroll data', 'error');
@@ -170,6 +173,34 @@ const Payroll = () => {
     return 183541.80 + (taxableIncome - 666666) * 0.35;
   };
 
+  // Get configured overtime rate (or use default if disabled)
+  const getOvertimeRate = () => {
+    if (!payrollConfig) return 1.25; // Default
+    const config = payrollConfig.regularOvertime;
+    return config?.enabled ? config.rate : 1.0; // 100% if disabled
+  };
+
+  // Get configured night differential rate
+  const getNightDiffRate = () => {
+    if (!payrollConfig) return 0.10; // Default 10%
+    const config = payrollConfig.nightDifferential;
+    return config?.enabled ? config.rate : 0; // 0 if disabled
+  };
+
+  // Get configured holiday rates
+  const getHolidayRate = (isRegular) => {
+    if (!payrollConfig) return isRegular ? 2.0 : 1.3;
+    const config = isRegular ? payrollConfig.regularHoliday : payrollConfig.specialHoliday;
+    return config?.enabled ? config.rate : 1.0; // 100% if disabled
+  };
+
+  // Get rest day overtime rate
+  const getRestDayOTRate = () => {
+    if (!payrollConfig) return 1.30;
+    const config = payrollConfig.restDayOvertime;
+    return config?.enabled ? config.rate : 1.0;
+  };
+
   const calculateEmployeePayroll = (employee, startDate, endDate) => {
     // Get attendance for period
     const empAttendance = attendance.filter(a => {
@@ -182,6 +213,7 @@ const Payroll = () => {
     let totalHours = 0;
     let regularHours = 0;
     let overtimeHours = 0;
+    let nightDiffHours = 0;
     let lateMinutes = 0;
 
     empAttendance.forEach(record => {
@@ -194,6 +226,14 @@ const Payroll = () => {
       totalHours += hours;
       lateMinutes += record.lateMinutes || 0;
 
+      // Check for night differential hours (10PM - 6AM)
+      const clockInHour = clockIn.getHours();
+      const clockOutHour = clockOut.getHours();
+      if (clockOutHour >= 22 || clockOutHour <= 6 || clockInHour >= 22) {
+        // Simplified: if any part of shift is in night hours, add some ND hours
+        nightDiffHours += Math.min(hours * 0.3, 4); // Estimate night hours
+      }
+
       if (hours > 8) {
         regularHours += 8;
         overtimeHours += (hours - 8);
@@ -202,10 +242,15 @@ const Payroll = () => {
       }
     });
 
-    // Calculate pay
+    // Calculate pay using configurable rates
     const hourlyRate = employee.dailyRate / 8;
     const regularPay = regularHours * hourlyRate;
-    const overtimePay = overtimeHours * hourlyRate * 1.25; // Regular OT multiplier
+    const overtimeRate = getOvertimeRate();
+    const overtimePay = overtimeHours * hourlyRate * overtimeRate;
+
+    // Calculate night differential pay
+    const nightDiffRate = getNightDiffRate();
+    const nightDiffPay = nightDiffHours * hourlyRate * nightDiffRate;
 
     // Calculate commissions
     const empTransactions = transactions.filter(t => {
@@ -223,8 +268,8 @@ const Payroll = () => {
       }
     });
 
-    // Gross pay
-    const grossPay = regularPay + overtimePay + commissions;
+    // Gross pay (now includes night differential)
+    const grossPay = regularPay + overtimePay + nightDiffPay + commissions;
 
     // Calculate monthly gross for deductions (semi-monthly × 2)
     const monthlyGross = grossPay * 2;
@@ -255,9 +300,11 @@ const Payroll = () => {
       daysWorked: empAttendance.length,
       regularHours: Math.round(regularHours * 10) / 10,
       overtimeHours: Math.round(overtimeHours * 10) / 10,
+      nightDiffHours: Math.round(nightDiffHours * 10) / 10,
       lateMinutes,
       regularPay,
       overtimePay,
+      nightDiffPay,
       commissions,
       grossPay,
       deductions: {
@@ -272,6 +319,11 @@ const Payroll = () => {
       period: {
         start: format(startDate, 'yyyy-MM-dd'),
         end: format(endDate, 'yyyy-MM-dd')
+      },
+      // Store applied rates for payslip display
+      appliedRates: {
+        overtime: overtimeRate,
+        nightDiff: nightDiffRate
       }
     };
   };
@@ -302,7 +354,8 @@ const Payroll = () => {
       totalDeductions: payrollData.reduce((sum, p) => sum + p.deductions.total, 0),
       netPay: payrollData.reduce((sum, p) => sum + p.netPay, 0),
       commissions: payrollData.reduce((sum, p) => sum + p.commissions, 0),
-      overtime: payrollData.reduce((sum, p) => sum + p.overtimePay, 0)
+      overtime: payrollData.reduce((sum, p) => sum + p.overtimePay, 0),
+      nightDiff: payrollData.reduce((sum, p) => sum + (p.nightDiffPay || 0), 0)
     };
   };
 
@@ -633,9 +686,15 @@ const Payroll = () => {
                     <span>₱{selectedPayslip.regularPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="payslip-line">
-                    <span>Overtime Pay ({selectedPayslip.overtimeHours}h @ ₱{((selectedPayslip.employee.dailyRate / 8) * 1.25).toFixed(2)}/hr)</span>
+                    <span>Overtime Pay ({selectedPayslip.overtimeHours}h @ {((selectedPayslip.appliedRates?.overtime || 1.25) * 100).toFixed(0)}%)</span>
                     <span>₱{selectedPayslip.overtimePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
+                  {selectedPayslip.nightDiffPay > 0 && (
+                    <div className="payslip-line">
+                      <span>Night Differential ({selectedPayslip.nightDiffHours}h @ +{((selectedPayslip.appliedRates?.nightDiff || 0.10) * 100).toFixed(0)}%)</span>
+                      <span>₱{selectedPayslip.nightDiffPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
                   <div className="payslip-line">
                     <span>Commissions</span>
                     <span>₱{selectedPayslip.commissions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

@@ -16,6 +16,7 @@ import {
   setHours,
   setMinutes
 } from 'date-fns';
+import { advanceBookingApi } from '../mockApi/advanceBookingApi';
 
 const Calendar = () => {
   const { showToast } = useApp();
@@ -33,80 +34,90 @@ const Calendar = () => {
     loadAppointments();
   }, [currentDate, view]);
 
-  const loadAppointments = () => {
+  const loadAppointments = async () => {
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const mockAppointments = [
-        {
-          id: 1,
-          customer: 'Maria Santos',
-          service: 'Swedish Massage (90 min)',
-          therapist: 'John Doe',
-          date: new Date().toISOString(),
-          startTime: '09:00',
-          endTime: '10:30',
-          status: 'confirmed',
-          room: 'Room 1',
-          price: 1200,
-          notes: 'Customer prefers firm pressure'
-        },
-        {
-          id: 2,
-          customer: 'Anna Cruz',
-          service: 'Hot Stone Therapy',
-          therapist: 'Jane Smith',
-          date: new Date().toISOString(),
-          startTime: '11:00',
-          endTime: '12:30',
-          status: 'pending',
-          room: 'Room 2',
-          price: 1500,
-          notes: ''
-        },
-        {
-          id: 3,
-          customer: 'Lisa Garcia',
-          service: 'Aromatherapy Massage',
-          therapist: 'Mike Johnson',
-          date: addDays(new Date(), 1).toISOString(),
-          startTime: '14:00',
-          endTime: '15:00',
-          status: 'confirmed',
-          room: 'Room 3',
-          price: 1000,
-          notes: 'Allergic to lavender oil'
-        },
-        {
-          id: 4,
-          customer: 'Sarah Lee',
-          service: 'Deep Tissue Massage',
-          therapist: 'John Doe',
-          date: addDays(new Date(), 2).toISOString(),
-          startTime: '10:00',
-          endTime: '11:30',
-          status: 'completed',
-          room: 'Room 1',
-          price: 1300,
-          notes: ''
-        },
-        {
-          id: 5,
-          customer: 'Emma Wilson',
-          service: 'Facial Treatment',
-          therapist: 'Jane Smith',
-          date: addDays(new Date(), -1).toISOString(),
-          startTime: '15:00',
-          endTime: '16:00',
-          status: 'cancelled',
-          room: 'Room 2',
-          price: 800,
-          notes: 'Cancelled due to emergency'
-        }
-      ];
-      setAppointments(mockAppointments);
+    try {
+      // Fetch advance bookings from API
+      const bookings = await advanceBookingApi.listAdvanceBookings();
+
+      // Transform bookings to calendar appointment format
+      const transformedAppointments = bookings.map(booking => {
+        const bookingDate = new Date(booking.bookingDateTime);
+        const startTime = format(bookingDate, 'HH:mm');
+        const endDate = new Date(bookingDate.getTime() + (booking.estimatedDuration || 60) * 60000);
+        const endTime = format(endDate, 'HH:mm');
+
+        return {
+          id: booking.id,
+          customer: booking.clientName,
+          service: booking.serviceName,
+          therapist: booking.employeeName,
+          date: booking.bookingDateTime,
+          startTime,
+          endTime,
+          status: booking.status === 'scheduled' ? 'pending' : booking.status,
+          room: booking.roomName || (booking.isHomeService ? 'Home Service' : 'N/A'),
+          price: booking.servicePrice,
+          notes: booking.specialRequests || '',
+          isHomeService: booking.isHomeService,
+          clientPhone: booking.clientPhone,
+          clientAddress: booking.clientAddress
+        };
+      });
+
+      // If no bookings exist, show demo data
+      if (transformedAppointments.length === 0) {
+        const mockAppointments = [
+          {
+            id: 'demo_1',
+            customer: 'Maria Santos',
+            service: 'Swedish Massage (90 min)',
+            therapist: 'John Doe',
+            date: new Date().toISOString(),
+            startTime: '09:00',
+            endTime: '10:30',
+            status: 'confirmed',
+            room: 'Room 1',
+            price: 1200,
+            notes: 'Customer prefers firm pressure'
+          },
+          {
+            id: 'demo_2',
+            customer: 'Anna Cruz',
+            service: 'Hot Stone Therapy',
+            therapist: 'Jane Smith',
+            date: new Date().toISOString(),
+            startTime: '11:00',
+            endTime: '12:30',
+            status: 'pending',
+            room: 'Room 2',
+            price: 1500,
+            notes: ''
+          },
+          {
+            id: 'demo_3',
+            customer: 'Lisa Garcia',
+            service: 'Aromatherapy Massage',
+            therapist: 'Mike Johnson',
+            date: addDays(new Date(), 1).toISOString(),
+            startTime: '14:00',
+            endTime: '15:00',
+            status: 'confirmed',
+            room: 'Room 3',
+            price: 1000,
+            notes: 'Allergic to lavender oil'
+          }
+        ];
+        setAppointments(mockAppointments);
+      } else {
+        setAppointments(transformedAppointments);
+      }
+    } catch (error) {
+      console.error('Failed to load appointments:', error);
+      showToast('Failed to load calendar appointments', 'error');
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
   // Navigation functions

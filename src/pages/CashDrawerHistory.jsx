@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
+import mockApi from '../mockApi/mockApi';
 
 const CashDrawerHistory = () => {
   const { showToast } = useApp();
@@ -21,94 +22,120 @@ const CashDrawerHistory = () => {
   const fetchCashDrawerSessions = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Fetch from API
+      let apiSessions = await mockApi.cashDrawer.getSessions({
+        startDate: filterStartDate || undefined,
+        endDate: filterEndDate || undefined
+      });
 
-      // Mock cash drawer sessions
-      const mockSessions = [
-        {
-          id: 1,
-          user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' },
-          openTime: '2025-01-20T08:00:00',
-          closeTime: '2025-01-20T17:00:00',
-          openingFloat: 5000,
-          expectedCash: 23450,
-          actualCash: 23450,
-          variance: 0,
-          status: 'closed',
-          transactions: [
-            { id: 101, type: 'Sale', time: '08:15', amount: 1200, method: 'Cash' },
-            { id: 102, type: 'Sale', time: '08:45', amount: 800, method: 'Cash' },
-            { id: 103, type: 'Sale', time: '09:30', amount: 2500, method: 'Cash' },
-            { id: 104, type: 'Sale', time: '10:15', amount: 1500, method: 'Cash' },
-            { id: 105, type: 'Sale', time: '11:00', amount: 3200, method: 'Cash' },
-            { id: 106, type: 'Refund', time: '11:30', amount: -500, method: 'Cash' },
-            { id: 107, type: 'Sale', time: '13:00', amount: 2100, method: 'Cash' },
-            { id: 108, type: 'Sale', time: '14:30', amount: 1850, method: 'Cash' },
-            { id: 109, type: 'Sale', time: '15:45', amount: 2800, method: 'Cash' },
-            { id: 110, type: 'Sale', time: '16:30', amount: 1500, method: 'Cash' }
-          ]
-        },
-        {
-          id: 2,
-          user: { firstName: 'John', lastName: 'Doe', role: 'Cashier' },
-          openTime: '2025-01-19T08:00:00',
-          closeTime: '2025-01-19T17:00:00',
-          openingFloat: 5000,
-          expectedCash: 19750,
-          actualCash: 19700,
-          variance: -50,
-          status: 'closed',
-          transactions: [
-            { id: 201, type: 'Sale', time: '08:30', amount: 1500, method: 'Cash' },
-            { id: 202, type: 'Sale', time: '09:00', amount: 2200, method: 'Cash' },
-            { id: 203, type: 'Sale', time: '10:45', amount: 1800, method: 'Cash' },
-            { id: 204, type: 'Sale', time: '12:00', amount: 2500, method: 'Cash' },
-            { id: 205, type: 'Sale', time: '13:30', amount: 1950, method: 'Cash' },
-            { id: 206, type: 'Sale', time: '15:00', amount: 2300, method: 'Cash' },
-            { id: 207, type: 'Sale', time: '16:00', amount: 1500, method: 'Cash' }
-          ]
-        },
-        {
-          id: 3,
-          user: { firstName: 'Anna', lastName: 'Cruz', role: 'Cashier' },
-          openTime: '2025-01-18T08:00:00',
-          closeTime: '2025-01-18T17:00:00',
-          openingFloat: 5000,
-          expectedCash: 21300,
-          actualCash: 21350,
-          variance: 50,
-          status: 'closed',
-          transactions: [
-            { id: 301, type: 'Sale', time: '08:15', amount: 1800, method: 'Cash' },
-            { id: 302, type: 'Sale', time: '09:30', amount: 2100, method: 'Cash' },
-            { id: 303, type: 'Sale', time: '10:00', amount: 1600, method: 'Cash' },
-            { id: 304, type: 'Sale', time: '11:15', amount: 2800, method: 'Cash' },
-            { id: 305, type: 'Sale', time: '13:00', amount: 1900, method: 'Cash' },
-            { id: 306, type: 'Sale', time: '14:30', amount: 2400, method: 'Cash' },
-            { id: 307, type: 'Sale', time: '15:45', amount: 1700, method: 'Cash' },
-            { id: 308, type: 'Sale', time: '16:30', amount: 2000, method: 'Cash' }
-          ]
-        },
-        {
-          id: 4,
-          user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' },
-          openTime: '2025-01-21T08:00:00',
-          closeTime: null,
-          openingFloat: 5000,
-          expectedCash: 12500,
-          actualCash: null,
-          variance: null,
-          status: 'open',
-          transactions: [
-            { id: 401, type: 'Sale', time: '08:20', amount: 1200, method: 'Cash' },
-            { id: 402, type: 'Sale', time: '09:00', amount: 1800, method: 'Cash' },
-            { id: 403, type: 'Sale', time: '10:15', amount: 2500, method: 'Cash' },
-            { id: 404, type: 'Sale', time: '11:30', amount: 2000, method: 'Cash' }
-          ]
+      // If no sessions exist, seed with demo data
+      if (apiSessions.length === 0) {
+        const demoSessions = [
+          {
+            userId: 'user_001',
+            userName: 'Maria Santos',
+            userRole: 'Cashier',
+            openTime: '2025-01-20T08:00:00',
+            closeTime: '2025-01-20T17:00:00',
+            openingFloat: 5000,
+            expectedCash: 23450,
+            actualCash: 23450,
+            variance: 0,
+            status: 'closed',
+            transactions: [
+              { type: 'Sale', time: '08:15', amount: 1200, method: 'Cash' },
+              { type: 'Sale', time: '08:45', amount: 800, method: 'Cash' },
+              { type: 'Sale', time: '09:30', amount: 2500, method: 'Cash' },
+              { type: 'Sale', time: '10:15', amount: 1500, method: 'Cash' },
+              { type: 'Sale', time: '11:00', amount: 3200, method: 'Cash' },
+              { type: 'Refund', time: '11:30', amount: -500, method: 'Cash' },
+              { type: 'Sale', time: '13:00', amount: 2100, method: 'Cash' },
+              { type: 'Sale', time: '14:30', amount: 1850, method: 'Cash' },
+              { type: 'Sale', time: '15:45', amount: 2800, method: 'Cash' },
+              { type: 'Sale', time: '16:30', amount: 1500, method: 'Cash' }
+            ]
+          },
+          {
+            userId: 'user_002',
+            userName: 'John Doe',
+            userRole: 'Cashier',
+            openTime: '2025-01-19T08:00:00',
+            closeTime: '2025-01-19T17:00:00',
+            openingFloat: 5000,
+            expectedCash: 19750,
+            actualCash: 19700,
+            variance: -50,
+            status: 'closed',
+            transactions: [
+              { type: 'Sale', time: '08:30', amount: 1500, method: 'Cash' },
+              { type: 'Sale', time: '09:00', amount: 2200, method: 'Cash' },
+              { type: 'Sale', time: '10:45', amount: 1800, method: 'Cash' },
+              { type: 'Sale', time: '12:00', amount: 2500, method: 'Cash' },
+              { type: 'Sale', time: '13:30', amount: 1950, method: 'Cash' },
+              { type: 'Sale', time: '15:00', amount: 2300, method: 'Cash' },
+              { type: 'Sale', time: '16:00', amount: 1500, method: 'Cash' }
+            ]
+          },
+          {
+            userId: 'user_003',
+            userName: 'Anna Cruz',
+            userRole: 'Cashier',
+            openTime: '2025-01-18T08:00:00',
+            closeTime: '2025-01-18T17:00:00',
+            openingFloat: 5000,
+            expectedCash: 21300,
+            actualCash: 21350,
+            variance: 50,
+            status: 'closed',
+            transactions: [
+              { type: 'Sale', time: '08:15', amount: 1800, method: 'Cash' },
+              { type: 'Sale', time: '09:30', amount: 2100, method: 'Cash' },
+              { type: 'Sale', time: '10:00', amount: 1600, method: 'Cash' },
+              { type: 'Sale', time: '11:15', amount: 2800, method: 'Cash' },
+              { type: 'Sale', time: '13:00', amount: 1900, method: 'Cash' },
+              { type: 'Sale', time: '14:30', amount: 2400, method: 'Cash' },
+              { type: 'Sale', time: '15:45', amount: 1700, method: 'Cash' },
+              { type: 'Sale', time: '16:30', amount: 2000, method: 'Cash' }
+            ]
+          }
+        ];
+
+        for (const session of demoSessions) {
+          await mockApi.cashDrawer.createSession(session);
         }
-      ];
+        apiSessions = await mockApi.cashDrawer.getSessions();
+      }
 
-      setSessions(mockSessions);
+      // Transform API sessions to expected format
+      const transformedSessions = apiSessions.map(session => ({
+        id: session._id,
+        user: {
+          firstName: session.userName?.split(' ')[0] || 'Unknown',
+          lastName: session.userName?.split(' ')[1] || '',
+          role: session.userRole || 'Cashier'
+        },
+        openTime: session.openTime,
+        closeTime: session.closeTime,
+        openingFloat: session.openingFloat,
+        expectedCash: session.expectedCash,
+        actualCash: session.actualCash,
+        variance: session.variance,
+        status: session.status,
+        transactions: session.transactions || []
+      }));
+
+      // Apply filters
+      let filtered = transformedSessions;
+      if (filterUser !== 'all') {
+        filtered = filtered.filter(s =>
+          `${s.user.firstName} ${s.user.lastName}`.toLowerCase().includes(filterUser.toLowerCase())
+        );
+      }
+      if (filterStatus !== 'all') {
+        filtered = filtered.filter(s => s.status === filterStatus);
+      }
+
+      setSessions(filtered);
     } catch (error) {
       showToast('Failed to load cash drawer history', 'error');
     } finally {

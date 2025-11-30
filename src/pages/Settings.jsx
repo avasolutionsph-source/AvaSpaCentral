@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import mockApi from '../mockApi/mockApi';
+import { format, parseISO } from 'date-fns';
 
 const Settings = () => {
-  const { showToast, user, canEdit } = useApp();
+  const { showToast, user, canEdit, isOwner, hasManagementAccess } = useApp();
 
   // Business Info
   const [businessInfo, setBusinessInfo] = useState({
@@ -103,6 +105,13 @@ const Settings = () => {
     }
   ]);
 
+  // Payroll Configuration State
+  const [payrollConfig, setPayrollConfig] = useState(null);
+  const [payrollConfigLogs, setPayrollConfigLogs] = useState([]);
+  const [payrollConfigLoading, setPayrollConfigLoading] = useState(true);
+  const [savingPayrollConfig, setSavingPayrollConfig] = useState(false);
+  const [showPayrollLogs, setShowPayrollLogs] = useState(false);
+
   const handleBusinessInfoChange = (e) => {
     const { name, value } = e.target;
     setBusinessInfo(prev => ({ ...prev, [name]: value }));
@@ -198,7 +207,126 @@ const Settings = () => {
     if (savedBusinessHours) setBusinessHours(JSON.parse(savedBusinessHours));
     if (savedTaxSettings) setTaxSettings(JSON.parse(savedTaxSettings));
     if (savedTheme) setTheme(savedTheme);
+
+    // Load payroll configuration
+    loadPayrollConfig();
   }, []);
+
+  // Load payroll configuration
+  const loadPayrollConfig = async () => {
+    try {
+      setPayrollConfigLoading(true);
+      const [config, logs] = await Promise.all([
+        mockApi.payrollConfig.getPayrollConfig(),
+        mockApi.payrollConfig.getPayrollConfigLogs()
+      ]);
+      setPayrollConfig(config);
+      setPayrollConfigLogs(logs);
+    } catch (error) {
+      showToast('Failed to load payroll configuration', 'error');
+    } finally {
+      setPayrollConfigLoading(false);
+    }
+  };
+
+  // Handle payroll rate toggle
+  const handlePayrollRateToggle = (rateKey) => {
+    if (!isOwner()) {
+      showToast('Only the owner can modify payroll settings', 'error');
+      return;
+    }
+    setPayrollConfig(prev => ({
+      ...prev,
+      [rateKey]: {
+        ...prev[rateKey],
+        enabled: !prev[rateKey].enabled
+      }
+    }));
+  };
+
+  // Handle payroll rate change
+  const handlePayrollRateChange = (rateKey, value) => {
+    if (!isOwner()) {
+      showToast('Only the owner can modify payroll settings', 'error');
+      return;
+    }
+    const numValue = parseFloat(value) || 0;
+    setPayrollConfig(prev => ({
+      ...prev,
+      [rateKey]: {
+        ...prev[rateKey],
+        rate: numValue
+      }
+    }));
+  };
+
+  // Save payroll configuration
+  const handleSavePayrollConfig = async () => {
+    if (!isOwner()) {
+      showToast('Only the owner can modify payroll settings', 'error');
+      return;
+    }
+
+    try {
+      setSavingPayrollConfig(true);
+      const result = await mockApi.payrollConfig.updatePayrollConfig(
+        payrollConfig,
+        user._id,
+        `${user.firstName} ${user.lastName}`
+      );
+
+      if (result.success) {
+        showToast(`Payroll settings saved! ${result.changesCount} change(s) recorded.`, 'success');
+        // Reload logs
+        const logs = await mockApi.payrollConfig.getPayrollConfigLogs();
+        setPayrollConfigLogs(logs);
+      }
+    } catch (error) {
+      showToast('Failed to save payroll configuration', 'error');
+    } finally {
+      setSavingPayrollConfig(false);
+    }
+  };
+
+  // Reset payroll configuration to defaults
+  const handleResetPayrollConfig = async () => {
+    if (!isOwner()) {
+      showToast('Only the owner can modify payroll settings', 'error');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to reset all payroll rates to default values?')) {
+      return;
+    }
+
+    try {
+      setSavingPayrollConfig(true);
+      const result = await mockApi.payrollConfig.resetPayrollConfig(
+        user._id,
+        `${user.firstName} ${user.lastName}`
+      );
+
+      if (result.success) {
+        setPayrollConfig(result.config);
+        showToast('Payroll settings reset to defaults', 'success');
+        // Reload logs
+        const logs = await mockApi.payrollConfig.getPayrollConfigLogs();
+        setPayrollConfigLogs(logs);
+      }
+    } catch (error) {
+      showToast('Failed to reset payroll configuration', 'error');
+    } finally {
+      setSavingPayrollConfig(false);
+    }
+  };
+
+  // Format rate for display
+  const formatRateDisplay = (rate, key) => {
+    if (key === 'nightDifferential') {
+      return `${(rate * 100).toFixed(0)}%`;
+    }
+    return `${(rate * 100).toFixed(0)}%`;
+  };
 
   const getInitials = () => {
     return `${profileData.firstName.charAt(0)}${profileData.lastName.charAt(0)}`.toUpperCase();
@@ -425,6 +553,165 @@ const Settings = () => {
             </div>
           </div>
         </div>
+
+        {/* Payroll Settings - Owner/Manager can view, only Owner can edit */}
+        {hasManagementAccess() && (
+          <div className="settings-section payroll-settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">📊</div>
+              <div className="settings-section-title">
+                <h2>Payroll Settings</h2>
+                <p>Configure overtime, holiday, and night differential rates</p>
+              </div>
+              {!isOwner() && (
+                <span className="settings-view-only-badge">View Only</span>
+              )}
+            </div>
+            <div className="settings-section-body">
+              {payrollConfigLoading ? (
+                <div className="payroll-config-loading">
+                  <div className="spinner"></div>
+                  <p>Loading payroll configuration...</p>
+                </div>
+              ) : payrollConfig ? (
+                <>
+                  {/* Info Banner */}
+                  <div className="payroll-config-info-banner">
+                    <div className="info-banner-icon">ℹ️</div>
+                    <div className="info-banner-content">
+                      <strong>Philippine Labor Law Rates</strong>
+                      <p>Configure multipliers for overtime, holiday pay, and night differential. When a rate is disabled, hours will be paid at 100% regular rate.</p>
+                    </div>
+                  </div>
+
+                  {/* Payroll Rates Grid */}
+                  <div className="payroll-rates-grid">
+                    {Object.entries(payrollConfig).map(([key, config]) => (
+                      <div key={key} className={`payroll-rate-card ${!config.enabled ? 'disabled' : ''}`}>
+                        <div className="payroll-rate-header">
+                          <div className="payroll-rate-info">
+                            <div className="payroll-rate-label">{config.label}</div>
+                            <div className="payroll-rate-desc">{config.description}</div>
+                          </div>
+                          <div className="payroll-rate-toggle">
+                            <div
+                              className={`toggle-switch ${config.enabled ? 'active' : ''} ${!isOwner() ? 'disabled' : ''}`}
+                              onClick={() => isOwner() && handlePayrollRateToggle(key)}
+                              title={!isOwner() ? 'Only owner can modify' : (config.enabled ? 'Disable rate' : 'Enable rate')}
+                            />
+                          </div>
+                        </div>
+                        <div className="payroll-rate-input-row">
+                          <div className="payroll-rate-input-group">
+                            <label>Rate Multiplier</label>
+                            <div className="payroll-rate-input-wrapper">
+                              <input
+                                type="number"
+                                value={config.rate}
+                                onChange={(e) => handlePayrollRateChange(key, e.target.value)}
+                                disabled={!config.enabled || !isOwner()}
+                                min="0"
+                                max="10"
+                                step="0.01"
+                                className="payroll-rate-input"
+                              />
+                              <span className="payroll-rate-suffix">
+                                {key === 'nightDifferential' ? '(+10% add\'l)' : `(${(config.rate * 100).toFixed(0)}%)`}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="payroll-rate-status">
+                            {config.enabled ? (
+                              <span className="rate-status-badge active">Active</span>
+                            ) : (
+                              <span className="rate-status-badge inactive">Disabled (100% rate)</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Action Buttons */}
+                  {isOwner() && (
+                    <div className="payroll-config-actions">
+                      <button
+                        className="btn btn-secondary"
+                        onClick={handleResetPayrollConfig}
+                        disabled={savingPayrollConfig}
+                      >
+                        🔄 Reset to Defaults
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setShowPayrollLogs(!showPayrollLogs)}
+                      >
+                        📋 {showPayrollLogs ? 'Hide' : 'View'} Change History
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleSavePayrollConfig}
+                        disabled={savingPayrollConfig}
+                      >
+                        {savingPayrollConfig ? '💾 Saving...' : '💾 Save Payroll Settings'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Change History Logs */}
+                  {showPayrollLogs && (
+                    <div className="payroll-config-logs">
+                      <h3>📋 Configuration Change History</h3>
+                      {payrollConfigLogs.length === 0 ? (
+                        <div className="payroll-logs-empty">
+                          <p>No configuration changes recorded yet.</p>
+                        </div>
+                      ) : (
+                        <div className="payroll-logs-list">
+                          {payrollConfigLogs.slice(0, 10).map(log => (
+                            <div key={log._id} className="payroll-log-entry">
+                              <div className="payroll-log-header">
+                                <span className="payroll-log-user">👤 {log.userName}</span>
+                                <span className="payroll-log-time">
+                                  {format(parseISO(log.timestamp), 'MMM dd, yyyy h:mm a')}
+                                </span>
+                              </div>
+                              <div className="payroll-log-summary">{log.summary}</div>
+                              <div className="payroll-log-changes">
+                                {log.changes.map((change, idx) => (
+                                  <div key={idx} className="payroll-log-change">
+                                    {change.type === 'reset' ? (
+                                      <span>🔄 All settings reset to defaults</span>
+                                    ) : change.type === 'enabled' ? (
+                                      <span>
+                                        {change.field}: {change.newValue ? '✅ Enabled' : '❌ Disabled'}
+                                      </span>
+                                    ) : (
+                                      <span>
+                                        {change.field} rate: {change.oldValue} → {change.newValue}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="payroll-config-error">
+                  <p>Failed to load payroll configuration. Please refresh the page.</p>
+                  <button className="btn btn-primary" onClick={loadPayrollConfig}>
+                    🔄 Retry
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Profile Settings */}
         <div className="settings-section">

@@ -8,7 +8,9 @@ const GiftCertificates = () => {
 
   const [loading, setLoading] = useState(true);
   const [giftCertificates, setGiftCertificates] = useState([]);
+  const [filteredGCs, setFilteredGCs] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showValidateModal, setShowValidateModal] = useState(false);
@@ -30,6 +32,10 @@ const GiftCertificates = () => {
     loadGiftCertificates();
   }, []);
 
+  useEffect(() => {
+    filterGiftCertificates();
+  }, [giftCertificates, searchTerm, filterStatus]);
+
   const loadGiftCertificates = async () => {
     try {
       setLoading(true);
@@ -42,9 +48,38 @@ const GiftCertificates = () => {
     }
   };
 
-  const getFilteredGCs = () => {
-    if (filterStatus === 'all') return giftCertificates;
-    return giftCertificates.filter(gc => gc.status === filterStatus);
+  const filterGiftCertificates = () => {
+    let filtered = [...giftCertificates];
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(gc =>
+        gc.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        gc.recipientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        gc.recipientEmail.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(gc => {
+        const status = getGCStatus(gc);
+        return status === filterStatus;
+      });
+    }
+
+    setFilteredGCs(filtered);
+  };
+
+  const getStatistics = () => {
+    const active = giftCertificates.filter(gc => getGCStatus(gc) === 'active').length;
+    const redeemed = giftCertificates.filter(gc => gc.status === 'redeemed').length;
+    const expired = giftCertificates.filter(gc => getGCStatus(gc) === 'expired' && gc.status !== 'redeemed').length;
+    const totalValue = giftCertificates
+      .filter(gc => getGCStatus(gc) === 'active')
+      .reduce((sum, gc) => sum + (gc.balance || 0), 0);
+
+    return { active, redeemed, expired, totalValue };
   };
 
   const getGCStatus = (gc) => {
@@ -161,20 +196,68 @@ const GiftCertificates = () => {
     return <div className="page-loading"><div className="spinner"></div><p>Loading gift certificates...</p></div>;
   }
 
+  const stats = getStatistics();
+
   return (
     <div className="gift-certificates-page">
       <div className="page-header">
         <div>
-          <h1>Gift Certificates</h1>
+          <h1>🎁 Gift Certificates</h1>
           <p>Manage gift certificates and vouchers</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-          <button className="btn btn-secondary" onClick={openValidateModal}>🔍 Validate Code</button>
-          <button className="btn btn-primary" onClick={openCreateModal}>+ Create Gift Certificate</button>
+          <button className="btn btn-secondary" onClick={openValidateModal}>
+            <span>🔍</span> Validate Code
+          </button>
+          <button className="btn btn-primary" onClick={openCreateModal}>
+            <span>+</span> Create Gift Certificate
+          </button>
         </div>
       </div>
 
+      {/* Statistics Cards */}
+      <div className="gc-stats-grid">
+        <div className="gc-stat-card active-stat">
+          <div className="gc-stat-icon">✓</div>
+          <div className="gc-stat-content">
+            <div className="gc-stat-value">{stats.active}</div>
+            <div className="gc-stat-label">Active</div>
+          </div>
+        </div>
+        <div className="gc-stat-card redeemed-stat">
+          <div className="gc-stat-icon">🎯</div>
+          <div className="gc-stat-content">
+            <div className="gc-stat-value">{stats.redeemed}</div>
+            <div className="gc-stat-label">Redeemed</div>
+          </div>
+        </div>
+        <div className="gc-stat-card expired-stat">
+          <div className="gc-stat-icon">⏰</div>
+          <div className="gc-stat-content">
+            <div className="gc-stat-value">{stats.expired}</div>
+            <div className="gc-stat-label">Expired</div>
+          </div>
+        </div>
+        <div className="gc-stat-card value-stat">
+          <div className="gc-stat-icon">💰</div>
+          <div className="gc-stat-content">
+            <div className="gc-stat-value">₱{stats.totalValue.toLocaleString()}</div>
+            <div className="gc-stat-label">Total Active Value</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
       <div className="filters-section">
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="Search by code, recipient, or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+        </div>
         <div className="filters-row">
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
             <option value="all">All Status</option>
@@ -182,62 +265,102 @@ const GiftCertificates = () => {
             <option value="redeemed">Redeemed</option>
             <option value="expired">Expired</option>
           </select>
-          <div className="results-count">{getFilteredGCs().length} gift certificates</div>
+          <div className="results-count">{filteredGCs.length} gift certificates</div>
         </div>
       </div>
 
-      {getFilteredGCs().length === 0 ? (
+      {/* Gift Certificates Grid */}
+      {filteredGCs.length === 0 ? (
         <div className="empty-state">
-          <p>No gift certificates found</p>
-          <button className="btn btn-primary" onClick={openCreateModal}>Create Your First Gift Certificate</button>
+          <div className="empty-icon">🎁</div>
+          <h3>No gift certificates found</h3>
+          <p>{searchTerm || filterStatus !== 'all' ? 'Try adjusting your filters or search term' : 'Create your first gift certificate to get started'}</p>
+          <button className="btn btn-primary" onClick={openCreateModal}>+ Create Gift Certificate</button>
         </div>
       ) : (
-        <div className="gc-grid">
-          {getFilteredGCs().map(gc => {
+        <div className="gc-grid-enhanced">
+          {filteredGCs.map(gc => {
             const status = getGCStatus(gc);
             return (
-              <div key={gc._id} className={`gc-card ${status}`}>
-                <div className="gc-header">
-                  <div className="gc-logo">🎁 GIFT CARD</div>
-                  <span className={`gc-status-badge ${status}`}>{status.toUpperCase()}</span>
+              <div key={gc._id} className={`gc-card-enhanced gc-${status}`}>
+                {/* Header with Status */}
+                <div className="gc-card-header-enhanced">
+                  <div className="gc-status-indicator">
+                    <span className={`gc-status-dot ${status}`}></span>
+                    <span className="gc-status-text">{status.toUpperCase()}</span>
+                  </div>
+                  <div className="gc-card-icon">🎁</div>
                 </div>
-                <div className="gc-code-section">
-                  <div className="gc-code-label">Code</div>
-                  <div className="gc-code">{gc.code}</div>
+
+                {/* Code Display */}
+                <div className="gc-code-display">
+                  <div className="gc-code-label">Gift Code</div>
+                  <div className="gc-code-value">{gc.code}</div>
                 </div>
-                <div className="gc-value-section">
-                  <div>
-                    <div className="gc-amount">₱{(gc.balance || 0).toLocaleString()}</div>
-                    <div className="gc-balance-label">
-                      {gc.balance === gc.amount ? 'Full Value' : `of ₱${(gc.amount || 0).toLocaleString()}`}
+
+                {/* Value Display */}
+                <div className="gc-value-display">
+                  <div className="gc-balance-amount">₱{(gc.balance || 0).toLocaleString()}</div>
+                  <div className="gc-balance-info">
+                    {gc.balance === gc.amount ? (
+                      <span className="gc-badge-full">Full Value</span>
+                    ) : (
+                      <span className="gc-badge-partial">of ₱{(gc.amount || 0).toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Details Section */}
+                <div className="gc-details-enhanced">
+                  <div className="gc-detail-item">
+                    <span className="gc-detail-icon">👤</span>
+                    <div className="gc-detail-text">
+                      <div className="gc-detail-label">Recipient</div>
+                      <div className="gc-detail-value">{gc.recipientName}</div>
                     </div>
                   </div>
-                </div>
-                <div className="gc-details">
-                  <div className="gc-detail-row">
-                    <span>Recipient:</span>
-                    <span>{gc.recipientName}</span>
+                  <div className="gc-detail-item">
+                    <span className="gc-detail-icon">✉️</span>
+                    <div className="gc-detail-text">
+                      <div className="gc-detail-label">Email</div>
+                      <div className="gc-detail-value gc-detail-email">{gc.recipientEmail}</div>
+                    </div>
                   </div>
-                  <div className="gc-detail-row">
-                    <span>Email:</span>
-                    <span style={{ fontSize: '0.75rem' }}>{gc.recipientEmail}</span>
-                  </div>
-                  <div className="gc-detail-row">
-                    <span>Expires:</span>
-                    <span>{gc.expiryDate ? format(parseISO(gc.expiryDate), 'MMM dd, yyyy') : 'N/A'}</span>
+                  <div className="gc-detail-item">
+                    <span className="gc-detail-icon">📅</span>
+                    <div className="gc-detail-text">
+                      <div className="gc-detail-label">Expires</div>
+                      <div className="gc-detail-value">
+                        {gc.expiryDate ? format(parseISO(gc.expiryDate), 'MMM dd, yyyy') : 'No expiry'}
+                      </div>
+                    </div>
                   </div>
                   {gc.message && (
-                    <div className="gc-detail-row">
-                      <span>Message:</span>
-                      <span style={{ fontSize: '0.8rem', fontStyle: 'italic' }}>{gc.message}</span>
+                    <div className="gc-message-section">
+                      <div className="gc-message-icon">💌</div>
+                      <div className="gc-message-text">{gc.message}</div>
                     </div>
                   )}
                 </div>
-                <div className="gc-actions">
+
+                {/* Actions */}
+                <div className="gc-card-actions-enhanced">
                   {status === 'active' && (
-                    <button className="btn btn-sm" onClick={() => handleRedeem(gc)}>Redeem</button>
+                    <button
+                      className="gc-action-btn redeem-btn"
+                      onClick={() => handleRedeem(gc)}
+                      title="Redeem certificate"
+                    >
+                      <span>🎯</span> Redeem
+                    </button>
                   )}
-                  <button className="btn btn-sm" onClick={() => handleDelete(gc)}>Delete</button>
+                  <button
+                    className="gc-action-btn delete-btn"
+                    onClick={() => handleDelete(gc)}
+                    title="Delete certificate"
+                  >
+                    <span>🗑️</span> Delete
+                  </button>
                 </div>
               </div>
             );

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO } from 'date-fns';
 import AdvanceBookingsTab from '../components/AdvanceBookingsTab';
+import { getEmployeesForService, getTherapists } from '../utils/employeeFilters';
 
 const Appointments = () => {
   const { showToast, user, canViewAll, isTherapist } = useApp();
@@ -60,7 +61,7 @@ const Appointments = () => {
         mockApi.rooms.getRooms()
       ]);
       setAppointments(appts);
-      setEmployees(emps.filter(e => e.active));
+      setEmployees(emps.filter(e => e.status === 'active'));
       setCustomers(custs);
       setServices(prods.filter(p => p.type === 'service' && p.active));
       setRooms(rms);
@@ -446,10 +447,18 @@ const Appointments = () => {
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Employee *</label>
+                    <label>Therapist *</label>
                     <select name="employeeId" value={formData.employeeId} onChange={handleInputChange} className="form-control" required>
-                      <option value="">Select employee...</option>
-                      {employees.map(e => <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>)}
+                      <option value="">Select therapist...</option>
+                      {(() => {
+                        const selectedService = services.find(s => s._id === formData.serviceId);
+                        const availableTherapists = formData.serviceId
+                          ? getEmployeesForService(employees, selectedService)
+                          : getTherapists(employees);
+                        return availableTherapists.map(e => (
+                          <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>
+                        ));
+                      })()}
                     </select>
                   </div>
                   <div className="form-group">

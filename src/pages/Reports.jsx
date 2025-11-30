@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, subDays, startOfMonth, endOfMonth, differenceInDays, parseISO, isSameDay, startOfWeek, endOfWeek } from 'date-fns';
 import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const Reports = () => {
   const { showToast, user, isTherapist, canViewAll } = useApp();
@@ -22,6 +24,7 @@ const Reports = () => {
   const [customers, setCustomers] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [advanceBookings, setAdvanceBookings] = useState([]);
+  const [expenses, setExpenses] = useState([]);
 
   // Computed report data
   const [reportData, setReportData] = useState(null);
@@ -94,12 +97,12 @@ const Reports = () => {
     if (selectedReport && selectedCategory) {
       generateReportData();
     }
-  }, [selectedReport, selectedCategory, startDate, endDate, transactions, employees, attendance, products, rooms, customers, appointments, advanceBookings]);
+  }, [selectedReport, selectedCategory, startDate, endDate, transactions, employees, attendance, products, rooms, customers, appointments, advanceBookings, expenses]);
 
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [txns, emps, attn, prods, rms, custs, appts, advBookings] = await Promise.all([
+      const [txns, emps, attn, prods, rms, custs, appts, advBookings, exps] = await Promise.all([
         mockApi.transactions.getTransactions(),
         mockApi.employees.getEmployees(),
         mockApi.attendance.getAttendance(),
@@ -107,7 +110,8 @@ const Reports = () => {
         mockApi.rooms.getRooms(),
         mockApi.customers.getCustomers(),
         mockApi.appointments.getAppointments(),
-        mockApi.advanceBooking.listAdvanceBookings()
+        mockApi.advanceBooking.listAdvanceBookings(),
+        mockApi.expenses.getExpenses()
       ]);
 
       setTransactions(txns);
@@ -118,6 +122,7 @@ const Reports = () => {
       setCustomers(custs);
       setAppointments(appts);
       setAdvanceBookings(advBookings);
+      setExpenses(exps);
       setLoading(false);
     } catch (error) {
       showToast('Failed to load report data', 'error');
@@ -141,12 +146,13 @@ const Reports = () => {
     const filteredAttendance = filterByDateRange(attendance, 'date');
     const filteredAppointments = filterByDateRange(appointments, 'dateTime');
     const filteredAdvanceBookings = filterByDateRange(advanceBookings, 'bookingDateTime');
+    const filteredExpenses = filterByDateRange(expenses, 'date');
 
     let data = {};
 
     switch (selectedCategory) {
       case 'financial':
-        data = generateFinancialData(filteredTransactions);
+        data = generateFinancialData(filteredTransactions, filteredExpenses);
         break;
       case 'operations':
         data = generateOperationsData(filteredTransactions, filteredAppointments, filteredAdvanceBookings);
@@ -162,9 +168,28 @@ const Reports = () => {
     setReportData(data);
   };
 
-  const generateFinancialData = (txns) => {
+  const generateFinancialData = (txns, exps) => {
     const totalRevenue = txns.reduce((sum, t) => sum + (t.total || 0), 0);
-    const totalExpenses = 180000; // Mock - would come from expenses API
+
+    // Calculate real expenses by category from API data
+    const expensesByCategory = {};
+    let totalExpenses = 0;
+    exps.forEach(exp => {
+      const category = exp.category || 'Other';
+      expensesByCategory[category] = (expensesByCategory[category] || 0) + (exp.amount || 0);
+      totalExpenses += (exp.amount || 0);
+    });
+
+    // If no real expenses, use default demo values
+    if (totalExpenses === 0) {
+      totalExpenses = 180000;
+      expensesByCategory['Payroll'] = 113400;
+      expensesByCategory['Supplies'] = 28800;
+      expensesByCategory['Utilities'] = 16200;
+      expensesByCategory['Rent'] = 19800;
+      expensesByCategory['Other'] = 1800;
+    }
+
     const profit = totalRevenue - totalExpenses;
     const margin = totalRevenue > 0 ? ((profit / totalRevenue) * 100) : 0;
 
@@ -179,6 +204,32 @@ const Reports = () => {
       revenueByPaymentMethod[t.paymentMethod] = (revenueByPaymentMethod[t.paymentMethod] || 0) + t.total;
     });
 
+    // Calculate actual revenue breakdown from transaction items
+    let serviceRevenue = 0;
+    let productRevenue = 0;
+    let gcRevenue = 0;
+    txns.forEach(t => {
+      t.items?.forEach(item => {
+        // Check if item is a product or service (heuristic based on name)
+        const isProduct = item.type === 'product' || item.name?.toLowerCase().includes('product') || item.name?.toLowerCase().includes('oil') || item.name?.toLowerCase().includes('candle');
+        const isGC = item.name?.toLowerCase().includes('gift') || item.name?.toLowerCase().includes('certificate');
+        if (isGC) {
+          gcRevenue += item.price * item.quantity;
+        } else if (isProduct) {
+          productRevenue += item.price * item.quantity;
+        } else {
+          serviceRevenue += item.price * item.quantity;
+        }
+      });
+    });
+
+    // Normalize if totals don't match
+    if (serviceRevenue + productRevenue + gcRevenue === 0 && totalRevenue > 0) {
+      serviceRevenue = totalRevenue * 0.85;
+      productRevenue = totalRevenue * 0.10;
+      gcRevenue = totalRevenue * 0.05;
+    }
+
     return {
       totalRevenue,
       totalExpenses,
@@ -190,17 +241,18 @@ const Reports = () => {
       revenueByPaymentMethod,
       topServices: calculateTopServices(txns),
       revenueBreakdown: {
-        services: totalRevenue * 0.85,
-        products: totalRevenue * 0.10,
-        giftCertificates: totalRevenue * 0.05
+        services: serviceRevenue,
+        products: productRevenue,
+        giftCertificates: gcRevenue
       },
       expenseBreakdown: {
-        payroll: totalExpenses * 0.63,
-        supplies: totalExpenses * 0.16,
-        utilities: totalExpenses * 0.09,
-        rent: totalExpenses * 0.11,
-        other: totalExpenses * 0.01
-      }
+        payroll: expensesByCategory['Payroll'] || expensesByCategory['payroll'] || totalExpenses * 0.63,
+        supplies: expensesByCategory['Supplies'] || expensesByCategory['supplies'] || totalExpenses * 0.16,
+        utilities: expensesByCategory['Utilities'] || expensesByCategory['utilities'] || totalExpenses * 0.09,
+        rent: expensesByCategory['Rent'] || expensesByCategory['rent'] || totalExpenses * 0.11,
+        other: expensesByCategory['Other'] || expensesByCategory['other'] || totalExpenses * 0.01
+      },
+      expensesByCategory
     };
   };
 
@@ -293,7 +345,7 @@ const Reports = () => {
     return {
       employeePerformance: Object.values(employeePerformance).sort((a, b) => b.revenue - a.revenue),
       totalEmployees: employees.length,
-      activeEmployees: employees.filter(e => e.active).length,
+      activeEmployees: employees.filter(e => e.status === 'active').length,
       avgAttendanceRate: Object.values(employeePerformance).reduce((sum, e) => sum + e.attendance, 0) / employees.length,
       topPerformer: Object.values(employeePerformance).sort((a, b) => b.revenue - a.revenue)[0]
     };
@@ -404,7 +456,245 @@ const Reports = () => {
   };
 
   const handleExportPDF = () => {
-    showToast('PDF export feature coming soon!', 'info');
+    if (!reportData) {
+      showToast('Please generate a report first', 'error');
+      return;
+    }
+
+    const doc = new jsPDF();
+    const reportName = selectedReport ? reports[selectedCategory].find(r => r.id === selectedReport)?.name : 'Report';
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFillColor(139, 92, 246); // Purple
+    doc.rect(0, 0, pageWidth, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Ava Solutions', 14, 18);
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('SPA Demo ERP', 14, 28);
+
+    doc.setFontSize(14);
+    doc.text(reportName, pageWidth - 14, 18, { align: 'right' });
+    doc.setFontSize(10);
+    doc.text(`Period: ${format(new Date(startDate), 'MMM d, yyyy')} - ${format(new Date(endDate), 'MMM d, yyyy')}`, pageWidth - 14, 28, { align: 'right' });
+
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+
+    let yPos = 55;
+
+    // Generate report based on type
+    if (selectedCategory === 'financial' && selectedReport === 'pl') {
+      // Profit & Loss Statement
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Profit & Loss Statement', 14, yPos);
+      yPos += 15;
+
+      // Revenue Section
+      doc.setFillColor(240, 253, 244);
+      doc.rect(14, yPos - 6, pageWidth - 28, 50, 'F');
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(22, 163, 74);
+      doc.text('REVENUE', 20, yPos);
+      yPos += 10;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+
+      const revenueItems = [
+        ['Service Revenue', `₱${reportData.revenueBreakdown.services.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`],
+        ['Product Sales', `₱${reportData.revenueBreakdown.products.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`],
+        ['Gift Certificates', `₱${reportData.revenueBreakdown.giftCertificates.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`]
+      ];
+
+      revenueItems.forEach(([label, value]) => {
+        doc.text(label, 24, yPos);
+        doc.text(value, pageWidth - 24, yPos, { align: 'right' });
+        yPos += 8;
+      });
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Revenue', 24, yPos);
+      doc.setTextColor(22, 163, 74);
+      doc.text(`₱${reportData.totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`, pageWidth - 24, yPos, { align: 'right' });
+      yPos += 20;
+
+      // Expenses Section
+      doc.setTextColor(0, 0, 0);
+      doc.setFillColor(254, 242, 242);
+      doc.rect(14, yPos - 6, pageWidth - 28, 60, 'F');
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(220, 38, 38);
+      doc.text('EXPENSES', 20, yPos);
+      yPos += 10;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+
+      const expenseItems = [
+        ['Payroll & Benefits', `₱${reportData.expenseBreakdown.payroll.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`],
+        ['Supplies & Materials', `₱${reportData.expenseBreakdown.supplies.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`],
+        ['Utilities', `₱${reportData.expenseBreakdown.utilities.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`],
+        ['Rent', `₱${reportData.expenseBreakdown.rent.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`],
+        ['Other Expenses', `₱${reportData.expenseBreakdown.other.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`]
+      ];
+
+      expenseItems.forEach(([label, value]) => {
+        doc.text(label, 24, yPos);
+        doc.text(value, pageWidth - 24, yPos, { align: 'right' });
+        yPos += 8;
+      });
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Expenses', 24, yPos);
+      doc.setTextColor(220, 38, 38);
+      doc.text(`₱${reportData.totalExpenses.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`, pageWidth - 24, yPos, { align: 'right' });
+      yPos += 20;
+
+      // Net Profit Section
+      doc.setTextColor(0, 0, 0);
+      const profitColor = reportData.profit >= 0 ? [22, 163, 74] : [220, 38, 38];
+      doc.setFillColor(profitColor[0], profitColor[1], profitColor[2]);
+      doc.rect(14, yPos - 6, pageWidth - 28, 20, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('NET PROFIT', 20, yPos + 4);
+      doc.text(`₱${reportData.profit.toLocaleString('en-PH', { minimumFractionDigits: 2 })} (${reportData.margin}%)`, pageWidth - 24, yPos + 4, { align: 'right' });
+
+    } else if (selectedCategory === 'employee' && selectedReport === 'performance') {
+      // Employee Performance Report
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Employee Performance Report', 14, yPos);
+      yPos += 10;
+
+      // Summary cards
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Employees: ${reportData.totalEmployees} | Active: ${reportData.activeEmployees} | Avg Attendance: ${reportData.avgAttendanceRate?.toFixed(1) || 0}%`, 14, yPos);
+      yPos += 10;
+
+      // Performance table
+      doc.autoTable({
+        startY: yPos,
+        head: [['Employee', 'Role', 'Services', 'Revenue', 'Commission', 'Rating', 'Attendance']],
+        body: reportData.employeePerformance.map(emp => [
+          emp.name,
+          emp.role,
+          emp.services,
+          `₱${emp.revenue.toLocaleString()}`,
+          `₱${emp.commission.toLocaleString()}`,
+          `${emp.rating.toFixed(1)}/5`,
+          `${emp.attendance}%`
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [139, 92, 246] },
+        styles: { fontSize: 9 }
+      });
+
+    } else if (selectedCategory === 'customer' && selectedReport === 'insights') {
+      // Customer Insights Report
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Customer Insights Report', 14, yPos);
+      yPos += 10;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Customers: ${reportData.totalCustomers} | New: ${reportData.newCustomers} | Returning: ${reportData.returningCustomers}`, 14, yPos);
+      yPos += 5;
+      doc.text(`Average Spend: ₱${reportData.averageSpend?.toLocaleString() || 0} | Total Revenue from Top Customers: ₱${reportData.topCustomers?.reduce((sum, c) => sum + c.spent, 0).toLocaleString() || 0}`, 14, yPos);
+      yPos += 10;
+
+      doc.autoTable({
+        startY: yPos,
+        head: [['Customer', 'Visits', 'Total Spent', 'Last Visit']],
+        body: (reportData.topCustomers || []).map(c => [
+          c.name,
+          c.visits,
+          `₱${c.spent.toLocaleString()}`,
+          format(new Date(c.lastVisit), 'MMM d, yyyy')
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [139, 92, 246] },
+        styles: { fontSize: 9 }
+      });
+
+    } else if (selectedCategory === 'operations' && selectedReport === 'services') {
+      // Service Performance Report
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Service Performance Report', 14, yPos);
+      yPos += 10;
+
+      if (reportData.servicePerformance) {
+        doc.autoTable({
+          startY: yPos,
+          head: [['Service', 'Bookings', 'Revenue', 'Avg Price', 'Performance']],
+          body: reportData.servicePerformance.map(s => [
+            s.name,
+            s.bookings,
+            `₱${s.revenue.toLocaleString()}`,
+            `₱${s.avgPrice.toLocaleString()}`,
+            s.trend || 'Stable'
+          ]),
+          theme: 'striped',
+          headStyles: { fillColor: [139, 92, 246] },
+          styles: { fontSize: 9 }
+        });
+      }
+
+    } else {
+      // Generic report
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Report data has been exported.', 14, yPos);
+      doc.text('Please check the data summary below:', 14, yPos + 10);
+
+      // Add basic summary
+      const summaryData = [];
+      if (reportData.totalRevenue) summaryData.push(['Total Revenue', `₱${reportData.totalRevenue.toLocaleString()}`]);
+      if (reportData.transactionCount) summaryData.push(['Transactions', reportData.transactionCount]);
+      if (reportData.avgTransaction) summaryData.push(['Avg Transaction', `₱${reportData.avgTransaction.toLocaleString()}`]);
+
+      if (summaryData.length > 0) {
+        doc.autoTable({
+          startY: yPos + 20,
+          head: [['Metric', 'Value']],
+          body: summaryData,
+          theme: 'striped',
+          headStyles: { fillColor: [139, 92, 246] }
+        });
+      }
+    }
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(`Generated on ${format(new Date(), 'MMM d, yyyy h:mm a')}`, 14, doc.internal.pageSize.getHeight() - 10);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - 14, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+    }
+
+    // Save
+    doc.save(`${reportName.toLowerCase().replace(/ /g, '-')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    showToast('PDF report downloaded successfully!', 'success');
   };
 
   const handleExportCSV = () => {

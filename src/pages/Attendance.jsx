@@ -39,10 +39,10 @@ const Attendance = () => {
       const todayRecords = attendance.filter(a => a.date === today);
 
       setTodayAttendance(todayRecords);
-      setEmployees(emps.filter(e => e.active));
+      setEmployees(emps.filter(e => e.status === 'active'));
 
       // Calculate stats
-      const activeEmployees = emps.filter(e => e.active);
+      const activeEmployees = emps.filter(e => e.status === 'active');
       const present = todayRecords.filter(a => a.status === 'present' || a.status === 'late').length;
       const late = todayRecords.filter(a => a.status === 'late').length;
       const absent = activeEmployees.length - present;

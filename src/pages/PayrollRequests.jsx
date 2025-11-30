@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
+import mockApi from '../mockApi/mockApi';
 
 const PayrollRequests = () => {
   const { showToast, user } = useApp();
@@ -20,9 +21,22 @@ const PayrollRequests = () => {
     attachments: []
   });
 
+  // Track submitted payroll requests
+  const [payrollRequests, setPayrollRequests] = useState([]);
+
   useEffect(() => {
     fetchPayrollHistory();
+    fetchPayrollRequests();
   }, [filterYear]);
+
+  const fetchPayrollRequests = async () => {
+    try {
+      const requests = await mockApi.payrollRequests.getRequests(user?._id);
+      setPayrollRequests(requests);
+    } catch (error) {
+      console.error('Failed to load payroll requests:', error);
+    }
+  };
 
   const fetchPayrollHistory = async () => {
     setLoading(true);
@@ -245,7 +259,7 @@ Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
     setRequestForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
     if (!requestForm.subject.trim()) {
       showToast('Subject is required', 'error');
       return;
@@ -256,16 +270,39 @@ Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
       return;
     }
 
-    // Simulate API call
-    showToast('Request submitted successfully! Your manager will review it shortly.', 'success');
-    setShowRequestForm(false);
-    setRequestForm({
-      type: 'adjustment',
-      subject: '',
-      description: '',
-      amount: '',
-      attachments: []
-    });
+    try {
+      const result = await mockApi.payrollRequests.createRequest({
+        employeeId: user?._id,
+        employeeName: `${user?.firstName} ${user?.lastName}`,
+        type: requestForm.type,
+        subject: requestForm.subject,
+        description: requestForm.description,
+        amount: requestForm.amount ? parseFloat(requestForm.amount) : null
+      });
+
+      // Log activity
+      await mockApi.activityLogs.createLog({
+        type: 'payroll',
+        action: 'Payroll Request Submitted',
+        description: `${user?.firstName} ${user?.lastName} submitted a ${requestForm.type} request: ${requestForm.subject}`,
+        userId: user?._id,
+        userName: `${user?.firstName} ${user?.lastName}`,
+        severity: 'info'
+      });
+
+      showToast('Request submitted successfully! Your manager will review it shortly.', 'success');
+      setShowRequestForm(false);
+      setRequestForm({
+        type: 'adjustment',
+        subject: '',
+        description: '',
+        amount: '',
+        attachments: []
+      });
+      fetchPayrollRequests();
+    } catch (error) {
+      showToast('Failed to submit request. Please try again.', 'error');
+    }
   };
 
   return (
@@ -369,6 +406,48 @@ Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* My Submitted Requests */}
+      {payrollRequests.length > 0 && (
+        <div className="payroll-history-section" style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <div className="payroll-history-header">
+            <h2>My Submitted Requests</h2>
+          </div>
+          <table className="payroll-history-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Subject</th>
+                <th className="number">Amount</th>
+                <th>Status</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payrollRequests.map(request => (
+                <tr key={request._id}>
+                  <td>{format(parseISO(request.createdAt), 'MMM dd, yyyy')}</td>
+                  <td style={{ textTransform: 'capitalize' }}>{request.type}</td>
+                  <td>
+                    <div>{request.subject}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>{request.description}</div>
+                  </td>
+                  <td className="number">
+                    {request.amount ? `₱${request.amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}` : '-'}
+                  </td>
+                  <td>
+                    <span className={`payroll-status-badge ${request.status}`}>
+                      {request.status}
+                    </span>
+                  </td>
+                  <td>{request.remarks || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

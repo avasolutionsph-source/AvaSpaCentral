@@ -6,7 +6,15 @@ const AdvanceBookingCheckout = ({
   value,
   onChange,
   employees,
-  rooms
+  rooms,
+  customers,
+  // Shared customer state from parent
+  customerType,
+  onCustomerTypeChange,
+  selectedCustomer,
+  onCustomerSelect,
+  walkInCustomerData,
+  onWalkInDataChange
 }) => {
   const [isAdvanceBooking, setIsAdvanceBooking] = useState(enabled || false);
   const [bookingData, setBookingData] = useState({
@@ -15,11 +23,8 @@ const AdvanceBookingCheckout = ({
     location: 'room',
     roomId: '',
     isHomeService: false,
-    clientName: '',
-    clientPhone: '',
-    clientEmail: '',
-    clientAddress: '',
-    specialRequests: ''
+    specialRequests: '',
+    clientNotes: '' // New field for preferences/allergies
   });
 
   const [errors, setErrors] = useState({});
@@ -40,18 +45,15 @@ const AdvanceBookingCheckout = ({
     if (onToggle) onToggle(newValue);
 
     if (!newValue) {
-      // Reset data when disabled
+      // Reset booking data when disabled
       setBookingData({
         bookingDateTime: '',
         paymentTiming: 'pay-now',
         location: 'room',
         roomId: '',
         isHomeService: false,
-        clientName: '',
-        clientPhone: '',
-        clientEmail: '',
-        clientAddress: '',
-        specialRequests: ''
+        specialRequests: '',
+        clientNotes: ''
       });
       setErrors({});
     }
@@ -105,11 +107,21 @@ const AdvanceBookingCheckout = ({
       newErrors.bookingDateTime = dateTimeError;
     }
 
-    if (!bookingData.clientName.trim()) {
-      newErrors.clientName = 'Client name is required';
+    // Validate customer based on type
+    if (customerType === 'existing') {
+      if (!selectedCustomer) {
+        newErrors.selectedCustomer = 'Please select a customer';
+      }
+    } else if (customerType === 'walk-in') {
+      if (!walkInCustomerData.name.trim()) {
+        newErrors.clientName = 'Client name is required';
+      }
+      if (!walkInCustomerData.phone.trim()) {
+        newErrors.clientPhone = 'Phone number is required';
+      }
     }
 
-    if (bookingData.isHomeService && !bookingData.clientAddress.trim()) {
+    if (bookingData.isHomeService && !walkInCustomerData.address.trim()) {
       newErrors.clientAddress = 'Address is required for home service';
     }
 
@@ -156,38 +168,126 @@ const AdvanceBookingCheckout = ({
         {/* Client Information */}
         <div className="form-section">
           <h4>Client Information</h4>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Client Name *</label>
+
+          {/* Customer Type Selector - Shared with main checkout */}
+          <div className="customer-type-selector" style={{ marginBottom: 'var(--spacing-md)' }}>
+            <label>
               <input
-                type="text"
-                value={bookingData.clientName}
-                onChange={(e) => handleChange('clientName', e.target.value)}
-                className={errors.clientName ? 'error' : ''}
-                placeholder="Enter client name"
+                type="radio"
+                value="walk-in"
+                checked={customerType === 'walk-in'}
+                onChange={() => onCustomerTypeChange && onCustomerTypeChange('walk-in')}
               />
-              {errors.clientName && (
-                <span className="error-message">{errors.clientName}</span>
+              Walk-in
+            </label>
+            <label>
+              <input
+                type="radio"
+                value="existing"
+                checked={customerType === 'existing'}
+                onChange={() => onCustomerTypeChange && onCustomerTypeChange('existing')}
+              />
+              Existing Customer
+            </label>
+            <p style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 'var(--spacing-sm)' }}>
+              ℹ️ Customer information is shared with the main checkout form
+            </p>
+          </div>
+
+          {/* For Existing Customer - Show Dropdown */}
+          {customerType === 'existing' && (
+            <div className="form-group">
+              <label>Select Customer *</label>
+              <select
+                value={selectedCustomer?._id || ''}
+                onChange={(e) => onCustomerSelect && onCustomerSelect(customers.find(c => c._id === e.target.value))}
+                className={`form-control ${errors.selectedCustomer ? 'error' : ''}`}
+              >
+                <option value="">Select customer...</option>
+                {customers && customers.map(customer => (
+                  <option key={customer._id} value={customer._id}>
+                    {customer.name} - {customer.phone}
+                  </option>
+                ))}
+              </select>
+              {errors.selectedCustomer && (
+                <span className="error-message">{errors.selectedCustomer}</span>
+              )}
+              {selectedCustomer && (
+                <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 500 }}>
+                  ✓ Customer selected: {selectedCustomer.name}
+                </p>
               )}
             </div>
-            <div className="form-group">
-              <label>Phone Number</label>
-              <input
-                type="tel"
-                value={bookingData.clientPhone}
-                onChange={(e) => handleChange('clientPhone', e.target.value)}
-                placeholder="+63 XXX XXX XXXX"
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Email (Optional)</label>
-            <input
-              type="email"
-              value={bookingData.clientEmail}
-              onChange={(e) => handleChange('clientEmail', e.target.value)}
-              placeholder="client@example.com"
+          )}
+
+          {/* For Walk-in Customer - Show Form (Shared with main checkout) */}
+          {customerType === 'walk-in' && (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Client Name *</label>
+                  <input
+                    type="text"
+                    value={walkInCustomerData.name}
+                    onChange={(e) => onWalkInDataChange && onWalkInDataChange({ ...walkInCustomerData, name: e.target.value })}
+                    className={errors.clientName ? 'error' : ''}
+                    placeholder="Enter client name"
+                  />
+                  {errors.clientName && (
+                    <span className="error-message">{errors.clientName}</span>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label>Phone Number *</label>
+                  <input
+                    type="tel"
+                    value={walkInCustomerData.phone}
+                    onChange={(e) => onWalkInDataChange && onWalkInDataChange({ ...walkInCustomerData, phone: e.target.value })}
+                    className={errors.clientPhone ? 'error' : ''}
+                    placeholder="+63 XXX XXX XXXX"
+                  />
+                  {errors.clientPhone && (
+                    <span className="error-message">{errors.clientPhone}</span>
+                  )}
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Email (Optional)</label>
+                <input
+                  type="email"
+                  value={walkInCustomerData.email}
+                  onChange={(e) => onWalkInDataChange && onWalkInDataChange({ ...walkInCustomerData, email: e.target.value })}
+                  placeholder="client@example.com"
+                />
+              </div>
+              {walkInCustomerData.name && walkInCustomerData.phone && (
+                <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 500 }}>
+                  ✓ Customer will be saved to database
+                </p>
+              )}
+            </>
+          )}
+
+          {/* Client Notes/Preferences - New Field */}
+          <div className="form-group" style={{ marginTop: 'var(--spacing-md)' }}>
+            <label>Client Notes & Preferences</label>
+            <textarea
+              value={bookingData.clientNotes}
+              onChange={(e) => handleChange('clientNotes', e.target.value)}
+              placeholder="e.g., Allergic to lavender, prefers firm pressure, sensitive skin..."
+              rows="3"
+              style={{
+                width: '100%',
+                padding: 'var(--spacing-sm)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--gray-300)',
+                fontSize: '0.9rem'
+              }}
             />
+            <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginTop: 'var(--spacing-xs)' }}>
+              📝 Record allergies, preferences, or special requirements
+            </p>
           </div>
         </div>
 

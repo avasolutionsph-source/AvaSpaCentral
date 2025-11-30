@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import mockApi from '../mockApi/mockApi';
 import { format, parseISO, subDays } from 'date-fns';
 
 const ServiceHistory = () => {
   const { showToast, user, canViewAll, isTherapist } = useApp();
   const [transactions, setTransactions] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -34,92 +36,36 @@ const ServiceHistory = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const [apiTransactions, apiEmployees] = await Promise.all([
+        mockApi.transactions.getTransactions(),
+        mockApi.employees.getEmployees()
+      ]);
 
-      // Mock transaction data
-      const mockTransactions = [
-        {
-          id: 1,
-          receiptNumber: 'REC-2025-001',
-          date: new Date().toISOString(),
-          customer: { name: 'Maria Santos', phone: '+63 912 345 6789' },
-          items: [
-            { name: 'Swedish Massage (90 min)', quantity: 1, price: 1200, employeeId: 'emp_002', employeeName: 'Juan Dela Cruz', commission: 120 },
-            { name: 'Hot Stone Therapy', quantity: 1, price: 800, employeeId: 'emp_002', employeeName: 'Juan Dela Cruz', commission: 80 }
-          ],
-          subtotal: 2000,
-          discount: 0,
-          tax: 240,
-          total: 2240,
-          paymentMethod: 'Cash',
-          cashier: 'Anna Garcia'
-        },
-        {
-          id: 2,
-          receiptNumber: 'REC-2025-002',
-          date: subDays(new Date(), 0).toISOString(),
-          customer: { name: 'Robert Lee', phone: '+63 923 456 7890' },
-          items: [
-            { name: 'Thai Massage (60 min)', quantity: 1, price: 900, employeeId: 'emp_001', employeeName: 'Maria Santos', commission: 90 },
-            { name: 'Foot Spa', quantity: 1, price: 400, employeeId: 'emp_001', employeeName: 'Maria Santos', commission: 40 }
-          ],
-          subtotal: 1300,
-          discount: 130,
-          tax: 140.40,
-          total: 1310.40,
-          paymentMethod: 'GCash',
-          cashier: 'Juan Dela Cruz'
-        },
-        {
-          id: 3,
-          receiptNumber: 'REC-2025-003',
-          date: subDays(new Date(), 1).toISOString(),
-          customer: { name: 'Lisa Wong', phone: '+63 934 567 8901' },
-          items: [
-            { name: 'Deep Tissue Massage', quantity: 1, price: 1000, employeeId: 'emp_004', employeeName: 'Anna Garcia', commission: 100 },
-            { name: 'Aromatherapy', quantity: 1, price: 600, employeeId: 'emp_004', employeeName: 'Anna Garcia', commission: 60 }
-          ],
-          subtotal: 1600,
-          discount: 0,
-          tax: 192,
-          total: 1792,
-          paymentMethod: 'Card',
-          cashier: 'Maria Santos'
-        },
-        {
-          id: 4,
-          receiptNumber: 'REC-2025-004',
-          date: subDays(new Date(), 1).toISOString(),
-          customer: { name: 'John Smith', phone: '+63 945 678 9012' },
-          items: [
-            { name: 'Swedish Massage (60 min)', quantity: 1, price: 800, employeeId: 'emp_003', employeeName: 'Sarah Lee', commission: 80 }
-          ],
-          subtotal: 800,
-          discount: 80,
-          tax: 86.40,
-          total: 806.40,
-          paymentMethod: 'Cash',
-          cashier: 'Anna Garcia'
-        },
-        {
-          id: 5,
-          receiptNumber: 'REC-2025-005',
-          date: subDays(new Date(), 2).toISOString(),
-          customer: { name: 'Sarah Johnson', phone: '+63 956 789 0123' },
-          items: [
-            { name: 'Hot Stone Therapy', quantity: 1, price: 800, employeeId: 'emp_003', employeeName: 'Sarah Lee', commission: 80 },
-            { name: 'Body Scrub', quantity: 1, price: 700, employeeId: 'emp_003', employeeName: 'Sarah Lee', commission: 70 }
-          ],
-          subtotal: 1500,
-          discount: 0,
-          tax: 180,
-          total: 1680,
-          paymentMethod: 'Cash',
-          cashier: 'Juan Dela Cruz'
-        }
-      ];
+      setEmployees(apiEmployees.filter(e => e.status === 'active'));
 
-      setTransactions(mockTransactions);
+      // Transform API transactions to expected format
+      const formattedTransactions = apiTransactions.map((t, index) => ({
+        id: t._id || index + 1,
+        receiptNumber: t.receiptNumber || `REC-${new Date(t.date).getFullYear()}-${String(index + 1).padStart(3, '0')}`,
+        date: t.date,
+        customer: t.customer || { name: 'Walk-in Customer', phone: '' },
+        items: t.items.map(item => ({
+          name: item.name,
+          quantity: item.quantity || 1,
+          price: item.price || item.subtotal,
+          employeeId: t.employee?._id || item.employeeId,
+          employeeName: t.employee?.name || item.employeeName || 'Staff',
+          commission: item.commission || (item.price * 0.1)
+        })),
+        subtotal: t.subtotal || t.items.reduce((sum, i) => sum + (i.subtotal || i.price), 0),
+        discount: t.discount || 0,
+        tax: t.tax || 0,
+        total: t.totalAmount || t.total,
+        paymentMethod: t.paymentMethod || 'Cash',
+        cashier: t.cashier || 'Staff'
+      }));
+
+      setTransactions(formattedTransactions);
     } catch (error) {
       showToast('Failed to load service history', 'error');
     } finally {
@@ -375,10 +321,11 @@ const ServiceHistory = () => {
               <label>Employee</label>
               <select value={filterEmployee} onChange={(e) => setFilterEmployee(e.target.value)}>
                 <option value="all">All Employees</option>
-                <option value="Maria Santos">Maria Santos</option>
-                <option value="Juan Dela Cruz">Juan Dela Cruz</option>
-                <option value="Sarah Lee">Sarah Lee</option>
-                <option value="Anna Garcia">Anna Garcia</option>
+                {employees.map(emp => (
+                  <option key={emp._id} value={`${emp.firstName} ${emp.lastName}`}>
+                    {emp.firstName} {emp.lastName}
+                  </option>
+                ))}
               </select>
             </div>
           )}

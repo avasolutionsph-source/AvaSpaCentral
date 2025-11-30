@@ -889,6 +889,542 @@ export const expensesApi = {
 // Import advance booking API
 import { advanceBookingApi } from './advanceBookingApi';
 
+// =============================================================================
+// PAYROLL CONFIGURATION API
+// =============================================================================
+
+// Default payroll rates (Philippine Labor Law compliant)
+const defaultPayrollConfig = {
+  regularOvertime: { enabled: true, rate: 1.25, label: 'Regular Overtime', description: 'Standard overtime (125% of hourly rate)' },
+  restDayOvertime: { enabled: true, rate: 1.30, label: 'Rest Day Overtime', description: 'Work on rest day (130% of hourly rate)' },
+  nightDifferential: { enabled: true, rate: 0.10, label: 'Night Differential', description: 'Night shift premium 10PM-6AM (10% additional)' },
+  regularHoliday: { enabled: true, rate: 2.00, label: 'Regular Holiday', description: 'Work on regular holiday (200% of daily rate)' },
+  specialHoliday: { enabled: true, rate: 1.30, label: 'Special Non-Working Holiday', description: 'Work on special holiday (130% of daily rate)' },
+  regularHolidayOT: { enabled: true, rate: 2.60, label: 'Regular Holiday + Overtime', description: 'OT on regular holiday (260% of hourly rate)' },
+  specialHolidayOT: { enabled: true, rate: 1.69, label: 'Special Holiday + Overtime', description: 'OT on special holiday (169% of hourly rate)' }
+};
+
+// Initialize payroll config in localStorage if not exists
+const initPayrollConfig = () => {
+  const stored = localStorage.getItem('payrollConfig');
+  if (!stored) {
+    localStorage.setItem('payrollConfig', JSON.stringify(defaultPayrollConfig));
+    return defaultPayrollConfig;
+  }
+  return JSON.parse(stored);
+};
+
+// Activity logs for payroll config changes
+let payrollConfigLogs = JSON.parse(localStorage.getItem('payrollConfigLogs') || '[]');
+
+export const payrollConfigApi = {
+  // Get current payroll configuration
+  async getPayrollConfig() {
+    await delay();
+    return clone(initPayrollConfig());
+  },
+
+  // Update payroll configuration (Owner only)
+  async updatePayrollConfig(newConfig, userId, userName) {
+    await delay(500);
+
+    const oldConfig = initPayrollConfig();
+
+    // Create change log entry
+    const changes = [];
+    Object.keys(newConfig).forEach(key => {
+      if (oldConfig[key]) {
+        if (oldConfig[key].enabled !== newConfig[key].enabled) {
+          changes.push({
+            field: key,
+            type: 'enabled',
+            oldValue: oldConfig[key].enabled,
+            newValue: newConfig[key].enabled
+          });
+        }
+        if (oldConfig[key].rate !== newConfig[key].rate) {
+          changes.push({
+            field: key,
+            type: 'rate',
+            oldValue: oldConfig[key].rate,
+            newValue: newConfig[key].rate
+          });
+        }
+      }
+    });
+
+    // Log the change if there were any modifications
+    if (changes.length > 0) {
+      const logEntry = {
+        _id: 'plog_' + Date.now(),
+        timestamp: new Date().toISOString(),
+        userId: userId,
+        userName: userName,
+        action: 'PAYROLL_CONFIG_UPDATE',
+        changes: changes,
+        summary: `Updated ${changes.length} payroll setting(s)`
+      };
+
+      payrollConfigLogs.unshift(logEntry);
+      // Keep only last 100 logs
+      if (payrollConfigLogs.length > 100) {
+        payrollConfigLogs = payrollConfigLogs.slice(0, 100);
+      }
+      localStorage.setItem('payrollConfigLogs', JSON.stringify(payrollConfigLogs));
+    }
+
+    // Save updated config
+    const updatedConfig = { ...oldConfig, ...newConfig };
+    localStorage.setItem('payrollConfig', JSON.stringify(updatedConfig));
+
+    return {
+      success: true,
+      config: clone(updatedConfig),
+      changesCount: changes.length
+    };
+  },
+
+  // Get payroll config change logs
+  async getPayrollConfigLogs() {
+    await delay();
+    return clone(payrollConfigLogs);
+  },
+
+  // Reset to default configuration
+  async resetPayrollConfig(userId, userName) {
+    await delay(500);
+
+    const oldConfig = initPayrollConfig();
+
+    // Log the reset
+    const logEntry = {
+      _id: 'plog_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      userId: userId,
+      userName: userName,
+      action: 'PAYROLL_CONFIG_RESET',
+      changes: [{ type: 'reset', oldValue: oldConfig, newValue: defaultPayrollConfig }],
+      summary: 'Reset all payroll settings to default values'
+    };
+
+    payrollConfigLogs.unshift(logEntry);
+    localStorage.setItem('payrollConfigLogs', JSON.stringify(payrollConfigLogs));
+
+    // Reset to defaults
+    localStorage.setItem('payrollConfig', JSON.stringify(defaultPayrollConfig));
+
+    return {
+      success: true,
+      config: clone(defaultPayrollConfig)
+    };
+  },
+
+  // Get default configuration (for reference)
+  getDefaultConfig() {
+    return clone(defaultPayrollConfig);
+  }
+};
+
+// =============================================================================
+// SERVICE ROTATION API
+// =============================================================================
+
+// Service rotation tracks employee queue based on clock-in time
+// First to clock in = first to serve customer
+const getServiceRotationKey = () => {
+  const today = new Date().toISOString().split('T')[0];
+  return `serviceRotation_${today}`;
+};
+
+const initServiceRotation = () => {
+  const key = getServiceRotationKey();
+  const stored = localStorage.getItem(key);
+  if (!stored) {
+    const initial = {
+      date: new Date().toISOString().split('T')[0],
+      queue: [], // Employees sorted by clock-in time
+      serviceCount: {}, // Track services per employee { empId: count }
+      lastServed: null // Last employee who served a customer
+    };
+    localStorage.setItem(key, JSON.stringify(initial));
+    return initial;
+  }
+  return JSON.parse(stored);
+};
+
+export const serviceRotationApi = {
+  // Get today's rotation queue (sorted by clock-in time)
+  async getRotationQueue() {
+    await delay();
+
+    const rotation = initServiceRotation();
+    const today = new Date().toISOString().split('T')[0];
+
+    // Get today's attendance to build queue
+    const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+    const todayAttendance = attendance.filter(a =>
+      a.date === today && a.clockIn && !a.clockOut
+    );
+
+    // Sort by clock-in time (earliest first)
+    todayAttendance.sort((a, b) => {
+      const timeA = a.clockIn.replace(':', '');
+      const timeB = b.clockIn.replace(':', '');
+      return parseInt(timeA) - parseInt(timeB);
+    });
+
+    // Build queue with employee details and service count
+    const queue = todayAttendance.map((att, index) => ({
+      employeeId: att.employee._id,
+      employeeName: `${att.employee.firstName} ${att.employee.lastName}`,
+      position: att.employee.position,
+      clockInTime: att.clockIn,
+      servicesCompleted: rotation.serviceCount[att.employee._id] || 0,
+      queuePosition: index + 1,
+      isNext: index === 0 && rotation.lastServed !== att.employee._id
+    }));
+
+    // Determine who should be next based on rotation
+    // After serving, employee goes to back of queue
+    if (queue.length > 0) {
+      const lastServedIndex = queue.findIndex(q => q.employeeId === rotation.lastServed);
+      if (lastServedIndex >= 0 && lastServedIndex < queue.length - 1) {
+        // Next person after last served
+        queue.forEach((q, i) => q.isNext = i === lastServedIndex + 1);
+      } else {
+        // Back to first person
+        queue.forEach((q, i) => q.isNext = i === 0);
+      }
+    }
+
+    return {
+      date: today,
+      queue: queue,
+      totalEmployees: queue.length,
+      nextEmployee: queue.find(q => q.isNext) || queue[0] || null
+    };
+  },
+
+  // Record a service (employee served a customer)
+  async recordService(employeeId) {
+    await delay();
+
+    const key = getServiceRotationKey();
+    const rotation = initServiceRotation();
+
+    // Increment service count
+    rotation.serviceCount[employeeId] = (rotation.serviceCount[employeeId] || 0) + 1;
+    rotation.lastServed = employeeId;
+
+    localStorage.setItem(key, JSON.stringify(rotation));
+
+    return {
+      success: true,
+      employeeId,
+      newServiceCount: rotation.serviceCount[employeeId]
+    };
+  },
+
+  // Get suggested next employee (for POS auto-selection)
+  async getNextEmployee() {
+    const queueData = await this.getRotationQueue();
+    return queueData.nextEmployee;
+  },
+
+  // Get service stats for today
+  async getServiceStats() {
+    await delay();
+
+    const rotation = initServiceRotation();
+    const stats = Object.entries(rotation.serviceCount).map(([empId, count]) => ({
+      employeeId: empId,
+      servicesCompleted: count
+    }));
+
+    return {
+      date: rotation.date,
+      stats: stats,
+      totalServices: stats.reduce((sum, s) => sum + s.servicesCompleted, 0)
+    };
+  },
+
+  // Skip an employee in rotation (they stay in queue but next person serves)
+  async skipEmployee(employeeId) {
+    await delay();
+
+    const key = getServiceRotationKey();
+    const rotation = initServiceRotation();
+
+    // Mark as "last served" so rotation moves to next person
+    rotation.lastServed = employeeId;
+    localStorage.setItem(key, JSON.stringify(rotation));
+
+    return { success: true };
+  },
+
+  // Reset rotation for the day (usually automatic at midnight)
+  async resetRotation() {
+    await delay();
+
+    const key = getServiceRotationKey();
+    const initial = {
+      date: new Date().toISOString().split('T')[0],
+      queue: [],
+      serviceCount: {},
+      lastServed: null
+    };
+    localStorage.setItem(key, JSON.stringify(initial));
+
+    return { success: true };
+  }
+};
+
+// =============================================================================
+// ACTIVITY LOGS API
+// =============================================================================
+
+const initActivityLogs = () => {
+  const stored = localStorage.getItem('activityLogs');
+  return stored ? JSON.parse(stored) : [];
+};
+
+const saveActivityLogs = (logs) => {
+  localStorage.setItem('activityLogs', JSON.stringify(logs));
+};
+
+export const activityLogsApi = {
+  async getLogs(filters = {}) {
+    await delay();
+    let logs = initActivityLogs();
+
+    if (filters.type) {
+      logs = logs.filter(l => l.type === filters.type);
+    }
+    if (filters.severity) {
+      logs = logs.filter(l => l.severity === filters.severity);
+    }
+    if (filters.startDate) {
+      logs = logs.filter(l => new Date(l.timestamp) >= new Date(filters.startDate));
+    }
+    if (filters.endDate) {
+      logs = logs.filter(l => new Date(l.timestamp) <= new Date(filters.endDate));
+    }
+
+    return clone(logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
+  },
+
+  async createLog(entry) {
+    await delay(100);
+    const logs = initActivityLogs();
+    const log = {
+      _id: 'log_' + Date.now(),
+      ...entry,
+      timestamp: new Date().toISOString()
+    };
+    logs.unshift(log);
+    if (logs.length > 500) logs.splice(500);
+    saveActivityLogs(logs);
+    return clone(log);
+  },
+
+  async getLogsByUser(userId) {
+    await delay();
+    const logs = initActivityLogs();
+    return clone(logs.filter(l => l.userId === userId));
+  }
+};
+
+// =============================================================================
+// CASH DRAWER API
+// =============================================================================
+
+const initCashDrawerSessions = () => {
+  const stored = localStorage.getItem('cashDrawerSessions');
+  return stored ? JSON.parse(stored) : [];
+};
+
+const saveCashDrawerSessions = (sessions) => {
+  localStorage.setItem('cashDrawerSessions', JSON.stringify(sessions));
+};
+
+export const cashDrawerApi = {
+  async getSessions(filters = {}) {
+    await delay();
+    let sessions = initCashDrawerSessions();
+
+    if (filters.status) {
+      sessions = sessions.filter(s => s.status === filters.status);
+    }
+    if (filters.userId) {
+      sessions = sessions.filter(s => s.userId === filters.userId);
+    }
+
+    return clone(sessions.sort((a, b) => new Date(b.openTime) - new Date(a.openTime)));
+  },
+
+  async createSession(data) {
+    await delay(300);
+    const sessions = initCashDrawerSessions();
+    const session = {
+      _id: 'cd_' + Date.now(),
+      ...data,
+      openTime: new Date().toISOString(),
+      closeTime: null,
+      status: 'open',
+      transactions: [],
+      variance: null
+    };
+    sessions.unshift(session);
+    saveCashDrawerSessions(sessions);
+    return clone(session);
+  },
+
+  async closeSession(sessionId, actualCash) {
+    await delay(400);
+    const sessions = initCashDrawerSessions();
+    const index = sessions.findIndex(s => s._id === sessionId);
+    if (index === -1) throw new Error('Session not found');
+
+    const session = sessions[index];
+    const cashTransactions = session.transactions.filter(t => t.method === 'Cash');
+    const expectedCash = session.openingFloat + cashTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+    sessions[index] = {
+      ...session,
+      closeTime: new Date().toISOString(),
+      status: 'closed',
+      expectedCash,
+      actualCash,
+      variance: actualCash - expectedCash
+    };
+    saveCashDrawerSessions(sessions);
+    return clone(sessions[index]);
+  },
+
+  async addTransaction(sessionId, transaction) {
+    await delay(200);
+    const sessions = initCashDrawerSessions();
+    const index = sessions.findIndex(s => s._id === sessionId);
+    if (index === -1) throw new Error('Session not found');
+
+    sessions[index].transactions.push({
+      _id: 'cdt_' + Date.now(),
+      ...transaction,
+      time: new Date().toISOString()
+    });
+    saveCashDrawerSessions(sessions);
+    return clone(sessions[index]);
+  },
+
+  async getOpenSession(userId) {
+    await delay();
+    const sessions = initCashDrawerSessions();
+    return clone(sessions.find(s => s.status === 'open' && s.userId === userId)) || null;
+  },
+
+  async getByDate(dateString) {
+    await delay();
+    const sessions = initCashDrawerSessions();
+    return clone(sessions.filter(s => s.openTime.startsWith(dateString)));
+  }
+};
+
+// =============================================================================
+// PAYROLL REQUESTS API
+// =============================================================================
+
+// Initialize payroll requests from localStorage
+const initPayrollRequests = () => {
+  const stored = localStorage.getItem('payrollRequests');
+  return stored ? JSON.parse(stored) : [];
+};
+
+// Save payroll requests to localStorage
+const savePayrollRequests = (requests) => {
+  localStorage.setItem('payrollRequests', JSON.stringify(requests));
+};
+
+export const payrollRequestsApi = {
+  // Get all payroll requests (optionally filtered by employee)
+  async getRequests(employeeId = null) {
+    await delay();
+    let requests = initPayrollRequests();
+    if (employeeId) {
+      requests = requests.filter(r => r.employeeId === employeeId);
+    }
+    return clone(requests);
+  },
+
+  // Create a new payroll request (cash advance or salary loan)
+  async createRequest(data) {
+    await delay(400);
+
+    const requests = initPayrollRequests();
+    const request = {
+      _id: 'pr_' + Date.now(),
+      ...data,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      processedAt: null,
+      processedBy: null,
+      remarks: ''
+    };
+
+    requests.unshift(request);
+    savePayrollRequests(requests);
+
+    return { success: true, request: clone(request) };
+  },
+
+  // Update request status (approve/reject)
+  async updateRequestStatus(requestId, status, processedBy, remarks = '') {
+    await delay(400);
+
+    const requests = initPayrollRequests();
+    const index = requests.findIndex(r => r._id === requestId);
+
+    if (index === -1) {
+      throw new Error('Payroll request not found');
+    }
+
+    requests[index] = {
+      ...requests[index],
+      status,
+      processedAt: new Date().toISOString(),
+      processedBy,
+      remarks
+    };
+
+    savePayrollRequests(requests);
+
+    return { success: true, request: clone(requests[index]) };
+  },
+
+  // Delete a payroll request
+  async deleteRequest(requestId) {
+    await delay(300);
+
+    const requests = initPayrollRequests();
+    const index = requests.findIndex(r => r._id === requestId);
+
+    if (index === -1) {
+      throw new Error('Payroll request not found');
+    }
+
+    requests.splice(index, 1);
+    savePayrollRequests(requests);
+
+    return { success: true };
+  },
+
+  // Get pending requests count (for dashboard/notifications)
+  async getPendingCount() {
+    await delay();
+    const requests = initPayrollRequests();
+    return requests.filter(r => r.status === 'pending').length;
+  }
+};
+
 // Export all APIs
 export default {
   auth: authApi,
@@ -902,5 +1438,10 @@ export default {
   attendance: attendanceApi,
   giftCertificates: giftCertificatesApi,
   expenses: expensesApi,
-  advanceBooking: advanceBookingApi
+  advanceBooking: advanceBookingApi,
+  payrollConfig: payrollConfigApi,
+  serviceRotation: serviceRotationApi,
+  payrollRequests: payrollRequestsApi,
+  activityLogs: activityLogsApi,
+  cashDrawer: cashDrawerApi
 };

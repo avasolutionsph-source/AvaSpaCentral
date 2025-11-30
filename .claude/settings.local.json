@@ -13,7 +13,11 @@
       "Bash(git commit:*)",
       "Bash(git rev-parse:*)",
       "Bash(git branch:*)",
-      "Bash(start:*)"
+      "Bash(start:*)",
+      "Bash(find:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

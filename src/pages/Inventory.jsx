@@ -58,56 +58,63 @@ const Inventory = () => {
   };
 
   const loadStockHistory = () => {
-    // Mock stock history data
-    const mockHistory = [
-      {
-        id: 1,
-        type: 'purchase',
-        productName: 'Massage Oil (500ml)',
-        quantity: 50,
-        oldStock: 20,
-        newStock: 70,
-        cost: 150,
-        totalCost: 7500,
-        reason: 'Purchase Order #PO-2025-001',
-        user: 'Admin User',
-        date: new Date().toISOString()
-      },
-      {
-        id: 2,
-        type: 'adjustment',
-        productName: 'Face Mask',
-        quantity: -5,
-        oldStock: 30,
-        newStock: 25,
-        reason: 'Damaged products during inspection',
-        user: 'Manager User',
-        date: new Date(Date.now() - 86400000).toISOString()
-      },
-      {
-        id: 3,
-        type: 'subtraction',
-        productName: 'Aromatic Candles',
-        quantity: -10,
-        oldStock: 50,
-        newStock: 40,
-        reason: 'Sales - POS Transaction',
-        user: 'Cashier User',
-        date: new Date(Date.now() - 172800000).toISOString()
-      },
-      {
-        id: 4,
-        type: 'addition',
-        productName: 'Hot Stone Set',
-        quantity: 3,
-        oldStock: 5,
-        newStock: 8,
-        reason: 'Stock replenishment from supplier',
-        user: 'Admin User',
-        date: new Date(Date.now() - 259200000).toISOString()
-      }
-    ];
-    setStockHistory(mockHistory);
+    // Load from localStorage or use demo data
+    const storedHistory = localStorage.getItem('stockHistory');
+    if (storedHistory) {
+      setStockHistory(JSON.parse(storedHistory));
+    } else {
+      // Seed with demo data
+      const mockHistory = [
+        {
+          id: 'sh_demo_1',
+          type: 'purchase',
+          productName: 'Massage Oil (500ml)',
+          quantity: 50,
+          oldStock: 20,
+          newStock: 70,
+          cost: 150,
+          totalCost: 7500,
+          reason: 'Purchase Order #PO-2025-001',
+          user: 'Admin User',
+          date: new Date().toISOString()
+        },
+        {
+          id: 'sh_demo_2',
+          type: 'adjustment',
+          productName: 'Face Mask',
+          quantity: -5,
+          oldStock: 30,
+          newStock: 25,
+          reason: 'Damaged products during inspection',
+          user: 'Manager User',
+          date: new Date(Date.now() - 86400000).toISOString()
+        },
+        {
+          id: 'sh_demo_3',
+          type: 'subtraction',
+          productName: 'Aromatic Candles',
+          quantity: -10,
+          oldStock: 50,
+          newStock: 40,
+          reason: 'Sales - POS Transaction',
+          user: 'Cashier User',
+          date: new Date(Date.now() - 172800000).toISOString()
+        },
+        {
+          id: 'sh_demo_4',
+          type: 'addition',
+          productName: 'Hot Stone Set',
+          quantity: 3,
+          oldStock: 5,
+          newStock: 8,
+          reason: 'Stock replenishment from supplier',
+          user: 'Admin User',
+          date: new Date(Date.now() - 259200000).toISOString()
+        }
+      ];
+      localStorage.setItem('stockHistory', JSON.stringify(mockHistory));
+      setStockHistory(mockHistory);
+    }
   };
 
   const applyFilters = () => {
@@ -177,7 +184,7 @@ const Inventory = () => {
     setShowAdjustmentModal(true);
   };
 
-  const handleStockAdjustment = () => {
+  const handleStockAdjustment = async () => {
     if (!adjustmentQuantity || parseInt(adjustmentQuantity) <= 0) {
       showToast('Please enter a valid quantity', 'error');
       return;
@@ -193,29 +200,49 @@ const Inventory = () => {
       ? selectedProduct.stock + quantity
       : Math.max(0, selectedProduct.stock - quantity);
 
-    // Add to history
-    const historyEntry = {
-      id: stockHistory.length + 1,
-      type: adjustmentType === 'add' ? 'addition' : 'subtraction',
-      productName: selectedProduct.name,
-      quantity: adjustmentType === 'add' ? quantity : -quantity,
-      oldStock: selectedProduct.stock,
-      newStock: newStock,
-      reason: adjustmentReason,
-      user: 'Current User',
-      date: new Date().toISOString()
-    };
+    try {
+      // Persist to API
+      await mockApi.products.updateProduct(selectedProduct._id, { stock: newStock });
 
-    setStockHistory([historyEntry, ...stockHistory]);
+      // Add to history (persisted in localStorage)
+      const historyEntry = {
+        id: 'sh_' + Date.now(),
+        type: adjustmentType === 'add' ? 'addition' : 'subtraction',
+        productId: selectedProduct._id,
+        productName: selectedProduct.name,
+        quantity: adjustmentType === 'add' ? quantity : -quantity,
+        oldStock: selectedProduct.stock,
+        newStock: newStock,
+        reason: adjustmentReason,
+        user: 'Current User',
+        date: new Date().toISOString()
+      };
 
-    // Update inventory
-    const updatedInventory = inventory.map(p =>
-      p._id === selectedProduct._id ? { ...p, stock: newStock } : p
-    );
-    setInventory(updatedInventory);
+      // Persist stock history to localStorage
+      const storedHistory = JSON.parse(localStorage.getItem('stockHistory') || '[]');
+      storedHistory.unshift(historyEntry);
+      localStorage.setItem('stockHistory', JSON.stringify(storedHistory));
+      setStockHistory([historyEntry, ...stockHistory]);
 
-    showToast(`Stock ${adjustmentType === 'add' ? 'increased' : 'decreased'} successfully!`, 'success');
-    setShowAdjustmentModal(false);
+      // Log activity
+      await mockApi.activityLogs.createLog({
+        type: 'inventory',
+        action: 'Stock Adjustment',
+        description: `${adjustmentType === 'add' ? 'Added' : 'Subtracted'} ${quantity} units of ${selectedProduct.name}. Reason: ${adjustmentReason}`,
+        severity: 'info'
+      });
+
+      // Update inventory
+      const updatedInventory = inventory.map(p =>
+        p._id === selectedProduct._id ? { ...p, stock: newStock } : p
+      );
+      setInventory(updatedInventory);
+
+      showToast(`Stock ${adjustmentType === 'add' ? 'increased' : 'decreased'} successfully!`, 'success');
+      setShowAdjustmentModal(false);
+    } catch (error) {
+      showToast('Failed to update stock. Please try again.', 'error');
+    }
   };
 
   // Purchase Order Handlers
@@ -248,7 +275,7 @@ const Inventory = () => {
     }, 0);
   };
 
-  const handlePurchaseOrder = () => {
+  const handlePurchaseOrder = async () => {
     if (!poSupplier.trim()) {
       showToast('Please enter supplier name', 'error');
       return;
@@ -260,39 +287,63 @@ const Inventory = () => {
       return;
     }
 
-    // Update inventory and history
-    validItems.forEach(item => {
-      const product = inventory.find(p => p._id === item.productId);
-      if (product) {
-        const quantity = parseInt(item.quantity);
-        const newStock = product.stock + quantity;
+    try {
+      const storedHistory = JSON.parse(localStorage.getItem('stockHistory') || '[]');
+      const newHistoryEntries = [];
 
-        // Add to history
-        const historyEntry = {
-          id: stockHistory.length + 1,
-          type: 'purchase',
-          productName: product.name,
-          quantity: quantity,
-          oldStock: product.stock,
-          newStock: newStock,
-          cost: parseFloat(item.cost),
-          totalCost: quantity * parseFloat(item.cost),
-          reason: `Purchase Order from ${poSupplier}`,
-          user: 'Current User',
-          date: poDate
-        };
+      // Update inventory and history
+      for (const item of validItems) {
+        const product = inventory.find(p => p._id === item.productId);
+        if (product) {
+          const quantity = parseInt(item.quantity);
+          const newStock = product.stock + quantity;
 
-        setStockHistory(prev => [historyEntry, ...prev]);
+          // Persist to API
+          await mockApi.products.updateProduct(product._id, { stock: newStock });
 
-        // Update inventory
-        setInventory(prev => prev.map(p =>
-          p._id === product._id ? { ...p, stock: newStock } : p
-        ));
+          // Add to history
+          const historyEntry = {
+            id: 'sh_' + Date.now() + '_' + product._id,
+            type: 'purchase',
+            productId: product._id,
+            productName: product.name,
+            quantity: quantity,
+            oldStock: product.stock,
+            newStock: newStock,
+            cost: parseFloat(item.cost),
+            totalCost: quantity * parseFloat(item.cost),
+            reason: `Purchase Order from ${poSupplier}`,
+            user: 'Current User',
+            date: poDate
+          };
+
+          newHistoryEntries.push(historyEntry);
+
+          // Update inventory state
+          setInventory(prev => prev.map(p =>
+            p._id === product._id ? { ...p, stock: newStock } : p
+          ));
+        }
       }
-    });
 
-    showToast('Purchase order processed successfully!', 'success');
-    setShowPurchaseOrderModal(false);
+      // Persist stock history to localStorage
+      const updatedHistory = [...newHistoryEntries, ...storedHistory];
+      localStorage.setItem('stockHistory', JSON.stringify(updatedHistory));
+      setStockHistory(updatedHistory);
+
+      // Log activity
+      await mockApi.activityLogs.createLog({
+        type: 'inventory',
+        action: 'Purchase Order Created',
+        description: `Purchase order from ${poSupplier} with ${validItems.length} item(s). Total: ₱${calculatePOTotal().toLocaleString()}`,
+        severity: 'info'
+      });
+
+      showToast('Purchase order processed successfully!', 'success');
+      setShowPurchaseOrderModal(false);
+    } catch (error) {
+      showToast('Failed to process purchase order. Please try again.', 'error');
+    }
   };
 
   // History Modal Handlers
@@ -303,7 +354,7 @@ const Inventory = () => {
 
   const getProductHistory = () => {
     if (!selectedProduct) return [];
-    return stockHistory.filter(h => h.productName === selectedProduct.name);
+    return stockHistory.filter(h => h.productId === selectedProduct._id || h.productName === selectedProduct.name);
   };
 
   const handleExportInventory = () => {

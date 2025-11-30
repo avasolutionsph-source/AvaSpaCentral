@@ -622,6 +622,42 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Top Quick Action Buttons */}
+      <div className="top-quick-actions">
+        <button className="quick-action-btn primary" onClick={() => navigate('/pos')}>
+          <span className="quick-btn-icon">💳</span>
+          <span className="quick-btn-text">New Sale</span>
+        </button>
+        <button className="quick-action-btn success" onClick={() => navigate('/appointments')}>
+          <span className="quick-btn-icon">📅</span>
+          <span className="quick-btn-text">New Booking</span>
+        </button>
+        <button className="quick-action-btn info" onClick={() => navigate('/customers')}>
+          <span className="quick-btn-icon">👤</span>
+          <span className="quick-btn-text">Add Customer</span>
+        </button>
+        <button className="quick-action-btn warning" onClick={() => navigate('/attendance')}>
+          <span className="quick-btn-icon">⏰</span>
+          <span className="quick-btn-text">Clock In/Out</span>
+        </button>
+        <button className="quick-action-btn purple" onClick={() => navigate('/inventory')}>
+          <span className="quick-btn-icon">📦</span>
+          <span className="quick-btn-text">Inventory</span>
+        </button>
+        <button className="quick-action-btn gradient" onClick={() => navigate('/ai-insights')}>
+          <span className="quick-btn-icon">🤖</span>
+          <span className="quick-btn-text">AI Insights</span>
+        </button>
+        <button className="quick-action-btn secondary" onClick={() => navigate('/reports')}>
+          <span className="quick-btn-icon">📊</span>
+          <span className="quick-btn-text">Reports</span>
+        </button>
+        <button className="quick-action-btn dark" onClick={() => navigate('/employees')}>
+          <span className="quick-btn-icon">👥</span>
+          <span className="quick-btn-text">Employees</span>
+        </button>
+      </div>
+
       {/* KPI Cards */}
       <div className="kpi-grid">
         {/* Financial Metrics */}

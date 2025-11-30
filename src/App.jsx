@@ -1,40 +1,51 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import Toast from './components/Toast';
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Eagerly loaded pages (frequently accessed, small bundle)
 import Login from './pages/Login';
 import Register from './pages/Register';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
 import POS from './pages/POS';
-import Products from './pages/Products';
-import Employees from './pages/Employees';
-import Customers from './pages/Customers';
-import Appointments from './pages/Appointments';
-import Attendance from './pages/Attendance';
-import Rooms from './pages/Rooms';
-import GiftCertificates from './pages/GiftCertificates';
-import Expenses from './pages/Expenses';
-import Payroll from './pages/Payroll';
-import MySchedule from './pages/MySchedule';
-import PayrollRequests from './pages/PayrollRequests';
-import CashDrawerHistory from './pages/CashDrawerHistory';
-import ActivityLogs from './pages/ActivityLogs';
-import ServiceHistory from './pages/ServiceHistory';
-import Inventory from './pages/Inventory';
-import Reports from './pages/Reports';
-import Calendar from './pages/Calendar';
-import Settings from './pages/Settings';
-import AIChatbot from './pages/AIChatbot';
-import AIInsights from './pages/AIInsights';
-import Toast from './components/Toast';
-import ProtectedRoute from './components/ProtectedRoute';
 
-// Loading Screen Component
+// Lazy loaded pages (code splitting for better initial load)
+const Products = lazy(() => import('./pages/Products'));
+const Employees = lazy(() => import('./pages/Employees'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Appointments = lazy(() => import('./pages/Appointments'));
+const Attendance = lazy(() => import('./pages/Attendance'));
+const Rooms = lazy(() => import('./pages/Rooms'));
+const GiftCertificates = lazy(() => import('./pages/GiftCertificates'));
+const Expenses = lazy(() => import('./pages/Expenses'));
+const Payroll = lazy(() => import('./pages/Payroll'));
+const MySchedule = lazy(() => import('./pages/MySchedule'));
+const PayrollRequests = lazy(() => import('./pages/PayrollRequests'));
+const CashDrawerHistory = lazy(() => import('./pages/CashDrawerHistory'));
+const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
+const ServiceHistory = lazy(() => import('./pages/ServiceHistory'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Calendar = lazy(() => import('./pages/Calendar'));
+const Settings = lazy(() => import('./pages/Settings'));
+const AIChatbot = lazy(() => import('./pages/AIChatbot'));
+const AIInsights = lazy(() => import('./pages/AIInsights'));
+
+// Loading Screen Component (for auth state)
 const LoadingScreen = () => (
   <div className="loading-screen">
     <div className="spinner"></div>
     <p>Loading...</p>
+  </div>
+);
+
+// Page Loader Component (for lazy loaded pages)
+const PageLoader = () => (
+  <div className="page-loader">
+    <div className="spinner"></div>
   </div>
 );
 
@@ -113,28 +124,30 @@ function AppRoutes() {
           }
         >
           <Route index element={<RedirectToFirstPage />} />
+          {/* Eagerly loaded routes */}
           <Route path="dashboard" element={<ProtectedRoute page="dashboard"><Dashboard /></ProtectedRoute>} />
           <Route path="pos" element={<ProtectedRoute page="pos"><POS /></ProtectedRoute>} />
-          <Route path="products" element={<ProtectedRoute page="products"><Products /></ProtectedRoute>} />
-          <Route path="employees" element={<ProtectedRoute page="employees"><Employees /></ProtectedRoute>} />
-          <Route path="customers" element={<ProtectedRoute page="customers"><Customers /></ProtectedRoute>} />
-          <Route path="appointments" element={<ProtectedRoute page="appointments"><Appointments /></ProtectedRoute>} />
-          <Route path="attendance" element={<ProtectedRoute page="attendance"><Attendance /></ProtectedRoute>} />
-          <Route path="rooms" element={<ProtectedRoute page="rooms"><Rooms /></ProtectedRoute>} />
-          <Route path="gift-certificates" element={<ProtectedRoute page="gift-certificates"><GiftCertificates /></ProtectedRoute>} />
-          <Route path="expenses" element={<ProtectedRoute page="expenses"><Expenses /></ProtectedRoute>} />
-          <Route path="payroll" element={<ProtectedRoute page="payroll"><Payroll /></ProtectedRoute>} />
-          <Route path="my-schedule" element={<ProtectedRoute page="my-schedule"><MySchedule /></ProtectedRoute>} />
-          <Route path="payroll-requests" element={<ProtectedRoute page="payroll-requests"><PayrollRequests /></ProtectedRoute>} />
-          <Route path="cash-drawer-history" element={<ProtectedRoute page="cash-drawer-history"><CashDrawerHistory /></ProtectedRoute>} />
-          <Route path="activity-logs" element={<ProtectedRoute page="activity-logs"><ActivityLogs /></ProtectedRoute>} />
-          <Route path="service-history" element={<ProtectedRoute page="service-history"><ServiceHistory /></ProtectedRoute>} />
-          <Route path="inventory" element={<ProtectedRoute page="inventory"><Inventory /></ProtectedRoute>} />
-          <Route path="reports" element={<ProtectedRoute page="reports"><Reports /></ProtectedRoute>} />
-          <Route path="calendar" element={<ProtectedRoute page="calendar"><Calendar /></ProtectedRoute>} />
-          <Route path="ai-insights" element={<ProtectedRoute page="ai-insights"><AIInsights /></ProtectedRoute>} />
-          <Route path="ai-chatbot" element={<ProtectedRoute page="ai-chatbot"><AIChatbot /></ProtectedRoute>} />
-          <Route path="settings" element={<ProtectedRoute page="settings"><Settings /></ProtectedRoute>} />
+          {/* Lazy loaded routes with Suspense */}
+          <Route path="products" element={<ProtectedRoute page="products"><Suspense fallback={<PageLoader />}><Products /></Suspense></ProtectedRoute>} />
+          <Route path="employees" element={<ProtectedRoute page="employees"><Suspense fallback={<PageLoader />}><Employees /></Suspense></ProtectedRoute>} />
+          <Route path="customers" element={<ProtectedRoute page="customers"><Suspense fallback={<PageLoader />}><Customers /></Suspense></ProtectedRoute>} />
+          <Route path="appointments" element={<ProtectedRoute page="appointments"><Suspense fallback={<PageLoader />}><Appointments /></Suspense></ProtectedRoute>} />
+          <Route path="attendance" element={<ProtectedRoute page="attendance"><Suspense fallback={<PageLoader />}><Attendance /></Suspense></ProtectedRoute>} />
+          <Route path="rooms" element={<ProtectedRoute page="rooms"><Suspense fallback={<PageLoader />}><Rooms /></Suspense></ProtectedRoute>} />
+          <Route path="gift-certificates" element={<ProtectedRoute page="gift-certificates"><Suspense fallback={<PageLoader />}><GiftCertificates /></Suspense></ProtectedRoute>} />
+          <Route path="expenses" element={<ProtectedRoute page="expenses"><Suspense fallback={<PageLoader />}><Expenses /></Suspense></ProtectedRoute>} />
+          <Route path="payroll" element={<ProtectedRoute page="payroll"><Suspense fallback={<PageLoader />}><Payroll /></Suspense></ProtectedRoute>} />
+          <Route path="my-schedule" element={<ProtectedRoute page="my-schedule"><Suspense fallback={<PageLoader />}><MySchedule /></Suspense></ProtectedRoute>} />
+          <Route path="payroll-requests" element={<ProtectedRoute page="payroll-requests"><Suspense fallback={<PageLoader />}><PayrollRequests /></Suspense></ProtectedRoute>} />
+          <Route path="cash-drawer-history" element={<ProtectedRoute page="cash-drawer-history"><Suspense fallback={<PageLoader />}><CashDrawerHistory /></Suspense></ProtectedRoute>} />
+          <Route path="activity-logs" element={<ProtectedRoute page="activity-logs"><Suspense fallback={<PageLoader />}><ActivityLogs /></Suspense></ProtectedRoute>} />
+          <Route path="service-history" element={<ProtectedRoute page="service-history"><Suspense fallback={<PageLoader />}><ServiceHistory /></Suspense></ProtectedRoute>} />
+          <Route path="inventory" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><Inventory /></Suspense></ProtectedRoute>} />
+          <Route path="reports" element={<ProtectedRoute page="reports"><Suspense fallback={<PageLoader />}><Reports /></Suspense></ProtectedRoute>} />
+          <Route path="calendar" element={<ProtectedRoute page="calendar"><Suspense fallback={<PageLoader />}><Calendar /></Suspense></ProtectedRoute>} />
+          <Route path="ai-insights" element={<ProtectedRoute page="ai-insights"><Suspense fallback={<PageLoader />}><AIInsights /></Suspense></ProtectedRoute>} />
+          <Route path="ai-chatbot" element={<ProtectedRoute page="ai-chatbot"><Suspense fallback={<PageLoader />}><AIChatbot /></Suspense></ProtectedRoute>} />
+          <Route path="settings" element={<ProtectedRoute page="settings"><Suspense fallback={<PageLoader />}><Settings /></Suspense></ProtectedRoute>} />
         </Route>
 
         {/* Catch all - redirect to first allowed page or login */}

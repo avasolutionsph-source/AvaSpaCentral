@@ -168,6 +168,14 @@ a:hover {
   min-height: 60vh;
 }
 
+.page-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  width: 100%;
+}
+
 .spinner {
   width: 48px;
   height: 48px;

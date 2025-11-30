@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
@@ -203,12 +203,12 @@ const Dashboard = () => {
     }
   };
 
-  const refreshDashboard = async () => {
+  const refreshDashboard = useCallback(async () => {
     setRefreshing(true);
     await loadDashboardData();
     setRefreshing(false);
     showToast('Dashboard refreshed', 'success');
-  };
+  }, [showToast]);
 
   const calculateRoomUtilization = (rooms) => {
     const occupied = rooms.filter(r => r.status === 'occupied').length;
@@ -508,7 +508,7 @@ const Dashboard = () => {
     setAiInsights(insights.slice(0, 9)); // Show top 9 insights
   };
 
-  const handleSetGoal = async () => {
+  const handleSetGoal = useCallback(async () => {
     try {
       const goal = parseFloat(newGoal);
       if (isNaN(goal) || goal <= 0) {
@@ -524,9 +524,9 @@ const Dashboard = () => {
     } catch (error) {
       showToast('Failed to update goal', 'error');
     }
-  };
+  }, [newGoal, showToast]);
 
-  const generateAlerts = async () => {
+  const generateAlerts = useCallback(async () => {
     try {
       const newAlerts = [];
 
@@ -589,13 +589,13 @@ const Dashboard = () => {
     } catch (error) {
       showToast('Failed to generate alerts', 'error');
     }
-  };
+  }, [kpis, dailyGoal, showToast]);
 
-  const dismissAlert = (alertId) => {
-    setAlerts(alerts.filter(a => a.id !== alertId));
-  };
+  const dismissAlert = useCallback((alertId) => {
+    setAlerts(prev => prev.filter(a => a.id !== alertId));
+  }, []);
 
-  const exportDailySales = async () => {
+  const exportDailySales = useCallback(async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
       const transactions = await mockApi.transactions.getTransactions({
@@ -630,7 +630,7 @@ const Dashboard = () => {
     } catch (error) {
       showToast('Failed to export sales', 'error');
     }
-  };
+  }, [showToast]);
 
   if (loading) {
     return (
@@ -641,8 +641,8 @@ const Dashboard = () => {
     );
   }
 
-  // Chart data
-  const revenueChartData = {
+  // Memoized chart data to prevent recreation on every render
+  const revenueChartData = useMemo(() => ({
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
       {
@@ -653,9 +653,9 @@ const Dashboard = () => {
         tension: 0.4
       }
     ]
-  };
+  }), []);
 
-  const bookingSourcesData = {
+  const bookingSourcesData = useMemo(() => ({
     labels: ['Walk-in', 'Phone', 'Facebook', 'Instagram', 'Website'],
     datasets: [
       {
@@ -663,9 +663,9 @@ const Dashboard = () => {
         backgroundColor: ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b']
       }
     ]
-  };
+  }), []);
 
-  const topServicesData = {
+  const topServicesData = useMemo(() => ({
     labels: ['Swedish Massage', 'Hot Stone', 'Facial', 'Body Scrub', 'Thai Massage'],
     datasets: [
       {
@@ -674,9 +674,9 @@ const Dashboard = () => {
         backgroundColor: '#8b5cf6'
       }
     ]
-  };
+  }), []);
 
-  const paymentMethodsData = {
+  const paymentMethodsData = useMemo(() => ({
     labels: ['Cash', 'Card', 'GCash'],
     datasets: [
       {
@@ -684,7 +684,13 @@ const Dashboard = () => {
         backgroundColor: ['#10b981', '#3b82f6', '#f59e0b']
       }
     ]
-  };
+  }), []);
+
+  // Memoized chart options
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false
+  }), []);
 
   return (
     <div className="dashboard-page">
@@ -978,28 +984,28 @@ const Dashboard = () => {
         <div className="chart-card">
           <h3>📈 Revenue Trend (7 Days)</h3>
           <div className="chart-container">
-            <Line data={revenueChartData} options={{ responsive: true, maintainAspectRatio: false }} />
+            <Line data={revenueChartData} options={chartOptions} />
           </div>
         </div>
 
         <div className="chart-card">
           <h3>📍 Booking Sources</h3>
           <div className="chart-container">
-            <Pie data={bookingSourcesData} options={{ responsive: true, maintainAspectRatio: false }} />
+            <Pie data={bookingSourcesData} options={chartOptions} />
           </div>
         </div>
 
         <div className="chart-card">
           <h3>⭐ Top Services by Revenue</h3>
           <div className="chart-container">
-            <Bar data={topServicesData} options={{ responsive: true, maintainAspectRatio: false }} />
+            <Bar data={topServicesData} options={chartOptions} />
           </div>
         </div>
 
         <div className="chart-card">
           <h3>💳 Payment Methods</h3>
           <div className="chart-container">
-            <Doughnut data={paymentMethodsData} options={{ responsive: true, maintainAspectRatio: false }} />
+            <Doughnut data={paymentMethodsData} options={chartOptions} />
           </div>
         </div>
       </div>

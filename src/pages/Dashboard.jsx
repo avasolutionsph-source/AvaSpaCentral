@@ -47,7 +47,90 @@ const Dashboard = () => {
   const [showAiInsights, setShowAiInsights] = useState(true);
 
   useEffect(() => {
-    loadDashboardData();
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        if (!isMounted) return;
+        setLoading(true);
+
+        // Get business settings
+        const business = await mockApi.business.getSettings();
+        if (!isMounted) return;
+        setDailyGoal(business.settings.dailyGoal);
+
+        // Get today's date
+        const today = new Date().toISOString().split('T')[0];
+
+        // Fetch all data
+        const [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount] =
+          await Promise.all([
+            mockApi.transactions.getRevenueSummary('today'),
+            mockApi.transactions.getRevenueSummary('week'),
+            mockApi.transactions.getRevenueSummary('month'),
+            mockApi.transactions.getTransactions({ limit: 10 }),
+            mockApi.appointments.getAppointments({ date: today }),
+            mockApi.attendance.getAttendance({ date: today }),
+            mockApi.products.getProducts(),
+            mockApi.rooms.getRooms(),
+            mockApi.advanceBooking.getPendingRevenue(),
+            mockApi.advanceBooking.getTodaysBookingsCount()
+          ]);
+
+        // Check if component is still mounted before updating state
+        if (!isMounted) return;
+
+        // Calculate KPIs
+        const kpiData = {
+          financial: {
+            todayRevenue: todaySummary.totalRevenue,
+            weekRevenue: weekSummary.totalRevenue,
+            monthRevenue: monthSummary.totalRevenue,
+            avgTransaction: todaySummary.averageTransaction
+          },
+          operational: {
+            pendingAppointments: appointments.filter(a => a.status === 'pending').length,
+            confirmedAppointments: appointments.filter(a => a.status === 'confirmed').length,
+            completedToday: todaySummary.totalTransactions,
+            roomUtilization: calculateRoomUtilization(rooms)
+          },
+          staff: {
+            attendanceRate: calculateAttendanceRate(attendance),
+            totalOvertime: 0, // Would calculate from attendance
+            lateArrivals: attendance.filter(a => a.lateMinutes > 0).length,
+            activeEmployees: attendance.length
+          },
+          inventory: {
+            criticalStock: products.filter(p => p.type === 'product' && p.stock <= p.lowStockAlert).length,
+            outOfStock: products.filter(p => p.type === 'product' && p.stock === 0).length,
+            totalValue: calculateInventoryValue(products),
+            lowStockAlerts: products.filter(p => p.type === 'product' && p.stock > 0 && p.stock <= p.lowStockAlert).length
+          }
+        };
+
+        setKpis(kpiData);
+        setRecentTransactions(transactions);
+        setPendingRevenue(pendingRevenueData.total);
+        setTodaysBookings(todaysBookingsCount);
+
+        // Generate AI insights
+        generateAIInsights(kpiData, transactions, products, rooms, pendingRevenueData, todaysBookingsCount);
+
+        setLoading(false);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to load dashboard:', error);
+        showToast('Failed to load dashboard data', 'error');
+        setLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const loadDashboardData = async () => {

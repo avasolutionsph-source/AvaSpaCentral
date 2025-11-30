@@ -47,7 +47,41 @@ const Appointments = () => {
   const bookingSources = ['walk-in', 'phone', 'social-media', 'website'];
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        if (!isMounted) return;
+        setLoading(true);
+        const [appts, emps, custs, prods, rms] = await Promise.all([
+          mockApi.appointments.getAppointments(),
+          mockApi.employees.getEmployees(),
+          mockApi.customers.getCustomers(),
+          mockApi.products.getProducts(),
+          mockApi.rooms.getRooms()
+        ]);
+
+        if (!isMounted) return;
+
+        setAppointments(appts);
+        setEmployees(emps.filter(e => e.status === 'active'));
+        setCustomers(custs);
+        setServices(prods.filter(p => p.type === 'service' && p.active));
+        setRooms(rms);
+        setLoading(false);
+      } catch (error) {
+        if (!isMounted) return;
+        showToast('Failed to load appointments', 'error');
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const loadData = async () => {

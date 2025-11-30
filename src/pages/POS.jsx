@@ -57,8 +57,56 @@ const POS = () => {
   const [showRotationQueue, setShowRotationQueue] = useState(true);
 
   useEffect(() => {
-    loadPOSData();
-    loadRotationQueue();
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        if (!isMounted) return;
+        setLoading(true);
+        const [productsData, employeesData, customersData, roomsData] = await Promise.all([
+          mockApi.products.getProducts({ active: true }),
+          mockApi.employees.getEmployees({ status: 'active' }),
+          mockApi.customers.getCustomers({ status: 'active' }),
+          mockApi.rooms.getRooms()
+        ]);
+
+        if (!isMounted) return;
+
+        setProducts(productsData);
+        setEmployees(employeesData);
+        setCustomers(customersData);
+        setRooms(roomsData);
+
+        // Extract unique categories
+        const uniqueCategories = [...new Set(productsData.map(p => p.category))];
+        setCategories(uniqueCategories);
+
+        setLoading(false);
+      } catch (error) {
+        if (!isMounted) return;
+        showToast('Failed to load POS data', 'error');
+        setLoading(false);
+      }
+    };
+
+    const loadQueue = async () => {
+      try {
+        const rotationData = await mockApi.serviceRotation.getRotationQueue();
+        if (!isMounted) return;
+        setRotationQueue(rotationData.queue);
+        setNextEmployee(rotationData.nextEmployee);
+      } catch (error) {
+        console.error('Failed to load rotation queue:', error);
+      }
+    };
+
+    loadData();
+    loadQueue();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {

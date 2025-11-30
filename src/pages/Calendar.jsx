@@ -56,32 +56,48 @@ const Calendar = () => {
 
   // Load appointments and dropdown data
   useEffect(() => {
-    loadAppointments();
-    loadDropdownData();
+    let isMounted = true;
+
+    const loadData = async () => {
+      if (!isMounted) return;
+      await loadAppointments(isMounted);
+    };
+
+    const loadDropdowns = async () => {
+      try {
+        const [emps, custs, prods, rms] = await Promise.all([
+          mockApi.employees.getEmployees(),
+          mockApi.customers.getCustomers(),
+          mockApi.products.getProducts(),
+          mockApi.rooms.getRooms()
+        ]);
+        if (!isMounted) return;
+        setEmployees(emps.filter(e => e.status === 'active'));
+        setCustomers(custs);
+        setServices(prods.filter(p => p.type === 'service' && p.active));
+        setRooms(rms);
+      } catch (error) {
+        console.error('Failed to load dropdown data:', error);
+      }
+    };
+
+    loadData();
+    loadDropdowns();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
   }, [currentDate, view]);
 
-  const loadDropdownData = async () => {
-    try {
-      const [emps, custs, prods, rms] = await Promise.all([
-        mockApi.employees.getEmployees(),
-        mockApi.customers.getCustomers(),
-        mockApi.products.getProducts(),
-        mockApi.rooms.getRooms()
-      ]);
-      setEmployees(emps.filter(e => e.status === 'active'));
-      setCustomers(custs);
-      setServices(prods.filter(p => p.type === 'service' && p.active));
-      setRooms(rms);
-    } catch (error) {
-      console.error('Failed to load dropdown data:', error);
-    }
-  };
-
-  const loadAppointments = async () => {
+  const loadAppointments = async (isMounted = true) => {
     setLoading(true);
     try {
       // Fetch advance bookings from API
       const bookings = await advanceBookingApi.listAdvanceBookings();
+
+      // Check if still mounted before updating state
+      if (!isMounted) return;
 
       // Transform bookings to calendar appointment format
       const transformedAppointments = bookings.map(booking => {
@@ -156,10 +172,13 @@ const Calendar = () => {
         setAppointments(transformedAppointments);
       }
     } catch (error) {
+      if (!isMounted) return;
       console.error('Failed to load appointments:', error);
       showToast('Failed to load calendar appointments', 'error');
     } finally {
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     }
   };
 

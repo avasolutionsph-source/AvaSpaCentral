@@ -7,8 +7,13 @@ const Toast = () => {
   if (!toast) return null;
 
   return (
-    <div className={`toast toast-${toast.type}`}>
-      <div className="toast-icon">
+    <div
+      className={`toast toast-${toast.type}`}
+      role="alert"
+      aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+      aria-atomic="true"
+    >
+      <div className="toast-icon" aria-hidden="true">
         {toast.type === 'success' && '✓'}
         {toast.type === 'error' && '✕'}
         {toast.type === 'warning' && '⚠'}

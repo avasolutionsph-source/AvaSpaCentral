@@ -167,8 +167,16 @@ const MainLayout = () => {
 
   return (
     <div className="main-layout">
+      {/* Skip to main content link for keyboard users */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       {/* Sidebar */}
-      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+      <aside
+        className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}
+        aria-label="Main navigation"
+      >
         <div className="sidebar-header">
           <div className="brand">
             <h2>Ava Solutions</h2>
@@ -177,26 +185,35 @@ const MainLayout = () => {
           <button
             className="sidebar-toggle"
             onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-expanded={sidebarOpen}
           >
             {sidebarOpen ? '◀' : '▶'}
           </button>
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" role="navigation" aria-label="Primary">
           {filteredGroups.map((group) => (
             <div key={group.label} className={`nav-group ${expandedGroups[group.label] ? 'expanded' : 'collapsed'}`}>
               {sidebarOpen && (
-                <div
+                <button
+                  type="button"
                   className="nav-group-label"
                   onClick={() => toggleGroup(group.label)}
+                  aria-expanded={expandedGroups[group.label]}
+                  aria-controls={`nav-group-${group.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
                   <span className="nav-group-text">{group.label}</span>
-                  <span className={`nav-group-arrow ${expandedGroups[group.label] ? 'expanded' : ''}`}>
+                  <span className={`nav-group-arrow ${expandedGroups[group.label] ? 'expanded' : ''}`} aria-hidden="true">
                     ▼
                   </span>
-                </div>
+                </button>
               )}
-              <div className={`nav-group-items ${expandedGroups[group.label] || !sidebarOpen ? 'show' : 'hide'}`}>
+              <div
+                id={`nav-group-${group.label.toLowerCase().replace(/\s+/g, '-')}`}
+                className={`nav-group-items ${expandedGroups[group.label] || !sidebarOpen ? 'show' : 'hide'}`}
+                role="list"
+              >
                 {group.items.map((item) => (
                   <NavLink
                     key={item.path}
@@ -204,9 +221,12 @@ const MainLayout = () => {
                     className={({ isActive }) =>
                       `nav-item ${isActive ? 'active' : ''}`
                     }
+                    role="listitem"
+                    aria-current={({ isActive }) => isActive ? 'page' : undefined}
                   >
-                    <span className="nav-icon">{item.icon}</span>
+                    <span className="nav-icon" aria-hidden="true">{item.icon}</span>
                     {sidebarOpen && <span className="nav-label">{item.label}</span>}
+                    {!sidebarOpen && <span className="visually-hidden">{item.label}</span>}
                   </NavLink>
                 ))}
               </div>
@@ -229,8 +249,13 @@ const MainLayout = () => {
               </div>
             </div>
           )}
-          <button className="logout-btn" onClick={handleLogout} title="Logout">
-            🚪 {sidebarOpen && 'Logout'}
+          <button
+            className="logout-btn"
+            onClick={handleLogout}
+            title="Logout"
+            aria-label="Logout from application"
+          >
+            <span aria-hidden="true">🚪</span> {sidebarOpen && 'Logout'}
           </button>
         </div>
       </aside>
@@ -238,13 +263,15 @@ const MainLayout = () => {
       {/* Main Content */}
       <div className="main-content">
         {/* Top Header */}
-        <header className="top-header">
+        <header className="top-header" role="banner">
           <div className="header-left">
             <button
               className="mobile-menu-btn"
               onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Toggle navigation menu"
+              aria-expanded={sidebarOpen}
             >
-              ☰
+              <span aria-hidden="true">☰</span>
             </button>
             <h1 className="page-title">{user?.businessName}</h1>
           </div>
@@ -262,11 +289,15 @@ const MainLayout = () => {
 
         {/* Low Stock Alert Banner */}
         {lowStockAlerts.length > 0 && showAlertBanner && !alertDismissed && (
-          <div className="stock-alert-banner">
+          <div
+            className="stock-alert-banner"
+            role="alert"
+            aria-live="polite"
+          >
             <div className="stock-alert-content">
               {lowStockAlerts.map((alert, idx) => (
                 <div key={idx} className={`stock-alert-item stock-alert-${alert.type}`}>
-                  <span className="stock-alert-icon">{alert.icon}</span>
+                  <span className="stock-alert-icon" aria-hidden="true">{alert.icon}</span>
                   <span className="stock-alert-message">{alert.message}</span>
                   <span className="stock-alert-items">
                     ({alert.items.join(', ')}{alert.items.length >= 3 ? '...' : ''})
@@ -278,21 +309,23 @@ const MainLayout = () => {
               <button
                 className="stock-alert-btn view"
                 onClick={() => navigate('/inventory')}
+                aria-label="View inventory to manage stock"
               >
                 View Inventory
               </button>
               <button
                 className="stock-alert-btn dismiss"
                 onClick={dismissAlerts}
+                aria-label="Dismiss stock alerts"
               >
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
           </div>
         )}
 
         {/* Page Content */}
-        <main className="page-content">
+        <main id="main-content" className="page-content" role="main">
           <Outlet />
         </main>
       </div>

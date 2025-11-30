@@ -30,11 +30,15 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="error-boundary">
+        <div
+          className="error-boundary"
+          role="alert"
+          aria-live="assertive"
+        >
           <div className="error-boundary-content">
-            <div className="error-icon">!</div>
-            <h1>Something went wrong</h1>
-            <p>We're sorry, but something unexpected happened. Please try again.</p>
+            <div className="error-icon" aria-hidden="true">!</div>
+            <h1 id="error-title">Something went wrong</h1>
+            <p id="error-description">We're sorry, but something unexpected happened. Please try again.</p>
 
             {process.env.NODE_ENV === 'development' && this.state.error && (
               <details className="error-details">
@@ -44,18 +48,17 @@ class ErrorBoundary extends React.Component {
               </details>
             )}
 
-            <div className="error-actions">
+            <div className="error-actions" role="group" aria-label="Error recovery options">
               <button
                 className="btn btn-primary"
                 onClick={this.handleRetry}
-                aria-label="Try again"
+                aria-describedby="error-description"
               >
                 Try Again
               </button>
               <button
                 className="btn btn-secondary"
                 onClick={this.handleGoHome}
-                aria-label="Go to home page"
               >
                 Go to Home
               </button>

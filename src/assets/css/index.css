@@ -5515,6 +5515,135 @@ a:focus:not(:focus-visible),
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* ============================================================================
+   SHARED COMPONENTS
+   ============================================================================ */
+
+/* Confirm Dialog */
+.confirm-dialog-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-dialog {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: var(--shadow-xl);
+}
+
+.confirm-dialog-icon {
+  font-size: 48px;
+  margin-bottom: var(--spacing-md);
+}
+
+.confirm-dialog-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: var(--spacing-sm);
+}
+
+.confirm-dialog-message {
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-lg);
+  line-height: 1.5;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+}
+
+.confirm-dialog-actions .btn {
+  min-width: 100px;
+}
+
+/* Button Variants */
+.btn-danger {
+  background: var(--error);
+  color: var(--white);
+  border-color: var(--error);
+}
+
+.btn-danger:hover {
+  background: var(--error-dark);
+  border-color: var(--error-dark);
+}
+
+.btn-warning {
+  background: var(--warning);
+  color: var(--gray-900);
+  border-color: var(--warning);
+}
+
+.btn-warning:hover {
+  background: var(--warning-dark);
+  border-color: var(--warning-dark);
+}
+
+/* Form Field Component */
+.form-group.has-error .form-control {
+  border-color: var(--error);
+}
+
+.form-group.has-error .form-control:focus {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.form-error {
+  color: var(--error);
+  font-size: 0.875rem;
+  margin-top: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.form-error::before {
+  content: '⚠';
+  font-size: 0.75rem;
+}
+
+.form-help {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-top: var(--spacing-xs);
+}
+
+.required-indicator {
+  color: var(--error);
+}
+
+.form-control.is-invalid {
+  border-color: var(--error);
+}
+
+/* Checkbox styling */
+.form-group-checkbox {
+  display: flex;
+  flex-direction: column;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   button:focus-visible,
@@ -5534,5 +5663,245 @@ a:focus:not(:focus-visible),
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================================
+   RESPONSIVE IMPROVEMENTS
+   ============================================================================ */
+
+/* Mobile-first touch targets (minimum 44x44px for accessibility) */
+@media (max-width: 768px) {
+  .btn,
+  .nav-item,
+  .quick-action-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Tables: horizontal scroll */
+  .table-container,
+  .transactions-table,
+  .data-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 600px;
+  }
+
+  /* Modals: full width on small screens */
+  .modal {
+    width: 95%;
+    max-width: none;
+    margin: var(--spacing-sm);
+    max-height: 90vh;
+  }
+
+  .modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  /* Form rows stack on mobile */
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row .form-group {
+    width: 100%;
+  }
+
+  /* KPI grid adjustments */
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Charts grid adjustments */
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Quick action buttons grid */
+  .top-quick-actions {
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+
+  .top-quick-actions .quick-action-btn {
+    flex: 1 1 calc(50% - var(--spacing-sm));
+    min-width: 120px;
+  }
+
+  /* Page header stacking */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  .header-actions {
+    width: 100%;
+    display: flex;
+    gap: var(--spacing-sm);
+  }
+
+  .header-actions .btn {
+    flex: 1;
+  }
+
+  /* Sidebar adjustments */
+  .sidebar.closed {
+    transform: translateX(-100%);
+    position: absolute;
+  }
+
+  .sidebar.open {
+    position: fixed;
+    z-index: 1000;
+    width: 280px;
+  }
+
+  /* AI insights grid */
+  .ai-insights-grid-enhanced {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .charts-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ai-insights-grid-enhanced {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES
+   ============================================================================ */
+
+@media print {
+  /* Hide non-essential elements */
+  .sidebar,
+  .top-header,
+  .skip-link,
+  .btn,
+  button,
+  .modal-overlay,
+  .toast,
+  .stock-alert-banner,
+  .header-actions,
+  .quick-actions,
+  .top-quick-actions,
+  nav,
+  .pagination,
+  .filters,
+  .search-box {
+    display: none !important;
+  }
+
+  /* Reset page layout */
+  .main-layout {
+    display: block;
+  }
+
+  .main-content {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+  }
+
+  .page-content {
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Adjust colors for printing */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  * {
+    background: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Keep some background colors for badges */
+  .badge,
+  .badge-success,
+  .badge-error,
+  .badge-warning,
+  .badge-info {
+    border: 1px solid currentColor !important;
+  }
+
+  /* Table improvements */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th,
+  td {
+    border: 1px solid #000 !important;
+    padding: 8px !important;
+  }
+
+  /* Page break handling */
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+  }
+
+  table, img, svg {
+    page-break-inside: avoid;
+  }
+
+  /* Show URLs for links */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+  }
+
+  a[href^="#"]:after,
+  a[href^="javascript"]:after {
+    content: "";
+  }
+
+  /* Print header for pages */
+  .dashboard-page::before,
+  .reports-page::before {
+    content: "Printed from Ava Solutions SPA Demo ERP";
+    display: block;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 0.5rem;
+  }
+
+  /* Ensure charts don't break */
+  .chart-card {
+    page-break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+
+  /* KPI cards for print */
+  .kpi-card {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 10px;
+    page-break-inside: avoid;
   }
 }

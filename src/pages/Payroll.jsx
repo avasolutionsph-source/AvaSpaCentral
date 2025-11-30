@@ -202,9 +202,10 @@ const Payroll = () => {
   };
 
   const calculateEmployeePayroll = (employee, startDate, endDate) => {
-    // Get attendance for period
+    // Get attendance for period - attendance uses employeeId field
     const empAttendance = attendance.filter(a => {
-      if (a.employee._id !== employee._id) return false;
+      const empId = a.employeeId || a.employee?._id;
+      if (!empId || empId !== employee._id) return false;
       const attDate = parseISO(a.date);
       return isWithinInterval(attDate, { start: startDate, end: endDate });
     });

@@ -26,7 +26,6 @@ const Products = () => {
     duration: '',
     stock: '',
     lowStockAlert: '',
-    commission: { type: 'percentage', value: '' },
     description: '',
     itemsUsed: [] // For services: products consumed during the service
   });
@@ -77,8 +76,7 @@ const Products = () => {
     setModalMode('create');
     setFormData({
       name: '', category: '', type: 'service', price: '', cost: '', duration: '',
-      stock: '', lowStockAlert: '', commission: { type: 'percentage', value: '' }, description: '',
-      itemsUsed: []
+      stock: '', lowStockAlert: '', description: '', itemsUsed: []
     });
     setShowModal(true);
   };
@@ -91,7 +89,6 @@ const Products = () => {
       price: product.price.toString(), cost: product.cost?.toString() || '',
       duration: product.duration?.toString() || '', stock: product.stock?.toString() || '',
       lowStockAlert: product.lowStockAlert?.toString() || '',
-      commission: { type: product.commission.type, value: product.commission.value.toString() },
       description: product.description || '',
       itemsUsed: product.itemsUsed || []
     });
@@ -100,12 +97,7 @@ const Products = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    if (name.startsWith('commission.')) {
-      const field = name.split('.')[1];
-      setFormData(prev => ({ ...prev, commission: { ...prev.commission, [field]: value } }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   // Add item to items used list
@@ -165,13 +157,6 @@ const Products = () => {
     if (formData.type === 'service' && (!formData.duration || parseInt(formData.duration) <= 0)) {
       showToast('Valid duration is required', 'error'); return false;
     }
-    if (!formData.commission.value || parseFloat(formData.commission.value) <= 0) {
-      showToast('Valid commission is required', 'error'); return false;
-    }
-    // Validate commission percentage is between 0-100%
-    if (formData.commission.type === 'percentage' && parseFloat(formData.commission.value) > 100) {
-      showToast('Commission percentage cannot exceed 100%', 'error'); return false;
-    }
     return true;
   };
 
@@ -187,7 +172,6 @@ const Products = () => {
         duration: formData.type === 'service' ? parseInt(formData.duration) : undefined,
         stock: formData.type === 'product' ? parseInt(formData.stock) : undefined,
         lowStockAlert: formData.type === 'product' && formData.lowStockAlert ? parseInt(formData.lowStockAlert) : undefined,
-        commission: { type: formData.commission.type, value: parseFloat(formData.commission.value) },
         description: formData.description.trim(),
         itemsUsed: formData.type === 'service' ? formData.itemsUsed : []
       };
@@ -297,9 +281,7 @@ const Products = () => {
 
                 <div className="product-info-row">
                   {product.type === 'service' && product.duration && (
-                    <>
-                      <span className="info-tag">⏱️ {product.duration}m</span>
-                    </>
+                    <span className="info-tag">⏱️ {product.duration}m</span>
                   )}
                   {product.type === 'product' && (
                     <>
@@ -309,9 +291,6 @@ const Products = () => {
                       <span className="info-tag">💰 ₱{product.cost?.toLocaleString() || 0}</span>
                     </>
                   )}
-                  <span className="info-tag">
-                    💵 {product.commission.value}{product.commission.type === 'percentage' ? '%' : 'PHP'}
-                  </span>
                 </div>
               </div>
 
@@ -465,17 +444,6 @@ const Products = () => {
                     </div>
                   </>
                 )}
-                <div className="form-group">
-                  <label>Commission *</label>
-                  <div className="commission-group">
-                    <select name="commission.type" value={formData.commission.type} onChange={handleInputChange} className="form-control commission-type">
-                      <option value="percentage">Percentage (%)</option>
-                      <option value="fixed">Fixed (₱)</option>
-                    </select>
-                    <input type="number" name="commission.value" value={formData.commission.value} onChange={handleInputChange}
-                      placeholder="0" className="form-control commission-value" min="0" step={formData.commission.type === 'percentage' ? '1' : '0.01'} required />
-                  </div>
-                </div>
                 <div className="form-group">
                   <label>Description</label>
                   <textarea name="description" value={formData.description} onChange={handleInputChange} placeholder="Optional" className="form-control" rows="3"></textarea>

@@ -132,6 +132,7 @@ const MainLayout = () => {
       items: [
         { path: '/employees', label: 'Employees', icon: '👥', page: 'employees' },
         { path: '/attendance', label: 'Attendance', icon: '⏰', page: 'attendance' },
+        { path: '/shift-schedules', label: 'Shift Schedules', icon: '📋', page: 'shift-schedules' },
         { path: '/payroll', label: 'Payroll', icon: '💵', page: 'payroll' },
       ]
     },
@@ -145,6 +146,7 @@ const MainLayout = () => {
     {
       label: 'Analytics',
       items: [
+        { path: '/analytics', label: 'Analytics Dashboard', icon: '📈', page: 'analytics' },
         { path: '/reports', label: 'Reports', icon: '📊', page: 'reports' },
         { path: '/ai-insights', label: 'AI Insights', icon: '🔮', page: 'ai-insights' },
         { path: '/ai-chatbot', label: 'Ava AI', icon: '✨', page: 'ai-chatbot' },
@@ -179,8 +181,7 @@ const MainLayout = () => {
       >
         <div className="sidebar-header">
           <div className="brand">
-            <h2>Ava Solutions</h2>
-            <p>SPA Demo ERP</p>
+            <img src="/Ava transparent.png" alt="Ava Solutions" className="brand-logo-img" />
           </div>
           <button
             className="sidebar-toggle"
@@ -273,7 +274,6 @@ const MainLayout = () => {
             >
               <span aria-hidden="true">☰</span>
             </button>
-            <h1 className="page-title">{user?.businessName}</h1>
           </div>
           <div className="header-right">
             <div className="header-info">

@@ -1,0 +1,488 @@
+/* ============================================================================
+   ANALYTICS DASHBOARD STYLES
+   Clean, minimal design with strict color palette - Optimized for performance
+   ============================================================================ */
+
+.analytics-dashboard {
+  padding: var(--spacing-lg);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Header */
+.analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+.analytics-header .header-left h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin: 0 0 4px 0;
+}
+
+.analytics-header .subtitle {
+  font-size: 0.85rem;
+  color: #666666;
+  margin: 0;
+}
+
+.analytics-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.period-select {
+  padding: 8px 14px;
+  border: 1px solid #E0E0E0;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  cursor: pointer;
+}
+
+.period-select:focus {
+  outline: none;
+  border-color: #1B5E37;
+}
+
+.btn-refresh {
+  padding: 8px 16px;
+  background: #FFFFFF;
+  color: #1B5E37;
+  border: 1px solid #1B5E37;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-refresh:hover {
+  background: #1B5E37;
+  color: #FFFFFF;
+}
+
+/* Real-time Banner - Compact */
+.realtime-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  border-radius: 8px;
+  margin-bottom: var(--spacing-lg);
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+}
+
+.realtime-banner.positive {
+  border-color: #1B5E37;
+  border-left: 4px solid #1B5E37;
+}
+
+.realtime-banner.negative {
+  border-color: #DC2626;
+  border-left: 4px solid #DC2626;
+}
+
+.realtime-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.realtime-label {
+  font-size: 0.7rem;
+  color: #666666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.realtime-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.realtime-banner.positive .realtime-value {
+  color: #1B5E37;
+}
+
+.realtime-banner.negative .realtime-value {
+  color: #DC2626;
+}
+
+.realtime-details {
+  font-size: 0.8rem;
+  color: #666666;
+}
+
+.realtime-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1B5E37;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  background: #1B5E37;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* KPI Grid - Compact cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.kpi-card {
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  transition: border-color 0.2s;
+}
+
+.kpi-card:hover {
+  border-color: #1B5E37;
+}
+
+.kpi-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.kpi-icon {
+  font-size: 1rem;
+}
+
+.kpi-title {
+  font-size: 0.65rem;
+  color: #666666;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.kpi-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin-bottom: 6px;
+}
+
+.kpi-value.positive {
+  color: #1B5E37;
+}
+
+.kpi-value.warning {
+  color: #92400e;
+}
+
+.kpi-value.negative {
+  color: #DC2626;
+}
+
+.kpi-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.7rem;
+  color: #999999;
+}
+
+.progress-bar {
+  height: 4px;
+  background: #E0E0E0;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #1B5E37;
+  border-radius: 2px;
+}
+
+/* Charts Grid - Smaller charts */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.chart-card {
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card.large {
+  height: 220px;
+}
+
+.chart-card h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin: 0 0 var(--spacing-sm) 0;
+  flex-shrink: 0;
+}
+
+.chart-card canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Insights Section - Compact */
+.insights-section {
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.insights-section h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.insight-card {
+  background: #F5F5F5;
+  border-radius: 6px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-left: 3px solid #666666;
+}
+
+.insight-card.insight-warning {
+  border-left-color: #d97706;
+}
+
+.insight-card.insight-success {
+  border-left-color: #1B5E37;
+}
+
+.insight-card.insight-opportunity {
+  border-left-color: #1B5E37;
+}
+
+.insight-card.insight-critical {
+  border-left-color: #DC2626;
+}
+
+.insight-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.insight-icon {
+  font-size: 0.9rem;
+}
+
+.insight-category {
+  font-size: 0.65rem;
+  color: #666666;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.insight-message {
+  font-size: 0.8rem;
+  color: #1A1A1A;
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+
+.insight-action,
+.insight-impact {
+  font-size: 0.7rem;
+  color: #666666;
+  margin: 0;
+}
+
+.insight-action strong,
+.insight-impact strong {
+  color: #1A1A1A;
+}
+
+/* Quick Navigation - Compact */
+.quick-nav {
+  margin-top: var(--spacing-md);
+}
+
+.quick-nav.top {
+  margin-top: 0;
+  margin-bottom: var(--spacing-lg);
+}
+
+.quick-nav h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.nav-cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.nav-card {
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 6px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  transition: border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-card:hover {
+  border-color: #1B5E37;
+}
+
+.nav-icon {
+  font-size: 1.25rem;
+}
+
+.nav-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.nav-desc {
+  font-size: 0.7rem;
+  color: #666666;
+}
+
+/* Loading State */
+.analytics-dashboard .loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: var(--spacing-md);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #E0E0E0;
+  border-top-color: #1B5E37;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.analytics-dashboard .loading-container p {
+  font-size: 0.85rem;
+  color: #666666;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chart-card.large {
+    grid-column: span 2;
+  }
+
+  .nav-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .analytics-dashboard {
+    padding: var(--spacing-md);
+  }
+
+  .analytics-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .realtime-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .realtime-value {
+    font-size: 1.25rem;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card,
+  .chart-card.large {
+    height: 200px;
+    grid-column: span 1;
+  }
+
+  .insights-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

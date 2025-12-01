@@ -752,3 +752,224 @@
     overflow-x: auto;
   }
 }
+
+/* =========================================
+   Customer Reports: Retention & Loyalty
+   ========================================= */
+
+/* Two-Column Grid for Retention Report */
+.report-grid.two-column {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+@media (max-width: 1024px) {
+  .report-grid.two-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Status Badges for Reports */
+.reports-page .status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.reports-page .status-badge.success {
+  background: rgba(27, 94, 55, 0.1);
+  color: var(--success);
+}
+
+.reports-page .status-badge.warning {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--warning);
+}
+
+.reports-page .status-badge.info {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.reports-page .status-badge.danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--danger);
+}
+
+/* Tier Badges for Loyalty Program */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tier-badge.platinum {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: var(--white);
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.tier-badge.gold {
+  background: linear-gradient(135deg, #f5af19 0%, #f12711 100%);
+  color: var(--white);
+  box-shadow: 0 2px 4px rgba(245, 175, 25, 0.3);
+}
+
+.tier-badge.silver {
+  background: linear-gradient(135deg, #bdc3c7 0%, #606060 100%);
+  color: var(--white);
+  box-shadow: 0 2px 4px rgba(189, 195, 199, 0.3);
+}
+
+.tier-badge.bronze {
+  background: linear-gradient(135deg, #cd7f32 0%, #a0522d 100%);
+  color: var(--white);
+  box-shadow: 0 2px 4px rgba(205, 127, 50, 0.3);
+}
+
+/* Value indicators */
+.insight-value.negative {
+  color: var(--danger);
+}
+
+.insight-value.warning {
+  color: var(--warning);
+}
+
+.insight-value.positive {
+  color: var(--success);
+}
+
+/* Table value highlights */
+.performers-table td.negative {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.performers-table td.warning {
+  color: var(--warning);
+}
+
+.performers-table td.positive {
+  color: var(--success);
+}
+
+/* Empty message for tables */
+.performers-table .empty-message {
+  text-align: center;
+  color: var(--gray-500);
+  font-style: italic;
+  padding: var(--spacing-md);
+}
+
+/* =========================================
+   Financial Reports: Cash Flow & Expenses
+   ========================================= */
+
+/* Small chart container for doughnut charts */
+.chart-container-small {
+  height: 250px;
+  max-width: 350px;
+  margin: 0 auto;
+}
+
+/* Category with icon */
+.category-with-icon {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.category-icon {
+  font-size: 1.1rem;
+}
+
+/* Cash Flow Details Section */
+.cashflow-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.cashflow-section {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  border: 1px solid var(--gray-200);
+}
+
+.cashflow-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.cashflow-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.cashflow-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+}
+
+.cashflow-item.total {
+  border-top: 2px solid var(--gray-200);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-md);
+}
+
+.cashflow-item .item-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.cashflow-item .item-value {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.cashflow-item .item-value.positive {
+  color: var(--success);
+}
+
+.cashflow-item .item-value.negative {
+  color: var(--danger);
+}
+
+/* Financial card variants */
+.financial-card.expenses {
+  border-left-color: var(--danger);
+}
+
+.financial-card.profit {
+  border-left-color: var(--success);
+}
+
+/* Table footer styling */
+.performers-table tfoot tr {
+  background: var(--gray-50);
+  border-top: 2px solid var(--gray-200);
+}
+
+.performers-table tfoot td {
+  font-weight: 600;
+}

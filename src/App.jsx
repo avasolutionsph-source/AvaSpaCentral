@@ -23,6 +23,7 @@ const GiftCertificates = lazy(() => import('./pages/GiftCertificates'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const Payroll = lazy(() => import('./pages/Payroll'));
 const MySchedule = lazy(() => import('./pages/MySchedule'));
+const ShiftSchedules = lazy(() => import('./pages/ShiftSchedules'));
 const PayrollRequests = lazy(() => import('./pages/PayrollRequests'));
 const CashDrawerHistory = lazy(() => import('./pages/CashDrawerHistory'));
 const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
@@ -33,6 +34,15 @@ const Calendar = lazy(() => import('./pages/Calendar'));
 const Settings = lazy(() => import('./pages/Settings'));
 const AIChatbot = lazy(() => import('./pages/AIChatbot'));
 const AIInsights = lazy(() => import('./pages/AIInsights'));
+
+// Analytics Pages
+const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
+const ProductAnalytics = lazy(() => import('./pages/ProductAnalytics'));
+const InventoryAnalytics = lazy(() => import('./pages/InventoryAnalytics'));
+const CustomerAnalytics = lazy(() => import('./pages/CustomerAnalytics'));
+const EmployeeAnalytics = lazy(() => import('./pages/EmployeeAnalytics'));
+const OpexTaxAnalytics = lazy(() => import('./pages/OpexTaxAnalytics'));
+const SalesHeatmap = lazy(() => import('./pages/SalesHeatmap'));
 
 // Loading Screen Component (for auth state)
 const LoadingScreen = () => (
@@ -138,6 +148,7 @@ function AppRoutes() {
           <Route path="expenses" element={<ProtectedRoute page="expenses"><Suspense fallback={<PageLoader />}><Expenses /></Suspense></ProtectedRoute>} />
           <Route path="payroll" element={<ProtectedRoute page="payroll"><Suspense fallback={<PageLoader />}><Payroll /></Suspense></ProtectedRoute>} />
           <Route path="my-schedule" element={<ProtectedRoute page="my-schedule"><Suspense fallback={<PageLoader />}><MySchedule /></Suspense></ProtectedRoute>} />
+          <Route path="shift-schedules" element={<ProtectedRoute page="shift-schedules"><Suspense fallback={<PageLoader />}><ShiftSchedules /></Suspense></ProtectedRoute>} />
           <Route path="payroll-requests" element={<ProtectedRoute page="payroll-requests"><Suspense fallback={<PageLoader />}><PayrollRequests /></Suspense></ProtectedRoute>} />
           <Route path="cash-drawer-history" element={<ProtectedRoute page="cash-drawer-history"><Suspense fallback={<PageLoader />}><CashDrawerHistory /></Suspense></ProtectedRoute>} />
           <Route path="activity-logs" element={<ProtectedRoute page="activity-logs"><Suspense fallback={<PageLoader />}><ActivityLogs /></Suspense></ProtectedRoute>} />
@@ -148,6 +159,14 @@ function AppRoutes() {
           <Route path="ai-insights" element={<ProtectedRoute page="ai-insights"><Suspense fallback={<PageLoader />}><AIInsights /></Suspense></ProtectedRoute>} />
           <Route path="ai-chatbot" element={<ProtectedRoute page="ai-chatbot"><Suspense fallback={<PageLoader />}><AIChatbot /></Suspense></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute page="settings"><Suspense fallback={<PageLoader />}><Settings /></Suspense></ProtectedRoute>} />
+          {/* Analytics Routes */}
+          <Route path="analytics" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><AnalyticsDashboard /></Suspense></ProtectedRoute>} />
+          <Route path="analytics/products" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><ProductAnalytics /></Suspense></ProtectedRoute>} />
+          <Route path="analytics/inventory" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><InventoryAnalytics /></Suspense></ProtectedRoute>} />
+          <Route path="analytics/customers" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><CustomerAnalytics /></Suspense></ProtectedRoute>} />
+          <Route path="analytics/employees" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><EmployeeAnalytics /></Suspense></ProtectedRoute>} />
+          <Route path="analytics/opex" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><OpexTaxAnalytics /></Suspense></ProtectedRoute>} />
+          <Route path="analytics/heatmap" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><SalesHeatmap /></Suspense></ProtectedRoute>} />
         </Route>
 
         {/* Catch all - redirect to first allowed page or login */}

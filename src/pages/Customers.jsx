@@ -326,103 +326,57 @@ const Customers = () => {
       </div>
 
       {/* Tabs */}
-      <div className="customer-tabs" style={{ display: 'flex', gap: '0', marginBottom: 'var(--spacing-lg)', borderBottom: '2px solid var(--gray-200)' }}>
+      <div className="customers-tabs">
         <button
-          className={`tab-btn ${activeTab === 'customers' ? 'active' : ''}`}
+          className={`customer-tab ${activeTab === 'customers' ? 'active' : ''}`}
           onClick={() => setActiveTab('customers')}
-          style={{
-            padding: '12px 24px',
-            border: 'none',
-            background: activeTab === 'customers' ? 'var(--white)' : 'transparent',
-            borderBottom: activeTab === 'customers' ? '2px solid var(--primary)' : '2px solid transparent',
-            marginBottom: '-2px',
-            cursor: 'pointer',
-            fontWeight: activeTab === 'customers' ? '600' : '400',
-            color: activeTab === 'customers' ? 'var(--primary)' : 'var(--gray-600)'
-          }}
         >
-          👤 Customers ({customers.length})
+          Customers ({customers.length})
         </button>
         <button
-          className={`tab-btn ${activeTab === 'loyalty' ? 'active' : ''}`}
+          className={`customer-tab ${activeTab === 'loyalty' ? 'active' : ''}`}
           onClick={() => setActiveTab('loyalty')}
-          style={{
-            padding: '12px 24px',
-            border: 'none',
-            background: activeTab === 'loyalty' ? 'var(--white)' : 'transparent',
-            borderBottom: activeTab === 'loyalty' ? '2px solid var(--primary)' : '2px solid transparent',
-            marginBottom: '-2px',
-            cursor: 'pointer',
-            fontWeight: activeTab === 'loyalty' ? '600' : '400',
-            color: activeTab === 'loyalty' ? 'var(--primary)' : 'var(--gray-600)'
-          }}
         >
-          ⭐ Loyalty Program
+          Loyalty Program
         </button>
       </div>
 
       {activeTab === 'loyalty' && (
         <div className="loyalty-program-section">
           {/* Loyalty Stats Cards */}
-          <div className="loyalty-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-xl)' }}>
-            <div className="loyalty-stat-card" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', color: 'white', padding: 'var(--spacing-lg)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Members</div>
-              <div style={{ fontSize: '2rem', fontWeight: '700' }}>{getLoyaltyStats().totalMembers}</div>
+          <div className="loyalty-stats-grid">
+            <div className="loyalty-stat-card primary">
+              <div className="stat-label">Total Members</div>
+              <div className="stat-value">{getLoyaltyStats().totalMembers}</div>
             </div>
-            <div className="loyalty-stat-card" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', padding: 'var(--spacing-lg)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Points</div>
-              <div style={{ fontSize: '2rem', fontWeight: '700' }}>{getLoyaltyStats().totalPoints.toLocaleString()}</div>
+            <div className="loyalty-stat-card primary">
+              <div className="stat-label">Total Points</div>
+              <div className="stat-value">{getLoyaltyStats().totalPoints.toLocaleString()}</div>
             </div>
             {loyaltyTiers.map(tier => (
-              <div key={tier.name} className="loyalty-stat-card" style={{
-                background: 'var(--white)',
-                padding: 'var(--spacing-lg)',
-                borderRadius: 'var(--radius-lg)',
-                border: `2px solid ${tier.color}`,
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '1.5rem' }}>{tier.icon}</div>
-                <div style={{ fontWeight: '600', color: tier.color }}>{tier.name}</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>{getLoyaltyStats().tierCounts[tier.name]}</div>
+              <div key={tier.name} className="loyalty-stat-card">
+                <div className="tier-icon">{tier.icon}</div>
+                <div className="tier-name">{tier.name}</div>
+                <div className="stat-value">{getLoyaltyStats().tierCounts[tier.name]}</div>
               </div>
             ))}
           </div>
 
           {/* Tier Benefits */}
-          <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-            <h3 style={{ marginBottom: 'var(--spacing-md)' }}>🏆 Loyalty Tiers & Benefits</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--spacing-md)' }}>
+          <div>
+            <h3 className="loyalty-section-header">Loyalty Tiers & Benefits</h3>
+            <div className="loyalty-tiers-grid">
               {loyaltyTiers.map(tier => (
-                <div key={tier.name} style={{
-                  background: 'var(--white)',
-                  border: `2px solid ${tier.color}`,
-                  borderRadius: 'var(--radius-lg)',
-                  padding: 'var(--spacing-lg)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    background: tier.color,
-                    color: tier.name === 'Silver' || tier.name === 'Platinum' ? '#333' : 'white',
-                    padding: '4px 12px',
-                    fontSize: '0.75rem',
-                    borderBottomLeftRadius: 'var(--radius-md)'
-                  }}>
-                    {tier.minPoints}+ pts
-                  </div>
-                  <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{tier.icon}</div>
-                  <h4 style={{ color: tier.color, marginBottom: '8px' }}>{tier.name}</h4>
+                <div key={tier.name} className="loyalty-tier-card">
+                  <span className="tier-points-badge">{tier.minPoints}+ pts</span>
+                  <div className="tier-icon">{tier.icon}</div>
+                  <div className="tier-name">{tier.name}</div>
                   {tier.discount > 0 && (
-                    <div style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600' }}>
-                      {tier.discount}% Discount
-                    </div>
+                    <div className="tier-discount">{tier.discount}% Discount</div>
                   )}
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  <ul className="tier-benefits">
                     {tier.benefits.map((b, i) => (
-                      <li key={i} style={{ fontSize: '0.875rem', color: 'var(--gray-600)', marginBottom: '4px' }}>✓ {b}</li>
+                      <li key={i}>{b}</li>
                     ))}
                   </ul>
                 </div>
@@ -431,35 +385,16 @@ const Customers = () => {
           </div>
 
           {/* Available Rewards */}
-          <div style={{ marginBottom: 'var(--spacing-xl)' }}>
-            <h3 style={{ marginBottom: 'var(--spacing-md)' }}>🎁 Available Rewards</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--spacing-md)' }}>
+          <div>
+            <h3 className="loyalty-section-header">Available Rewards</h3>
+            <div className="loyalty-rewards-grid">
               {loyaltyRewards.map(reward => (
-                <div key={reward.id} style={{
-                  background: 'var(--white)',
-                  border: '1px solid var(--gray-200)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: 'var(--spacing-lg)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-md)'
-                }}>
-                  <div style={{ fontSize: '2.5rem' }}>{reward.icon}</div>
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ marginBottom: '4px' }}>{reward.name}</h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)', margin: 0 }}>{reward.description}</p>
-                    <div style={{
-                      marginTop: '8px',
-                      background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                      color: '#92400e',
-                      padding: '4px 10px',
-                      borderRadius: '20px',
-                      display: 'inline-block',
-                      fontSize: '0.875rem',
-                      fontWeight: '600'
-                    }}>
-                      ⭐ {reward.points} points
-                    </div>
+                <div key={reward.id} className="loyalty-reward-card">
+                  <div className="reward-icon">{reward.icon}</div>
+                  <div className="reward-content">
+                    <div className="reward-name">{reward.name}</div>
+                    <div className="reward-description">{reward.description}</div>
+                    <span className="reward-points">{reward.points} points</span>
                   </div>
                 </div>
               ))}
@@ -468,8 +403,8 @@ const Customers = () => {
 
           {/* Top Loyalty Members */}
           <div>
-            <h3 style={{ marginBottom: 'var(--spacing-md)' }}>👑 Top Loyalty Members</h3>
-            <div className="customers-grid">
+            <h3 className="loyalty-section-header">Top Loyalty Members</h3>
+            <div className="loyalty-members-grid">
               {[...customers]
                 .sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0))
                 .slice(0, 6)
@@ -477,54 +412,36 @@ const Customers = () => {
                   const tier = getCustomerTier(customer.loyaltyPoints || 0);
                   const nextTier = getNextTier(customer.loyaltyPoints || 0);
                   const pointsToNext = getPointsToNextTier(customer.loyaltyPoints || 0);
-                  const history = getPointsHistory(customer._id);
 
                   return (
-                    <div key={customer._id} className="customer-card" style={{ border: `2px solid ${tier.color}` }}>
-                      <div className="customer-header">
-                        <div className="customer-avatar" style={{ background: tier.color, color: tier.name === 'Silver' || tier.name === 'Platinum' ? '#333' : 'white' }}>
-                          {tier.icon}
-                        </div>
-                        <div style={{
-                          background: tier.color,
-                          color: tier.name === 'Silver' || tier.name === 'Platinum' ? '#333' : 'white',
-                          padding: '4px 10px',
-                          borderRadius: '20px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600'
-                        }}>
-                          {tier.name}
-                        </div>
+                    <div key={customer._id} className="loyalty-member-card">
+                      <div className="member-header">
+                        <div className="member-avatar">{tier.icon}</div>
+                        <span className="member-tier-badge">{tier.name}</span>
                       </div>
-                      <h3 className="customer-name">{customer.name}</h3>
-                      <div style={{ textAlign: 'center', margin: 'var(--spacing-md) 0' }}>
-                        <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--primary)' }}>
-                          ⭐ {(customer.loyaltyPoints || 0).toLocaleString()}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>Loyalty Points</div>
+                      <div className="member-name">{customer.name}</div>
+                      <div className="member-points">
+                        <div className="points-value">{(customer.loyaltyPoints || 0).toLocaleString()}</div>
+                        <div className="points-label">Loyalty Points</div>
                       </div>
                       {nextTier && (
-                        <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                        <div className="loyalty-progress">
+                          <div className="progress-labels">
                             <span>{tier.name}</span>
                             <span>{nextTier.name}</span>
                           </div>
-                          <div style={{ background: 'var(--gray-200)', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
-                            <div style={{
-                              width: `${Math.min(100, ((customer.loyaltyPoints || 0) - tier.minPoints) / (nextTier.minPoints - tier.minPoints) * 100)}%`,
-                              height: '100%',
-                              background: tier.color,
-                              borderRadius: '10px'
-                            }}></div>
+                          <div className="progress-bar">
+                            <div
+                              className="progress-fill"
+                              style={{ width: `${Math.min(100, ((customer.loyaltyPoints || 0) - tier.minPoints) / (nextTier.minPoints - tier.minPoints) * 100)}%` }}
+                            ></div>
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', textAlign: 'center', marginTop: '4px' }}>
-                            {pointsToNext} points to {nextTier.name}
-                          </div>
+                          <div className="progress-text">{pointsToNext} points to {nextTier.name}</div>
                         </div>
                       )}
-                      <div className="customer-actions" style={{ justifyContent: 'center' }}>
-                        <button className="btn btn-sm btn-primary" onClick={() => openLoyaltyModal(customer)}>+ Add Points</button>
-                        <button className="btn btn-sm btn-secondary" onClick={() => openRedeemModal(customer)}>Redeem</button>
+                      <div className="member-actions">
+                        <button className="btn btn-primary" onClick={() => openLoyaltyModal(customer)}>+ Add Points</button>
+                        <button className="btn btn-secondary" onClick={() => openRedeemModal(customer)}>Redeem</button>
                       </div>
                     </div>
                   );
@@ -561,13 +478,8 @@ const Customers = () => {
                 </div>
                 {(customer.loyaltyPoints || 0) > 0 && (
                   <div
-                    className="loyalty-badge"
+                    className={`loyalty-badge ${getCustomerTier(customer.loyaltyPoints || 0).name.toLowerCase()}`}
                     onClick={() => openRedeemModal(customer)}
-                    style={{
-                      cursor: 'pointer',
-                      background: getCustomerTier(customer.loyaltyPoints || 0).color,
-                      color: getCustomerTier(customer.loyaltyPoints || 0).name === 'Silver' || getCustomerTier(customer.loyaltyPoints || 0).name === 'Platinum' ? '#333' : 'white'
-                    }}
                     title="Click to redeem rewards"
                   >
                     {getCustomerTier(customer.loyaltyPoints || 0).icon} {customer.loyaltyPoints} pts
@@ -611,10 +523,10 @@ const Customers = () => {
                   💬 {customer.notes}
                 </div>
               )}
-              <div className="customer-actions" style={{ flexWrap: 'wrap', gap: '4px' }}>
+              <div className="customer-actions">
                 <button className="btn btn-sm btn-secondary" onClick={() => openEditModal(customer)}>Edit</button>
                 <button className="btn btn-sm btn-primary" onClick={() => openHistoryModal(customer)}>History</button>
-                <button className="btn btn-sm" onClick={() => openLoyaltyModal(customer)} style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>+ Points</button>
+                <button className="btn btn-sm btn-points" onClick={() => openLoyaltyModal(customer)}>+ Points</button>
                 <button className="btn btn-sm btn-error" onClick={() => handleDelete(customer)}>Delete</button>
               </div>
             </div>

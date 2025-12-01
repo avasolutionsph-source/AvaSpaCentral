@@ -229,36 +229,49 @@ const ActivityLogs = () => {
   return (
     <div className="activity-logs-page">
       <div className="page-header">
-        <div>
+        <div className="header-left">
           <h1>Activity Logs</h1>
-          <p>Monitor system activities and user actions</p>
+          <p className="subtitle">Monitor system activities and user actions</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowExportModal(true)}>
-          📥 Export Logs
-        </button>
+        <div className="header-right">
+          <button className="btn-refresh" onClick={fetchActivityLogs}>
+            ↻ Refresh
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowExportModal(true)}>
+            Export Logs
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
       <div className="activity-summary-grid">
         <div className="activity-summary-card total">
           <div className="activity-summary-icon">📊</div>
-          <div className="activity-summary-value">{summary.total}</div>
-          <div className="activity-summary-label">Total Logs</div>
+          <div className="activity-summary-info">
+            <div className="activity-summary-value">{summary.total}</div>
+            <div className="activity-summary-label">Total Logs</div>
+          </div>
         </div>
         <div className="activity-summary-card today">
           <div className="activity-summary-icon">📅</div>
-          <div className="activity-summary-value">{summary.today}</div>
-          <div className="activity-summary-label">Today's Activities</div>
+          <div className="activity-summary-info">
+            <div className="activity-summary-value">{summary.today}</div>
+            <div className="activity-summary-label">Today's Activities</div>
+          </div>
         </div>
         <div className="activity-summary-card users">
           <div className="activity-summary-icon">👥</div>
-          <div className="activity-summary-value">{summary.uniqueUsers}</div>
-          <div className="activity-summary-label">Active Users</div>
+          <div className="activity-summary-info">
+            <div className="activity-summary-value">{summary.uniqueUsers}</div>
+            <div className="activity-summary-label">Active Users</div>
+          </div>
         </div>
         <div className="activity-summary-card critical">
           <div className="activity-summary-icon">⚠️</div>
-          <div className="activity-summary-value">{summary.critical}</div>
-          <div className="activity-summary-label">Critical Events</div>
+          <div className="activity-summary-info">
+            <div className="activity-summary-value">{summary.critical}</div>
+            <div className="activity-summary-label">Critical Events</div>
+          </div>
         </div>
       </div>
 
@@ -354,15 +367,15 @@ const ActivityLogs = () => {
       {/* Activity Logs List */}
       <div className="activity-logs-section">
         <div className="logs-header">
-          <h2>Activity Timeline</h2>
-          <div style={{ fontSize: '0.875rem', color: 'var(--gray-600)' }}>
-            Showing {indexOfFirstLog + 1}-{Math.min(indexOfLastLog, filteredLogs.length)} of {filteredLogs.length} logs
-          </div>
+          <h2>Activity Timeline ({filteredLogs.length} logs)</h2>
+          <button className="export-btn" onClick={() => setShowExportModal(true)}>
+            📥 Export
+          </button>
         </div>
 
         {loading ? (
           <div className="loading-logs">
-            <div className="spinner" style={{ margin: '0 auto' }}></div>
+            <div className="loading-spinner"></div>
             <p>Loading activity logs...</p>
           </div>
         ) : currentLogs.length === 0 ? (
@@ -453,47 +466,54 @@ const ActivityLogs = () => {
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
-          <div className="modal-content export-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Export Activity Logs</h2>
-            <p>Select export format:</p>
-            <div className="export-options">
-              <div
-                className={`export-option ${exportFormat === 'txt' ? 'selected' : ''}`}
-                onClick={() => setExportFormat('txt')}
-              >
-                <div className="export-option-icon">📄</div>
-                <div className="export-option-info">
-                  <div className="export-option-title">Text File (.txt)</div>
-                  <div className="export-option-desc">Human-readable text format with full details</div>
+        <div className="export-modal-overlay" onClick={() => setShowExportModal(false)}>
+          <div className="export-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="export-modal-header">
+              <h3>Export Activity Logs</h3>
+              <button className="export-modal-close" onClick={() => setShowExportModal(false)}>×</button>
+            </div>
+            <div className="export-modal-body">
+              <div className="export-options">
+                <div
+                  className={`export-option ${exportFormat === 'txt' ? 'selected' : ''}`}
+                  onClick={() => setExportFormat('txt')}
+                >
+                  <div className="export-option-icon">📄</div>
+                  <div className="export-option-info">
+                    <div className="export-option-title">Text File (.txt)</div>
+                    <div className="export-option-desc">Human-readable text format</div>
+                  </div>
+                  <div className="export-option-check">{exportFormat === 'txt' && '✓'}</div>
                 </div>
-              </div>
-              <div
-                className={`export-option ${exportFormat === 'csv' ? 'selected' : ''}`}
-                onClick={() => setExportFormat('csv')}
-              >
-                <div className="export-option-icon">📊</div>
-                <div className="export-option-info">
-                  <div className="export-option-title">CSV File (.csv)</div>
-                  <div className="export-option-desc">Spreadsheet format for Excel or Google Sheets</div>
+                <div
+                  className={`export-option ${exportFormat === 'csv' ? 'selected' : ''}`}
+                  onClick={() => setExportFormat('csv')}
+                >
+                  <div className="export-option-icon">📊</div>
+                  <div className="export-option-info">
+                    <div className="export-option-title">CSV File (.csv)</div>
+                    <div className="export-option-desc">Spreadsheet compatible format</div>
+                  </div>
+                  <div className="export-option-check">{exportFormat === 'csv' && '✓'}</div>
                 </div>
-              </div>
-              <div
-                className={`export-option ${exportFormat === 'json' ? 'selected' : ''}`}
-                onClick={() => setExportFormat('json')}
-              >
-                <div className="export-option-icon">🔧</div>
-                <div className="export-option-info">
-                  <div className="export-option-title">JSON File (.json)</div>
-                  <div className="export-option-desc">Structured data format for technical analysis</div>
+                <div
+                  className={`export-option ${exportFormat === 'json' ? 'selected' : ''}`}
+                  onClick={() => setExportFormat('json')}
+                >
+                  <div className="export-option-icon">🔧</div>
+                  <div className="export-option-info">
+                    <div className="export-option-title">JSON File (.json)</div>
+                    <div className="export-option-desc">Structured data format</div>
+                  </div>
+                  <div className="export-option-check">{exportFormat === 'json' && '✓'}</div>
                 </div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end', marginTop: 'var(--spacing-lg)' }}>
-              <button className="btn btn-secondary" onClick={() => setShowExportModal(false)}>
+            <div className="export-modal-footer">
+              <button className="btn btn-cancel" onClick={() => setShowExportModal(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleExport}>
+              <button className="btn btn-export" onClick={handleExport}>
                 Export {filteredLogs.length} Logs
               </button>
             </div>

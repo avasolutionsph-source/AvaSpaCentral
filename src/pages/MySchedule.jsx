@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import mockApi from '../mockApi/mockApi';
 import {
   format,
   startOfWeek,
@@ -10,16 +11,22 @@ import {
   isSameDay,
   isToday,
   parseISO,
-  isWithinInterval,
-  isSameMonth
+  isWithinInterval
 } from 'date-fns';
+
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const MySchedule = () => {
   const { showToast, user } = useApp();
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [view, setView] = useState('calendar'); // calendar or list
-  const [scheduleData, setScheduleData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState('calendar');
+  const [loading, setLoading] = useState(true);
+
+  // Data state
+  const [mySchedule, setMySchedule] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [shiftConfig, setShiftConfig] = useState(null);
 
   // Time Off Request Modal State
   const [showTimeOffModal, setShowTimeOffModal] = useState(false);
@@ -33,258 +40,206 @@ const MySchedule = () => {
   const [submittingRequest, setSubmittingRequest] = useState(false);
 
   // Get week dates
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
-  const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 }); // Sunday
+  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  // Mock API - Fetch schedule data
+  // Load data
   useEffect(() => {
-    fetchScheduleData();
-    fetchTimeOffRequests();
-  }, [currentWeek]);
+    loadData();
+  }, [currentWeek, user]);
 
-  const fetchTimeOffRequests = async () => {
-    // Mock existing time off requests
-    const mockRequests = [
-      {
-        id: 1,
-        startDate: '2025-12-20',
-        endDate: '2025-12-25',
-        type: 'vacation',
-        reason: 'Christmas holiday with family',
-        status: 'approved',
-        submittedAt: '2025-11-15',
-        reviewedBy: 'Manager'
-      },
-      {
-        id: 2,
-        startDate: '2025-12-31',
-        endDate: '2026-01-01',
-        type: 'personal',
-        reason: 'New Year celebration',
-        status: 'pending',
-        submittedAt: '2025-11-28'
-      }
-    ];
-    setTimeOffRequests(mockRequests);
-  };
-
-  const fetchScheduleData = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const [scheduleData, configData, appointmentsData, timeOffData] = await Promise.all([
+        user?._id ? mockApi.shiftSchedules.getMySchedule(user._id) : Promise.resolve(null),
+        mockApi.shiftSchedules.getShiftConfig(),
+        mockApi.appointments.getAppointments(),
+        user?.employeeId
+          ? mockApi.shiftSchedules.getTimeOffRequests({ employeeId: user.employeeId })
+          : Promise.resolve([])
+      ]);
 
-      // Mock schedule data for the current user
-      const mockSchedule = [
-        // Regular Shifts
-        {
-          id: 1,
-          type: 'shift',
-          date: format(weekDays[0], 'yyyy-MM-dd'),
-          startTime: '09:00',
-          endTime: '17:00',
-          title: 'Morning Shift',
-          location: 'Main Branch',
-          role: 'Therapist',
-          notes: 'Regular shift'
-        },
-        {
-          id: 2,
-          type: 'shift',
-          date: format(weekDays[1], 'yyyy-MM-dd'),
-          startTime: '09:00',
-          endTime: '17:00',
-          title: 'Morning Shift',
-          location: 'Main Branch',
-          role: 'Therapist',
-          notes: 'Regular shift'
-        },
-        {
-          id: 3,
-          type: 'shift',
-          date: format(weekDays[2], 'yyyy-MM-dd'),
-          startTime: '13:00',
-          endTime: '21:00',
-          title: 'Afternoon Shift',
-          location: 'Main Branch',
-          role: 'Therapist',
-          notes: 'Evening coverage'
-        },
-        {
-          id: 4,
-          type: 'shift',
-          date: format(weekDays[3], 'yyyy-MM-dd'),
-          startTime: '09:00',
-          endTime: '17:00',
-          title: 'Morning Shift',
-          location: 'Main Branch',
-          role: 'Therapist',
-          notes: 'Regular shift'
-        },
-        {
-          id: 5,
-          type: 'shift',
-          date: format(weekDays[4], 'yyyy-MM-dd'),
-          startTime: '09:00',
-          endTime: '17:00',
-          title: 'Morning Shift',
-          location: 'Main Branch',
-          role: 'Therapist',
-          notes: 'Regular shift'
-        },
+      setMySchedule(scheduleData);
+      setShiftConfig(configData);
+      setTimeOffRequests(timeOffData);
 
-        // Appointments
-        {
-          id: 6,
-          type: 'appointment',
-          date: format(weekDays[0], 'yyyy-MM-dd'),
-          startTime: '10:00',
-          endTime: '11:30',
-          title: 'Swedish Massage - Maria Santos',
-          customer: 'Maria Santos',
-          service: 'Swedish Massage (90 min)',
-          room: 'Room 1',
-          notes: 'Customer prefers medium pressure'
-        },
-        {
-          id: 7,
-          type: 'appointment',
-          date: format(weekDays[0], 'yyyy-MM-dd'),
-          startTime: '14:00',
-          endTime: '15:00',
-          title: 'Hot Stone Therapy - John Doe',
-          customer: 'John Doe',
-          service: 'Hot Stone Therapy (60 min)',
-          room: 'Room 2',
-          notes: 'First-time customer'
-        },
-        {
-          id: 8,
-          type: 'appointment',
-          date: format(weekDays[1], 'yyyy-MM-dd'),
-          startTime: '11:00',
-          endTime: '12:00',
-          title: 'Thai Massage - Anna Cruz',
-          customer: 'Anna Cruz',
-          service: 'Thai Massage (60 min)',
-          room: 'Room 3',
-          notes: 'Regular customer'
-        },
-        {
-          id: 9,
-          type: 'appointment',
-          date: format(weekDays[2], 'yyyy-MM-dd'),
-          startTime: '15:00',
-          endTime: '16:30',
-          title: 'Deep Tissue - Robert Lee',
-          customer: 'Robert Lee',
-          service: 'Deep Tissue Massage (90 min)',
-          room: 'Room 1',
-          notes: 'Focus on back and shoulders'
-        },
-        {
-          id: 10,
-          type: 'appointment',
-          date: format(weekDays[3], 'yyyy-MM-dd'),
-          startTime: '10:30',
-          endTime: '11:30',
-          title: 'Aromatherapy - Lisa Wong',
-          customer: 'Lisa Wong',
-          service: 'Aromatherapy (60 min)',
-          room: 'Room 2',
-          notes: 'Prefers lavender oil'
-        },
-
-        // Day Off
-        {
-          id: 11,
-          type: 'day-off',
-          date: format(weekDays[5], 'yyyy-MM-dd'),
-          title: 'Day Off',
-          notes: 'Personal day'
-        },
-        {
-          id: 12,
-          type: 'day-off',
-          date: format(weekDays[6], 'yyyy-MM-dd'),
-          title: 'Day Off',
-          notes: 'Weekend rest'
-        }
-      ];
-
-      setScheduleData(mockSchedule);
+      // Filter appointments for current user if they are an employee
+      if (user?.employeeId && appointmentsData) {
+        const myAppointments = appointmentsData.filter(
+          appt => appt.employeeId === user.employeeId
+        );
+        setAppointments(myAppointments);
+      }
     } catch (error) {
+      console.error('Failed to load schedule:', error);
       showToast('Failed to load schedule', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Navigation handlers
-  const handlePreviousWeek = () => {
-    setCurrentWeek(prev => subWeeks(prev, 1));
+  // Get shift info for display
+  const getShiftInfo = (shift) => {
+    if (!shiftConfig) return { color: '#6b7280', label: 'Unknown', icon: '❓' };
+
+    switch (shift) {
+      case 'day':
+        return { color: shiftConfig.dayShift.color, label: 'Day Shift', icon: '☀️' };
+      case 'night':
+        return { color: shiftConfig.nightShift.color, label: 'Night Shift', icon: '🌙' };
+      case 'wholeDay':
+        return { color: shiftConfig.wholeDayShift.color, label: 'Whole Day', icon: '📅' };
+      case 'off':
+        return { color: shiftConfig.off.color, label: 'Day Off', icon: '🏖️' };
+      default:
+        return { color: '#6b7280', label: 'Not Scheduled', icon: '❓' };
+    }
   };
 
-  const handleNextWeek = () => {
-    setCurrentWeek(prev => addWeeks(prev, 1));
-  };
-
-  const handleToday = () => {
-    setCurrentWeek(new Date());
-  };
-
-  // Get items for a specific day
+  // Get schedule items for a specific day
   const getItemsForDay = (day) => {
-    return scheduleData.filter(item => {
-      const itemDate = parseISO(item.date);
-      return isSameDay(itemDate, day);
+    const items = [];
+    const dayOfWeek = format(day, 'EEEE').toLowerCase();
+
+    // Add shift from schedule
+    if (mySchedule?.weeklySchedule[dayOfWeek]) {
+      const daySchedule = mySchedule.weeklySchedule[dayOfWeek];
+      const shiftInfo = getShiftInfo(daySchedule.shift);
+
+      items.push({
+        id: `shift-${dayOfWeek}`,
+        type: daySchedule.shift === 'off' ? 'day-off' : 'shift',
+        date: format(day, 'yyyy-MM-dd'),
+        startTime: daySchedule.startTime,
+        endTime: daySchedule.endTime,
+        title: shiftInfo.label,
+        icon: shiftInfo.icon,
+        color: shiftInfo.color
+      });
+    }
+
+    // Add appointments for this day
+    appointments.forEach(appt => {
+      const apptDate = parseISO(appt.date);
+      if (isSameDay(apptDate, day)) {
+        items.push({
+          id: appt._id,
+          type: 'appointment',
+          date: format(day, 'yyyy-MM-dd'),
+          startTime: appt.startTime,
+          endTime: appt.endTime,
+          title: appt.serviceName || appt.service || 'Appointment',
+          customer: appt.customerName,
+          room: appt.roomName || 'TBD',
+          icon: '👤'
+        });
+      }
     });
+
+    // Check for approved time-off
+    timeOffRequests
+      .filter(r => r.status === 'approved')
+      .forEach(request => {
+        const start = parseISO(request.startDate);
+        const end = parseISO(request.endDate);
+        if (isWithinInterval(day, { start, end }) || isSameDay(day, start) || isSameDay(day, end)) {
+          items.push({
+            id: request._id,
+            type: 'time-off',
+            date: format(day, 'yyyy-MM-dd'),
+            title: `${request.type.charAt(0).toUpperCase() + request.type.slice(1)} Leave`,
+            icon: '🏖️',
+            notes: request.reason
+          });
+        }
+      });
+
+    return items;
   };
 
   // Calculate summary statistics
   const calculateSummary = () => {
-    const shifts = scheduleData.filter(item => item.type === 'shift');
-    const appointments = scheduleData.filter(item => item.type === 'appointment');
-    const daysOff = scheduleData.filter(item => item.type === 'day-off');
+    if (!mySchedule) return { shifts: 0, hours: 0, appointments: 0, daysOff: 0 };
 
-    // Calculate total hours
-    let totalHours = 0;
-    shifts.forEach(shift => {
-      const [startHour, startMin] = shift.startTime.split(':').map(Number);
-      const [endHour, endMin] = shift.endTime.split(':').map(Number);
-      const hours = (endHour * 60 + endMin - (startHour * 60 + startMin)) / 60;
-      totalHours += hours;
+    let shifts = 0;
+    let totalMinutes = 0;
+    let daysOff = 0;
+
+    DAYS.forEach(day => {
+      const daySchedule = mySchedule.weeklySchedule[day];
+      if (daySchedule) {
+        if (daySchedule.shift === 'off') {
+          daysOff++;
+        } else {
+          shifts++;
+          if (daySchedule.startTime && daySchedule.endTime) {
+            const [startH, startM] = daySchedule.startTime.split(':').map(Number);
+            const [endH, endM] = daySchedule.endTime.split(':').map(Number);
+            totalMinutes += (endH * 60 + endM) - (startH * 60 + startM);
+          }
+        }
+      }
     });
 
+    // Count appointments for this week
+    const weekAppointments = appointments.filter(appt => {
+      const apptDate = parseISO(appt.date);
+      return isWithinInterval(apptDate, { start: weekStart, end: weekEnd });
+    }).length;
+
     return {
-      shifts: shifts.length,
-      hours: totalHours.toFixed(1),
-      appointments: appointments.length,
-      daysOff: daysOff.length
+      shifts,
+      hours: (totalMinutes / 60).toFixed(1),
+      appointments: weekAppointments,
+      daysOff
     };
   };
 
   const summary = calculateSummary();
 
+  // Navigation handlers
+  const handlePreviousWeek = () => setCurrentWeek(prev => subWeeks(prev, 1));
+  const handleNextWeek = () => setCurrentWeek(prev => addWeeks(prev, 1));
+  const handleToday = () => setCurrentWeek(new Date());
+
   // Export schedule
   const handleExportSchedule = () => {
-    const scheduleText = scheduleData.map(item => {
-      return `${item.date} | ${item.type.toUpperCase()} | ${item.title} | ${item.startTime || ''}-${item.endTime || ''}`;
-    }).join('\n');
+    if (!mySchedule) {
+      showToast('No schedule to export', 'error');
+      return;
+    }
 
-    const blob = new Blob([scheduleText], { type: 'text/plain' });
+    let exportText = `My Schedule - ${format(weekStart, 'MMM dd')} to ${format(weekEnd, 'MMM dd, yyyy')}\n\n`;
+
+    weekDays.forEach((day, idx) => {
+      const items = getItemsForDay(day);
+      exportText += `${format(day, 'EEEE, MMMM d')}:\n`;
+      items.forEach(item => {
+        if (item.type === 'shift') {
+          exportText += `  - Shift: ${item.startTime} - ${item.endTime}\n`;
+        } else if (item.type === 'appointment') {
+          exportText += `  - Appointment: ${item.title} (${item.customer}) ${item.startTime}-${item.endTime}\n`;
+        } else if (item.type === 'day-off') {
+          exportText += `  - Day Off\n`;
+        }
+      });
+      exportText += '\n';
+    });
+
+    const blob = new Blob([exportText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `schedule-${format(weekStart, 'yyyy-MM-dd')}.txt`;
+    a.download = `my-schedule-${format(weekStart, 'yyyy-MM-dd')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
 
     showToast('Schedule exported successfully!', 'success');
   };
 
-  // Request time off
+  // Time off request handlers
   const handleRequestTimeOff = () => {
     setTimeOffForm({
       startDate: '',
@@ -321,24 +276,23 @@ const MySchedule = () => {
     }
 
     setSubmittingRequest(true);
+    try {
+      await mockApi.shiftSchedules.createTimeOffRequest({
+        employeeId: user.employeeId,
+        startDate: timeOffForm.startDate,
+        endDate: timeOffForm.endDate,
+        type: timeOffForm.type,
+        reason: timeOffForm.reason
+      });
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const newRequest = {
-      id: Date.now(),
-      startDate: timeOffForm.startDate,
-      endDate: timeOffForm.endDate,
-      type: timeOffForm.type,
-      reason: timeOffForm.reason,
-      status: 'pending',
-      submittedAt: format(new Date(), 'yyyy-MM-dd')
-    };
-
-    setTimeOffRequests(prev => [newRequest, ...prev]);
-    setSubmittingRequest(false);
-    setShowTimeOffModal(false);
-    showToast('Time off request submitted successfully!', 'success');
+      showToast('Time off request submitted successfully!', 'success');
+      setShowTimeOffModal(false);
+      loadData();
+    } catch (error) {
+      showToast('Failed to submit request', 'error');
+    } finally {
+      setSubmittingRequest(false);
+    }
   };
 
   const getStatusBadgeClass = (status) => {
@@ -349,6 +303,15 @@ const MySchedule = () => {
       default: return 'badge-secondary';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="page-loading">
+        <div className="spinner"></div>
+        <p>Loading your schedule...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="schedule-page">
@@ -411,6 +374,14 @@ const MySchedule = () => {
         </div>
       </div>
 
+      {/* No Schedule Warning */}
+      {!mySchedule && (
+        <div className="alert alert-info" style={{ marginBottom: '16px' }}>
+          <span>ℹ️</span>
+          <span>No shift schedule has been assigned to you yet. Contact your manager to set up your schedule.</span>
+        </div>
+      )}
+
       {/* View Toggle */}
       <div className="schedule-list">
         <div className="schedule-list-header">
@@ -431,45 +402,39 @@ const MySchedule = () => {
           </div>
         </div>
 
-        {loading ? (
-          <div className="empty-schedule">
-            <div className="spinner" style={{ margin: '0 auto' }}></div>
-            <p>Loading schedule...</p>
-          </div>
-        ) : scheduleData.length === 0 ? (
-          <div className="empty-schedule">
-            <div className="empty-schedule-icon">📭</div>
-            <h3>No Schedule This Week</h3>
-            <p>You don't have any shifts or appointments scheduled for this week.</p>
-          </div>
-        ) : view === 'calendar' ? (
+        {view === 'calendar' ? (
           /* Calendar View */
           <div className="schedule-calendar">
             <div className="calendar-grid">
               {/* Day Headers */}
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+              {DAY_LABELS.map(day => (
                 <div key={day} className="calendar-day-header">{day}</div>
               ))}
 
               {/* Calendar Days */}
-              {weekDays.map(day => {
+              {weekDays.map((day, idx) => {
                 const dayItems = getItemsForDay(day);
                 const hasShift = dayItems.some(item => item.type === 'shift');
+                const hasTimeOff = dayItems.some(item => item.type === 'time-off' || item.type === 'day-off');
 
                 return (
                   <div
                     key={day.toString()}
-                    className={`calendar-day ${isToday(day) ? 'today' : ''} ${hasShift ? 'has-shift' : ''}`}
-                    data-day={format(day, 'EEEE')}
+                    className={`calendar-day ${isToday(day) ? 'today' : ''} ${hasShift ? 'has-shift' : ''} ${hasTimeOff ? 'has-off' : ''}`}
                   >
                     <div className="calendar-day-date">{format(day, 'd')}</div>
                     <div className="calendar-day-shifts">
                       {dayItems.map(item => (
-                        <div key={item.id} className={`calendar-shift-item ${item.type}`}>
-                          {item.startTime && `${item.startTime} `}
-                          {item.type === 'shift' && '🏢'}
-                          {item.type === 'appointment' && '👤'}
-                          {item.type === 'day-off' && '🏖️'}
+                        <div
+                          key={item.id}
+                          className={`calendar-shift-item ${item.type}`}
+                          style={item.color ? { borderLeftColor: item.color } : {}}
+                          title={item.type === 'appointment' ? `${item.title} - ${item.customer}` : item.title}
+                        >
+                          <span className="shift-item-icon">{item.icon}</span>
+                          {item.startTime && (
+                            <span className="shift-item-time">{item.startTime}</span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -481,85 +446,65 @@ const MySchedule = () => {
         ) : (
           /* List View */
           <div className="schedule-items">
-            {scheduleData
-              .sort((a, b) => {
-                const dateCompare = a.date.localeCompare(b.date);
-                if (dateCompare !== 0) return dateCompare;
-                return (a.startTime || '').localeCompare(b.startTime || '');
-              })
-              .map(item => (
-                <div key={item.id} className={`schedule-item ${item.type}`}>
-                  <div className="schedule-item-header">
-                    <div className="schedule-item-title">
-                      <div className="schedule-item-icon">
-                        {item.type === 'shift' && '🏢'}
-                        {item.type === 'appointment' && '📅'}
-                        {item.type === 'day-off' && '🏖️'}
-                      </div>
-                      <div className="schedule-item-info">
-                        <h4>{item.title}</h4>
-                        <p>{format(parseISO(item.date), 'EEEE, MMMM d, yyyy')}</p>
-                      </div>
-                    </div>
-                    <div className={`schedule-item-badge ${item.type}`}>
-                      {item.type.replace('-', ' ')}
-                    </div>
+            {weekDays.map(day => {
+              const dayItems = getItemsForDay(day);
+
+              return (
+                <div key={day.toString()} className="schedule-day-section">
+                  <div className={`schedule-day-header ${isToday(day) ? 'today' : ''}`}>
+                    <span className="day-name">{format(day, 'EEEE')}</span>
+                    <span className="day-date">{format(day, 'MMMM d')}</span>
+                    {isToday(day) && <span className="today-badge">Today</span>}
                   </div>
 
-                  <div className="schedule-item-details">
-                    {item.startTime && item.endTime && (
-                      <div className="schedule-detail-item">
-                        <div className="schedule-detail-label">Time</div>
-                        <div className="schedule-detail-value">
-                          {item.startTime} - {item.endTime}
+                  {dayItems.length === 0 ? (
+                    <div className="no-items">No scheduled items</div>
+                  ) : (
+                    dayItems.map(item => (
+                      <div key={item.id} className={`schedule-item ${item.type}`}>
+                        <div className="schedule-item-header">
+                          <div className="schedule-item-title">
+                            <div className="schedule-item-icon">{item.icon}</div>
+                            <div className="schedule-item-info">
+                              <h4>{item.title}</h4>
+                              {item.customer && <p>Customer: {item.customer}</p>}
+                            </div>
+                          </div>
+                          <div className={`schedule-item-badge ${item.type}`}>
+                            {item.type.replace('-', ' ')}
+                          </div>
                         </div>
-                      </div>
-                    )}
 
-                    {item.location && (
-                      <div className="schedule-detail-item">
-                        <div className="schedule-detail-label">Location</div>
-                        <div className="schedule-detail-value">{item.location}</div>
+                        {(item.startTime || item.room || item.notes) && (
+                          <div className="schedule-item-details">
+                            {item.startTime && item.endTime && (
+                              <div className="schedule-detail-item">
+                                <div className="schedule-detail-label">Time</div>
+                                <div className="schedule-detail-value">
+                                  {item.startTime} - {item.endTime}
+                                </div>
+                              </div>
+                            )}
+                            {item.room && (
+                              <div className="schedule-detail-item">
+                                <div className="schedule-detail-label">Room</div>
+                                <div className="schedule-detail-value">{item.room}</div>
+                              </div>
+                            )}
+                            {item.notes && (
+                              <div className="schedule-detail-item">
+                                <div className="schedule-detail-label">Notes</div>
+                                <div className="schedule-detail-value">{item.notes}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-
-                    {item.role && (
-                      <div className="schedule-detail-item">
-                        <div className="schedule-detail-label">Role</div>
-                        <div className="schedule-detail-value">{item.role}</div>
-                      </div>
-                    )}
-
-                    {item.customer && (
-                      <div className="schedule-detail-item">
-                        <div className="schedule-detail-label">Customer</div>
-                        <div className="schedule-detail-value">{item.customer}</div>
-                      </div>
-                    )}
-
-                    {item.service && (
-                      <div className="schedule-detail-item">
-                        <div className="schedule-detail-label">Service</div>
-                        <div className="schedule-detail-value">{item.service}</div>
-                      </div>
-                    )}
-
-                    {item.room && (
-                      <div className="schedule-detail-item">
-                        <div className="schedule-detail-label">Room</div>
-                        <div className="schedule-detail-value">{item.room}</div>
-                      </div>
-                    )}
-
-                    {item.notes && (
-                      <div className="schedule-detail-item">
-                        <div className="schedule-detail-label">Notes</div>
-                        <div className="schedule-detail-value">{item.notes}</div>
-                      </div>
-                    )}
-                  </div>
+                    ))
+                  )}
                 </div>
-              ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -632,23 +577,25 @@ const MySchedule = () => {
 
                 {/* Existing Requests */}
                 {timeOffRequests.length > 0 && (
-                  <div className="existing-requests" style={{ marginTop: 'var(--spacing-lg)' }}>
-                    <h4 style={{ marginBottom: 'var(--spacing-sm)', color: 'var(--gray-700)' }}>Your Recent Requests</h4>
+                  <div className="existing-requests" style={{ marginTop: '16px' }}>
+                    <h4 style={{ marginBottom: '8px', color: 'var(--gray-700)' }}>Your Recent Requests</h4>
                     <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                      {timeOffRequests.slice(0, 3).map(request => (
+                      {timeOffRequests.slice(0, 5).map(request => (
                         <div
-                          key={request.id}
+                          key={request._id}
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            padding: 'var(--spacing-sm)',
+                            padding: '8px',
                             borderBottom: '1px solid var(--gray-200)',
                             fontSize: '0.875rem'
                           }}
                         >
                           <div>
-                            <strong>{format(parseISO(request.startDate), 'MMM d')} - {format(parseISO(request.endDate), 'MMM d, yyyy')}</strong>
+                            <strong>
+                              {format(parseISO(request.startDate), 'MMM d')} - {format(parseISO(request.endDate), 'MMM d, yyyy')}
+                            </strong>
                             <div style={{ color: 'var(--gray-500)', fontSize: '0.75rem' }}>
                               {request.type.charAt(0).toUpperCase() + request.type.slice(1)} Leave
                             </div>

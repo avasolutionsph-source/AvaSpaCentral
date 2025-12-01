@@ -51,10 +51,17 @@ const POS = () => {
     address: ''
   });
 
+  // Customer search autocomplete state
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+
   // Service rotation state
   const [rotationQueue, setRotationQueue] = useState([]);
   const [nextEmployee, setNextEmployee] = useState(null);
   const [showRotationQueue, setShowRotationQueue] = useState(true);
+
+  // Scheduled employees for advance booking (based on selected date)
+  const [scheduledEmployees, setScheduledEmployees] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -154,6 +161,26 @@ const POS = () => {
       console.error('Failed to load rotation queue:', error);
     }
   };
+
+  // Load scheduled employees when advance booking date changes
+  useEffect(() => {
+    const loadScheduledEmployees = async () => {
+      if (isAdvanceBooking && advanceBookingData?.bookingDateTime) {
+        try {
+          const bookingDate = advanceBookingData.bookingDateTime.split('T')[0];
+          const scheduleData = await mockApi.shiftSchedules.getScheduleForDate(bookingDate);
+          setScheduledEmployees(scheduleData);
+        } catch (error) {
+          console.error('Failed to load scheduled employees:', error);
+          setScheduledEmployees([]);
+        }
+      } else {
+        setScheduledEmployees([]);
+      }
+    };
+
+    loadScheduledEmployees();
+  }, [isAdvanceBooking, advanceBookingData?.bookingDateTime]);
 
   // Select employee from rotation queue
   const selectFromRotation = (employeeId) => {
@@ -630,6 +657,8 @@ const POS = () => {
     setGcValidation(null);
     setGcCode('');
     setBookingSource('Walk-in');
+    setCustomerSearch('');
+    setShowCustomerSuggestions(false);
   };
 
   if (loading) {
@@ -904,10 +933,29 @@ const POS = () => {
                 )}
 
                 {/* No employees clocked in warning */}
-                {rotationQueue.length === 0 && (
+                {!isAdvanceBooking && rotationQueue.length === 0 && (
                   <div className="rotation-no-queue">
                     <span>⚠️</span>
                     <p>No employees clocked in today. Select manually below.</p>
+                  </div>
+                )}
+
+                {/* Advance Booking: Show scheduled employees info */}
+                {isAdvanceBooking && advanceBookingData?.bookingDateTime && (
+                  <div className="rotation-info" style={{ marginBottom: '12px', padding: '8px 12px', background: '#F5F5F5', borderRadius: '6px', fontSize: '0.8125rem', color: '#666666' }}>
+                    <span>📅</span>
+                    <p style={{ margin: 0 }}>
+                      {scheduledEmployees.length > 0
+                        ? `${scheduledEmployees.length} therapist(s) scheduled for ${new Date(advanceBookingData.bookingDateTime).toLocaleDateString()}`
+                        : 'No therapists scheduled for this date. Please select another date.'}
+                    </p>
+                  </div>
+                )}
+
+                {isAdvanceBooking && !advanceBookingData?.bookingDateTime && (
+                  <div className="rotation-no-queue">
+                    <span>ℹ️</span>
+                    <p>Please select a booking date first to see available therapists.</p>
                   </div>
                 )}
 
@@ -920,11 +968,48 @@ const POS = () => {
                 >
                   <option value="">Select therapist...</option>
                   {getTherapists(employees).map(emp => {
+                    // For advance booking: check if therapist is scheduled for the selected date/time
+                    if (isAdvanceBooking) {
+                      const isScheduled = scheduledEmployees.some(s => s.employeeId === emp._id);
+                      // Also check if the booking time falls within their shift
+                      let isWithinShift = false;
+                      if (isScheduled && advanceBookingData?.bookingDateTime) {
+                        const scheduled = scheduledEmployees.find(s => s.employeeId === emp._id);
+                        const bookingTime = advanceBookingData.bookingDateTime.split('T')[1]?.substring(0, 5);
+                        if (scheduled && bookingTime) {
+                          isWithinShift = bookingTime >= scheduled.startTime && bookingTime <= scheduled.endTime;
+                        }
+                      }
+                      const canSelect = isScheduled && isWithinShift;
+                      return (
+                        <option
+                          key={emp._id}
+                          value={emp._id}
+                          disabled={!canSelect}
+                          style={!canSelect ? { color: '#999999' } : {}}
+                        >
+                          {emp.firstName} {emp.lastName} - {emp.position}
+                          {canSelect
+                            ? ` (Scheduled: ${scheduledEmployees.find(s => s.employeeId === emp._id)?.startTime} - ${scheduledEmployees.find(s => s.employeeId === emp._id)?.endTime})`
+                            : isScheduled
+                              ? ' (Outside shift hours)'
+                              : ' (Not scheduled)'}
+                        </option>
+                      );
+                    }
+
+                    // For regular POS: check if therapist is clocked in
                     const inQueue = rotationQueue.find(q => q.employeeId === emp._id);
+                    const isClockedIn = !!inQueue;
                     return (
-                      <option key={emp._id} value={emp._id}>
+                      <option
+                        key={emp._id}
+                        value={emp._id}
+                        disabled={!isClockedIn}
+                        style={!isClockedIn ? { color: '#999999' } : {}}
+                      >
                         {emp.firstName} {emp.lastName} - {emp.position}
-                        {inQueue ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)` : ' (⚪ Not clocked in)'}
+                        {isClockedIn ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)` : ' (Not clocked in)'}
                       </option>
                     );
                   })}
@@ -947,7 +1032,12 @@ const POS = () => {
                         type="radio"
                         value="walk-in"
                         checked={customerType === 'walk-in'}
-                        onChange={(e) => setCustomerType(e.target.value)}
+                        onChange={(e) => {
+                          setCustomerType(e.target.value);
+                          // Clear existing customer selection when switching to walk-in
+                          setSelectedCustomer(null);
+                          setCustomerSearch('');
+                        }}
                       />
                       Walk-in
                     </label>
@@ -1028,21 +1118,122 @@ const POS = () => {
                     </div>
                   )}
 
-                  {/* Existing Customer Selector */}
+                  {/* Existing Customer Selector - Autocomplete Search */}
                   {customerType === 'existing' && (
-                    <select
-                      value={selectedCustomer?._id || ''}
-                      onChange={(e) => setSelectedCustomer(customers.find(c => c._id === e.target.value))}
-                      className="form-control"
-                      style={{ marginTop: 'var(--spacing-md)' }}
-                    >
-                      <option value="">Select customer...</option>
-                      {customers.map(customer => (
-                        <option key={customer._id} value={customer._id}>
-                          {customer.name} - {customer.phone}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="customer-autocomplete" style={{ marginTop: 'var(--spacing-md)', position: 'relative' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Type customer name or phone..."
+                        value={customerSearch}
+                        onChange={(e) => {
+                          setCustomerSearch(e.target.value);
+                          setShowCustomerSuggestions(true);
+                          if (!e.target.value) {
+                            setSelectedCustomer(null);
+                          }
+                        }}
+                        onFocus={() => setShowCustomerSuggestions(true)}
+                        onBlur={() => {
+                          // Delay to allow click on suggestion
+                          setTimeout(() => setShowCustomerSuggestions(false), 200);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          border: selectedCustomer ? '2px solid var(--success)' : '1px solid var(--gray-300)',
+                          borderRadius: '8px',
+                          fontSize: '0.95rem',
+                          backgroundColor: selectedCustomer ? 'rgba(27, 94, 55, 0.05)' : 'var(--white)'
+                        }}
+                      />
+                      {selectedCustomer && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomer(null);
+                            setCustomerSearch('');
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '1.2rem',
+                            cursor: 'pointer',
+                            color: 'var(--gray-500)',
+                            padding: '4px'
+                          }}
+                        >
+                          ×
+                        </button>
+                      )}
+                      {/* Customer Suggestions Dropdown */}
+                      {showCustomerSuggestions && customerSearch && !selectedCustomer && (
+                        <div
+                          className="customer-suggestions"
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            background: 'var(--white)',
+                            border: '1px solid var(--gray-300)',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            maxHeight: '250px',
+                            overflowY: 'auto',
+                            zIndex: 1000,
+                            marginTop: '4px'
+                          }}
+                        >
+                          {customers
+                            .filter(c =>
+                              c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                              c.phone?.includes(customerSearch)
+                            )
+                            .slice(0, 10)
+                            .map(customer => (
+                              <div
+                                key={customer._id}
+                                onClick={() => {
+                                  setSelectedCustomer(customer);
+                                  setCustomerSearch(`${customer.name} - ${customer.phone}`);
+                                  setShowCustomerSuggestions(false);
+                                }}
+                                style={{
+                                  padding: '12px 16px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid var(--gray-100)',
+                                  transition: 'background 0.15s'
+                                }}
+                                onMouseEnter={(e) => e.target.style.background = 'var(--gray-50)'}
+                                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                              >
+                                <div style={{ fontWeight: 500, color: 'var(--gray-900)' }}>{customer.name}</div>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--gray-600)' }}>
+                                  📞 {customer.phone} {customer.email && `• ✉️ ${customer.email}`}
+                                </div>
+                              </div>
+                            ))}
+                          {customers.filter(c =>
+                            c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                            c.phone?.includes(customerSearch)
+                          ).length === 0 && (
+                            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--gray-500)' }}>
+                              No customers found matching "{customerSearch}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {selectedCustomer && (
+                        <div style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 500 }}>
+                          ✓ Selected: {selectedCustomer.name}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

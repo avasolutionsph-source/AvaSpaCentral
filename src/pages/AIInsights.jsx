@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, subDays, differenceInDays, addDays } from 'date-fns';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import '../assets/css/ai-insights.css';
 
 const AIInsights = () => {
   const { showToast } = useApp();
@@ -366,62 +367,70 @@ const AIInsights = () => {
 
   if (loading) {
     return (
-      <div className="page-loading">
-        <div className="spinner"></div>
-        <p>Analyzing data with AI...</p>
+      <div className="ai-insights-page">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Analyzing data with AI...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="ai-insights-page">
-      <div className="page-header">
-        <div>
-          <h1>🤖 AI-Powered Business Insights</h1>
-          <p>Advanced analytics, predictions, and recommendations powered by artificial intelligence</p>
+      {/* Header */}
+      <div className="ai-insights-header">
+        <div className="header-content">
+          <h1>
+            AI-Powered Insights
+            <span className="ai-badge">AI</span>
+          </h1>
+          <p className="subtitle">Advanced analytics, predictions & recommendations</p>
         </div>
-        <button className="btn btn-primary" onClick={loadAllData}>
-          🔄 Refresh Analysis
-        </button>
+        <div className="header-actions">
+          <button className="btn-refresh" onClick={loadAllData}>
+            ↻ Refresh
+          </button>
+        </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tab Navigation */}
       <div className="ai-tabs">
         <button
           className={`ai-tab ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
-          📊 Overview
+          <span className="ai-tab-icon">📊</span> Overview
         </button>
         <button
           className={`ai-tab ${activeTab === 'product-usage' ? 'active' : ''}`}
           onClick={() => setActiveTab('product-usage')}
         >
-          🧴 Product Usage
+          <span className="ai-tab-icon">🧴</span> Product Usage
         </button>
         <button
           className={`ai-tab ${activeTab === 'inventory' ? 'active' : ''}`}
           onClick={() => setActiveTab('inventory')}
         >
-          📦 Inventory Predictions
+          <span className="ai-tab-icon">📦</span> Inventory
         </button>
         <button
           className={`ai-tab ${activeTab === 'revenue' ? 'active' : ''}`}
           onClick={() => setActiveTab('revenue')}
         >
-          💰 Revenue Forecast
+          <span className="ai-tab-icon">💰</span> Revenue
         </button>
         <button
           className={`ai-tab ${activeTab === 'customers' ? 'active' : ''}`}
           onClick={() => setActiveTab('customers')}
         >
-          👥 Customer Insights
+          <span className="ai-tab-icon">👥</span> Customers
         </button>
         <button
           className={`ai-tab ${activeTab === 'performance' ? 'active' : ''}`}
           onClick={() => setActiveTab('performance')}
         >
-          ⭐ Performance
+          <span className="ai-tab-icon">⭐</span> Performance
         </button>
       </div>
 
@@ -474,12 +483,12 @@ const AIInsights = () => {
                       datasets: [{
                         label: 'Predicted Revenue',
                         data: revenuePredictions.forecast.map(f => f.predicted),
-                        borderColor: '#8b5cf6',
-                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        borderColor: '#1B5E37',
+                        backgroundColor: 'rgba(27, 94, 55, 0.1)',
                         fill: true,
                         tension: 0.4,
                         pointRadius: 4,
-                        pointBackgroundColor: '#8b5cf6',
+                        pointBackgroundColor: '#1B5E37',
                         pointBorderColor: '#fff',
                         pointBorderWidth: 2
                       }]
@@ -527,18 +536,18 @@ const AIInsights = () => {
                         label: 'Revenue',
                         data: servicePerformance.slice(0, 5).map(s => s.revenue),
                         backgroundColor: [
-                          'rgba(139, 92, 246, 0.8)',
-                          'rgba(99, 102, 241, 0.8)',
-                          'rgba(59, 130, 246, 0.8)',
-                          'rgba(14, 165, 233, 0.8)',
-                          'rgba(6, 182, 212, 0.8)'
+                          'rgba(27, 94, 55, 0.9)',
+                          'rgba(27, 94, 55, 0.75)',
+                          'rgba(27, 94, 55, 0.6)',
+                          'rgba(27, 94, 55, 0.45)',
+                          'rgba(27, 94, 55, 0.3)'
                         ],
                         borderColor: [
-                          '#8b5cf6',
-                          '#6366f1',
-                          '#3b82f6',
-                          '#0ea5e9',
-                          '#06b6d4'
+                          '#1B5E37',
+                          '#1B5E37',
+                          '#1B5E37',
+                          '#1B5E37',
+                          '#1B5E37'
                         ],
                         borderWidth: 2
                       }]
@@ -593,12 +602,12 @@ const AIInsights = () => {
                         backgroundColor: [
                           'rgba(239, 68, 68, 0.8)',
                           'rgba(245, 158, 11, 0.8)',
-                          'rgba(16, 185, 129, 0.8)'
+                          'rgba(27, 94, 55, 0.8)'
                         ],
                         borderColor: [
                           '#ef4444',
                           '#f59e0b',
-                          '#10b981'
+                          '#1B5E37'
                         ],
                         borderWidth: 2
                       }]
@@ -887,20 +896,20 @@ const AIInsights = () => {
                           backgroundColor: productUsageAnalysis.map(p =>
                             p.alert === 'HIGH' ? 'rgba(239, 68, 68, 0.8)' :
                             p.alert === 'MEDIUM' ? 'rgba(245, 158, 11, 0.8)' :
-                            'rgba(16, 185, 129, 0.8)'
+                            'rgba(27, 94, 55, 0.8)'
                           ),
                           borderColor: productUsageAnalysis.map(p =>
                             p.alert === 'HIGH' ? '#ef4444' :
                             p.alert === 'MEDIUM' ? '#f59e0b' :
-                            '#10b981'
+                            '#1B5E37'
                           ),
                           borderWidth: 2
                         },
                         {
                           label: 'Current Stock (units)',
                           data: productUsageAnalysis.map(p => p.currentStock),
-                          backgroundColor: 'rgba(139, 92, 246, 0.5)',
-                          borderColor: '#8b5cf6',
+                          backgroundColor: 'rgba(27, 94, 55, 0.5)',
+                          borderColor: '#1B5E37',
                           borderWidth: 2
                         }
                       ]
@@ -1079,12 +1088,12 @@ const AIInsights = () => {
                         backgroundColor: inventoryPredictions.slice(0, 10).map(p =>
                           p.alert === 'HIGH' ? 'rgba(239, 68, 68, 0.8)' :
                           p.alert === 'MEDIUM' ? 'rgba(245, 158, 11, 0.8)' :
-                          'rgba(16, 185, 129, 0.8)'
+                          'rgba(27, 94, 55, 0.8)'
                         ),
                         borderColor: inventoryPredictions.slice(0, 10).map(p =>
                           p.alert === 'HIGH' ? '#ef4444' :
                           p.alert === 'MEDIUM' ? '#f59e0b' :
-                          '#10b981'
+                          '#1B5E37'
                         ),
                         borderWidth: 2
                       }]
@@ -1208,12 +1217,12 @@ const AIInsights = () => {
                     {
                       label: 'Predicted Revenue',
                       data: revenuePredictions.forecast.map(f => f.predicted),
-                      borderColor: '#10b981',
-                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                      borderColor: '#1B5E37',
+                      backgroundColor: 'rgba(27, 94, 55, 0.1)',
                       tension: 0.4,
                       fill: true,
                       pointRadius: 6,
-                      pointBackgroundColor: '#10b981',
+                      pointBackgroundColor: '#1B5E37',
                       pointBorderColor: '#fff',
                       pointBorderWidth: 2,
                       pointHoverRadius: 8
@@ -1350,11 +1359,11 @@ const AIInsights = () => {
                           customerInsights.totalCustomers - customerInsights.activeCustomers
                         ],
                         backgroundColor: [
-                          'rgba(16, 185, 129, 0.8)',
+                          'rgba(27, 94, 55, 0.8)',
                           'rgba(156, 163, 175, 0.5)'
                         ],
                         borderColor: [
-                          '#10b981',
+                          '#1B5E37',
                           '#9ca3af'
                         ],
                         borderWidth: 2
@@ -1409,8 +1418,8 @@ const AIInsights = () => {
                     datasets: [{
                       label: 'Total Spending',
                       data: customerInsights.topCustomers.map(c => c.totalSpent),
-                      backgroundColor: 'rgba(139, 92, 246, 0.8)',
-                      borderColor: '#8b5cf6',
+                      backgroundColor: 'rgba(27, 94, 55, 0.8)',
+                      borderColor: '#1B5E37',
                       borderWidth: 2
                     }]
                   }}

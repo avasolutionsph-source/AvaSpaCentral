@@ -228,12 +228,8 @@ const Rooms = () => {
               <p className="room-type">{room.type}</p>
               <div className="room-details">
                 <div className="room-detail-row">
-                  <span className="room-detail-label">Capacity:</span>
+                  <span className="room-detail-label">Capacity</span>
                   <span className="room-detail-value">{room.capacity} {room.capacity === 1 ? 'person' : 'people'}</span>
-                </div>
-                <div className="room-detail-row">
-                  <span className="room-detail-label">Status:</span>
-                  <span className="room-detail-value">{room.status}</span>
                 </div>
               </div>
               {room.amenities && room.amenities.length > 0 && (
@@ -248,25 +244,25 @@ const Rooms = () => {
               )}
               <div className="status-change-group">
                 {room.status !== 'available' && (
-                  <button className="btn btn-xs btn-success" onClick={() => handleStatusChange(room, 'available')}>
-                    Set Available
+                  <button className="btn btn-success" onClick={() => handleStatusChange(room, 'available')}>
+                    Available
                   </button>
                 )}
                 {room.status !== 'occupied' && (
-                  <button className="btn btn-xs btn-error" onClick={() => handleStatusChange(room, 'occupied')}>
-                    Set Occupied
+                  <button className="btn btn-error" onClick={() => handleStatusChange(room, 'occupied')}>
+                    Occupied
                   </button>
                 )}
                 {room.status !== 'maintenance' && (
-                  <button className="btn btn-xs btn-warning" onClick={() => handleStatusChange(room, 'maintenance')}>
+                  <button className="btn btn-warning" onClick={() => handleStatusChange(room, 'maintenance')}>
                     Maintenance
                   </button>
                 )}
               </div>
               {canEdit() && (
                 <div className="room-actions">
-                  <button className="btn btn-sm btn-secondary" onClick={() => openEditModal(room)}>Edit</button>
-                  <button className="btn btn-sm btn-error" onClick={() => handleDelete(room)}>Delete</button>
+                  <button className="btn btn-secondary" onClick={() => openEditModal(room)}>Edit</button>
+                  <button className="btn btn-error" onClick={() => handleDelete(room)}>Delete</button>
                 </div>
               )}
             </div>

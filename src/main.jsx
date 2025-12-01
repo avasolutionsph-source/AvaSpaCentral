@@ -20,6 +20,8 @@ import './assets/css/reports.css'
 import './assets/css/calendar.css'
 import './assets/css/chatbot.css'
 import './assets/css/settings.css'
+import './assets/css/shift-schedules.css'
+import './assets/css/analytics-dashboard.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

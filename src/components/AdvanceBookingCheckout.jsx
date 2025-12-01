@@ -29,6 +29,19 @@ const AdvanceBookingCheckout = ({
 
   const [errors, setErrors] = useState({});
 
+  // Customer search autocomplete state
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+
+  // Sync customer search with selected customer
+  useEffect(() => {
+    if (selectedCustomer) {
+      setCustomerSearch(`${selectedCustomer.name} - ${selectedCustomer.phone}`);
+    } else {
+      setCustomerSearch('');
+    }
+  }, [selectedCustomer]);
+
   useEffect(() => {
     if (value) {
       setBookingData(prev => ({ ...prev, ...value }));
@@ -194,28 +207,125 @@ const AdvanceBookingCheckout = ({
             </p>
           </div>
 
-          {/* For Existing Customer - Show Dropdown */}
+          {/* For Existing Customer - Autocomplete Search */}
           {customerType === 'existing' && (
             <div className="form-group">
               <label>Select Customer *</label>
-              <select
-                value={selectedCustomer?._id || ''}
-                onChange={(e) => onCustomerSelect && onCustomerSelect(customers.find(c => c._id === e.target.value))}
-                className={`form-control ${errors.selectedCustomer ? 'error' : ''}`}
-              >
-                <option value="">Select customer...</option>
-                {customers && customers.map(customer => (
-                  <option key={customer._id} value={customer._id}>
-                    {customer.name} - {customer.phone}
-                  </option>
-                ))}
-              </select>
+              <div className="customer-autocomplete" style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className={`form-control ${errors.selectedCustomer ? 'error' : ''}`}
+                  placeholder="Type customer name or phone..."
+                  value={customerSearch}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    setShowCustomerSuggestions(true);
+                    if (!e.target.value) {
+                      onCustomerSelect && onCustomerSelect(null);
+                    }
+                  }}
+                  onFocus={() => setShowCustomerSuggestions(true)}
+                  onBlur={() => {
+                    // Delay to allow click on suggestion
+                    setTimeout(() => setShowCustomerSuggestions(false), 200);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    border: selectedCustomer ? '2px solid var(--success)' : errors.selectedCustomer ? '2px solid var(--error)' : '1px solid var(--gray-300)',
+                    borderRadius: '8px',
+                    fontSize: '0.95rem',
+                    backgroundColor: selectedCustomer ? 'rgba(27, 94, 55, 0.05)' : 'var(--white)'
+                  }}
+                />
+                {selectedCustomer && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onCustomerSelect && onCustomerSelect(null);
+                      setCustomerSearch('');
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '1.2rem',
+                      cursor: 'pointer',
+                      color: 'var(--gray-500)',
+                      padding: '4px'
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+                {/* Customer Suggestions Dropdown */}
+                {showCustomerSuggestions && customerSearch && !selectedCustomer && (
+                  <div
+                    className="customer-suggestions"
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'var(--white)',
+                      border: '1px solid var(--gray-300)',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      maxHeight: '250px',
+                      overflowY: 'auto',
+                      zIndex: 1000,
+                      marginTop: '4px'
+                    }}
+                  >
+                    {customers && customers
+                      .filter(c =>
+                        c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                        c.phone?.includes(customerSearch)
+                      )
+                      .slice(0, 10)
+                      .map(customer => (
+                        <div
+                          key={customer._id}
+                          onClick={() => {
+                            onCustomerSelect && onCustomerSelect(customer);
+                            setCustomerSearch(`${customer.name} - ${customer.phone}`);
+                            setShowCustomerSuggestions(false);
+                          }}
+                          style={{
+                            padding: '12px 16px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid var(--gray-100)',
+                            transition: 'background 0.15s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'var(--gray-50)'}
+                          onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                        >
+                          <div style={{ fontWeight: 500, color: 'var(--gray-900)' }}>{customer.name}</div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--gray-600)' }}>
+                            📞 {customer.phone} {customer.email && `• ✉️ ${customer.email}`}
+                          </div>
+                        </div>
+                      ))}
+                    {customers && customers.filter(c =>
+                      c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                      c.phone?.includes(customerSearch)
+                    ).length === 0 && (
+                      <div style={{ padding: '16px', textAlign: 'center', color: 'var(--gray-500)' }}>
+                        No customers found matching "{customerSearch}"
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               {errors.selectedCustomer && (
                 <span className="error-message">{errors.selectedCustomer}</span>
               )}
               {selectedCustomer && (
                 <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 500 }}>
-                  ✓ Customer selected: {selectedCustomer.name}
+                  ✓ Selected: {selectedCustomer.name}
                 </p>
               )}
             </div>

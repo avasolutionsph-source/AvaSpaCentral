@@ -332,21 +332,6 @@ const Calendar = () => {
     );
   };
 
-  // Get appointment position for time-based views
-  const getAppointmentPosition = (startTime) => {
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const totalMinutes = (hours - 8) * 60 + minutes; // Start from 8 AM
-    return (totalMinutes / 60) * 80; // 80px per hour
-  };
-
-  // Get appointment height based on duration
-  const getAppointmentHeight = (startTime, endTime) => {
-    const [startHours, startMinutes] = startTime.split(':').map(Number);
-    const [endHours, endMinutes] = endTime.split(':').map(Number);
-    const durationMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
-    return (durationMinutes / 60) * 80; // 80px per hour
-  };
-
   // Month view rendering
   const renderMonthView = () => {
     const monthStart = startOfMonth(currentDate);
@@ -375,20 +360,30 @@ const Calendar = () => {
           >
             <div className="day-number">{format(day, 'd')}</div>
             <div className="day-appointments">
-              {dayAppointments.slice(0, 3).map(apt => (
-                <div
-                  key={apt.id}
-                  className={`appointment-dot ${apt.status}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedAppointment(apt);
-                    setShowDetailModal(true);
-                  }}
-                  title={`${apt.startTime} - ${apt.customer} - ${apt.service}`}
-                >
-                  {apt.startTime} {apt.customer}
-                </div>
-              ))}
+              {dayAppointments.slice(0, 3).map(apt => {
+                // Convert military time to 12-hour format
+                const formatTime12hr = (time) => {
+                  const [hours, minutes] = time.split(':');
+                  const hour = parseInt(hours);
+                  const ampm = hour >= 12 ? 'PM' : 'AM';
+                  const hour12 = hour % 12 || 12;
+                  return `${hour12}:${minutes} ${ampm}`;
+                };
+                return (
+                  <div
+                    key={apt.id}
+                    className={`appointment-dot ${apt.status}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAppointment(apt);
+                      setShowDetailModal(true);
+                    }}
+                    title={`${formatTime12hr(apt.startTime)} - ${apt.customer} - ${apt.service}`}
+                  >
+                    {formatTime12hr(apt.startTime)}
+                  </div>
+                );
+              })}
               {dayAppointments.length > 3 && (
                 <span className="appointment-count">
                   +{dayAppointments.length - 3} more
@@ -415,6 +410,13 @@ const Calendar = () => {
         </div>
       </div>
     );
+  };
+
+  // Helper function to format hour to 12-hour format
+  const formatHour12hr = (hour) => {
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:00 ${ampm}`;
   };
 
   // Week view rendering
@@ -448,7 +450,7 @@ const Calendar = () => {
         <div className="week-grid">
           {hours.map(hour => (
             <React.Fragment key={hour}>
-              <div className="time-slot">{`${hour}:00`}</div>
+              <div className="time-slot">{formatHour12hr(hour)}</div>
               {weekDays.map(day => {
                 const dayAppointments = getAppointmentsForDate(day);
                 return (
@@ -458,22 +460,26 @@ const Calendar = () => {
                   >
                     {dayAppointments.map(apt => {
                       const [aptHour] = apt.startTime.split(':').map(Number);
+                      // Convert military time to 12-hour format
+                      const formatTime12hr = (time) => {
+                        const [hours, minutes] = time.split(':');
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const hour12 = hour % 12 || 12;
+                        return `${hour12}:${minutes} ${ampm}`;
+                      };
                       if (aptHour === hour) {
                         return (
                           <div
                             key={apt.id}
                             className={`week-appointment ${apt.status}`}
-                            style={{
-                              top: `${getAppointmentPosition(apt.startTime) % 80}px`,
-                              height: `${getAppointmentHeight(apt.startTime, apt.endTime)}px`
-                            }}
                             onClick={() => {
                               setSelectedAppointment(apt);
                               setShowDetailModal(true);
                             }}
+                            title={`${formatTime12hr(apt.startTime)} - ${apt.customer} - ${apt.service}`}
                           >
-                            <div>{apt.startTime} - {apt.customer}</div>
-                            <div>{apt.service}</div>
+                            {formatTime12hr(apt.startTime)}
                           </div>
                         );
                       }
@@ -504,30 +510,30 @@ const Calendar = () => {
           <div className="day-timeline">
             {hours.map(hour => (
               <React.Fragment key={hour}>
-                <div className="day-time-label">{`${hour}:00`}</div>
+                <div className="day-time-label">{formatHour12hr(hour)}</div>
                 <div className="day-time-block">
                   {dayAppointments.map(apt => {
                     const [aptHour] = apt.startTime.split(':').map(Number);
                     if (aptHour === hour) {
+                      // Convert military time to 12-hour format
+                      const formatTime12hr = (time) => {
+                        const [hours, minutes] = time.split(':');
+                        const hr = parseInt(hours);
+                        const ampm = hr >= 12 ? 'PM' : 'AM';
+                        const hour12 = hr % 12 || 12;
+                        return `${hour12}:${minutes} ${ampm}`;
+                      };
                       return (
                         <div
                           key={apt.id}
                           className={`day-appointment ${apt.status}`}
-                          style={{
-                            top: `${getAppointmentPosition(apt.startTime) % 80}px`,
-                            height: `${getAppointmentHeight(apt.startTime, apt.endTime)}px`
-                          }}
                           onClick={() => {
                             setSelectedAppointment(apt);
                             setShowDetailModal(true);
                           }}
+                          title={`${formatTime12hr(apt.startTime)} - ${apt.customer} - ${apt.service}`}
                         >
-                          <div className="appointment-time">
-                            {apt.startTime} - {apt.endTime}
-                          </div>
-                          <div className="appointment-customer">{apt.customer}</div>
-                          <div className="appointment-service">{apt.service}</div>
-                          <div className="appointment-service">Therapist: {apt.therapist}</div>
+                          {apt.customer}
                         </div>
                       );
                     }

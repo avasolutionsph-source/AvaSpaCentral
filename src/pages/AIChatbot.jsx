@@ -532,49 +532,6 @@ const AIChatbot = () => {
       </div>
 
       <div className={`chatbot-container ${isMinimized ? 'minimized' : ''}`}>
-        {/* Chat Stats */}
-        <div className="chat-stats">
-          <div className="stat-card">
-            <div className="stat-icon">💬</div>
-            <div className="stat-info">
-              <div className="stat-label">Messages</div>
-              <div className="stat-value">{messages.length}</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">🔌</div>
-            <div className="stat-info">
-              <div className="stat-label">Data Status</div>
-              <div className="stat-value">
-                <span className={`status-badge ${businessData.dataLoaded ? 'active' : 'pending'}`}>
-                  {businessData.dataLoaded ? 'Live' : 'Loading...'}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">📦</div>
-            <div className="stat-info">
-              <div className="stat-label">Products</div>
-              <div className="stat-value">{businessData.products.length}</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">👥</div>
-            <div className="stat-info">
-              <div className="stat-label">Customers</div>
-              <div className="stat-value">{businessData.customers.length}</div>
-            </div>
-          </div>
-          <div className="stat-card clickable" onClick={loadBusinessData} title="Click to refresh data">
-            <div className="stat-icon">🔄</div>
-            <div className="stat-info">
-              <div className="stat-label">Refresh</div>
-              <div className="stat-value" style={{ fontSize: '0.75rem' }}>Click to sync</div>
-            </div>
-          </div>
-        </div>
-
         {!isMinimized && (
           <>
             {/* Chat Messages */}

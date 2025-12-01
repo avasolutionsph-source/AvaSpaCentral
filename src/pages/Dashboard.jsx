@@ -596,14 +596,15 @@ const Dashboard = () => {
   }, []);
 
   // Memoized chart data - must be before conditional returns (Rules of Hooks)
+  // Using strict color palette: Primary green #1B5E37, shades of gray
   const revenueChartData = useMemo(() => ({
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     datasets: [
       {
         label: 'Revenue (₱)',
         data: [8500, 12000, 10500, 15000, 13500, 18000, 16000],
-        borderColor: '#8b5cf6',
-        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+        borderColor: '#1B5E37',
+        backgroundColor: 'rgba(27, 94, 55, 0.1)',
         tension: 0.4
       }
     ]
@@ -614,7 +615,7 @@ const Dashboard = () => {
     datasets: [
       {
         data: [35, 25, 20, 15, 5],
-        backgroundColor: ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b']
+        backgroundColor: ['#1B5E37', '#145A2C', '#666666', '#999999', '#E0E0E0']
       }
     ]
   }), []);
@@ -625,7 +626,7 @@ const Dashboard = () => {
       {
         label: 'Revenue (₱)',
         data: [96000, 72000, 48600, 35000, 32400],
-        backgroundColor: '#8b5cf6'
+        backgroundColor: '#1B5E37'
       }
     ]
   }), []);
@@ -635,7 +636,7 @@ const Dashboard = () => {
     datasets: [
       {
         data: [50, 30, 20],
-        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b']
+        backgroundColor: ['#1B5E37', '#666666', '#999999']
       }
     ]
   }), []);
@@ -913,54 +914,28 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* AI Insights Section - Enhanced */}
+      {/* AI Insights Section - Simplified */}
       {aiInsights.length > 0 && showAiInsights && (
-        <div className="ai-insights-section">
-          <div className="ai-insights-header">
-            <div>
-              <h2>🤖 AI-Powered Business Insights</h2>
-              <p>Real-time intelligence and actionable recommendations</p>
-            </div>
-            <div className="ai-header-actions">
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => navigate('/ai-insights')}
-              >
-                View Full Analytics
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => setShowAiInsights(false)}
-              >
-                Hide Insights
-              </button>
+        <div className="ai-insights-simple">
+          <div className="ai-insights-simple-header">
+            <h3>AI Insights</h3>
+            <div className="ai-simple-actions">
+              <button className="btn-link" onClick={() => navigate('/ai-insights')}>View All</button>
+              <button className="btn-link muted" onClick={() => setShowAiInsights(false)}>Hide</button>
             </div>
           </div>
-          <div className="ai-insights-grid-enhanced">
-            {aiInsights.map((insight) => (
-              <div key={insight.id} className={`ai-insight-card-enhanced ai-insight-${insight.type}`}>
-                <div className="ai-insight-header-row">
-                  <div className="ai-insight-icon-large">{insight.icon}</div>
-                  {insight.metric && (
-                    <span className={`ai-insight-metric ai-metric-${insight.type}`}>
-                      {insight.metric}
-                    </span>
-                  )}
+          <div className="ai-insights-simple-list">
+            {aiInsights.slice(0, 4).map((insight) => (
+              <div
+                key={insight.id}
+                className="ai-insight-simple-item"
+                onClick={() => navigate(insight.actionLink)}
+              >
+                <span className="ai-simple-icon">{insight.icon}</span>
+                <div className="ai-simple-content">
+                  <span className="ai-simple-title">{insight.title}</span>
+                  <span className="ai-simple-metric">{insight.metric}</span>
                 </div>
-                <div className="ai-insight-content-enhanced">
-                  <h4 className="ai-insight-title-enhanced">{insight.title}</h4>
-                  <p className="ai-insight-message-enhanced">{insight.message}</p>
-                  {insight.action && (
-                    <button
-                      className="ai-insight-action-btn"
-                      onClick={() => navigate(insight.actionLink)}
-                    >
-                      <span>{insight.action}</span>
-                      <span className="action-arrow">→</span>
-                    </button>
-                  )}
-                </div>
-                <div className={`ai-insight-glow ai-glow-${insight.type}`}></div>
               </div>
             ))}
           </div>

@@ -202,7 +202,7 @@ const GiftCertificates = () => {
     <div className="gift-certificates-page">
       <div className="page-header">
         <div>
-          <h1>🎁 Gift Certificates</h1>
+          <h1>Gift Certificates</h1>
           <p>Manage gift certificates and vouchers</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>

@@ -1581,4 +1581,584 @@ function generateConsumptionHistory() {
 
 mockDatabase.productConsumption = generateConsumptionHistory();
 
+// =============================================================================
+// SHIFT SCHEDULES
+// =============================================================================
+
+// Global shift configuration
+mockDatabase.shiftConfig = {
+  dayShift: { startTime: '09:00', endTime: '17:00', label: 'Day Shift', color: '#10b981' },
+  nightShift: { startTime: '13:00', endTime: '21:00', label: 'Night Shift', color: '#6366f1' },
+  wholeDayShift: { startTime: '09:00', endTime: '21:00', label: 'Whole Day', color: '#f59e0b' },
+  off: { startTime: null, endTime: null, label: 'Day Off', color: '#6b7280' }
+};
+
+// Schedule templates for quick assignment
+mockDatabase.scheduleTemplates = [
+  {
+    _id: 'tmpl_001',
+    name: 'Standard Day (Mon-Fri)',
+    description: 'Regular day shift Monday to Friday, weekends off',
+    weeklySchedule: {
+      monday: { shift: 'day' },
+      tuesday: { shift: 'day' },
+      wednesday: { shift: 'day' },
+      thursday: { shift: 'day' },
+      friday: { shift: 'day' },
+      saturday: { shift: 'off' },
+      sunday: { shift: 'off' }
+    }
+  },
+  {
+    _id: 'tmpl_002',
+    name: 'Alternating Day/Night',
+    description: 'Alternating day and night shifts',
+    weeklySchedule: {
+      monday: { shift: 'day' },
+      tuesday: { shift: 'night' },
+      wednesday: { shift: 'day' },
+      thursday: { shift: 'night' },
+      friday: { shift: 'day' },
+      saturday: { shift: 'off' },
+      sunday: { shift: 'off' }
+    }
+  },
+  {
+    _id: 'tmpl_003',
+    name: 'Night Shift Worker',
+    description: 'Night shifts with different rest days',
+    weeklySchedule: {
+      monday: { shift: 'night' },
+      tuesday: { shift: 'night' },
+      wednesday: { shift: 'off' },
+      thursday: { shift: 'night' },
+      friday: { shift: 'night' },
+      saturday: { shift: 'night' },
+      sunday: { shift: 'off' }
+    }
+  },
+  {
+    _id: 'tmpl_004',
+    name: 'Weekend Warrior',
+    description: 'Whole day shifts on weekends, rest during weekdays',
+    weeklySchedule: {
+      monday: { shift: 'off' },
+      tuesday: { shift: 'off' },
+      wednesday: { shift: 'day' },
+      thursday: { shift: 'day' },
+      friday: { shift: 'day' },
+      saturday: { shift: 'wholeDay' },
+      sunday: { shift: 'wholeDay' }
+    }
+  }
+];
+
+// Generate shift schedules for all employees
+function generateShiftSchedules() {
+  const schedules = [];
+  const today = new Date();
+  const startOfThisWeek = new Date(today);
+  startOfThisWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
+  startOfThisWeek.setHours(0, 0, 0, 0);
+
+  // Templates for variety
+  const shiftPatterns = [
+    // Pattern 1: Standard Day Worker
+    {
+      monday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      tuesday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      wednesday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      thursday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      friday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      saturday: { shift: 'off', startTime: null, endTime: null },
+      sunday: { shift: 'off', startTime: null, endTime: null }
+    },
+    // Pattern 2: Alternating with Weekend
+    {
+      monday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      tuesday: { shift: 'night', startTime: '13:00', endTime: '21:00' },
+      wednesday: { shift: 'off', startTime: null, endTime: null },
+      thursday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      friday: { shift: 'night', startTime: '13:00', endTime: '21:00' },
+      saturday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      sunday: { shift: 'off', startTime: null, endTime: null }
+    },
+    // Pattern 3: Night Shift Focus
+    {
+      monday: { shift: 'night', startTime: '13:00', endTime: '21:00' },
+      tuesday: { shift: 'night', startTime: '13:00', endTime: '21:00' },
+      wednesday: { shift: 'night', startTime: '13:00', endTime: '21:00' },
+      thursday: { shift: 'off', startTime: null, endTime: null },
+      friday: { shift: 'night', startTime: '13:00', endTime: '21:00' },
+      saturday: { shift: 'night', startTime: '13:00', endTime: '21:00' },
+      sunday: { shift: 'off', startTime: null, endTime: null }
+    },
+    // Pattern 4: Whole Day Weekends
+    {
+      monday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      tuesday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      wednesday: { shift: 'off', startTime: null, endTime: null },
+      thursday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      friday: { shift: 'day', startTime: '09:00', endTime: '17:00' },
+      saturday: { shift: 'wholeDay', startTime: '09:00', endTime: '21:00' },
+      sunday: { shift: 'off', startTime: null, endTime: null }
+    }
+  ];
+
+  mockDatabase.employees.forEach((employee, index) => {
+    const pattern = shiftPatterns[index % shiftPatterns.length];
+
+    schedules.push({
+      _id: `sched_${employee._id}`,
+      businessId: 'biz_001',
+      employeeId: employee._id,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      employeePosition: employee.position,
+      effectiveDate: startOfThisWeek.toISOString().split('T')[0],
+      weeklySchedule: { ...pattern },
+      isActive: true,
+      notes: index === 0 ? 'Senior therapist - flexible hours' : '',
+      createdAt: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: today.toISOString(),
+      createdBy: 'user_001'
+    });
+  });
+
+  return schedules;
+}
+
+mockDatabase.shiftSchedules = generateShiftSchedules();
+
+// =============================================================================
+// ANALYTICS & METRICS DATA
+// =============================================================================
+
+// Fixed Costs Configuration (Monthly)
+mockDatabase.fixedCosts = {
+  rent: 35000,
+  utilities: 12000,
+  insurance: 5000,
+  salaries: 180000,
+  marketing: 8000,
+  software: 3000,
+  maintenance: 5000,
+  miscellaneous: 2000
+};
+
+// Cash & Bank Accounts
+mockDatabase.cashAccounts = {
+  cashOnHand: 125000,
+  bankBalance: 450000,
+  totalCash: 575000,
+  lastUpdated: new Date().toISOString()
+};
+
+// Suppliers Database
+mockDatabase.suppliers = [
+  {
+    _id: 'sup_001',
+    businessId: 'biz_001',
+    name: 'Manila Spa Supplies Co.',
+    contactPerson: 'Ramon Cruz',
+    email: 'sales@manilaspasupplies.ph',
+    phone: '+639171234567',
+    address: 'Makati City, Manila',
+    category: 'Spa Products',
+    paymentTerms: 'Net 30',
+    status: 'active',
+    rating: 4.5,
+    createdAt: '2023-01-15'
+  },
+  {
+    _id: 'sup_002',
+    businessId: 'biz_001',
+    name: 'Beauty Essentials PH',
+    contactPerson: 'Lisa Tan',
+    email: 'orders@beautyessentials.ph',
+    phone: '+639181234568',
+    address: 'Quezon City, Manila',
+    category: 'Skincare',
+    paymentTerms: 'Net 15',
+    status: 'active',
+    rating: 4.8,
+    createdAt: '2023-03-20'
+  },
+  {
+    _id: 'sup_003',
+    businessId: 'biz_001',
+    name: 'Wellness Wholesale Inc.',
+    contactPerson: 'Mark Santos',
+    email: 'wholesale@wellnessinc.ph',
+    phone: '+639191234569',
+    address: 'Pasig City, Manila',
+    category: 'Equipment & Supplies',
+    paymentTerms: 'COD',
+    status: 'active',
+    rating: 4.2,
+    createdAt: '2023-05-10'
+  },
+  {
+    _id: 'sup_004',
+    businessId: 'biz_001',
+    name: 'Aromatherapy World',
+    contactPerson: 'Jenny Lee',
+    email: 'info@aromatherapyworld.ph',
+    phone: '+639201234570',
+    address: 'Cebu City',
+    category: 'Essential Oils',
+    paymentTerms: 'Net 45',
+    status: 'active',
+    rating: 4.6,
+    createdAt: '2023-02-28'
+  }
+];
+
+// Purchase Orders for supplier tracking
+function generatePurchaseOrders() {
+  const orders = [];
+  const now = new Date();
+
+  for (let i = 0; i < 50; i++) {
+    const orderDate = new Date(now);
+    orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 90));
+
+    const supplier = mockDatabase.suppliers[Math.floor(Math.random() * mockDatabase.suppliers.length)];
+    const expectedDelivery = new Date(orderDate);
+    expectedDelivery.setDate(expectedDelivery.getDate() + Math.floor(Math.random() * 7) + 3);
+
+    const actualDelivery = new Date(expectedDelivery);
+    if (Math.random() > 0.8) {
+      actualDelivery.setDate(actualDelivery.getDate() + Math.floor(Math.random() * 5) + 1);
+    }
+
+    const items = [];
+    const numItems = Math.floor(Math.random() * 3) + 1;
+    let totalAmount = 0;
+    let defectiveItems = 0;
+
+    const retailProducts = mockDatabase.products.filter(p => p.type === 'product');
+    for (let j = 0; j < numItems; j++) {
+      const product = retailProducts[Math.floor(Math.random() * retailProducts.length)];
+      if (product) {
+        const qty = Math.floor(Math.random() * 20) + 5;
+        const cost = product.cost || 100;
+        const defective = Math.random() > 0.95 ? Math.floor(Math.random() * 3) + 1 : 0;
+
+        items.push({
+          productId: product._id,
+          productName: product.name,
+          quantity: qty,
+          unitCost: cost,
+          subtotal: qty * cost,
+          defectiveQty: defective
+        });
+
+        totalAmount += qty * cost;
+        defectiveItems += defective;
+      }
+    }
+
+    orders.push({
+      _id: `po_${String(i + 1).padStart(3, '0')}`,
+      businessId: 'biz_001',
+      supplierId: supplier._id,
+      supplierName: supplier.name,
+      orderNumber: `PO-${orderDate.getFullYear()}${String(orderDate.getMonth() + 1).padStart(2, '0')}-${String(i + 1).padStart(3, '0')}`,
+      orderDate: orderDate.toISOString(),
+      expectedDeliveryDate: expectedDelivery.toISOString(),
+      actualDeliveryDate: actualDelivery.toISOString(),
+      items,
+      totalAmount,
+      defectiveItems,
+      status: 'delivered',
+      isOnTime: actualDelivery <= expectedDelivery,
+      leadTimeDays: Math.floor((actualDelivery - orderDate) / (1000 * 60 * 60 * 24)),
+      paymentStatus: Math.random() > 0.1 ? 'paid' : 'pending',
+      notes: ''
+    });
+  }
+
+  return orders.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
+}
+
+mockDatabase.purchaseOrders = generatePurchaseOrders();
+
+// Inventory Movements (for COGS calculation)
+function generateInventoryMovements() {
+  const movements = [];
+  const now = new Date();
+  const retailProducts = mockDatabase.products.filter(p => p.type === 'product');
+
+  for (let dayOffset = 90; dayOffset >= 0; dayOffset--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - dayOffset);
+
+    if (Math.random() > 0.7) {
+      const product = retailProducts[Math.floor(Math.random() * retailProducts.length)];
+      if (product) {
+        movements.push({
+          _id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          productId: product._id,
+          productName: product.name,
+          type: 'purchase',
+          quantity: Math.floor(Math.random() * 20) + 5,
+          unitCost: product.cost || 100,
+          date: date.toISOString(),
+          reference: `PO-${date.toISOString().split('T')[0].replace(/-/g, '')}`
+        });
+      }
+    }
+
+    const salesCount = Math.floor(Math.random() * 7) + 3;
+    for (let s = 0; s < salesCount; s++) {
+      const product = retailProducts[Math.floor(Math.random() * retailProducts.length)];
+      if (product) {
+        movements.push({
+          _id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          productId: product._id,
+          productName: product.name,
+          type: 'sale',
+          quantity: -1 * (Math.floor(Math.random() * 3) + 1),
+          unitCost: product.cost || 100,
+          date: date.toISOString(),
+          reference: `RCP-${date.toISOString().split('T')[0].replace(/-/g, '')}`
+        });
+      }
+    }
+
+    if (Math.random() > 0.95) {
+      const product = retailProducts[Math.floor(Math.random() * retailProducts.length)];
+      if (product) {
+        movements.push({
+          _id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          productId: product._id,
+          productName: product.name,
+          type: 'adjustment',
+          quantity: -1 * (Math.floor(Math.random() * 2) + 1),
+          unitCost: product.cost || 100,
+          date: date.toISOString(),
+          reference: 'ADJ-Wastage',
+          reason: ['Damaged', 'Expired', 'Wastage', 'Shrinkage'][Math.floor(Math.random() * 4)]
+        });
+      }
+    }
+  }
+
+  return movements.sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
+mockDatabase.inventoryMovements = generateInventoryMovements();
+
+// Tax Configuration (Philippine tax rates)
+mockDatabase.taxConfig = {
+  vatRate: 0.12,
+  isVATRegistered: true,
+  percentageTax: 0.03,
+  withholdingTax: {
+    professionalFees: 0.10,
+    rentals: 0.05,
+    services: 0.02
+  },
+  sss: {
+    employeeShare: 0.045,
+    employerShare: 0.095,
+    maxSalaryCredit: 30000
+  },
+  philHealth: {
+    rate: 0.05,
+    maxPremium: 5000
+  },
+  pagIbig: {
+    employeeRate: 0.02,
+    employerRate: 0.02,
+    maxContribution: 200
+  }
+};
+
+// Monthly Financial Snapshots
+function generateMonthlySnapshots() {
+  const snapshots = [];
+  const now = new Date();
+
+  for (let monthsAgo = 11; monthsAgo >= 0; monthsAgo--) {
+    const snapshotDate = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
+    const monthKey = snapshotDate.toISOString().substring(0, 7);
+
+    const seasonalFactor = 1 + Math.sin((snapshotDate.getMonth() - 3) * Math.PI / 6) * 0.2;
+    const baseRevenue = 280000 * seasonalFactor;
+    const variance = (Math.random() - 0.5) * 40000;
+
+    const revenue = Math.round(baseRevenue + variance);
+    const cogs = Math.round(revenue * (0.25 + Math.random() * 0.05));
+    const grossProfit = revenue - cogs;
+
+    const fixedCostsTotal = Object.values(mockDatabase.fixedCosts).reduce((a, b) => a + b, 0);
+    const variableExpenses = Math.round(revenue * (0.15 + Math.random() * 0.05));
+    const totalExpenses = fixedCostsTotal + variableExpenses;
+    const netProfit = grossProfit - totalExpenses + (fixedCostsTotal * 0.3);
+
+    snapshots.push({
+      month: monthKey,
+      date: snapshotDate.toISOString(),
+      revenue,
+      cogs,
+      grossProfit,
+      grossProfitMargin: ((grossProfit / revenue) * 100).toFixed(1),
+      totalExpenses: totalExpenses - (fixedCostsTotal * 0.3),
+      netProfit: Math.round(netProfit),
+      netProfitMargin: ((netProfit / revenue) * 100).toFixed(1),
+      transactionCount: Math.floor(revenue / 850),
+      customerCount: Math.floor(revenue / 1200),
+      inventoryValue: 150000 + Math.round(Math.random() * 30000),
+      cashBalance: 400000 + Math.round(Math.random() * 200000)
+    });
+  }
+
+  return snapshots;
+}
+
+mockDatabase.monthlySnapshots = generateMonthlySnapshots();
+
+// Sales by Hour (for heatmap)
+function generateHourlySalesData() {
+  const hourlyData = [];
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  for (let day = 0; day < 7; day++) {
+    for (let hour = 9; hour <= 21; hour++) {
+      let baseSales = 2000;
+      if ((hour >= 10 && hour <= 12) || (hour >= 14 && hour <= 16) || (hour >= 18 && hour <= 20)) {
+        baseSales = 4500;
+      }
+
+      if (day === 0 || day === 6) {
+        baseSales *= 1.3;
+      }
+
+      const sales = Math.round(baseSales * (0.7 + Math.random() * 0.6));
+      const transactions = Math.floor(sales / (600 + Math.random() * 400));
+
+      hourlyData.push({
+        day: days[day],
+        dayIndex: day,
+        hour,
+        hourLabel: `${hour}:00`,
+        sales,
+        transactions,
+        avgTicket: transactions > 0 ? Math.round(sales / transactions) : 0
+      });
+    }
+  }
+
+  return hourlyData;
+}
+
+mockDatabase.hourlySalesData = generateHourlySalesData();
+
+// Product Bundles
+mockDatabase.productBundles = [
+  {
+    _id: 'bundle_001',
+    name: 'Relaxation Starter Kit',
+    products: ['prod_022', 'prod_027', 'prod_028'],
+    bundlePrice: 650,
+    regularPrice: 750,
+    discount: 13.3,
+    salesCount: 45
+  },
+  {
+    _id: 'bundle_002',
+    name: 'Face Care Essentials',
+    products: ['prod_024', 'prod_029', 'prod_030'],
+    bundlePrice: 1350,
+    regularPrice: 1530,
+    discount: 11.8,
+    salesCount: 32
+  },
+  {
+    _id: 'bundle_003',
+    name: 'Nail Care Set',
+    products: ['prod_034', 'prod_035'],
+    bundlePrice: 450,
+    regularPrice: 520,
+    discount: 13.5,
+    salesCount: 28
+  }
+];
+
+// Frequently Bought Together
+mockDatabase.frequentlyBoughtTogether = [
+  { products: ['prod_001', 'prod_036'], count: 85, correlation: 0.72 },
+  { products: ['prod_001', 'prod_037'], count: 62, correlation: 0.58 },
+  { products: ['prod_009', 'prod_024'], count: 48, correlation: 0.65 },
+  { products: ['prod_002', 'prod_038'], count: 72, correlation: 0.81 },
+  { products: ['prod_019', 'prod_021'], count: 95, correlation: 0.89 },
+  { products: ['prod_010', 'prod_029'], count: 38, correlation: 0.52 }
+];
+
+// Product Cannibalization Data
+mockDatabase.cannibalizationData = [
+  {
+    productA: 'prod_001',
+    productB: 'prod_005',
+    cannibalizationRate: 0.15,
+    note: 'Aromatherapy upgrade reduces standalone Swedish sales'
+  },
+  {
+    productA: 'prod_019',
+    productB: 'prod_020',
+    cannibalizationRate: 0.25,
+    note: 'Gel manicure premium option cannibalizes classic'
+  }
+];
+
+// Time-off requests (linked to shifts)
+mockDatabase.timeOffRequests = [
+  {
+    _id: 'tor_001',
+    businessId: 'biz_001',
+    employeeId: 'emp_001',
+    employeeName: 'Maria Santos',
+    startDate: '2025-12-20',
+    endDate: '2025-12-25',
+    type: 'vacation',
+    reason: 'Christmas holiday with family',
+    status: 'approved',
+    submittedAt: '2025-11-15T00:00:00Z',
+    reviewedAt: '2025-11-16T00:00:00Z',
+    reviewedBy: 'user_001',
+    reviewerNotes: 'Approved for holiday season'
+  },
+  {
+    _id: 'tor_002',
+    businessId: 'biz_001',
+    employeeId: 'emp_002',
+    employeeName: 'Juan Dela Cruz',
+    startDate: '2025-12-31',
+    endDate: '2026-01-01',
+    type: 'personal',
+    reason: 'New Year celebration',
+    status: 'pending',
+    submittedAt: '2025-11-28T00:00:00Z',
+    reviewedAt: null,
+    reviewedBy: null,
+    reviewerNotes: null
+  },
+  {
+    _id: 'tor_003',
+    businessId: 'biz_001',
+    employeeId: 'emp_003',
+    employeeName: 'Sarah Lee',
+    startDate: '2025-12-15',
+    endDate: '2025-12-15',
+    type: 'sick',
+    reason: 'Medical appointment',
+    status: 'approved',
+    submittedAt: '2025-12-10T00:00:00Z',
+    reviewedAt: '2025-12-10T00:00:00Z',
+    reviewedBy: 'user_001',
+    reviewerNotes: 'Approved'
+  }
+];
+
 export default mockDatabase;

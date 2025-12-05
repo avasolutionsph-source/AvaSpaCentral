@@ -11,7 +11,7 @@
   display: flex;
   gap: 0;
   margin-bottom: var(--spacing-lg);
-  border-bottom: 1px solid #E0E0E0;
+  border-bottom: 1px solid var(--gray-200);
 }
 
 .customer-tab {
@@ -20,18 +20,18 @@
   border: none;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #666666;
+  color: var(--gray-600);
   cursor: pointer;
   position: relative;
   transition: color 0.2s;
 }
 
 .customer-tab:hover {
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .customer-tab.active {
-  color: #1B5E37;
+  color: var(--primary);
 }
 
 .customer-tab.active::after {
@@ -41,13 +41,13 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #1B5E37;
+  background: var(--primary);
 }
 
 /* Search Section */
 .customers-search {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-md);
   margin-bottom: var(--spacing-lg);
@@ -56,19 +56,19 @@
 .customers-search input {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
   border-radius: 6px;
   font-size: 0.9rem;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .customers-search input:focus {
   outline: none;
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .customers-search input::placeholder {
-  color: #999999;
+  color: var(--gray-400);
 }
 
 /* Grid */
@@ -80,15 +80,15 @@
 
 /* Customer Card - Clean Design */
 .customer-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .customer-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
@@ -104,8 +104,8 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #1B5E37;
-  color: #FFFFFF;
+  background: var(--primary);
+  color: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -115,8 +115,8 @@
 }
 
 .loyalty-badge {
-  background: #F5F5F5;
-  color: #666666;
+  background: var(--gray-100);
+  color: var(--gray-600);
   padding: 4px 10px;
   border-radius: 20px;
   font-size: 0.7rem;
@@ -124,44 +124,44 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .loyalty-badge:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .loyalty-badge.bronze {
-  background: #F5F5F5;
+  background: var(--gray-100);
   color: #92400e;
   border-color: #d97706;
 }
 
 .loyalty-badge.silver {
-  background: #F5F5F5;
-  color: #666666;
-  border-color: #999999;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border-color: var(--gray-400);
 }
 
 .loyalty-badge.gold {
-  background: #F5F5F5;
+  background: var(--gray-100);
   color: #92400e;
   border-color: #d97706;
 }
 
 .loyalty-badge.platinum {
-  background: #F5F5F5;
-  color: #1B5E37;
-  border-color: #1B5E37;
+  background: var(--gray-100);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 /* Customer Name */
 .customer-name {
   font-size: 1.1rem;
   margin: 0 0 var(--spacing-xs) 0;
-  color: #1A1A1A;
+  color: var(--gray-900);
   font-weight: 600;
 }
 
@@ -169,7 +169,7 @@
 .customer-contact-info {
   margin: var(--spacing-md) 0;
   padding: var(--spacing-sm) var(--spacing-md);
-  background: #F5F5F5;
+  background: var(--gray-100);
   border-radius: 6px;
 }
 
@@ -179,7 +179,7 @@
   gap: 8px;
   padding: 4px 0;
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
 }
 
 .contact-item-icon {
@@ -195,8 +195,8 @@
   gap: var(--spacing-md);
   margin: var(--spacing-md) 0;
   padding: var(--spacing-md) 0;
-  border-top: 1px solid #E0E0E0;
-  border-bottom: 1px solid #E0E0E0;
+  border-top: 1px solid var(--gray-200);
+  border-bottom: 1px solid var(--gray-200);
 }
 
 .stat-item {
@@ -207,14 +207,14 @@
   display: block;
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1A1A1A;
+  color: var(--gray-900);
   margin-bottom: 2px;
 }
 
 .stat-label {
   display: block;
   font-size: 0.65rem;
-  color: #999999;
+  color: var(--gray-400);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -223,10 +223,10 @@
 .customer-notes {
   margin: var(--spacing-md) 0;
   padding: var(--spacing-sm) var(--spacing-md);
-  background: #F5F5F5;
+  background: var(--gray-100);
   border-radius: 6px;
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
   font-style: italic;
 }
 
@@ -252,20 +252,20 @@
 }
 
 .customer-actions .btn-secondary {
-  background: #FFFFFF;
-  color: #1A1A1A;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
 }
 
 .customer-actions .btn-secondary:hover {
-  border-color: #1B5E37;
-  color: #1B5E37;
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .customer-actions .btn-primary {
-  background: #1B5E37;
-  color: #FFFFFF;
-  border: 1px solid #1B5E37;
+  background: var(--primary);
+  color: var(--white);
+  border: 1px solid var(--primary);
 }
 
 .customer-actions .btn-primary:hover {
@@ -273,28 +273,28 @@
 }
 
 .customer-actions .btn-success {
-  background: #FFFFFF;
-  color: #1B5E37;
-  border: 1px solid #1B5E37;
+  background: var(--white);
+  color: var(--primary);
+  border: 1px solid var(--primary);
 }
 
 .customer-actions .btn-success:hover {
-  background: #1B5E37;
-  color: #FFFFFF;
+  background: var(--primary);
+  color: var(--white);
 }
 
 .customer-actions .btn-error {
-  background: #FFFFFF;
-  color: #DC2626;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  color: var(--error);
+  border: 1px solid var(--gray-200);
 }
 
 .customer-actions .btn-error:hover {
-  border-color: #DC2626;
+  border-color: var(--error);
 }
 
 .customer-actions .btn-points {
-  background: #FFFFFF;
+  background: var(--white);
   color: #92400e;
   border: 1px solid #d97706;
 }
@@ -315,9 +315,9 @@
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: #F5F5F5;
-  color: #1B5E37;
-  border: 1px solid #1B5E37;
+  background: var(--gray-100);
+  color: var(--primary);
+  border: 1px solid var(--primary);
   border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 500;
@@ -340,44 +340,44 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-md);
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
   border-radius: 6px;
   margin-bottom: var(--spacing-sm);
-  background: #FFFFFF;
+  background: var(--white);
 }
 
 .purchase-item:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .purchase-details h4 {
   margin: 0 0 4px 0;
   font-size: 0.9rem;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .purchase-meta {
   font-size: 0.75rem;
-  color: #666666;
+  color: var(--gray-600);
 }
 
 .purchase-amount {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1B5E37;
+  color: var(--primary);
 }
 
 .no-purchases {
   text-align: center;
   padding: var(--spacing-xl);
-  color: #666666;
+  color: var(--gray-600);
   font-style: italic;
 }
 
 /* Loyalty Program Tab */
 .loyalty-overview {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
@@ -391,8 +391,8 @@
 }
 
 .loyalty-tier-card {
-  background: #F5F5F5;
-  border: 1px solid #E0E0E0;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-md);
   text-align: center;
@@ -401,18 +401,18 @@
 .loyalty-tier-card h4 {
   margin: 0 0 var(--spacing-xs) 0;
   font-size: 1rem;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .loyalty-tier-card .tier-points {
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
 }
 
 .loyalty-tier-card .tier-benefits {
   margin-top: var(--spacing-sm);
   font-size: 0.75rem;
-  color: #666666;
+  color: var(--gray-600);
 }
 
 /* Redeem Modal */
@@ -423,8 +423,8 @@
 }
 
 .reward-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-md);
   cursor: pointer;
@@ -432,11 +432,11 @@
 }
 
 .reward-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .reward-card.selected {
-  border-color: #1B5E37;
+  border-color: var(--primary);
   background: rgba(27, 94, 55, 0.05);
 }
 
@@ -447,13 +447,13 @@
 
 .reward-card .reward-name {
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
   margin-bottom: 4px;
 }
 
 .reward-card .reward-points {
   font-size: 0.8rem;
-  color: #1B5E37;
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -474,8 +474,8 @@
 }
 
 .loyalty-stat-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
   text-align: center;
@@ -483,23 +483,23 @@
 }
 
 .loyalty-stat-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .loyalty-stat-card.primary {
-  background: #1B5E37;
-  color: #FFFFFF;
-  border-color: #1B5E37;
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
 }
 
 .loyalty-stat-card.secondary {
-  background: #F5F5F5;
-  border-color: #E0E0E0;
+  background: var(--gray-100);
+  border-color: var(--gray-200);
 }
 
 .loyalty-stat-card .stat-label {
   font-size: 0.75rem;
-  color: #666666;
+  color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -512,11 +512,11 @@
 .loyalty-stat-card .stat-value {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .loyalty-stat-card.primary .stat-value {
-  color: #FFFFFF;
+  color: var(--white);
 }
 
 .loyalty-stat-card .tier-icon {
@@ -527,7 +527,7 @@
 .loyalty-stat-card .tier-name {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #666666;
+  color: var(--gray-600);
   margin-bottom: 4px;
 }
 
@@ -535,7 +535,7 @@
 .loyalty-section-header {
   font-size: 1rem;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
   margin-bottom: var(--spacing-md);
   display: flex;
   align-items: center;
@@ -551,8 +551,8 @@
 }
 
 .loyalty-tier-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
   position: relative;
@@ -560,20 +560,20 @@
 }
 
 .loyalty-tier-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .loyalty-tier-card .tier-points-badge {
   position: absolute;
   top: 12px;
   right: 12px;
-  background: #F5F5F5;
-  color: #666666;
+  background: var(--gray-100);
+  color: var(--gray-600);
   padding: 4px 10px;
   border-radius: 20px;
   font-size: 0.7rem;
   font-weight: 600;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
 }
 
 .loyalty-tier-card .tier-icon {
@@ -584,19 +584,19 @@
 .loyalty-tier-card .tier-name {
   font-size: 1rem;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
   margin-bottom: 8px;
 }
 
 .loyalty-tier-card .tier-discount {
   display: inline-block;
-  background: #F5F5F5;
-  color: #1B5E37;
+  background: var(--gray-100);
+  color: var(--primary);
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
-  border: 1px solid #1B5E37;
+  border: 1px solid var(--primary);
   margin-bottom: 12px;
 }
 
@@ -608,7 +608,7 @@
 
 .loyalty-tier-card .tier-benefits li {
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
   margin-bottom: 4px;
   padding-left: 16px;
   position: relative;
@@ -618,7 +618,7 @@
   content: '✓';
   position: absolute;
   left: 0;
-  color: #1B5E37;
+  color: var(--primary);
 }
 
 /* Rewards Grid */
@@ -630,8 +630,8 @@
 }
 
 .loyalty-reward-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-md);
   display: flex;
@@ -641,7 +641,7 @@
 }
 
 .loyalty-reward-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .loyalty-reward-card .reward-icon {
@@ -656,25 +656,25 @@
 .loyalty-reward-card .reward-name {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
   margin-bottom: 2px;
 }
 
 .loyalty-reward-card .reward-description {
   font-size: 0.75rem;
-  color: #666666;
+  color: var(--gray-600);
   margin-bottom: 8px;
 }
 
 .loyalty-reward-card .reward-points {
   display: inline-block;
-  background: #F5F5F5;
-  color: #1B5E37;
+  background: var(--gray-100);
+  color: var(--primary);
   padding: 4px 10px;
   border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 600;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
 }
 
 /* Top Members Grid */
@@ -685,15 +685,15 @@
 }
 
 .loyalty-member-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
   transition: border-color 0.2s;
 }
 
 .loyalty-member-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .loyalty-member-card .member-header {
@@ -707,8 +707,8 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: #F5F5F5;
-  border: 1px solid #E0E0E0;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -716,19 +716,19 @@
 }
 
 .loyalty-member-card .member-tier-badge {
-  background: #F5F5F5;
-  color: #666666;
+  background: var(--gray-100);
+  color: var(--gray-600);
   padding: 4px 10px;
   border-radius: 20px;
   font-size: 0.7rem;
   font-weight: 600;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
 }
 
 .loyalty-member-card .member-name {
   font-size: 1rem;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
   margin-bottom: var(--spacing-md);
 }
 
@@ -740,12 +740,12 @@
 .loyalty-member-card .member-points .points-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1B5E37;
+  color: var(--primary);
 }
 
 .loyalty-member-card .member-points .points-label {
   font-size: 0.7rem;
-  color: #999999;
+  color: var(--gray-400);
   text-transform: uppercase;
 }
 
@@ -758,12 +758,12 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.7rem;
-  color: #666666;
+  color: var(--gray-600);
   margin-bottom: 4px;
 }
 
 .loyalty-progress .progress-bar {
-  background: #E0E0E0;
+  background: var(--gray-200);
   border-radius: 10px;
   height: 6px;
   overflow: hidden;
@@ -771,14 +771,14 @@
 
 .loyalty-progress .progress-fill {
   height: 100%;
-  background: #1B5E37;
+  background: var(--primary);
   border-radius: 10px;
   transition: width 0.3s;
 }
 
 .loyalty-progress .progress-text {
   font-size: 0.7rem;
-  color: #666666;
+  color: var(--gray-600);
   text-align: center;
   margin-top: 4px;
 }

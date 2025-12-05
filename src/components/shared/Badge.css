@@ -1,0 +1,94 @@
+/* ============================================================================
+   BADGE COMPONENT STYLES
+   ============================================================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+/* Sizes */
+.badge-sm {
+  padding: 2px 6px;
+  font-size: 0.625rem;
+  border-radius: var(--radius-xs, 2px);
+}
+
+.badge-md {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.badge-lg {
+  padding: 6px 14px;
+  font-size: 0.875rem;
+  border-radius: var(--radius-md, 6px);
+}
+
+/* Pill style */
+.badge-pill {
+  border-radius: 9999px;
+}
+
+/* Variants - Filled */
+.badge-success {
+  background: rgba(27, 94, 55, 0.1);
+  color: var(--primary, #1B5E37);
+}
+
+.badge-warning {
+  background: rgba(217, 119, 6, 0.1);
+  color: #92400E;
+}
+
+.badge-error {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--error, #DC2626);
+}
+
+.badge-info {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563EB;
+}
+
+.badge-neutral {
+  background: var(--gray-100, #F5F5F5);
+  color: var(--gray-600, #666666);
+}
+
+/* Outline variants */
+.badge-outline.badge-success {
+  background: transparent;
+  border: 1px solid var(--primary, #1B5E37);
+  color: var(--primary, #1B5E37);
+}
+
+.badge-outline.badge-warning {
+  background: transparent;
+  border: 1px solid #D97706;
+  color: #92400E;
+}
+
+.badge-outline.badge-error {
+  background: transparent;
+  border: 1px solid var(--error, #DC2626);
+  color: var(--error, #DC2626);
+}
+
+.badge-outline.badge-info {
+  background: transparent;
+  border: 1px solid #2563EB;
+  color: #2563EB;
+}
+
+.badge-outline.badge-neutral {
+  background: transparent;
+  border: 1px solid var(--gray-300, #E0E0E0);
+  color: var(--gray-600, #666666);
+}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, parseISO } from 'date-fns';
+import { ConfirmDialog } from '../components/shared';
 
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, hasManagementAccess } = useApp();
@@ -111,6 +112,9 @@ const Settings = () => {
   const [payrollConfigLoading, setPayrollConfigLoading] = useState(true);
   const [savingPayrollConfig, setSavingPayrollConfig] = useState(false);
   const [showPayrollLogs, setShowPayrollLogs] = useState(false);
+
+  // Reset confirmation state
+  const [resetConfirm, setResetConfirm] = useState(false);
 
   const handleBusinessInfoChange = (e) => {
     const { name, value } = e.target;
@@ -289,18 +293,18 @@ const Settings = () => {
   };
 
   // Reset payroll configuration to defaults
-  const handleResetPayrollConfig = async () => {
+  const handleResetPayrollConfig = () => {
     if (!isOwner()) {
       showToast('Only the owner can modify payroll settings', 'error');
       return;
     }
+    setResetConfirm(true);
+  };
 
-    if (!window.confirm('Are you sure you want to reset all payroll rates to default values?')) {
-      return;
-    }
-
+  const confirmResetPayrollConfig = async () => {
     try {
       setSavingPayrollConfig(true);
+      setResetConfirm(false);
       const result = await mockApi.payrollConfig.resetPayrollConfig(
         user._id,
         `${user.firstName} ${user.lastName}`
@@ -1054,6 +1058,17 @@ const Settings = () => {
           </div>
         )}
       </div>
+
+      {/* Payroll Reset Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={resetConfirm}
+        onClose={() => setResetConfirm(false)}
+        onConfirm={confirmResetPayrollConfig}
+        title="Reset Payroll Settings"
+        message="Are you sure you want to reset all payroll rates to default values? This action cannot be undone."
+        confirmText="Reset"
+        confirmVariant="warning"
+      />
 
       {/* 2FA Setup Modal */}
       {show2FASetup && (

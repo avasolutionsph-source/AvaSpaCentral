@@ -151,50 +151,106 @@
 .expense-category-badge {
   display: inline-block;
   padding: 4px 10px;
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: rgba(27, 94, 55, 0.1);
+  color: var(--primary);
+  border: 1px solid rgba(27, 94, 55, 0.2);
 }
 
 .expense-category-badge.office-supplies {
-  background: #E3F2FD;
-  color: #1565C0;
+  background: rgba(27, 94, 55, 0.08);
+  color: var(--primary);
 }
 
 .expense-category-badge.utilities {
-  background: #FFF3E0;
-  color: #E65100;
+  background: var(--gray-100);
+  color: var(--gray-700);
 }
 
 .expense-category-badge.salaries {
-  background: #F3E5F5;
-  color: #6A1B9A;
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary-dark);
 }
 
 .expense-category-badge.maintenance {
-  background: #E8F5E9;
-  color: #2E7D32;
+  background: rgba(27, 94, 55, 0.12);
+  color: var(--primary);
 }
 
 .expense-category-badge.marketing {
-  background: #FCE4EC;
-  color: #C2185B;
+  background: var(--gray-100);
+  color: var(--gray-600);
 }
 
 .expense-category-badge.inventory {
-  background: #FFF9C4;
-  color: #F57F17;
+  background: rgba(27, 94, 55, 0.15);
+  color: var(--primary);
 }
 
 .expense-category-badge.rent {
-  background: #E0F2F1;
-  color: #00695C;
+  background: rgba(27, 94, 55, 0.1);
+  color: var(--primary);
 }
 
 .expense-category-badge.other {
+  background: var(--gray-50);
+  color: var(--gray-600);
+  border-color: var(--gray-200);
+}
+
+/* Expense Type Badges - Professional monochromatic theme */
+.expense-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.expense-type-badge.fixed {
+  background: rgba(27, 94, 55, 0.1);
+  color: var(--primary);
+  border: 1px solid rgba(27, 94, 55, 0.3);
+}
+
+.expense-type-badge.variable {
   background: var(--gray-100);
   color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+}
+
+.expense-type-badge.opex {
+  background: rgba(27, 94, 55, 0.15);
+  color: var(--primary);
+  border: 1px solid rgba(27, 94, 55, 0.35);
+}
+
+.expense-type-badge.capex {
+  background: var(--primary);
+  color: var(--white);
+  border: 1px solid var(--primary-dark);
+}
+
+.expense-type-badge.direct {
+  background: rgba(27, 94, 55, 0.08);
+  color: var(--primary);
+  border: 1px solid rgba(27, 94, 55, 0.25);
+}
+
+.expense-type-badge.indirect {
+  background: var(--gray-50);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-200);
 }
 
 .expense-payment-badge {

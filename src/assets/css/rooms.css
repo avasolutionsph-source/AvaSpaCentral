@@ -15,23 +15,23 @@
 
 /* Room Card - Clean and Simple */
 .room-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .room-card.available {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .room-card.occupied {
-  border-color: #DC2626;
+  border-color: var(--error);
 }
 
 .room-card.maintenance {
-  border-color: #666666;
+  border-color: var(--gray-600);
 }
 
 .room-card:hover {
@@ -50,8 +50,8 @@
   width: 48px;
   height: 48px;
   border-radius: 8px;
-  background: #F5F5F5;
-  border: 1px solid #E0E0E0;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -69,34 +69,34 @@
 }
 
 .room-status-badge.available {
-  background: #F5F5F5;
-  color: #1B5E37;
-  border: 1px solid #1B5E37;
+  background: var(--gray-100);
+  color: var(--primary);
+  border: 1px solid var(--primary);
 }
 
 .room-status-badge.occupied {
-  background: #F5F5F5;
-  color: #DC2626;
-  border: 1px solid #DC2626;
+  background: var(--gray-100);
+  color: var(--error);
+  border: 1px solid var(--error);
 }
 
 .room-status-badge.maintenance {
-  background: #F5F5F5;
-  color: #666666;
-  border: 1px solid #666666;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-600);
 }
 
 /* Room Info */
 .room-name {
   font-size: 1.1rem;
   margin: 0 0 4px 0;
-  color: #1A1A1A;
+  color: var(--gray-900);
   font-weight: 600;
 }
 
 .room-type {
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
   margin-bottom: var(--spacing-md);
 }
 
@@ -104,7 +104,7 @@
 .room-details {
   margin: var(--spacing-md) 0;
   padding: var(--spacing-sm) var(--spacing-md);
-  background: #F5F5F5;
+  background: var(--gray-100);
   border-radius: 6px;
 }
 
@@ -116,11 +116,11 @@
 }
 
 .room-detail-label {
-  color: #666666;
+  color: var(--gray-600);
 }
 
 .room-detail-value {
-  color: #1A1A1A;
+  color: var(--gray-900);
   font-weight: 500;
 }
 
@@ -134,9 +134,9 @@
 
 .amenity-tag {
   padding: 4px 10px;
-  background: #F5F5F5;
-  color: #666666;
-  border: 1px solid #E0E0E0;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-200);
   border-radius: 4px;
   font-size: 0.7rem;
   font-weight: 500;
@@ -148,7 +148,7 @@
   gap: 8px;
   margin-top: var(--spacing-md);
   padding-top: var(--spacing-md);
-  border-top: 1px solid #E0E0E0;
+  border-top: 1px solid var(--gray-200);
 }
 
 .status-change-group .btn {
@@ -162,36 +162,36 @@
 }
 
 .status-change-group .btn-success {
-  background: #FFFFFF;
-  color: #1B5E37;
-  border: 1px solid #1B5E37;
+  background: var(--white);
+  color: var(--primary);
+  border: 1px solid var(--primary);
 }
 
 .status-change-group .btn-success:hover {
-  background: #1B5E37;
-  color: #FFFFFF;
+  background: var(--primary);
+  color: var(--white);
 }
 
 .status-change-group .btn-error {
-  background: #FFFFFF;
-  color: #DC2626;
-  border: 1px solid #DC2626;
+  background: var(--white);
+  color: var(--error);
+  border: 1px solid var(--error);
 }
 
 .status-change-group .btn-error:hover {
-  background: #DC2626;
-  color: #FFFFFF;
+  background: var(--error);
+  color: var(--white);
 }
 
 .status-change-group .btn-warning {
-  background: #FFFFFF;
-  color: #666666;
-  border: 1px solid #666666;
+  background: var(--white);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-600);
 }
 
 .status-change-group .btn-warning:hover {
-  background: #666666;
-  color: #FFFFFF;
+  background: var(--gray-600);
+  color: var(--white);
 }
 
 /* Room Actions - Clean buttons */
@@ -212,24 +212,24 @@
 }
 
 .room-actions .btn-secondary {
-  background: #FFFFFF;
-  color: #1A1A1A;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
 }
 
 .room-actions .btn-secondary:hover {
-  border-color: #1B5E37;
-  color: #1B5E37;
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .room-actions .btn-error {
-  background: #FFFFFF;
-  color: #DC2626;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  color: var(--error);
+  border: 1px solid var(--gray-200);
 }
 
 .room-actions .btn-error:hover {
-  border-color: #DC2626;
+  border-color: var(--error);
 }
 
 /* Room Modal */
@@ -242,9 +242,9 @@
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   padding: var(--spacing-md);
-  background: #F5F5F5;
+  background: var(--gray-100);
   border-radius: 6px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
 }
 
 .amenity-checkbox {
@@ -258,18 +258,18 @@
 }
 
 .amenity-checkbox:hover {
-  background: #FFFFFF;
+  background: var(--white);
 }
 
 .amenity-checkbox input[type="checkbox"] {
   margin: 0;
   cursor: pointer;
-  accent-color: #1B5E37;
+  accent-color: var(--primary);
 }
 
 .amenity-checkbox span {
   font-size: 0.8rem;
-  color: #1A1A1A;
+  color: var(--gray-900);
   user-select: none;
 }
 
@@ -277,7 +277,7 @@
 .empty-rooms {
   text-align: center;
   padding: var(--spacing-xxl) var(--spacing-lg);
-  color: #666666;
+  color: var(--gray-600);
 }
 
 .empty-rooms-icon {
@@ -293,8 +293,8 @@
 
 /* Filters Section */
 .filters-section {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-md);
   margin-top: var(--spacing-lg);
@@ -308,23 +308,23 @@
 
 .filter-select {
   padding: 8px 12px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
   border-radius: 6px;
   font-size: 0.85rem;
-  color: #1A1A1A;
-  background: #FFFFFF;
+  color: var(--gray-900);
+  background: var(--white);
   cursor: pointer;
   min-width: 150px;
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .results-count {
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
   margin-left: auto;
 }
 
@@ -382,14 +382,14 @@
 .upcoming-bookings-section {
   margin-top: var(--spacing-xxl);
   padding-top: var(--spacing-xl);
-  border-top: 1px solid #E0E0E0;
+  border-top: 1px solid var(--gray-200);
 }
 
 .upcoming-bookings-section h3 {
   margin-bottom: var(--spacing-lg);
   font-size: 1.1rem;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .upcoming-bookings-grid {
@@ -399,15 +399,15 @@
 }
 
 .upcoming-booking-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-md);
   transition: border-color 0.2s;
 }
 
 .upcoming-booking-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .booking-card-header {
@@ -416,14 +416,14 @@
   align-items: center;
   margin-bottom: var(--spacing-md);
   padding-bottom: var(--spacing-sm);
-  border-bottom: 1px solid #F5F5F5;
+  border-bottom: 1px solid var(--gray-100);
 }
 
 .room-badge {
   padding: 4px 10px;
-  background: #F5F5F5;
-  color: #1A1A1A;
-  border: 1px solid #E0E0E0;
+  background: var(--gray-100);
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -432,9 +432,9 @@
 .status-badge.scheduled,
 .status-badge.confirmed {
   padding: 4px 10px;
-  background: #F5F5F5;
-  color: #1B5E37;
-  border: 1px solid #1B5E37;
+  background: var(--gray-100);
+  color: var(--primary);
+  border: 1px solid var(--primary);
   border-radius: 4px;
   font-size: 0.65rem;
   font-weight: 600;
@@ -448,26 +448,26 @@
 .booking-card-body p {
   margin: 6px 0;
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
   line-height: 1.4;
 }
 
 .booking-card-body .client-name {
   font-weight: 600;
   font-size: 0.9rem;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .booking-card-body .service-name {
-  color: #1B5E37;
+  color: var(--primary);
   font-weight: 500;
 }
 
 .booking-card-body .special-note {
   font-size: 0.75rem;
   font-style: italic;
-  color: #666666;
-  background: #F5F5F5;
+  color: var(--gray-600);
+  background: var(--gray-100);
   padding: 8px;
   border-radius: 4px;
   margin-top: var(--spacing-sm);
@@ -475,7 +475,7 @@
 
 .booking-card-footer {
   padding-top: var(--spacing-md);
-  border-top: 1px solid #F5F5F5;
+  border-top: 1px solid var(--gray-100);
 }
 
 .booking-card-footer .btn {

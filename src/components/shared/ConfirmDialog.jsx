@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, memo } from 'react';
 
 /**
- * Accessible Confirmation Dialog Component
+ * Accessible Confirmation Dialog Component (Memoized)
  * Used for delete confirmations and other destructive actions
  */
-const ConfirmDialog = ({
+const ConfirmDialog = memo(function ConfirmDialog({
   isOpen,
   onClose,
   onConfirm,
@@ -14,7 +14,7 @@ const ConfirmDialog = ({
   cancelText = 'Cancel',
   confirmVariant = 'danger', // 'danger', 'warning', 'primary'
   isLoading = false
-}) => {
+}) {
   const dialogRef = useRef(null);
   const confirmButtonRef = useRef(null);
   const previousActiveElement = useRef(null);
@@ -143,6 +143,6 @@ const ConfirmDialog = ({
       </div>
     </div>
   );
-};
+});
 
 export default ConfirmDialog;

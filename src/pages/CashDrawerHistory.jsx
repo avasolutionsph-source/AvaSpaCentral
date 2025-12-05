@@ -274,7 +274,7 @@ const CashDrawerHistory = () => {
 
         {loading ? (
           <div className="empty-cash-drawer">
-            <div className="spinner" style={{ margin: '0 auto' }}></div>
+            <div className="spinner m-auto"></div>
             <p>Loading sessions...</p>
           </div>
         ) : sessions.length === 0 ? (
@@ -454,7 +454,7 @@ const CashDrawerHistory = () => {
                   : '⚠️ Variance exceeds acceptable range. Please investigate.'}
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--spacing-lg)' }}>
+            <div className="flex justify-end mt-lg">
               <button className="btn btn-secondary" onClick={() => setShowVarianceModal(false)}>
                 Close
               </button>

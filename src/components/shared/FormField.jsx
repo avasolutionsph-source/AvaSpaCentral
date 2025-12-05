@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 /**
- * Accessible Form Field Component
+ * Accessible Form Field Component (Memoized)
  * Wraps input with label and error display
  */
-const FormField = ({
+const FormField = memo(function FormField({
   label,
   name,
   type = 'text',
@@ -24,7 +24,7 @@ const FormField = ({
   step,
   autoFocus = false,
   className = ''
-}) => {
+}) {
   const inputId = `field-${name}`;
   const errorId = `${name}-error`;
   const helpId = `${name}-help`;
@@ -157,6 +157,6 @@ const FormField = ({
       )}
     </div>
   );
-};
+});
 
 export default FormField;

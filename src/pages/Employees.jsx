@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
+import { ConfirmDialog } from '../components/shared';
 
 const Employees = () => {
   const { showToast, canEdit, isManager } = useApp();
@@ -17,6 +18,9 @@ const Employees = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+
+  // Delete confirmation dialog state
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, employee: null });
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -197,11 +201,17 @@ const Employees = () => {
     }
   };
 
-  const handleDelete = async (employee) => {
-    if (!window.confirm(`Delete "${employee.firstName} ${employee.lastName}"?`)) return;
+  const handleDelete = (employee) => {
+    setDeleteConfirm({ isOpen: true, employee });
+  };
+
+  const confirmDelete = async () => {
+    const employee = deleteConfirm.employee;
+    if (!employee) return;
     try {
       await mockApi.employees.deleteEmployee(employee._id);
       showToast('Employee deleted', 'success');
+      setDeleteConfirm({ isOpen: false, employee: null });
       loadEmployees();
     } catch (error) {
       showToast('Failed to delete', 'error');
@@ -473,6 +483,17 @@ const Employees = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, employee: null })}
+        onConfirm={confirmDelete}
+        title="Delete Employee"
+        message={`Are you sure you want to delete "${deleteConfirm.employee?.firstName} ${deleteConfirm.employee?.lastName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 };

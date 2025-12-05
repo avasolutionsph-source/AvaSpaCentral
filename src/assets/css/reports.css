@@ -300,13 +300,18 @@
 }
 
 .pl-line.grand-total {
-  background: var(--primary-light);
+  background: var(--primary);
   font-weight: 700;
   font-size: 1.1rem;
-  border-top: 3px solid var(--primary);
-  border-bottom: 3px solid var(--primary);
+  border-top: 3px solid var(--primary-dark);
+  border-bottom: 3px solid var(--primary-dark);
   margin-top: var(--spacing-md);
-  color: var(--primary-dark);
+  color: var(--white);
+}
+
+.pl-line.grand-total .pl-label,
+.pl-line.grand-total .pl-value {
+  color: var(--white);
 }
 
 .pl-label {

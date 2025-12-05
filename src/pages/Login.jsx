@@ -283,7 +283,7 @@ const Login = () => {
             <div className="modal-body">
               {!forgotSuccess ? (
                 <>
-                  <p style={{ marginBottom: 'var(--spacing-md)', color: 'var(--gray-600)' }}>
+                  <p className="mb-md text-gray-600">
                     Enter your email address and we'll send you a link to reset your password.
                   </p>
                   <form onSubmit={handleForgotPassword}>
@@ -318,15 +318,15 @@ const Login = () => {
                 </>
               ) : (
                 <div className="forgot-success">
-                  <div className="success-icon" style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)' }}>✓</div>
-                  <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Check Your Email</h3>
-                  <p style={{ color: 'var(--gray-600)', marginBottom: 'var(--spacing-lg)' }}>
+                  <div className="success-icon text-3xl mb-md">✓</div>
+                  <h3 className="mb-sm">Check Your Email</h3>
+                  <p className="text-gray-600 mb-lg">
                     We've sent a password reset link to <strong>{forgotEmail}</strong>
                   </p>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--gray-500)' }}>
+                  <p className="text-sm text-gray-500">
                     Didn't receive the email? Check your spam folder or try again.
                   </p>
-                  <div className="modal-footer" style={{ marginTop: 'var(--spacing-lg)' }}>
+                  <div className="modal-footer mt-lg">
                     <button className="btn btn-primary" onClick={closeForgotModal}>
                       Back to Login
                     </button>

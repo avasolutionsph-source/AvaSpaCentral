@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
   format,
@@ -17,16 +18,20 @@ import { advanceBookingApi } from '../mockApi/advanceBookingApi';
 import mockApi from '../mockApi/mockApi';
 
 const Calendar = () => {
+  const navigate = useNavigate();
   const { showToast } = useApp();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // 'month', 'week', 'day'
+  const [dataFilter, setDataFilter] = useState('all'); // 'all', 'appointments', 'attendance', 'shifts'
   const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
   const [appointments, setAppointments] = useState([]);
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [shiftData, setShiftData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Data for form dropdowns
@@ -54,52 +59,60 @@ const Calendar = () => {
     '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'
   ];
 
-  // Load appointments and dropdown data
+  // Load all data
   useEffect(() => {
     let isMounted = true;
 
-    const loadData = async () => {
+    const loadAllData = async () => {
       if (!isMounted) return;
-      await loadAppointments(isMounted);
-    };
+      setLoading(true);
 
-    const loadDropdowns = async () => {
       try {
-        const [emps, custs, prods, rms] = await Promise.all([
-          mockApi.employees.getEmployees(),
-          mockApi.customers.getCustomers(),
-          mockApi.products.getProducts(),
-          mockApi.rooms.getRooms()
+        await Promise.all([
+          loadAppointments(isMounted),
+          loadAttendance(isMounted),
+          loadShifts(isMounted),
+          loadDropdowns(isMounted)
         ]);
-        if (!isMounted) return;
-        setEmployees(emps.filter(e => e.status === 'active'));
-        setCustomers(custs);
-        setServices(prods.filter(p => p.type === 'service' && p.active));
-        setRooms(rms);
       } catch (error) {
-        console.error('Failed to load dropdown data:', error);
+        console.error('Failed to load calendar data:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    loadData();
-    loadDropdowns();
+    loadAllData();
 
-    // Cleanup function to prevent memory leaks
     return () => {
       isMounted = false;
     };
   }, [currentDate, view]);
 
-  const loadAppointments = async (isMounted = true) => {
-    setLoading(true);
+  const loadDropdowns = async (isMounted = true) => {
     try {
-      // Fetch advance bookings from API
-      const bookings = await advanceBookingApi.listAdvanceBookings();
+      const [emps, custs, prods, rms] = await Promise.all([
+        mockApi.employees.getEmployees(),
+        mockApi.customers.getCustomers(),
+        mockApi.products.getProducts(),
+        mockApi.rooms.getRooms()
+      ]);
+      if (!isMounted) return;
+      setEmployees(emps.filter(e => e.status === 'active'));
+      setCustomers(custs);
+      setServices(prods.filter(p => p.type === 'service' && p.active));
+      setRooms(rms);
+    } catch (error) {
+      console.error('Failed to load dropdown data:', error);
+    }
+  };
 
-      // Check if still mounted before updating state
+  const loadAppointments = async (isMounted = true) => {
+    try {
+      const bookings = await advanceBookingApi.listAdvanceBookings();
       if (!isMounted) return;
 
-      // Transform bookings to calendar appointment format
       const transformedAppointments = bookings.map(booking => {
         const bookingDate = new Date(booking.bookingDateTime);
         const startTime = format(bookingDate, 'HH:mm');
@@ -108,6 +121,7 @@ const Calendar = () => {
 
         return {
           id: booking.id,
+          type: 'appointment',
           customer: booking.clientName,
           service: booking.serviceName,
           therapist: booking.employeeName,
@@ -124,11 +138,11 @@ const Calendar = () => {
         };
       });
 
-      // If no bookings exist, show demo data
       if (transformedAppointments.length === 0) {
         const mockAppointments = [
           {
             id: 'demo_1',
+            type: 'appointment',
             customer: 'Maria Santos',
             service: 'Swedish Massage (90 min)',
             therapist: 'John Doe',
@@ -142,6 +156,7 @@ const Calendar = () => {
           },
           {
             id: 'demo_2',
+            type: 'appointment',
             customer: 'Anna Cruz',
             service: 'Hot Stone Therapy',
             therapist: 'Jane Smith',
@@ -155,6 +170,7 @@ const Calendar = () => {
           },
           {
             id: 'demo_3',
+            type: 'appointment',
             customer: 'Lisa Garcia',
             service: 'Aromatherapy Massage',
             therapist: 'Mike Johnson',
@@ -174,11 +190,131 @@ const Calendar = () => {
     } catch (error) {
       if (!isMounted) return;
       console.error('Failed to load appointments:', error);
-      showToast('Failed to load calendar appointments', 'error');
-    } finally {
-      if (isMounted) {
-        setLoading(false);
+    }
+  };
+
+  const loadAttendance = async (isMounted = true) => {
+    try {
+      const [attendance, emps] = await Promise.all([
+        mockApi.attendance.getAttendance(),
+        mockApi.employees.getEmployees()
+      ]);
+      if (!isMounted) return;
+
+      const transformedAttendance = attendance.map(record => {
+        const employee = emps.find(e => e.id === record.employeeId || e._id === record.employeeId);
+        const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown Employee';
+
+        return {
+          id: `att_${record.id || record._id}`,
+          type: 'attendance',
+          employeeId: record.employeeId,
+          employeeName,
+          date: record.date,
+          clockIn: record.clockIn,
+          clockOut: record.clockOut,
+          status: record.status || (record.clockIn ? 'present' : 'absent'),
+          hoursWorked: record.hoursWorked || 0,
+          overtime: record.overtime || 0
+        };
+      });
+
+      setAttendanceData(transformedAttendance);
+    } catch (error) {
+      if (!isMounted) return;
+      console.error('Failed to load attendance:', error);
+    }
+  };
+
+  const loadShifts = async (isMounted = true) => {
+    try {
+      const [schedules, emps] = await Promise.all([
+        mockApi.schedules ? mockApi.schedules.getSchedules() : Promise.resolve([]),
+        mockApi.employees.getEmployees()
+      ]);
+      if (!isMounted) return;
+
+      // Transform shift data - handling different data structures
+      const transformedShifts = [];
+
+      if (schedules && Array.isArray(schedules)) {
+        schedules.forEach(schedule => {
+          const employee = emps.find(e => e.id === schedule.employeeId || e._id === schedule.employeeId);
+          const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown Employee';
+
+          // Handle weekly schedules
+          if (schedule.schedule && typeof schedule.schedule === 'object') {
+            Object.entries(schedule.schedule).forEach(([day, shift]) => {
+              if (shift && shift !== 'OFF') {
+                // Create date for this week's day
+                const dayIndex = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].indexOf(day.toLowerCase());
+                if (dayIndex !== -1) {
+                  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+                  const shiftDate = addDays(weekStart, dayIndex);
+
+                  transformedShifts.push({
+                    id: `shift_${schedule.employeeId}_${day}`,
+                    type: 'shift',
+                    employeeId: schedule.employeeId,
+                    employeeName,
+                    date: format(shiftDate, 'yyyy-MM-dd'),
+                    shiftType: shift.type || shift,
+                    startTime: shift.start || (shift === 'D' || shift.type === 'day' ? '09:00' : '13:00'),
+                    endTime: shift.end || (shift === 'D' || shift.type === 'day' ? '17:00' : '21:00'),
+                    status: 'scheduled'
+                  });
+                }
+              }
+            });
+          } else if (schedule.date) {
+            // Single date schedule
+            transformedShifts.push({
+              id: `shift_${schedule.id || schedule._id}`,
+              type: 'shift',
+              employeeId: schedule.employeeId,
+              employeeName,
+              date: schedule.date,
+              shiftType: schedule.shiftType || 'day',
+              startTime: schedule.startTime || '09:00',
+              endTime: schedule.endTime || '17:00',
+              status: schedule.status || 'scheduled'
+            });
+          }
+        });
       }
+
+      // Generate demo shifts if none exist
+      if (transformedShifts.length === 0) {
+        const activeEmployees = emps.filter(e => e.status === 'active').slice(0, 5);
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+
+        activeEmployees.forEach((emp, empIndex) => {
+          for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+            // Skip some days for variety
+            if ((empIndex + dayOffset) % 7 === 6) continue; // Day off pattern
+
+            const shiftDate = addDays(weekStart, dayOffset);
+            const isNightShift = empIndex % 2 === 1 && dayOffset % 2 === 0;
+
+            transformedShifts.push({
+              id: `shift_demo_${emp._id || emp.id}_${dayOffset}`,
+              type: 'shift',
+              employeeId: emp._id || emp.id,
+              employeeName: `${emp.firstName} ${emp.lastName}`,
+              date: format(shiftDate, 'yyyy-MM-dd'),
+              shiftType: isNightShift ? 'night' : 'day',
+              startTime: isNightShift ? '13:00' : '09:00',
+              endTime: isNightShift ? '21:00' : '17:00',
+              status: 'scheduled'
+            });
+          }
+        });
+      }
+
+      setShiftData(transformedShifts);
+    } catch (error) {
+      if (!isMounted) return;
+      console.error('Failed to load shifts:', error);
     }
   };
 
@@ -207,6 +343,88 @@ const Calendar = () => {
     setCurrentDate(new Date());
   };
 
+  // Get all events for a specific date based on filter
+  const getEventsForDate = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    let events = [];
+
+    // Add appointments
+    if (dataFilter === 'all' || dataFilter === 'appointments') {
+      const dayAppointments = appointments.filter(apt => {
+        try {
+          return isSameDay(parseISO(apt.date), date);
+        } catch {
+          return false;
+        }
+      });
+      events = [...events, ...dayAppointments];
+    }
+
+    // Add attendance
+    if (dataFilter === 'all' || dataFilter === 'attendance') {
+      const dayAttendance = attendanceData.filter(att => {
+        try {
+          const attDate = typeof att.date === 'string' ? att.date : format(new Date(att.date), 'yyyy-MM-dd');
+          return attDate === dateStr;
+        } catch {
+          return false;
+        }
+      });
+      events = [...events, ...dayAttendance];
+    }
+
+    // Add shifts
+    if (dataFilter === 'all' || dataFilter === 'shifts') {
+      const dayShifts = shiftData.filter(shift => {
+        try {
+          const shiftDate = typeof shift.date === 'string' ? shift.date : format(new Date(shift.date), 'yyyy-MM-dd');
+          return shiftDate === dateStr;
+        } catch {
+          return false;
+        }
+      });
+      events = [...events, ...dayShifts];
+    }
+
+    return events;
+  };
+
+  // Get event display info
+  const getEventDisplay = (event) => {
+    switch (event.type) {
+      case 'appointment':
+        return {
+          label: event.startTime ? formatTime12hr(event.startTime) : 'Appt',
+          title: `${event.customer} - ${event.service}`,
+          className: `event-appointment event-${event.status}`
+        };
+      case 'attendance':
+        return {
+          label: event.clockIn || (event.status === 'absent' ? 'Absent' : '-'),
+          title: `${event.employeeName} - ${event.status}`,
+          className: `event-attendance event-${event.status}`
+        };
+      case 'shift':
+        return {
+          label: event.shiftType === 'night' ? 'N' : 'D',
+          title: `${event.employeeName} - ${event.shiftType} shift`,
+          className: `event-shift event-${event.shiftType}`
+        };
+      default:
+        return { label: '?', title: 'Unknown', className: 'event-unknown' };
+    }
+  };
+
+  // Helper function to format time
+  const formatTime12hr = (time) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+  };
+
   // Modal functions
   const openCreateModal = (date = null) => {
     setModalMode('create');
@@ -225,20 +443,29 @@ const Calendar = () => {
     setShowAppointmentModal(true);
   };
 
-  const openEditModal = (appointment) => {
+  const openEventDetail = (event) => {
+    setSelectedEvent(event);
+    setShowDetailModal(true);
+  };
+
+  const openEditModal = (event) => {
+    if (event.type !== 'appointment') {
+      showToast('Only appointments can be edited here', 'info');
+      return;
+    }
     setModalMode('edit');
-    setSelectedAppointment(appointment);
-    const apptDate = parseISO(appointment.date);
+    setSelectedEvent(event);
+    const apptDate = parseISO(event.date);
     setFormData({
       customerId: '',
-      customerName: appointment.customer || '',
+      customerName: event.customer || '',
       serviceId: '',
       employeeId: '',
       roomId: '',
       date: format(apptDate, 'yyyy-MM-dd'),
-      time: appointment.startTime,
+      time: event.startTime,
       duration: 60,
-      notes: appointment.notes || ''
+      notes: event.notes || ''
     });
     setShowDetailModal(false);
     setShowAppointmentModal(true);
@@ -313,7 +540,7 @@ const Calendar = () => {
         await advanceBookingApi.createAdvanceBooking(bookingData);
         showToast('Appointment created successfully!', 'success');
       } else {
-        await advanceBookingApi.updateAdvanceBooking(selectedAppointment.id, bookingData);
+        await advanceBookingApi.updateAdvanceBooking(selectedEvent.id, bookingData);
         showToast('Appointment updated successfully!', 'success');
       }
 
@@ -323,13 +550,6 @@ const Calendar = () => {
       console.error('Failed to save appointment:', error);
       showToast('Failed to save appointment', 'error');
     }
-  };
-
-  // Get appointments for a specific date
-  const getAppointmentsForDate = (date) => {
-    return appointments.filter(apt =>
-      isSameDay(parseISO(apt.date), date)
-    );
   };
 
   // Month view rendering
@@ -345,7 +565,7 @@ const Calendar = () => {
 
     while (day <= endDate) {
       for (let i = 0; i < 7; i++) {
-        const dayAppointments = getAppointmentsForDate(day);
+        const dayEvents = getEventsForDate(day);
         const dayClone = new Date(day);
 
         days.push(
@@ -359,34 +579,26 @@ const Calendar = () => {
             onClick={() => setSelectedDate(dayClone)}
           >
             <div className="day-number">{format(day, 'd')}</div>
-            <div className="day-appointments">
-              {dayAppointments.slice(0, 3).map(apt => {
-                // Convert military time to 12-hour format
-                const formatTime12hr = (time) => {
-                  const [hours, minutes] = time.split(':');
-                  const hour = parseInt(hours);
-                  const ampm = hour >= 12 ? 'PM' : 'AM';
-                  const hour12 = hour % 12 || 12;
-                  return `${hour12}:${minutes} ${ampm}`;
-                };
+            <div className="day-events">
+              {dayEvents.slice(0, 4).map(event => {
+                const display = getEventDisplay(event);
                 return (
                   <div
-                    key={apt.id}
-                    className={`appointment-dot ${apt.status}`}
+                    key={event.id}
+                    className={`event-dot ${display.className}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedAppointment(apt);
-                      setShowDetailModal(true);
+                      openEventDetail(event);
                     }}
-                    title={`${formatTime12hr(apt.startTime)} - ${apt.customer} - ${apt.service}`}
+                    title={display.title}
                   >
-                    {formatTime12hr(apt.startTime)}
+                    {display.label}
                   </div>
                 );
               })}
-              {dayAppointments.length > 3 && (
-                <span className="appointment-count">
-                  +{dayAppointments.length - 3} more
+              {dayEvents.length > 4 && (
+                <span className="event-count">
+                  +{dayEvents.length - 4} more
                 </span>
               )}
             </div>
@@ -401,8 +613,8 @@ const Calendar = () => {
     return (
       <div className="month-view">
         <div className="calendar-header">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="calendar-day-name">{day}</div>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+            <div key={d} className="calendar-day-name">{d}</div>
           ))}
         </div>
         <div className="calendar-grid">
@@ -412,7 +624,7 @@ const Calendar = () => {
     );
   };
 
-  // Helper function to format hour to 12-hour format
+  // Helper function to format hour
   const formatHour12hr = (hour) => {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const hour12 = hour % 12 || 12;
@@ -452,34 +664,26 @@ const Calendar = () => {
             <React.Fragment key={hour}>
               <div className="time-slot">{formatHour12hr(hour)}</div>
               {weekDays.map(day => {
-                const dayAppointments = getAppointmentsForDate(day);
+                const dayEvents = getEventsForDate(day);
                 return (
                   <div
                     key={`${day}-${hour}`}
                     className={`week-day-column ${isSameDay(day, new Date()) ? 'today' : ''}`}
                   >
-                    {dayAppointments.map(apt => {
-                      const [aptHour] = apt.startTime.split(':').map(Number);
-                      // Convert military time to 12-hour format
-                      const formatTime12hr = (time) => {
-                        const [hours, minutes] = time.split(':');
-                        const hour = parseInt(hours);
-                        const ampm = hour >= 12 ? 'PM' : 'AM';
-                        const hour12 = hour % 12 || 12;
-                        return `${hour12}:${minutes} ${ampm}`;
-                      };
-                      if (aptHour === hour) {
+                    {dayEvents.map(event => {
+                      const startHour = event.startTime ? parseInt(event.startTime.split(':')[0]) :
+                                       event.clockIn ? parseInt(event.clockIn.split(':')[0]) : null;
+
+                      if (startHour === hour) {
+                        const display = getEventDisplay(event);
                         return (
                           <div
-                            key={apt.id}
-                            className={`week-appointment ${apt.status}`}
-                            onClick={() => {
-                              setSelectedAppointment(apt);
-                              setShowDetailModal(true);
-                            }}
-                            title={`${formatTime12hr(apt.startTime)} - ${apt.customer} - ${apt.service}`}
+                            key={event.id}
+                            className={`week-event ${display.className}`}
+                            onClick={() => openEventDetail(event)}
+                            title={display.title}
                           >
-                            {formatTime12hr(apt.startTime)}
+                            {display.label}
                           </div>
                         );
                       }
@@ -502,7 +706,12 @@ const Calendar = () => {
       hours.push(i);
     }
 
-    const dayAppointments = getAppointmentsForDate(currentDate);
+    const dayEvents = getEventsForDate(currentDate);
+
+    // Separate events by type for summary
+    const dayAppointments = dayEvents.filter(e => e.type === 'appointment');
+    const dayAttendance = dayEvents.filter(e => e.type === 'attendance');
+    const dayShifts = dayEvents.filter(e => e.type === 'shift');
 
     return (
       <div className="day-view">
@@ -512,28 +721,20 @@ const Calendar = () => {
               <React.Fragment key={hour}>
                 <div className="day-time-label">{formatHour12hr(hour)}</div>
                 <div className="day-time-block">
-                  {dayAppointments.map(apt => {
-                    const [aptHour] = apt.startTime.split(':').map(Number);
-                    if (aptHour === hour) {
-                      // Convert military time to 12-hour format
-                      const formatTime12hr = (time) => {
-                        const [hours, minutes] = time.split(':');
-                        const hr = parseInt(hours);
-                        const ampm = hr >= 12 ? 'PM' : 'AM';
-                        const hour12 = hr % 12 || 12;
-                        return `${hour12}:${minutes} ${ampm}`;
-                      };
+                  {dayEvents.map(event => {
+                    const startHour = event.startTime ? parseInt(event.startTime.split(':')[0]) :
+                                     event.clockIn ? parseInt(event.clockIn.split(':')[0]) : null;
+
+                    if (startHour === hour) {
+                      const display = getEventDisplay(event);
                       return (
                         <div
-                          key={apt.id}
-                          className={`day-appointment ${apt.status}`}
-                          onClick={() => {
-                            setSelectedAppointment(apt);
-                            setShowDetailModal(true);
-                          }}
-                          title={`${formatTime12hr(apt.startTime)} - ${apt.customer} - ${apt.service}`}
+                          key={event.id}
+                          className={`day-event ${display.className}`}
+                          onClick={() => openEventDetail(event)}
+                          title={display.title}
                         >
-                          {apt.customer}
+                          {event.type === 'appointment' ? event.customer : event.employeeName}
                         </div>
                       );
                     }
@@ -550,26 +751,43 @@ const Calendar = () => {
             <h3>Daily Summary</h3>
             <div className="summary-stats">
               <div className="summary-stat">
-                <span className="stat-label">Total Appointments</span>
+                <span className="stat-label">Appointments</span>
                 <span className="stat-value">{dayAppointments.length}</span>
               </div>
               <div className="summary-stat">
-                <span className="stat-label">Confirmed</span>
+                <span className="stat-label">Staff Present</span>
                 <span className="stat-value">
-                  {dayAppointments.filter(apt => apt.status === 'confirmed').length}
+                  {dayAttendance.filter(a => a.status === 'present' || a.clockIn).length}
                 </span>
               </div>
               <div className="summary-stat">
-                <span className="stat-label">Pending</span>
-                <span className="stat-value">
-                  {dayAppointments.filter(apt => apt.status === 'pending').length}
-                </span>
+                <span className="stat-label">Shifts Scheduled</span>
+                <span className="stat-value">{dayShifts.length}</span>
               </div>
               <div className="summary-stat">
-                <span className="stat-label">Revenue Expected</span>
+                <span className="stat-label">Expected Revenue</span>
                 <span className="stat-value">
-                  ₱{dayAppointments.reduce((sum, apt) => sum + apt.price, 0).toLocaleString()}
+                  ₱{dayAppointments.reduce((sum, apt) => sum + (apt.price || 0), 0).toLocaleString()}
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Event type legend */}
+          <div className="event-legend">
+            <h4>Legend</h4>
+            <div className="legend-items">
+              <div className="legend-item">
+                <span className="legend-color event-appointment"></span>
+                <span>Appointments</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color event-attendance"></span>
+                <span>Attendance</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-color event-shift"></span>
+                <span>Shifts</span>
               </div>
             </div>
           </div>
@@ -588,6 +806,150 @@ const Calendar = () => {
     } else {
       return format(currentDate, 'EEEE, MMMM d, yyyy');
     }
+  };
+
+  // Render event detail modal based on type
+  const renderEventDetailModal = () => {
+    if (!selectedEvent) return null;
+
+    if (selectedEvent.type === 'appointment') {
+      return (
+        <div className="modal-body">
+          <div className="event-detail-header">
+            <span className={`event-type-badge appointment`}>Appointment</span>
+            <span className={`event-status-badge ${selectedEvent.status}`}>
+              {selectedEvent.status}
+            </span>
+          </div>
+          <div className="event-details-grid">
+            <div className="detail-group">
+              <span className="detail-label">Customer</span>
+              <span className="detail-value">{selectedEvent.customer}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Service</span>
+              <span className="detail-value">{selectedEvent.service}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Therapist</span>
+              <span className="detail-value">{selectedEvent.therapist}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Room</span>
+              <span className="detail-value">{selectedEvent.room}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Date</span>
+              <span className="detail-value">
+                {format(parseISO(selectedEvent.date), 'MMMM d, yyyy')}
+              </span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Time</span>
+              <span className="detail-value">
+                {formatTime12hr(selectedEvent.startTime)} - {formatTime12hr(selectedEvent.endTime)}
+              </span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Price</span>
+              <span className="detail-value">
+                ₱{(selectedEvent.price || 0).toLocaleString()}
+              </span>
+            </div>
+          </div>
+          {selectedEvent.notes && (
+            <div className="event-notes">
+              <h4>Notes</h4>
+              <p>{selectedEvent.notes}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (selectedEvent.type === 'attendance') {
+      return (
+        <div className="modal-body">
+          <div className="event-detail-header">
+            <span className={`event-type-badge attendance`}>Attendance</span>
+            <span className={`event-status-badge ${selectedEvent.status}`}>
+              {selectedEvent.status}
+            </span>
+          </div>
+          <div className="event-details-grid">
+            <div className="detail-group">
+              <span className="detail-label">Employee</span>
+              <span className="detail-value">{selectedEvent.employeeName}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Date</span>
+              <span className="detail-value">{selectedEvent.date}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Clock In</span>
+              <span className="detail-value">{selectedEvent.clockIn || '-'}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Clock Out</span>
+              <span className="detail-value">{selectedEvent.clockOut || '-'}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Hours Worked</span>
+              <span className="detail-value">{selectedEvent.hoursWorked || 0} hrs</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Overtime</span>
+              <span className="detail-value">{selectedEvent.overtime || 0} hrs</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (selectedEvent.type === 'shift') {
+      return (
+        <div className="modal-body">
+          <div className="event-detail-header">
+            <span className={`event-type-badge shift`}>Shift Schedule</span>
+            <span className={`event-status-badge ${selectedEvent.shiftType}`}>
+              {selectedEvent.shiftType} shift
+            </span>
+          </div>
+          <div className="event-details-grid">
+            <div className="detail-group">
+              <span className="detail-label">Employee</span>
+              <span className="detail-value">{selectedEvent.employeeName}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Date</span>
+              <span className="detail-value">{selectedEvent.date}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Shift Type</span>
+              <span className="detail-value" style={{ textTransform: 'capitalize' }}>
+                {selectedEvent.shiftType}
+              </span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Start Time</span>
+              <span className="detail-value">{formatTime12hr(selectedEvent.startTime)}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">End Time</span>
+              <span className="detail-value">{formatTime12hr(selectedEvent.endTime)}</span>
+            </div>
+            <div className="detail-group">
+              <span className="detail-label">Status</span>
+              <span className="detail-value" style={{ textTransform: 'capitalize' }}>
+                {selectedEvent.status}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   if (loading) {
@@ -618,31 +980,108 @@ const Calendar = () => {
           </button>
         </div>
 
-        <div className="view-switcher">
-          <button
-            className={`view-btn ${view === 'month' ? 'active' : ''}`}
-            onClick={() => setView('month')}
-          >
-            Month
-          </button>
-          <button
-            className={`view-btn ${view === 'week' ? 'active' : ''}`}
-            onClick={() => setView('week')}
-          >
-            Week
-          </button>
-          <button
-            className={`view-btn ${view === 'day' ? 'active' : ''}`}
-            onClick={() => setView('day')}
-          >
-            Day
-          </button>
+        <div className="calendar-filters">
+          {/* Data type filter */}
+          <div className="data-filter">
+            <button
+              className={`filter-btn ${dataFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setDataFilter('all')}
+            >
+              All
+            </button>
+            <button
+              className={`filter-btn filter-appointments ${dataFilter === 'appointments' ? 'active' : ''}`}
+              onClick={() => setDataFilter('appointments')}
+            >
+              Appointments
+            </button>
+            <button
+              className={`filter-btn filter-attendance ${dataFilter === 'attendance' ? 'active' : ''}`}
+              onClick={() => setDataFilter('attendance')}
+            >
+              Attendance
+            </button>
+            <button
+              className={`filter-btn filter-shifts ${dataFilter === 'shifts' ? 'active' : ''}`}
+              onClick={() => setDataFilter('shifts')}
+            >
+              Shifts
+            </button>
+          </div>
+
+          {/* View switcher */}
+          <div className="view-switcher">
+            <button
+              className={`view-btn ${view === 'month' ? 'active' : ''}`}
+              onClick={() => setView('month')}
+            >
+              Month
+            </button>
+            <button
+              className={`view-btn ${view === 'week' ? 'active' : ''}`}
+              onClick={() => setView('week')}
+            >
+              Week
+            </button>
+            <button
+              className={`view-btn ${view === 'day' ? 'active' : ''}`}
+              onClick={() => setView('day')}
+            >
+              Day
+            </button>
+          </div>
+
+          {/* Quick navigation to management pages */}
+          <div className="calendar-quick-nav">
+            <span className="quick-nav-label">Manage:</span>
+            <button
+              className="quick-nav-btn appointments"
+              onClick={() => navigate('/appointments')}
+              title="Go to Appointments Management"
+            >
+              ◐ Appointments
+            </button>
+            <button
+              className="quick-nav-btn attendance"
+              onClick={() => navigate('/attendance')}
+              title="Go to Attendance Management"
+            >
+              ◑ Attendance
+            </button>
+            <button
+              className="quick-nav-btn shifts"
+              onClick={() => navigate('/shift-schedules')}
+              title="Go to Shift Schedules"
+            >
+              ◒ Shift Schedules
+            </button>
+          </div>
         </div>
 
         <div className="calendar-actions">
           <button className="btn btn-primary" onClick={() => openCreateModal(selectedDate || currentDate)}>
             + New Appointment
           </button>
+        </div>
+      </div>
+
+      {/* Legend bar */}
+      <div className="calendar-legend-bar">
+        <div className="legend-item">
+          <span className="legend-dot event-appointment"></span>
+          <span>Appointments</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-dot event-attendance event-present"></span>
+          <span>Attendance</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-dot event-shift event-day"></span>
+          <span>Day Shift</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-dot event-shift event-night"></span>
+          <span>Night Shift</span>
         </div>
       </div>
 
@@ -653,76 +1092,33 @@ const Calendar = () => {
         {view === 'day' && renderDayView()}
       </div>
 
-      {/* Appointment Detail Modal */}
-      {showDetailModal && selectedAppointment && (
+      {/* Event Detail Modal */}
+      {showDetailModal && selectedEvent && (
         <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
           <div
-            className="modal appointment-detail-modal"
+            className="modal event-detail-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <div className="appointment-detail-header">
-                <h2>Appointment Details</h2>
-                <span className={`appointment-status-badge ${selectedAppointment.status}`}>
-                  {selectedAppointment.status}
-                </span>
-              </div>
+              <h2>
+                {selectedEvent.type === 'appointment' ? 'Appointment Details' :
+                 selectedEvent.type === 'attendance' ? 'Attendance Record' :
+                 'Shift Details'}
+              </h2>
               <button className="modal-close" onClick={() => setShowDetailModal(false)}>
                 ✕
               </button>
             </div>
-            <div className="modal-body">
-              <div className="appointment-details-grid">
-                <div className="detail-group">
-                  <span className="detail-label">Customer</span>
-                  <span className="detail-value">{selectedAppointment.customer}</span>
-                </div>
-                <div className="detail-group">
-                  <span className="detail-label">Service</span>
-                  <span className="detail-value">{selectedAppointment.service}</span>
-                </div>
-                <div className="detail-group">
-                  <span className="detail-label">Therapist</span>
-                  <span className="detail-value">{selectedAppointment.therapist}</span>
-                </div>
-                <div className="detail-group">
-                  <span className="detail-label">Room</span>
-                  <span className="detail-value">{selectedAppointment.room}</span>
-                </div>
-                <div className="detail-group">
-                  <span className="detail-label">Date</span>
-                  <span className="detail-value">
-                    {format(parseISO(selectedAppointment.date), 'MMMM d, yyyy')}
-                  </span>
-                </div>
-                <div className="detail-group">
-                  <span className="detail-label">Time</span>
-                  <span className="detail-value">
-                    {selectedAppointment.startTime} - {selectedAppointment.endTime}
-                  </span>
-                </div>
-                <div className="detail-group">
-                  <span className="detail-label">Price</span>
-                  <span className="detail-value">
-                    ₱{selectedAppointment.price.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {selectedAppointment.notes && (
-                <div className="appointment-notes">
-                  <h4>Notes</h4>
-                  <p className="notes-text">{selectedAppointment.notes}</p>
-                </div>
-              )}
-            </div>
+            {renderEventDetailModal()}
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>
                 Close
               </button>
-              <button className="btn btn-primary" onClick={() => openEditModal(selectedAppointment)}>
-                Edit Appointment
-              </button>
+              {selectedEvent.type === 'appointment' && (
+                <button className="btn btn-primary" onClick={() => openEditModal(selectedEvent)}>
+                  Edit Appointment
+                </button>
+              )}
             </div>
           </div>
         </div>

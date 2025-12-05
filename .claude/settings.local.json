@@ -17,7 +17,8 @@
       "Bash(find:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

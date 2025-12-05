@@ -15,8 +15,8 @@
 }
 
 .cash-drawer-summary-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
   text-align: center;
@@ -24,17 +24,17 @@
 }
 
 .cash-drawer-summary-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .cash-drawer-summary-card.total {
-  background: #1B5E37;
-  border-color: #1B5E37;
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .cash-drawer-summary-card.total .cash-drawer-summary-value,
 .cash-drawer-summary-card.total .cash-drawer-summary-label {
-  color: #FFFFFF;
+  color: var(--white);
 }
 
 .cash-drawer-summary-card.total .cash-drawer-summary-icon {
@@ -49,21 +49,21 @@
 .cash-drawer-summary-value {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #1A1A1A;
+  color: var(--gray-900);
   margin-bottom: 4px;
 }
 
 .cash-drawer-summary-label {
   font-size: 0.75rem;
-  color: #666666;
+  color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 /* Filters Section */
 .cash-drawer-filters {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
@@ -83,30 +83,30 @@
 
 .filter-group label {
   font-weight: 500;
-  color: #1A1A1A;
+  color: var(--gray-900);
   font-size: 0.8rem;
 }
 
 .filter-group input,
 .filter-group select {
   padding: 10px 14px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
   border-radius: 6px;
   font-size: 0.85rem;
-  color: #1A1A1A;
-  background: #FFFFFF;
+  color: var(--gray-900);
+  background: var(--white);
 }
 
 .filter-group input:focus,
 .filter-group select:focus {
   outline: none;
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 /* Cash Drawer Sessions List */
 .cash-drawer-sessions {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: var(--spacing-lg);
 }
@@ -117,14 +117,14 @@
   align-items: center;
   margin-bottom: var(--spacing-lg);
   padding-bottom: var(--spacing-md);
-  border-bottom: 1px solid #E0E0E0;
+  border-bottom: 1px solid var(--gray-200);
 }
 
 .sessions-header h2 {
   font-size: 1.1rem;
   margin: 0;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .sessions-list {
@@ -135,23 +135,23 @@
 
 /* Session Card */
 .session-card {
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   overflow: hidden;
   transition: border-color 0.2s;
 }
 
 .session-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .session-card.open {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .session-card.closed {
-  border-color: #E0E0E0;
+  border-color: var(--gray-200);
 }
 
 .session-header {
@@ -159,8 +159,8 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: var(--spacing-md);
-  background: #F5F5F5;
-  border-bottom: 1px solid #E0E0E0;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
 }
 
 .session-info {
@@ -183,12 +183,12 @@
   font-size: 1rem;
   margin: 0 0 2px 0;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .session-name p {
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
   margin: 0;
 }
 
@@ -206,7 +206,7 @@
 
 .session-meta-label {
   font-size: 0.65rem;
-  color: #666666;
+  color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -214,7 +214,7 @@
 
 .session-meta-value {
   font-size: 0.85rem;
-  color: #1A1A1A;
+  color: var(--gray-900);
   font-weight: 500;
 }
 
@@ -237,21 +237,21 @@
 }
 
 .session-status-badge.open {
-  background: #F5F5F5;
-  color: #1B5E37;
-  border: 1px solid #1B5E37;
+  background: var(--gray-100);
+  color: var(--primary);
+  border: 1px solid var(--primary);
 }
 
 .session-status-badge.closed {
-  background: #F5F5F5;
-  color: #666666;
-  border: 1px solid #666666;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-600);
 }
 
 .session-total {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1B5E37;
+  color: var(--primary);
 }
 
 /* Session Body */
@@ -268,15 +268,15 @@
 
 .session-summary-item {
   padding: var(--spacing-md);
-  background: #F5F5F5;
+  background: var(--gray-100);
   border-radius: 6px;
   text-align: center;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
 }
 
 .session-summary-label {
   font-size: 0.65rem;
-  color: #666666;
+  color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -286,15 +286,15 @@
 .session-summary-value {
   font-size: 1rem;
   font-weight: 700;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .session-summary-value.positive {
-  color: #1B5E37;
+  color: var(--primary);
 }
 
 .session-summary-value.negative {
-  color: #DC2626;
+  color: var(--error);
 }
 
 /* Transactions Toggle */
@@ -303,8 +303,8 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-sm) var(--spacing-md);
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
@@ -312,19 +312,19 @@
 }
 
 .session-transactions-toggle:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .session-transactions-toggle h4 {
   font-size: 0.85rem;
   margin: 0;
-  color: #1A1A1A;
+  color: var(--gray-900);
   font-weight: 500;
 }
 
 .toggle-icon {
   font-size: 0.8rem;
-  color: #666666;
+  color: var(--gray-600);
   transition: transform 0.2s;
 }
 
@@ -341,9 +341,9 @@
   overflow-y: auto;
   margin-bottom: var(--spacing-md);
   padding: var(--spacing-sm);
-  background: #F5F5F5;
+  background: var(--gray-100);
   border-radius: 6px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
 }
 
 .transaction-item {
@@ -351,15 +351,15 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-sm) var(--spacing-md);
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 4px;
   font-size: 0.85rem;
   transition: border-color 0.2s;
 }
 
 .transaction-item:hover {
-  border-color: #1B5E37;
+  border-color: var(--primary);
 }
 
 .transaction-info {
@@ -370,13 +370,13 @@
 
 .transaction-type {
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
   font-size: 0.85rem;
 }
 
 .transaction-time {
   font-size: 0.7rem;
-  color: #666666;
+  color: var(--gray-600);
 }
 
 .transaction-amount {
@@ -385,11 +385,11 @@
 }
 
 .transaction-amount.positive {
-  color: #1B5E37;
+  color: var(--primary);
 }
 
 .transaction-amount.negative {
-  color: #DC2626;
+  color: var(--error);
 }
 
 /* Session Actions */
@@ -398,7 +398,7 @@
   gap: 8px;
   justify-content: flex-end;
   padding-top: var(--spacing-md);
-  border-top: 1px solid #E0E0E0;
+  border-top: 1px solid var(--gray-200);
 }
 
 .session-actions .btn {
@@ -411,18 +411,18 @@
 }
 
 .session-actions .btn-secondary {
-  background: #FFFFFF;
-  color: #1A1A1A;
-  border: 1px solid #E0E0E0;
+  background: var(--white);
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
 }
 
 .session-actions .btn-secondary:hover {
-  border-color: #1B5E37;
-  color: #1B5E37;
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .session-actions .btn-warning {
-  background: #FFFFFF;
+  background: var(--white);
   color: #92400e;
   border: 1px solid #d97706;
 }
@@ -439,7 +439,7 @@
 .variance-modal h2 {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
   margin: 0 0 var(--spacing-lg) 0;
 }
 
@@ -451,15 +451,15 @@
 
 .variance-section {
   padding: var(--spacing-md);
-  background: #F5F5F5;
+  background: var(--gray-100);
   border-radius: 6px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--gray-200);
 }
 
 .variance-section h3 {
   font-size: 0.8rem;
   margin: 0 0 var(--spacing-md) 0;
-  color: #666666;
+  color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -479,28 +479,28 @@
 }
 
 .variance-item-label {
-  color: #666666;
+  color: var(--gray-600);
 }
 
 .variance-item-value {
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .variance-total {
   display: flex;
   justify-content: space-between;
   padding: var(--spacing-md) 0;
-  border-top: 1px solid #E0E0E0;
+  border-top: 1px solid var(--gray-200);
   margin-top: var(--spacing-sm);
   font-weight: 700;
   font-size: 1rem;
-  color: #1A1A1A;
+  color: var(--gray-900);
 }
 
 .variance-alert {
   padding: var(--spacing-md);
-  background: #FFFFFF;
+  background: var(--white);
   border: 1px solid #d97706;
   border-left: 4px solid #d97706;
   border-radius: 6px;
@@ -509,17 +509,17 @@
 }
 
 .variance-alert.success {
-  background: #FFFFFF;
-  border-color: #1B5E37;
-  border-left-color: #1B5E37;
-  color: #1B5E37;
+  background: var(--white);
+  border-color: var(--primary);
+  border-left-color: var(--primary);
+  color: var(--primary);
 }
 
 /* Empty State */
 .empty-cash-drawer {
   text-align: center;
   padding: var(--spacing-xxl) var(--spacing-lg);
-  color: #666666;
+  color: var(--gray-600);
 }
 
 .empty-cash-drawer-icon {
@@ -531,14 +531,14 @@
 .empty-cash-drawer h3 {
   font-size: 1.1rem;
   margin: 0 0 var(--spacing-sm) 0;
-  color: #1A1A1A;
+  color: var(--gray-900);
   font-weight: 600;
 }
 
 .empty-cash-drawer p {
   font-size: 0.85rem;
   margin: 0;
-  color: #666666;
+  color: var(--gray-600);
 }
 
 /* Responsive */

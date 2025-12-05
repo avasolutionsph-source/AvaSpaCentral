@@ -1220,13 +1220,14 @@ export const mockDatabase = {
       vendor: 'Camarines Norte Electric Cooperative',
       receipt: null,
       status: 'paid',
+      expenseType: 'variable',
       createdBy: 'user_001',
       createdAt: '2025-11-05'
     },
     {
       _id: 'exp_002',
       businessId: 'biz_001',
-      category: 'Supplies',
+      category: 'Office Supplies',
       description: 'Massage oils and lotions restock',
       amount: 12000,
       date: '2025-11-10',
@@ -1234,6 +1235,7 @@ export const mockDatabase = {
       vendor: 'Manila Spa Supplies',
       receipt: null,
       status: 'paid',
+      expenseType: 'direct',
       createdBy: 'user_001',
       createdAt: '2025-11-10'
     },
@@ -1248,13 +1250,14 @@ export const mockDatabase = {
       vendor: 'CoolTech Services',
       receipt: null,
       status: 'paid',
+      expenseType: 'opex',
       createdBy: 'user_001',
       createdAt: '2025-11-12'
     },
     {
       _id: 'exp_004',
       businessId: 'biz_001',
-      category: 'Supplies',
+      category: 'Office Supplies',
       description: 'Towels and linens',
       amount: 6000,
       date: '2025-11-15',
@@ -1262,6 +1265,7 @@ export const mockDatabase = {
       vendor: 'Textile World',
       receipt: null,
       status: 'paid',
+      expenseType: 'direct',
       createdBy: 'user_001',
       createdAt: '2025-11-15'
     },
@@ -1272,12 +1276,88 @@ export const mockDatabase = {
       description: 'Facebook ads - November campaign',
       amount: 3000,
       date: '2025-11-01',
-      paymentMethod: 'Card',
+      paymentMethod: 'Credit Card',
       vendor: 'Facebook',
       receipt: null,
       status: 'paid',
+      expenseType: 'opex',
       createdBy: 'user_001',
       createdAt: '2025-11-01'
+    },
+    {
+      _id: 'exp_006',
+      businessId: 'biz_001',
+      category: 'Rent',
+      description: 'Monthly rent - November 2025',
+      amount: 35000,
+      date: '2025-11-01',
+      paymentMethod: 'Bank Transfer',
+      vendor: 'Property Management Corp',
+      receipt: null,
+      status: 'paid',
+      expenseType: 'fixed',
+      createdBy: 'user_001',
+      createdAt: '2025-11-01'
+    },
+    {
+      _id: 'exp_007',
+      businessId: 'biz_001',
+      category: 'Salaries',
+      description: 'Staff salaries - November 2025',
+      amount: 180000,
+      date: '2025-11-30',
+      paymentMethod: 'Bank Transfer',
+      vendor: 'Payroll',
+      receipt: null,
+      status: 'paid',
+      expenseType: 'fixed',
+      createdBy: 'user_001',
+      createdAt: '2025-11-30'
+    },
+    {
+      _id: 'exp_008',
+      businessId: 'biz_001',
+      category: 'Inventory',
+      description: 'Spa equipment - new massage table',
+      amount: 25000,
+      date: '2025-11-08',
+      paymentMethod: 'Bank Transfer',
+      vendor: 'Wellness Equipment PH',
+      receipt: null,
+      status: 'paid',
+      expenseType: 'capex',
+      createdBy: 'user_001',
+      createdAt: '2025-11-08'
+    },
+    {
+      _id: 'exp_009',
+      businessId: 'biz_001',
+      category: 'Utilities',
+      description: 'Water bill - November 2025',
+      amount: 3500,
+      date: '2025-11-05',
+      paymentMethod: 'Cash',
+      vendor: 'Daet Water District',
+      receipt: null,
+      status: 'paid',
+      expenseType: 'variable',
+      createdBy: 'user_001',
+      createdAt: '2025-11-05'
+    },
+    {
+      _id: 'exp_010',
+      businessId: 'biz_001',
+      category: 'Other',
+      description: 'Business permit renewal',
+      amount: 8000,
+      date: '2025-11-20',
+      paymentMethod: 'Cash',
+      vendor: 'Municipal Hall',
+      receipt: null,
+      status: 'paid',
+      expenseType: 'indirect',
+      createdBy: 'user_001',
+      createdAt: '2025-11-20'
     }
   ],
 
@@ -1743,6 +1823,40 @@ mockDatabase.fixedCosts = {
   software: 3000,
   maintenance: 5000,
   miscellaneous: 2000
+};
+
+// Industry Benchmarks for Philippine SPA/Wellness Business
+mockDatabase.industryBenchmarks = {
+  // Expense as percentage of revenue (healthy ranges)
+  payroll: { min: 25, max: 30, ideal: 27, label: 'Payroll' },
+  rent: { min: 8, max: 12, ideal: 10, label: 'Rent' },
+  utilities: { min: 3, max: 5, ideal: 4, label: 'Utilities' },
+  marketing: { min: 3, max: 5, ideal: 4, label: 'Marketing' },
+  supplies: { min: 5, max: 8, ideal: 6, label: 'Supplies' },
+  maintenance: { min: 2, max: 4, ideal: 3, label: 'Maintenance' },
+  totalOpex: { min: 55, max: 70, ideal: 60, label: 'Total OPEX' },
+
+  // Health score thresholds for payroll
+  salaryHealth: {
+    excellent: { max: 25, score: 100, label: 'Excellent', color: '#10B981' },
+    healthy: { max: 30, score: 80, label: 'Healthy', color: '#34D399' },
+    atLimit: { max: 35, score: 60, label: 'At Limit', color: '#FBBF24' },
+    warning: { max: 40, score: 40, label: 'Warning', color: '#F97316' },
+    critical: { max: 100, score: 20, label: 'Critical', color: '#EF4444' }
+  },
+
+  // Expense type default mappings
+  expenseTypeDefaults: {
+    'Rent': 'fixed',
+    'Salaries': 'fixed',
+    'Insurance': 'fixed',
+    'Utilities': 'variable',
+    'Office Supplies': 'direct',
+    'Marketing': 'opex',
+    'Maintenance': 'opex',
+    'Inventory': 'capex',
+    'Other': 'indirect'
+  }
 };
 
 // Cash & Bank Accounts

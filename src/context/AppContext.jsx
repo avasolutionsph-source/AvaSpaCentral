@@ -7,9 +7,9 @@ const AppContext = createContext();
 const rolePermissions = {
   'Owner': ['dashboard', 'pos', 'products', 'employees', 'customers', 'appointments', 'attendance', 'rooms',
             'gift-certificates', 'expenses', 'payroll', 'my-schedule', 'shift-schedules', 'payroll-requests', 'cash-drawer-history',
-            'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'ai-insights', 'analytics', 'settings'],
+            'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'ava-sensei', 'analytics', 'settings'],
   'Manager': ['dashboard', 'pos', 'products', 'inventory', 'employees', 'customers', 'appointments', 'attendance',
-              'payroll', 'rooms', 'service-history', 'gift-certificates', 'expenses', 'ai-chatbot', 'ai-insights', 'analytics', 'settings',
+              'payroll', 'rooms', 'service-history', 'gift-certificates', 'expenses', 'ai-chatbot', 'ava-sensei', 'analytics', 'settings',
               'my-schedule', 'shift-schedules', 'payroll-requests'],
   'Receptionist': ['pos', 'products', 'inventory', 'customers', 'appointments', 'attendance', 'payroll', 'rooms',
                    'service-history', 'expenses', 'my-schedule', 'payroll-requests'],

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, parseISO } from 'date-fns';
 
 const Inventory = () => {
+  const navigate = useNavigate();
   const { showToast, canEdit } = useApp();
 
   const [loading, setLoading] = useState(true);
@@ -32,11 +34,18 @@ const Inventory = () => {
   // Stock Movement History
   const [stockHistory, setStockHistory] = useState([]);
 
+  // Reorder Suggestions
+  const [reorderSuggestions, setReorderSuggestions] = useState([]);
+  const [showReorderModal, setShowReorderModal] = useState(false);
+  const [suppliers, setSuppliers] = useState([]);
+
   const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
 
   useEffect(() => {
     loadInventory();
     loadStockHistory();
+    loadReorderSuggestions();
+    loadSuppliers();
   }, []);
 
   useEffect(() => {
@@ -114,6 +123,24 @@ const Inventory = () => {
       ];
       localStorage.setItem('stockHistory', JSON.stringify(mockHistory));
       setStockHistory(mockHistory);
+    }
+  };
+
+  const loadReorderSuggestions = async () => {
+    try {
+      const suggestions = await mockApi.purchaseOrders.getReorderSuggestions();
+      setReorderSuggestions(suggestions);
+    } catch (error) {
+      console.error('Failed to load reorder suggestions:', error);
+    }
+  };
+
+  const loadSuppliers = async () => {
+    try {
+      const suppliersData = await mockApi.suppliers.getSuppliers();
+      setSuppliers(suppliersData.filter(s => s.status === 'active'));
+    } catch (error) {
+      console.error('Failed to load suppliers:', error);
     }
   };
 
@@ -424,14 +451,70 @@ const Inventory = () => {
       {/* Quick Actions */}
       {canEdit() && (
         <div className="inventory-quick-actions">
-          <button className="quick-action-btn" onClick={openPurchaseOrderModal}>
+          <button className="quick-action-btn" onClick={() => navigate('/purchase-orders')}>
             <span className="quick-action-icon">📋</span>
-            <span>New Purchase Order</span>
+            <span>Manage Purchase Orders</span>
+          </button>
+          <button className="quick-action-btn" onClick={() => navigate('/suppliers')}>
+            <span className="quick-action-icon">🏢</span>
+            <span>Manage Suppliers</span>
           </button>
           <button className="quick-action-btn" onClick={handleExportInventory}>
             <span className="quick-action-icon">📊</span>
             <span>Export Report</span>
           </button>
+        </div>
+      )}
+
+      {/* Reorder Suggestions */}
+      {reorderSuggestions.length > 0 && canEdit() && (
+        <div className="reorder-suggestions-section">
+          <div className="reorder-header">
+            <div className="reorder-title">
+              <span className="reorder-icon">🔄</span>
+              <h3>Reorder Suggestions ({reorderSuggestions.length})</h3>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate('/purchase-orders')}
+            >
+              Create Purchase Order
+            </button>
+          </div>
+          <div className="reorder-list">
+            {reorderSuggestions.slice(0, 5).map(item => (
+              <div key={item._id} className="reorder-item">
+                <div className="reorder-product-info">
+                  <span className="reorder-product-name">{item.name}</span>
+                  <span className="reorder-product-category">{item.category}</span>
+                </div>
+                <div className="reorder-stock-info">
+                  <div className="reorder-stock-current">
+                    <span className="label">Current:</span>
+                    <span className={`value ${item.stock === 0 ? 'critical' : 'warning'}`}>{item.stock}</span>
+                  </div>
+                  <div className="reorder-stock-target">
+                    <span className="label">Reorder Point:</span>
+                    <span className="value">{item.lowStockAlert}</span>
+                  </div>
+                  <div className="reorder-stock-suggested">
+                    <span className="label">Suggested Qty:</span>
+                    <span className="value highlight">{item.suggestedQuantity}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {reorderSuggestions.length > 5 && (
+            <div className="reorder-footer">
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => navigate('/purchase-orders')}
+              >
+                View all {reorderSuggestions.length} suggestions
+              </button>
+            </div>
+          )}
         </div>
       )}
 

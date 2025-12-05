@@ -43,6 +43,8 @@ const AnalyticsDashboard = () => {
   const [forecasts, setForecasts] = useState(null);
   const [insights, setInsights] = useState([]);
   const [realtimeProfit, setRealtimeProfit] = useState(null);
+  const [salaryHealth, setSalaryHealth] = useState(null);
+  const [utilizationMetrics, setUtilizationMetrics] = useState(null);
 
   useEffect(() => {
     loadAnalytics();
@@ -66,14 +68,16 @@ const AnalyticsDashboard = () => {
     try {
       setLoading(true);
 
-      const [bep, profit, burn, customers, forecast, aiInsights, realtime] = await Promise.all([
+      const [bep, profit, burn, customers, forecast, aiInsights, realtime, salaryHealthData, utilization] = await Promise.all([
         mockApi.analytics.getBreakEvenMetrics(),
         mockApi.analytics.getProfitabilityMetrics(period),
         mockApi.analytics.getBurnRateAndRunway(),
         mockApi.analytics.getCustomerMetrics(),
         mockApi.analytics.getForecasts(),
         mockApi.analytics.getInsights(),
-        mockApi.analytics.getRealtimeProfit()
+        mockApi.analytics.getRealtimeProfit(),
+        mockApi.analytics.getSalaryHealthMetrics(),
+        mockApi.analytics.getUtilizationMetrics(period)
       ]);
 
       setBreakEven(bep);
@@ -83,6 +87,8 @@ const AnalyticsDashboard = () => {
       setForecasts(forecast);
       setInsights(aiInsights?.insights || []);
       setRealtimeProfit(realtime);
+      setSalaryHealth(salaryHealthData);
+      setUtilizationMetrics(utilization);
       setLoading(false);
     } catch (error) {
       console.error('Failed to load analytics:', error);
@@ -368,6 +374,160 @@ const AnalyticsDashboard = () => {
             <span>Top 20%: {customerMetrics?.pareto?.top20Count || 0} customers</span>
           </div>
         </div>
+
+        {/* Salary Health Indicator */}
+        {salaryHealth && (
+          <div className="kpi-card salary-health-card">
+            <div className="kpi-header">
+              <span className="kpi-icon">💰</span>
+              <span className="kpi-title">Salary Health</span>
+            </div>
+            <div className="salary-health-score" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div
+                className="health-score-circle"
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  background: `conic-gradient(${salaryHealth.health.color} ${salaryHealth.health.score}%, #E5E7EB ${salaryHealth.health.score}%)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: '700',
+                  fontSize: '0.9rem',
+                  color: salaryHealth.health.color
+                }}>
+                  {salaryHealth.health.score}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontWeight: '600', color: salaryHealth.health.color, fontSize: '1rem' }}>
+                  {salaryHealth.health.label}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                  {salaryHealth.currentMonth.payrollPercentage}% of Revenue
+                </div>
+              </div>
+            </div>
+            <div className="salary-benchmark-bar" style={{ marginTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#888', marginBottom: '4px' }}>
+                <span>0%</span>
+                <span style={{ color: '#10B981' }}>Industry: {salaryHealth.benchmark.industry.min}-{salaryHealth.benchmark.industry.max}%</span>
+                <span>50%</span>
+              </div>
+              <div style={{ height: '8px', background: '#E5E7EB', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
+                <div style={{
+                  position: 'absolute',
+                  left: `${salaryHealth.benchmark.industry.min * 2}%`,
+                  width: `${(salaryHealth.benchmark.industry.max - salaryHealth.benchmark.industry.min) * 2}%`,
+                  height: '100%',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  borderRadius: '4px'
+                }}></div>
+                <div style={{
+                  position: 'absolute',
+                  left: `${Math.min(salaryHealth.currentMonth.payrollPercentage * 2, 98)}%`,
+                  width: '4px',
+                  height: '100%',
+                  background: salaryHealth.health.color,
+                  borderRadius: '2px',
+                  transform: 'translateX(-50%)'
+                }}></div>
+              </div>
+            </div>
+            <div className="kpi-details" style={{ marginTop: '8px' }}>
+              <span>
+                {salaryHealth.trend.direction === 'improving' && '↗️ '}
+                {salaryHealth.trend.direction === 'declining' && '↘️ '}
+                {salaryHealth.trend.direction === 'stable' && '→ '}
+                {salaryHealth.trend.direction}
+              </span>
+              <span>₱{salaryHealth.currentMonth.totalPayroll.toLocaleString()}/mo</span>
+            </div>
+          </div>
+        )}
+
+        {/* No-Show Rate */}
+        {utilizationMetrics && (
+          <div className="kpi-card">
+            <div className="kpi-header">
+              <span className="kpi-icon">📅</span>
+              <span className="kpi-title">No-Show Rate</span>
+            </div>
+            <div className={`kpi-value ${parseFloat(utilizationMetrics.noShow.noShowRate) <= 10 ? 'positive' : 'warning'}`}>
+              {utilizationMetrics.noShow.noShowRate}%
+            </div>
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{
+                  width: `${Math.min(parseFloat(utilizationMetrics.noShow.noShowRate) * 5, 100)}%`,
+                  background: parseFloat(utilizationMetrics.noShow.noShowRate) > 10 ? 'var(--error)' : 'var(--primary)'
+                }}
+              ></div>
+            </div>
+            <div className="kpi-details">
+              <span>{utilizationMetrics.noShow.noShowCount} no-shows</span>
+              <span>Lost: {formatCurrency(utilizationMetrics.noShow.costOfNoShows)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Room Utilization */}
+        {utilizationMetrics && (
+          <div className="kpi-card">
+            <div className="kpi-header">
+              <span className="kpi-icon">🚪</span>
+              <span className="kpi-title">Room Utilization</span>
+            </div>
+            <div className={`kpi-value ${utilizationMetrics.roomUtilization.avgUtilizationPercent >= 60 ? 'positive' : 'warning'}`}>
+              {utilizationMetrics.roomUtilization.avgUtilizationPercent}%
+            </div>
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: `${utilizationMetrics.roomUtilization.avgUtilizationPercent}%` }}
+              ></div>
+            </div>
+            <div className="kpi-details">
+              <span>{utilizationMetrics.roomUtilization.activeRooms} active rooms</span>
+              <span>Rev/Room: {formatCurrency(utilizationMetrics.roomUtilization.avgRevenuePerRoom)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Therapist Utilization */}
+        {utilizationMetrics && (
+          <div className="kpi-card">
+            <div className="kpi-header">
+              <span className="kpi-icon">💆</span>
+              <span className="kpi-title">Therapist Utilization</span>
+            </div>
+            <div className={`kpi-value ${utilizationMetrics.therapistUtilization.avgUtilizationPercent >= 65 ? 'positive' : 'warning'}`}>
+              {utilizationMetrics.therapistUtilization.avgUtilizationPercent}%
+            </div>
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: `${utilizationMetrics.therapistUtilization.avgUtilizationPercent}%` }}
+              ></div>
+            </div>
+            <div className="kpi-details">
+              <span>{utilizationMetrics.therapistUtilization.totalTherapists} therapists</span>
+              <span>Rev/Therapist: {formatCurrency(utilizationMetrics.summary.revenuePerTherapist)}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Charts Row */}

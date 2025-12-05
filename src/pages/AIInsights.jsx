@@ -637,7 +637,7 @@ const AIInsights = () => {
             </div>
           </div>
 
-          <div className="ai-section" style={{ marginTop: 'var(--spacing-xl)' }}>
+          <div className="ai-section mt-xl">
             <h3>🚨 Immediate Actions Needed</h3>
             <div className="ai-alerts-list">
               {inventoryPredictions.filter(p => p.alert === 'HIGH').slice(0, 3).map((pred, idx) => (
@@ -670,7 +670,7 @@ const AIInsights = () => {
           </div>
 
           {/* Key Recommendations */}
-          <div className="ai-section" style={{ marginTop: 'var(--spacing-xl)' }}>
+          <div className="ai-section mt-xl">
             <h3>💡 AI-Powered Recommendations</h3>
             <div className="recommendations-grid">
               <div className="recommendation-card">
@@ -882,7 +882,7 @@ const AIInsights = () => {
 
             {/* Product Usage Chart */}
             {productUsageAnalysis.length > 0 && (
-              <div className="ai-section" style={{ marginTop: 'var(--spacing-xl)' }}>
+              <div className="ai-section mt-xl">
                 <h3>📊 Services Possible per Product</h3>
                 <p className="ai-section-subtitle">How many services you can perform with current stock</p>
                 <div className="chart-container-ai" style={{ height: '350px', marginTop: 'var(--spacing-lg)' }}>
@@ -1075,7 +1075,7 @@ const AIInsights = () => {
 
             {/* Inventory Depletion Timeline Chart */}
             {inventoryPredictions.length > 0 && (
-              <div className="ai-section" style={{ marginTop: 'var(--spacing-xl)' }}>
+              <div className="ai-section mt-xl">
                 <h3>📉 Stock Depletion Timeline</h3>
                 <p className="ai-section-subtitle">Days remaining until out of stock</p>
                 <div className="chart-container-ai" style={{ height: '350px', marginTop: 'var(--spacing-lg)' }}>
@@ -1346,7 +1346,7 @@ const AIInsights = () => {
             </div>
 
             {/* Customer Retention Donut Chart */}
-            <div className="ai-section" style={{ marginTop: 'var(--spacing-xl)' }}>
+            <div className="ai-section mt-xl">
               <h3>📊 Customer Activity Distribution</h3>
               <div className="customer-charts-grid">
                 <div className="chart-container-ai" style={{ height: '300px' }}>
@@ -1409,7 +1409,7 @@ const AIInsights = () => {
             </div>
 
             {/* Top Customers Bar Chart */}
-            <div className="ai-section" style={{ marginTop: 'var(--spacing-xl)' }}>
+            <div className="ai-section mt-xl">
               <h3>🏆 Top Customers by Spending</h3>
               <div className="chart-container-ai" style={{ height: '300px', marginTop: 'var(--spacing-lg)' }}>
                 <Bar

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, parseISO, isPast } from 'date-fns';
+import { ConfirmDialog } from '../components/shared';
 
 const GiftCertificates = () => {
   const { showToast } = useApp();
@@ -25,6 +26,10 @@ const GiftCertificates = () => {
 
   const [validateCode, setValidateCode] = useState('');
   const [validationResult, setValidationResult] = useState(null);
+
+  // Confirmation dialog states
+  const [redeemConfirm, setRedeemConfirm] = useState({ isOpen: false, gc: null });
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, gc: null });
 
   const amountPresets = [500, 1000, 1500, 2000, 3000, 5000];
 
@@ -168,24 +173,34 @@ const GiftCertificates = () => {
     }
   };
 
-  const handleRedeem = async (gc) => {
-    if (!window.confirm(`Redeem gift certificate ${gc.code}?`)) return;
+  const handleRedeem = (gc) => {
+    setRedeemConfirm({ isOpen: true, gc });
+  };
 
+  const confirmRedeem = async () => {
+    const gc = redeemConfirm.gc;
+    if (!gc) return;
     try {
       await mockApi.giftCertificates.redeemGiftCertificate(gc._id);
       showToast('Gift certificate redeemed!', 'success');
+      setRedeemConfirm({ isOpen: false, gc: null });
       loadGiftCertificates();
     } catch (error) {
       showToast('Failed to redeem gift certificate', 'error');
     }
   };
 
-  const handleDelete = async (gc) => {
-    if (!window.confirm(`Delete gift certificate ${gc.code}?`)) return;
+  const handleDelete = (gc) => {
+    setDeleteConfirm({ isOpen: true, gc });
+  };
 
+  const confirmDelete = async () => {
+    const gc = deleteConfirm.gc;
+    if (!gc) return;
     try {
       await mockApi.giftCertificates.deleteGiftCertificate(gc._id);
       showToast('Gift certificate deleted', 'success');
+      setDeleteConfirm({ isOpen: false, gc: null });
       loadGiftCertificates();
     } catch (error) {
       showToast('Failed to delete', 'error');
@@ -205,7 +220,7 @@ const GiftCertificates = () => {
           <h1>Gift Certificates</h1>
           <p>Manage gift certificates and vouchers</p>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+        <div className="flex gap-sm">
           <button className="btn btn-secondary" onClick={openValidateModal}>
             <span>🔍</span> Validate Code
           </button>
@@ -461,7 +476,7 @@ const GiftCertificates = () => {
                       </div>
                       <div className="gc-detail-row">
                         <span>Balance:</span>
-                        <span style={{ fontWeight: 700, color: 'var(--success)' }}>
+                        <span className="font-bold text-success">
                           ₱{validationResult.giftCertificate.balance.toLocaleString()}
                         </span>
                       </div>
@@ -484,6 +499,28 @@ const GiftCertificates = () => {
           </div>
         </div>
       )}
+
+      {/* Redeem Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={redeemConfirm.isOpen}
+        onClose={() => setRedeemConfirm({ isOpen: false, gc: null })}
+        onConfirm={confirmRedeem}
+        title="Redeem Gift Certificate"
+        message={`Are you sure you want to redeem gift certificate ${redeemConfirm.gc?.code}?`}
+        confirmText="Redeem"
+        confirmVariant="primary"
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, gc: null })}
+        onConfirm={confirmDelete}
+        title="Delete Gift Certificate"
+        message={`Are you sure you want to delete gift certificate ${deleteConfirm.gc?.code}? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 };

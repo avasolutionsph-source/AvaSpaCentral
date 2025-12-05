@@ -29,14 +29,15 @@ const CashDrawerHistory = lazy(() => import('./pages/CashDrawerHistory'));
 const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
 const ServiceHistory = lazy(() => import('./pages/ServiceHistory'));
 const Inventory = lazy(() => import('./pages/Inventory'));
+const Suppliers = lazy(() => import('./pages/Suppliers'));
+const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Settings = lazy(() => import('./pages/Settings'));
 const AIChatbot = lazy(() => import('./pages/AIChatbot'));
-const AIInsights = lazy(() => import('./pages/AIInsights'));
+const AvaSenseiUltrathink = lazy(() => import('./pages/AvaSenseiUltrathink'));
 
 // Analytics Pages
-const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
 const ProductAnalytics = lazy(() => import('./pages/ProductAnalytics'));
 const InventoryAnalytics = lazy(() => import('./pages/InventoryAnalytics'));
 const CustomerAnalytics = lazy(() => import('./pages/CustomerAnalytics'));
@@ -154,13 +155,14 @@ function AppRoutes() {
           <Route path="activity-logs" element={<ProtectedRoute page="activity-logs"><Suspense fallback={<PageLoader />}><ActivityLogs /></Suspense></ProtectedRoute>} />
           <Route path="service-history" element={<ProtectedRoute page="service-history"><Suspense fallback={<PageLoader />}><ServiceHistory /></Suspense></ProtectedRoute>} />
           <Route path="inventory" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><Inventory /></Suspense></ProtectedRoute>} />
+          <Route path="suppliers" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><Suppliers /></Suspense></ProtectedRoute>} />
+          <Route path="purchase-orders" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><PurchaseOrders /></Suspense></ProtectedRoute>} />
           <Route path="reports" element={<ProtectedRoute page="reports"><Suspense fallback={<PageLoader />}><Reports /></Suspense></ProtectedRoute>} />
           <Route path="calendar" element={<ProtectedRoute page="calendar"><Suspense fallback={<PageLoader />}><Calendar /></Suspense></ProtectedRoute>} />
-          <Route path="ai-insights" element={<ProtectedRoute page="ai-insights"><Suspense fallback={<PageLoader />}><AIInsights /></Suspense></ProtectedRoute>} />
+          <Route path="ava-sensei" element={<ProtectedRoute page="ava-sensei"><Suspense fallback={<PageLoader />}><AvaSenseiUltrathink /></Suspense></ProtectedRoute>} />
           <Route path="ai-chatbot" element={<ProtectedRoute page="ai-chatbot"><Suspense fallback={<PageLoader />}><AIChatbot /></Suspense></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute page="settings"><Suspense fallback={<PageLoader />}><Settings /></Suspense></ProtectedRoute>} />
           {/* Analytics Routes */}
-          <Route path="analytics" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><AnalyticsDashboard /></Suspense></ProtectedRoute>} />
           <Route path="analytics/products" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><ProductAnalytics /></Suspense></ProtectedRoute>} />
           <Route path="analytics/inventory" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><InventoryAnalytics /></Suspense></ProtectedRoute>} />
           <Route path="analytics/customers" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><CustomerAnalytics /></Suspense></ProtectedRoute>} />

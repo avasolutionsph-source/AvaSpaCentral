@@ -43,8 +43,9 @@ const Dashboard = () => {
   const [newGoal, setNewGoal] = useState('');
   const [pendingRevenue, setPendingRevenue] = useState(0);
   const [todaysBookings, setTodaysBookings] = useState(0);
-  const [aiInsights, setAiInsights] = useState([]);
   const [showAiInsights, setShowAiInsights] = useState(true);
+  const [salaryHealth, setSalaryHealth] = useState(null);
+  const [insightsData, setInsightsData] = useState({ products: [], rooms: [] });
 
   useEffect(() => {
     let isMounted = true;
@@ -63,7 +64,7 @@ const Dashboard = () => {
         const today = new Date().toISOString().split('T')[0];
 
         // Fetch all data
-        const [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount] =
+        const [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount, salaryHealthData] =
           await Promise.all([
             mockApi.transactions.getRevenueSummary('today'),
             mockApi.transactions.getRevenueSummary('week'),
@@ -74,7 +75,8 @@ const Dashboard = () => {
             mockApi.products.getProducts(),
             mockApi.rooms.getRooms(),
             mockApi.advanceBooking.getPendingRevenue(),
-            mockApi.advanceBooking.getTodaysBookingsCount()
+            mockApi.advanceBooking.getTodaysBookingsCount(),
+            mockApi.analytics.getSalaryHealthMetrics()
           ]);
 
         // Check if component is still mounted before updating state
@@ -112,9 +114,8 @@ const Dashboard = () => {
         setRecentTransactions(transactions);
         setPendingRevenue(pendingRevenueData.total);
         setTodaysBookings(todaysBookingsCount);
-
-        // Generate AI insights
-        generateAIInsights(kpiData, transactions, products, rooms, pendingRevenueData, todaysBookingsCount);
+        setSalaryHealth(salaryHealthData);
+        setInsightsData({ products, rooms });
 
         setLoading(false);
       } catch (error) {
@@ -191,9 +192,7 @@ const Dashboard = () => {
       setRecentTransactions(transactions);
       setPendingRevenue(pendingRevenueData.total);
       setTodaysBookings(todaysBookingsCount);
-
-      // Generate AI insights
-      generateAIInsights(kpiData, transactions, products, rooms, pendingRevenueData, todaysBookingsCount);
+      setInsightsData({ products, rooms });
 
       setLoading(false);
     } catch (error) {
@@ -229,8 +228,14 @@ const Dashboard = () => {
       .reduce((sum, p) => sum + (p.stock * p.cost || 0), 0);
   };
 
-  const generateAIInsights = (kpiData, transactions, products, rooms, pendingRevenueData, todaysBookingsCount) => {
+  // Memoized AI Insights - only recalculates when dependencies change
+  const aiInsights = useMemo(() => {
+    if (!kpis || !recentTransactions) return [];
+
     const insights = [];
+    const kpiData = kpis;
+    const transactions = recentTransactions;
+    const pendingRevenueData = { total: pendingRevenue };
 
     // 1. Revenue Performance & Trend Analysis
     const revenueGrowth = ((kpiData.financial.weekRevenue / 7) / dailyGoal) * 100;
@@ -364,29 +369,29 @@ const Dashboard = () => {
     }
 
     // 5. Advance Booking Intelligence
-    if (todaysBookingsCount > 5) {
+    if (todaysBookings > 5) {
       insights.push({
         id: 'high_bookings',
         type: 'success',
         icon: '📅',
         title: 'High-Volume Day Ahead',
-        message: `${todaysBookingsCount} advance bookings today (₱${(todaysBookingsCount * avgTransaction).toLocaleString(undefined, { maximumFractionDigits: 0 })} projected). Ensure adequate staffing and supplies.`,
+        message: `${todaysBookings} advance bookings today (₱${(todaysBookings * avgTransaction).toLocaleString(undefined, { maximumFractionDigits: 0 })} projected). Ensure adequate staffing and supplies.`,
         action: 'View Schedule',
         actionLink: '/appointments',
         priority: 2,
-        metric: `${todaysBookingsCount} bookings`
+        metric: `${todaysBookings} bookings`
       });
-    } else if (todaysBookingsCount <= 2 && todaysBookingsCount > 0) {
+    } else if (todaysBookings <= 2 && todaysBookings > 0) {
       insights.push({
         id: 'low_bookings',
         type: 'info',
         icon: '📱',
         title: 'Booking Volume Below Average',
-        message: `Only ${todaysBookingsCount} advance bookings. Consider SMS/social media outreach to fill capacity.`,
+        message: `Only ${todaysBookings} advance bookings. Consider SMS/social media outreach to fill capacity.`,
         action: 'Boost Marketing',
         actionLink: '/appointments',
         priority: 3,
-        metric: `${todaysBookingsCount} bookings`
+        metric: `${todaysBookings} bookings`
       });
     }
 
@@ -505,8 +510,8 @@ const Dashboard = () => {
     // Sort by priority
     insights.sort((a, b) => a.priority - b.priority);
 
-    setAiInsights(insights.slice(0, 9)); // Show top 9 insights
-  };
+    return insights.slice(0, 9); // Show top 9 insights
+  }, [kpis, recentTransactions, pendingRevenue, todaysBookings, dailyGoal]);
 
   const handleSetGoal = useCallback(async () => {
     try {
@@ -851,6 +856,25 @@ const Dashboard = () => {
               <span className="kpi-label">Active Employees</span>
               <span className="kpi-value">{kpis?.staff.activeEmployees}</span>
             </div>
+            {salaryHealth && (
+              <div className="kpi-item" style={{ borderTop: '1px solid #eee', paddingTop: '8px', marginTop: '8px' }}>
+                <span className="kpi-label">Payroll Health</span>
+                <span className="kpi-value" style={{
+                  color: salaryHealth.health.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: salaryHealth.health.color
+                  }}></span>
+                  {salaryHealth.currentMonth.payrollPercentage}%
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -944,7 +968,7 @@ const Dashboard = () => {
 
       {/* Show Insights Button (when hidden) */}
       {!showAiInsights && (
-        <div style={{ marginBottom: 'var(--spacing-lg)', textAlign: 'center' }}>
+        <div className="mb-lg text-center">
           <button
             className="btn btn-primary"
             onClick={() => setShowAiInsights(true)}

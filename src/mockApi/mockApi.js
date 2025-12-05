@@ -438,26 +438,108 @@ export const employeesApi = {
 // CUSTOMERS API
 // =============================================================================
 
+// Customer Tier Configuration
+const CUSTOMER_TIERS = {
+  VIP: { minSpend: 50000, discount: 10, benefits: ['Priority booking', '10% discount', 'Exclusive offers'] },
+  REGULAR: { minSpend: 20000, discount: 5, benefits: ['5% discount', 'Birthday rewards'] },
+  NEW: { minSpend: 0, discount: 0, benefits: ['Welcome offer'] }
+};
+
+// Helper to calculate customer tier
+const calculateCustomerTier = (totalSpent) => {
+  if (totalSpent >= CUSTOMER_TIERS.VIP.minSpend) return 'VIP';
+  if (totalSpent >= CUSTOMER_TIERS.REGULAR.minSpend) return 'REGULAR';
+  return 'NEW';
+};
+
+// Helper to enrich customer with tier info
+const enrichCustomerWithTier = (customer) => {
+  const tier = calculateCustomerTier(customer.totalSpent || 0);
+  const tierInfo = CUSTOMER_TIERS[tier];
+  return {
+    ...customer,
+    tier,
+    tierInfo: {
+      discount: tierInfo.discount,
+      benefits: tierInfo.benefits,
+      nextTier: tier === 'NEW' ? 'REGULAR' : tier === 'REGULAR' ? 'VIP' : null,
+      spendToNextTier: tier === 'NEW'
+        ? CUSTOMER_TIERS.REGULAR.minSpend - (customer.totalSpent || 0)
+        : tier === 'REGULAR'
+          ? CUSTOMER_TIERS.VIP.minSpend - (customer.totalSpent || 0)
+          : 0
+    }
+  };
+};
+
 export const customersApi = {
-  // Get all customers
+  // Get customer tier thresholds
+  getTierConfig() {
+    return clone(CUSTOMER_TIERS);
+  },
+
+  // Get all customers with tier info
   async getCustomers(filters = {}) {
     await delay();
 
     let customers = clone(mockDatabase.customers);
 
+    // Enrich all customers with tier information
+    customers = customers.map(enrichCustomerWithTier);
+
+    // Filter by status
     if (filters.status) {
       customers = customers.filter(c => c.status === filters.status);
+    }
+
+    // Filter by tier
+    if (filters.tier) {
+      customers = customers.filter(c => c.tier === filters.tier);
+    }
+
+    // Search by name/phone/email
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      customers = customers.filter(c =>
+        c.name?.toLowerCase().includes(search) ||
+        c.phone?.includes(search) ||
+        c.email?.toLowerCase().includes(search)
+      );
     }
 
     return customers;
   },
 
-  // Get single customer
+  // Get single customer with tier info
   async getCustomer(id) {
     await delay();
     const customer = mockDatabase.customers.find(c => c._id === id);
     if (!customer) throw new Error('Customer not found');
-    return clone(customer);
+    return enrichCustomerWithTier(clone(customer));
+  },
+
+  // Get customer segments summary
+  async getCustomerSegments() {
+    await delay();
+
+    const customers = clone(mockDatabase.customers).map(enrichCustomerWithTier);
+
+    const segments = {
+      VIP: customers.filter(c => c.tier === 'VIP'),
+      REGULAR: customers.filter(c => c.tier === 'REGULAR'),
+      NEW: customers.filter(c => c.tier === 'NEW')
+    };
+
+    return {
+      summary: {
+        total: customers.length,
+        vip: segments.VIP.length,
+        regular: segments.REGULAR.length,
+        new: segments.NEW.length
+      },
+      segments,
+      tierConfig: clone(CUSTOMER_TIERS)
+    };
   },
 
   // Create customer
@@ -574,6 +656,94 @@ export const appointmentsApi = {
     mockDatabase.appointments.splice(index, 1);
 
     return { success: true };
+  },
+
+  // Check availability for therapist and/or room
+  async checkAvailability({ therapistId, roomId, date, time, duration, excludeAppointmentId = null }) {
+    await delay(100);
+
+    const conflicts = {
+      therapist: null,
+      room: null
+    };
+
+    if (!date || !time || !duration) {
+      return conflicts;
+    }
+
+    // Parse the new appointment time range
+    const newStart = new Date(`${date}T${time}:00`);
+    const newEnd = new Date(newStart.getTime() + duration * 60000);
+
+    // Get all appointments for the same date that are not cancelled
+    const dateAppointments = mockDatabase.appointments.filter(a => {
+      if (!a.dateTime && !a.scheduledDateTime) return false;
+      if (a.status === 'cancelled') return false;
+      if (excludeAppointmentId && a._id === excludeAppointmentId) return false;
+
+      const apptDateTime = a.dateTime || a.scheduledDateTime;
+      const apptDate = new Date(apptDateTime).toISOString().split('T')[0];
+      return apptDate === date;
+    });
+
+    // Check for therapist conflicts
+    if (therapistId) {
+      const therapistConflict = dateAppointments.find(a => {
+        const empId = a.employee?._id || a.employeeId;
+        if (empId !== therapistId) return false;
+
+        const apptDateTime = a.dateTime || a.scheduledDateTime;
+        const existingStart = new Date(apptDateTime);
+        const existingEnd = new Date(existingStart.getTime() + (a.duration || 60) * 60000);
+
+        // Check for overlap: new appointment overlaps if it starts before existing ends AND ends after existing starts
+        return newStart < existingEnd && newEnd > existingStart;
+      });
+
+      if (therapistConflict) {
+        const apptTime = new Date(therapistConflict.dateTime || therapistConflict.scheduledDateTime);
+        const therapistName = therapistConflict.employee
+          ? `${therapistConflict.employee.firstName} ${therapistConflict.employee.lastName}`
+          : 'Therapist';
+        conflicts.therapist = {
+          appointmentId: therapistConflict._id,
+          time: apptTime.toTimeString().slice(0, 5),
+          duration: therapistConflict.duration || 60,
+          customerName: therapistConflict.customer?.name || 'Customer',
+          serviceName: therapistConflict.service?.name || 'Service',
+          therapistName
+        };
+      }
+    }
+
+    // Check for room conflicts
+    if (roomId) {
+      const roomConflict = dateAppointments.find(a => {
+        const rmId = a.room?._id || a.roomId;
+        if (rmId !== roomId) return false;
+
+        const apptDateTime = a.dateTime || a.scheduledDateTime;
+        const existingStart = new Date(apptDateTime);
+        const existingEnd = new Date(existingStart.getTime() + (a.duration || 60) * 60000);
+
+        return newStart < existingEnd && newEnd > existingStart;
+      });
+
+      if (roomConflict) {
+        const apptTime = new Date(roomConflict.dateTime || roomConflict.scheduledDateTime);
+        const roomName = roomConflict.room?.name || 'Room';
+        conflicts.room = {
+          appointmentId: roomConflict._id,
+          time: apptTime.toTimeString().slice(0, 5),
+          duration: roomConflict.duration || 60,
+          customerName: roomConflict.customer?.name || 'Customer',
+          serviceName: roomConflict.service?.name || 'Service',
+          roomName
+        };
+      }
+    }
+
+    return conflicts;
   }
 };
 
@@ -622,8 +792,8 @@ export const attendanceApi = {
     return attendance;
   },
 
-  // Clock in
-  async clockIn(employeeId) {
+  // Clock in with optional photo and location
+  async clockIn(employeeId, captureData = null) {
     await delay(300);
 
     const employee = mockDatabase.employees.find(e => e._id === employeeId);
@@ -655,7 +825,12 @@ export const attendanceApi = {
       status: 'present',
       lateMinutes,
       hoursWorked: 0,
-      notes: lateMinutes > 0 ? 'Late arrival' : ''
+      notes: lateMinutes > 0 ? 'Late arrival' : '',
+      // Photo and GPS data for clock in
+      clockInPhoto: captureData?.photo || null,
+      clockInLocation: captureData?.location || null,
+      clockOutPhoto: null,
+      clockOutLocation: null
     };
 
     mockDatabase.attendance.push(record);
@@ -663,8 +838,8 @@ export const attendanceApi = {
     return { success: true, attendance: clone(record) };
   },
 
-  // Clock out
-  async clockOut(employeeId) {
+  // Clock out with optional photo and location
+  async clockOut(employeeId, captureData = null) {
     await delay(300);
 
     const today = new Date().toISOString().split('T')[0];
@@ -682,6 +857,9 @@ export const attendanceApi = {
 
     record.clockOut = clockOut.toISOString();
     record.hoursWorked = parseFloat(hoursWorked.toFixed(2));
+    // Photo and GPS data for clock out
+    record.clockOutPhoto = captureData?.photo || null;
+    record.clockOutLocation = captureData?.location || null;
 
     return { success: true, attendance: clone(record) };
   }
@@ -2502,6 +2680,129 @@ export const analyticsApi = {
   },
 
   // -------------------------------------------------------------------------
+  // SALARY HEALTH METRICS
+  // -------------------------------------------------------------------------
+  async getSalaryHealthMetrics() {
+    await delay();
+
+    const benchmarks = clone(mockDatabase.industryBenchmarks);
+    const employees = clone(mockDatabase.employees).filter(e => e.status === 'active');
+    const snapshots = clone(mockDatabase.monthlySnapshots);
+    const currentSnapshot = snapshots[snapshots.length - 1] || { revenue: 600000 };
+    const previousSnapshot = snapshots[snapshots.length - 2] || { revenue: 550000 };
+
+    // Calculate total monthly payroll
+    const totalPayroll = mockDatabase.fixedCosts.salaries || 180000;
+    const monthlyRevenue = currentSnapshot.revenue;
+    const previousPayrollPercent = (totalPayroll / previousSnapshot.revenue) * 100;
+
+    // Calculate payroll as percentage of revenue
+    const payrollPercentage = (totalPayroll / monthlyRevenue) * 100;
+
+    // Determine health score based on benchmarks
+    let healthScore = 100;
+    let healthStatus = 'excellent';
+    let healthColor = benchmarks.salaryHealth.excellent.color;
+    let healthLabel = benchmarks.salaryHealth.excellent.label;
+
+    if (payrollPercentage > 40) {
+      healthScore = benchmarks.salaryHealth.critical.score;
+      healthStatus = 'critical';
+      healthColor = benchmarks.salaryHealth.critical.color;
+      healthLabel = benchmarks.salaryHealth.critical.label;
+    } else if (payrollPercentage > 35) {
+      healthScore = benchmarks.salaryHealth.warning.score;
+      healthStatus = 'warning';
+      healthColor = benchmarks.salaryHealth.warning.color;
+      healthLabel = benchmarks.salaryHealth.warning.label;
+    } else if (payrollPercentage > 30) {
+      healthScore = benchmarks.salaryHealth.atLimit.score;
+      healthStatus = 'atLimit';
+      healthColor = benchmarks.salaryHealth.atLimit.color;
+      healthLabel = benchmarks.salaryHealth.atLimit.label;
+    } else if (payrollPercentage > 25) {
+      healthScore = benchmarks.salaryHealth.healthy.score;
+      healthStatus = 'healthy';
+      healthColor = benchmarks.salaryHealth.healthy.color;
+      healthLabel = benchmarks.salaryHealth.healthy.label;
+    }
+
+    // Calculate trend
+    const trendDiff = previousPayrollPercent - payrollPercentage;
+    let trend = 'stable';
+    if (trendDiff > 2) trend = 'improving';
+    else if (trendDiff < -2) trend = 'declining';
+
+    // Calculate per-employee metrics
+    const employeeCount = employees.length;
+    const avgSalaryPerEmployee = totalPayroll / employeeCount;
+    const revenuePerEmployee = monthlyRevenue / employeeCount;
+    const profitPerEmployee = (monthlyRevenue * 0.15) / employeeCount; // Assume 15% net profit
+
+    // Breakdown by role
+    const roleBreakdown = {};
+    employees.forEach(emp => {
+      const role = emp.position || 'Other';
+      if (!roleBreakdown[role]) {
+        roleBreakdown[role] = { count: 0, totalSalary: 0 };
+      }
+      roleBreakdown[role].count++;
+      roleBreakdown[role].totalSalary += emp.hourlyRate ? emp.hourlyRate * 160 : 15000; // Estimate monthly
+    });
+
+    // Compare to industry benchmark
+    const industryMin = benchmarks.payroll.min;
+    const industryMax = benchmarks.payroll.max;
+    const industryIdeal = benchmarks.payroll.ideal;
+    let benchmarkComparison = 'within';
+    if (payrollPercentage < industryMin) benchmarkComparison = 'below';
+    else if (payrollPercentage > industryMax) benchmarkComparison = 'above';
+
+    return {
+      currentMonth: {
+        totalPayroll,
+        revenue: monthlyRevenue,
+        payrollPercentage: parseFloat(payrollPercentage.toFixed(1)),
+        employeeCount,
+        avgSalaryPerEmployee: Math.round(avgSalaryPerEmployee),
+        revenuePerEmployee: Math.round(revenuePerEmployee),
+        profitPerEmployee: Math.round(profitPerEmployee)
+      },
+      health: {
+        score: healthScore,
+        status: healthStatus,
+        label: healthLabel,
+        color: healthColor
+      },
+      trend: {
+        direction: trend,
+        previousPercentage: parseFloat(previousPayrollPercent.toFixed(1)),
+        change: parseFloat(trendDiff.toFixed(1))
+      },
+      benchmark: {
+        industry: {
+          min: industryMin,
+          max: industryMax,
+          ideal: industryIdeal
+        },
+        comparison: benchmarkComparison,
+        gap: parseFloat((payrollPercentage - industryIdeal).toFixed(1))
+      },
+      breakdown: {
+        byRole: roleBreakdown,
+        fixed: totalPayroll,
+        commissions: Math.round(monthlyRevenue * 0.05) // Estimate 5% commissions
+      },
+      recommendations: [
+        payrollPercentage > 35 && { type: 'warning', message: 'Payroll costs are high. Consider optimizing staffing or increasing revenue.' },
+        payrollPercentage < 20 && { type: 'info', message: 'Payroll is below industry average. Ensure staff are fairly compensated.' },
+        trend === 'declining' && { type: 'warning', message: 'Payroll percentage is increasing. Monitor closely.' },
+        trend === 'improving' && { type: 'success', message: 'Payroll efficiency is improving compared to last month.' }
+      ].filter(Boolean)
+    };
+  },
+
+  // -------------------------------------------------------------------------
   // SALES HEATMAP DATA
   // -------------------------------------------------------------------------
   async getSalesHeatmapData() {
@@ -2924,6 +3225,600 @@ export const analyticsApi = {
       cannibalization,
       bundleSuggestions: bundles.sort((a, b) => parseFloat(b.correlation) - parseFloat(a.correlation))
     };
+  },
+
+  // -------------------------------------------------------------------------
+  // UTILIZATION METRICS
+  // No-Show Rate, Room Utilization, Therapist Utilization
+  // -------------------------------------------------------------------------
+  async getUtilizationMetrics(period = 'month') {
+    await delay();
+
+    const now = new Date();
+    let startDate;
+
+    switch (period) {
+      case 'week':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'quarter':
+        startDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const appointments = clone(mockDatabase.appointments);
+    const rooms = clone(mockDatabase.rooms);
+    const employees = clone(mockDatabase.employees).filter(e =>
+      e.status === 'active' && (e.department === 'Services' || e.position?.toLowerCase().includes('therapist'))
+    );
+    const transactions = mockDatabase.transactions.filter(t =>
+      new Date(t.date) >= startDate && new Date(t.date) <= now
+    );
+
+    // =====================
+    // NO-SHOW RATE CALCULATION
+    // =====================
+    // Since appointments may be limited in mock data, we'll simulate realistic numbers
+    const totalAppointments = Math.max(appointments.length, transactions.length * 0.8);
+    const noShowCount = Math.floor(totalAppointments * 0.08); // ~8% no-show rate (industry average)
+    const cancelledCount = Math.floor(totalAppointments * 0.12); // ~12% cancellation rate
+    const completedCount = Math.floor(totalAppointments * 0.75);
+    const confirmedCount = totalAppointments - noShowCount - cancelledCount - completedCount;
+
+    const noShowRate = totalAppointments > 0 ? (noShowCount / totalAppointments) * 100 : 0;
+    const cancellationRate = totalAppointments > 0 ? (cancelledCount / totalAppointments) * 100 : 0;
+    const completionRate = totalAppointments > 0 ? (completedCount / totalAppointments) * 100 : 0;
+
+    // No-show by day of week (simulated pattern - weekends higher)
+    const noShowByDayOfWeek = [
+      { day: 'Sunday', rate: 12.5 },
+      { day: 'Monday', rate: 6.2 },
+      { day: 'Tuesday', rate: 5.8 },
+      { day: 'Wednesday', rate: 7.1 },
+      { day: 'Thursday', rate: 6.5 },
+      { day: 'Friday', rate: 8.3 },
+      { day: 'Saturday', rate: 10.2 }
+    ];
+
+    // =====================
+    // ROOM UTILIZATION
+    // =====================
+    const operatingHoursPerDay = 12; // 9 AM to 9 PM
+    const daysInPeriod = Math.ceil((now - startDate) / (1000 * 60 * 60 * 24));
+    const totalAvailableRoomHours = rooms.filter(r => r.status !== 'maintenance').length * operatingHoursPerDay * daysInPeriod;
+
+    // Calculate booked room hours from transactions (estimate 1.2 hours average per transaction)
+    const avgServiceDuration = 1.2; // hours
+    const bookedRoomHours = transactions.length * avgServiceDuration;
+    const roomUtilization = totalAvailableRoomHours > 0 ? (bookedRoomHours / totalAvailableRoomHours) * 100 : 0;
+
+    // Per-room utilization
+    const roomUtilizationDetails = rooms.map(room => {
+      const roomTransactions = transactions.filter(t =>
+        t.items?.some(item => item.roomId === room._id) ||
+        room.status === 'occupied'
+      );
+      // Simulate varying utilization per room
+      const baseUtilization = room.status === 'maintenance' ? 0 :
+        room.type === 'VIP' ? 45 + Math.random() * 20 :
+        room.type === 'Couples' ? 55 + Math.random() * 25 :
+        60 + Math.random() * 25;
+
+      const roomHours = (baseUtilization / 100) * operatingHoursPerDay * daysInPeriod;
+      const revenuePerHour = room.type === 'VIP' ? 850 : room.type === 'Couples' ? 750 : 600;
+      const estimatedRevenue = Math.round(roomHours * revenuePerHour);
+
+      return {
+        roomId: room._id,
+        roomName: room.name,
+        roomType: room.type,
+        status: room.status,
+        utilizationPercent: Math.round(baseUtilization),
+        bookedHours: Math.round(roomHours),
+        availableHours: room.status === 'maintenance' ? 0 : operatingHoursPerDay * daysInPeriod,
+        estimatedRevenue,
+        revenuePerHour: Math.round(estimatedRevenue / Math.max(roomHours, 1))
+      };
+    });
+
+    const avgRoomUtilization = roomUtilizationDetails
+      .filter(r => r.status !== 'maintenance')
+      .reduce((sum, r) => sum + r.utilizationPercent, 0) /
+      roomUtilizationDetails.filter(r => r.status !== 'maintenance').length;
+
+    // =====================
+    // THERAPIST UTILIZATION
+    // =====================
+    const therapistUtilizationDetails = employees.map(emp => {
+      const empTransactions = transactions.filter(t => t.employee?.id === emp._id);
+      const serviceHours = empTransactions.length * avgServiceDuration;
+
+      // Calculate scheduled hours from attendance
+      const attendance = mockDatabase.attendance.filter(a =>
+        a.employeeId === emp._id && new Date(a.date) >= startDate
+      );
+      const scheduledHours = attendance.reduce((sum, a) => sum + (a.hoursWorked || 8), 0) || (daysInPeriod * 8 * 0.7);
+
+      const utilization = scheduledHours > 0 ? (serviceHours / scheduledHours) * 100 : 0;
+      const revenue = empTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+
+      return {
+        employeeId: emp._id,
+        name: `${emp.firstName} ${emp.lastName}`,
+        position: emp.position,
+        serviceHours: Math.round(serviceHours),
+        scheduledHours: Math.round(scheduledHours),
+        utilizationPercent: Math.min(Math.round(utilization), 95), // Cap at 95%
+        transactionCount: empTransactions.length,
+        revenue,
+        revenuePerHour: scheduledHours > 0 ? Math.round(revenue / scheduledHours) : 0,
+        avgTicket: empTransactions.length > 0 ? Math.round(revenue / empTransactions.length) : 0
+      };
+    });
+
+    const avgTherapistUtilization = therapistUtilizationDetails.length > 0
+      ? therapistUtilizationDetails.reduce((sum, t) => sum + t.utilizationPercent, 0) / therapistUtilizationDetails.length
+      : 0;
+
+    // =====================
+    // PEAK HOURS ANALYSIS
+    // =====================
+    const peakHours = [
+      { hour: '9:00', utilization: 35 },
+      { hour: '10:00', utilization: 55 },
+      { hour: '11:00', utilization: 70 },
+      { hour: '12:00', utilization: 45 },
+      { hour: '13:00', utilization: 40 },
+      { hour: '14:00', utilization: 65 },
+      { hour: '15:00', utilization: 80 },
+      { hour: '16:00', utilization: 85 },
+      { hour: '17:00', utilization: 90 },
+      { hour: '18:00', utilization: 85 },
+      { hour: '19:00', utilization: 75 },
+      { hour: '20:00', utilization: 50 }
+    ];
+
+    const peakHourSlots = peakHours.filter(h => h.utilization >= 80);
+    const lowUtilizationSlots = peakHours.filter(h => h.utilization < 50);
+
+    // =====================
+    // REVENUE PER ROOM METRICS
+    // =====================
+    const activeRooms = rooms.filter(r => r.status !== 'maintenance').length;
+    const totalRevenue = transactions.reduce((sum, t) => sum + t.totalAmount, 0);
+    const avgRevenuePerRoom = activeRooms > 0 ? totalRevenue / activeRooms : 0;
+
+    return {
+      period,
+      dateRange: {
+        start: startDate.toISOString(),
+        end: now.toISOString(),
+        days: daysInPeriod
+      },
+      noShow: {
+        totalAppointments: Math.round(totalAppointments),
+        noShowCount,
+        noShowRate: noShowRate.toFixed(1),
+        cancelledCount,
+        cancellationRate: cancellationRate.toFixed(1),
+        completedCount,
+        completionRate: completionRate.toFixed(1),
+        confirmedCount,
+        byDayOfWeek: noShowByDayOfWeek,
+        costOfNoShows: Math.round(noShowCount * 650), // Avg service price
+        insight: noShowRate > 10
+          ? 'No-show rate is above industry average (10%). Consider appointment reminders or deposits.'
+          : 'No-show rate is within acceptable range.'
+      },
+      roomUtilization: {
+        totalRooms: rooms.length,
+        activeRooms,
+        maintenanceRooms: rooms.filter(r => r.status === 'maintenance').length,
+        avgUtilizationPercent: Math.round(avgRoomUtilization),
+        totalAvailableHours: Math.round(totalAvailableRoomHours),
+        totalBookedHours: Math.round(bookedRoomHours),
+        rooms: roomUtilizationDetails.sort((a, b) => b.utilizationPercent - a.utilizationPercent),
+        underutilized: roomUtilizationDetails.filter(r => r.utilizationPercent < 50 && r.status !== 'maintenance'),
+        highPerformers: roomUtilizationDetails.filter(r => r.utilizationPercent >= 70),
+        avgRevenuePerRoom: Math.round(avgRevenuePerRoom),
+        insight: avgRoomUtilization < 60
+          ? 'Room utilization is below optimal (60%). Consider promotions during off-peak hours.'
+          : 'Room utilization is healthy.'
+      },
+      therapistUtilization: {
+        totalTherapists: therapistUtilizationDetails.length,
+        avgUtilizationPercent: Math.round(avgTherapistUtilization),
+        therapists: therapistUtilizationDetails.sort((a, b) => b.utilizationPercent - a.utilizationPercent),
+        topPerformers: therapistUtilizationDetails.filter(t => t.utilizationPercent >= 70).slice(0, 3),
+        needsMoreBookings: therapistUtilizationDetails.filter(t => t.utilizationPercent < 50),
+        insight: avgTherapistUtilization < 65
+          ? 'Therapist utilization is below target (65%). Consider reducing staff during slow periods.'
+          : 'Therapist utilization is optimal.'
+      },
+      peakAnalysis: {
+        hourlyUtilization: peakHours,
+        peakHours: peakHourSlots.map(h => h.hour),
+        lowUtilizationHours: lowUtilizationSlots.map(h => h.hour),
+        recommendation: `Peak hours are ${peakHourSlots.map(h => h.hour).join(', ')}. Consider premium pricing during these times.`
+      },
+      summary: {
+        overallScore: Math.round((100 - noShowRate + avgRoomUtilization + avgTherapistUtilization) / 3),
+        totalRevenue,
+        revenuePerRoom: Math.round(avgRevenuePerRoom),
+        revenuePerTherapist: therapistUtilizationDetails.length > 0
+          ? Math.round(totalRevenue / therapistUtilizationDetails.length)
+          : 0,
+        capacityRecommendations: [
+          avgRoomUtilization > 80 && { type: 'expansion', message: 'Consider adding more rooms - current utilization is high' },
+          avgTherapistUtilization > 85 && { type: 'hiring', message: 'Consider hiring more therapists to meet demand' },
+          avgRoomUtilization < 50 && { type: 'marketing', message: 'Focus on marketing to fill empty room slots' },
+          noShowRate > 15 && { type: 'policy', message: 'Implement stricter no-show policy or deposits' }
+        ].filter(Boolean)
+      }
+    };
+  }
+};
+
+// ============================================================================
+// SUPPLIERS API
+// ============================================================================
+const suppliersApi = {
+  async getSuppliers(filters = {}) {
+    await delay();
+    let suppliers = clone(mockDatabase.suppliers);
+
+    // Apply filters
+    if (filters.status) {
+      suppliers = suppliers.filter(s => s.status === filters.status);
+    }
+    if (filters.category) {
+      suppliers = suppliers.filter(s => s.category === filters.category);
+    }
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      suppliers = suppliers.filter(s =>
+        s.name.toLowerCase().includes(search) ||
+        s.contactPerson.toLowerCase().includes(search) ||
+        s.email.toLowerCase().includes(search)
+      );
+    }
+
+    return suppliers;
+  },
+
+  async getSupplier(id) {
+    await delay();
+    const supplier = mockDatabase.suppliers.find(s => s._id === id);
+    if (!supplier) throw new Error('Supplier not found');
+
+    // Get associated purchase orders
+    const purchaseOrders = mockDatabase.purchaseOrders.filter(po => po.supplierId === id);
+
+    return {
+      ...clone(supplier),
+      purchaseOrders: purchaseOrders.slice(0, 10),
+      totalOrders: purchaseOrders.length,
+      totalSpent: purchaseOrders.reduce((sum, po) => sum + po.totalAmount, 0)
+    };
+  },
+
+  async createSupplier(data) {
+    await delay();
+    const newSupplier = {
+      _id: `sup_${Date.now()}`,
+      businessId: 'biz_001',
+      name: data.name,
+      contactPerson: data.contactPerson || '',
+      email: data.email || '',
+      phone: data.phone || '',
+      address: data.address || '',
+      category: data.category || 'General',
+      paymentTerms: data.paymentTerms || 'COD',
+      status: 'active',
+      rating: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    mockDatabase.suppliers.push(newSupplier);
+    return clone(newSupplier);
+  },
+
+  async updateSupplier(id, data) {
+    await delay();
+    const index = mockDatabase.suppliers.findIndex(s => s._id === id);
+    if (index === -1) throw new Error('Supplier not found');
+
+    mockDatabase.suppliers[index] = {
+      ...mockDatabase.suppliers[index],
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+
+    return clone(mockDatabase.suppliers[index]);
+  },
+
+  async deleteSupplier(id) {
+    await delay();
+    const index = mockDatabase.suppliers.findIndex(s => s._id === id);
+    if (index === -1) throw new Error('Supplier not found');
+
+    // Check if supplier has purchase orders
+    const hasOrders = mockDatabase.purchaseOrders.some(po => po.supplierId === id);
+    if (hasOrders) {
+      // Soft delete - just mark as inactive
+      mockDatabase.suppliers[index].status = 'inactive';
+      return { success: true, message: 'Supplier deactivated (has existing orders)' };
+    }
+
+    mockDatabase.suppliers.splice(index, 1);
+    return { success: true, message: 'Supplier deleted' };
+  },
+
+  async getCategories() {
+    await delay();
+    const categories = [...new Set(mockDatabase.suppliers.map(s => s.category))];
+    return categories;
+  }
+};
+
+// ============================================================================
+// PURCHASE ORDERS API
+// ============================================================================
+const purchaseOrdersApi = {
+  async getPurchaseOrders(filters = {}) {
+    await delay();
+    let orders = clone(mockDatabase.purchaseOrders);
+
+    // Apply filters
+    if (filters.status) {
+      orders = orders.filter(o => o.status === filters.status);
+    }
+    if (filters.supplierId) {
+      orders = orders.filter(o => o.supplierId === filters.supplierId);
+    }
+    if (filters.paymentStatus) {
+      orders = orders.filter(o => o.paymentStatus === filters.paymentStatus);
+    }
+    if (filters.startDate) {
+      orders = orders.filter(o => new Date(o.orderDate) >= new Date(filters.startDate));
+    }
+    if (filters.endDate) {
+      orders = orders.filter(o => new Date(o.orderDate) <= new Date(filters.endDate));
+    }
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      orders = orders.filter(o =>
+        o.orderNumber.toLowerCase().includes(search) ||
+        o.supplierName.toLowerCase().includes(search)
+      );
+    }
+
+    return orders;
+  },
+
+  async getPurchaseOrder(id) {
+    await delay();
+    const order = mockDatabase.purchaseOrders.find(o => o._id === id);
+    if (!order) throw new Error('Purchase order not found');
+
+    const supplier = mockDatabase.suppliers.find(s => s._id === order.supplierId);
+
+    return {
+      ...clone(order),
+      supplier: supplier ? clone(supplier) : null
+    };
+  },
+
+  async createPurchaseOrder(data) {
+    await delay();
+
+    const supplier = mockDatabase.suppliers.find(s => s._id === data.supplierId);
+    if (!supplier) throw new Error('Supplier not found');
+
+    const now = new Date();
+    const orderNumber = `PO-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${String(mockDatabase.purchaseOrders.length + 1).padStart(3, '0')}`;
+
+    // Calculate total
+    const items = data.items.map(item => ({
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitCost: item.unitCost,
+      subtotal: item.quantity * item.unitCost,
+      receivedQty: 0,
+      defectiveQty: 0
+    }));
+
+    const totalAmount = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+    const newOrder = {
+      _id: `po_${Date.now()}`,
+      businessId: 'biz_001',
+      supplierId: data.supplierId,
+      supplierName: supplier.name,
+      orderNumber,
+      orderDate: now.toISOString(),
+      expectedDeliveryDate: data.expectedDeliveryDate || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      actualDeliveryDate: null,
+      items,
+      totalAmount,
+      defectiveItems: 0,
+      status: 'pending',
+      isOnTime: null,
+      leadTimeDays: null,
+      paymentStatus: 'pending',
+      notes: data.notes || '',
+      createdBy: data.createdBy || 'System'
+    };
+
+    mockDatabase.purchaseOrders.unshift(newOrder);
+    return clone(newOrder);
+  },
+
+  async updatePurchaseOrder(id, data) {
+    await delay();
+    const index = mockDatabase.purchaseOrders.findIndex(o => o._id === id);
+    if (index === -1) throw new Error('Purchase order not found');
+
+    const order = mockDatabase.purchaseOrders[index];
+
+    // Can only update pending orders
+    if (order.status !== 'pending' && !data.forceUpdate) {
+      throw new Error('Can only modify pending orders');
+    }
+
+    // Update items if provided
+    if (data.items) {
+      data.items = data.items.map(item => ({
+        ...item,
+        subtotal: item.quantity * item.unitCost
+      }));
+      data.totalAmount = data.items.reduce((sum, item) => sum + item.subtotal, 0);
+    }
+
+    mockDatabase.purchaseOrders[index] = {
+      ...order,
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+
+    return clone(mockDatabase.purchaseOrders[index]);
+  },
+
+  async approvePurchaseOrder(id) {
+    await delay();
+    const index = mockDatabase.purchaseOrders.findIndex(o => o._id === id);
+    if (index === -1) throw new Error('Purchase order not found');
+
+    mockDatabase.purchaseOrders[index].status = 'approved';
+    mockDatabase.purchaseOrders[index].approvedAt = new Date().toISOString();
+
+    return clone(mockDatabase.purchaseOrders[index]);
+  },
+
+  async receivePurchaseOrder(id, receivedItems) {
+    await delay();
+    const index = mockDatabase.purchaseOrders.findIndex(o => o._id === id);
+    if (index === -1) throw new Error('Purchase order not found');
+
+    const order = mockDatabase.purchaseOrders[index];
+    const now = new Date();
+
+    // Update received quantities and defectives
+    let totalDefective = 0;
+    order.items = order.items.map(item => {
+      const received = receivedItems.find(r => r.productId === item.productId);
+      if (received) {
+        item.receivedQty = received.receivedQty || item.quantity;
+        item.defectiveQty = received.defectiveQty || 0;
+        totalDefective += item.defectiveQty;
+
+        // Update product stock
+        const productIndex = mockDatabase.products.findIndex(p => p._id === item.productId);
+        if (productIndex !== -1) {
+          mockDatabase.products[productIndex].stock = (mockDatabase.products[productIndex].stock || 0) + item.receivedQty - item.defectiveQty;
+        }
+      }
+      return item;
+    });
+
+    // Update order status
+    order.status = 'received';
+    order.actualDeliveryDate = now.toISOString();
+    order.defectiveItems = totalDefective;
+    order.isOnTime = new Date(order.actualDeliveryDate) <= new Date(order.expectedDeliveryDate);
+    order.leadTimeDays = Math.floor((now - new Date(order.orderDate)) / (1000 * 60 * 60 * 24));
+
+    mockDatabase.purchaseOrders[index] = order;
+
+    return clone(order);
+  },
+
+  async cancelPurchaseOrder(id, reason) {
+    await delay();
+    const index = mockDatabase.purchaseOrders.findIndex(o => o._id === id);
+    if (index === -1) throw new Error('Purchase order not found');
+
+    const order = mockDatabase.purchaseOrders[index];
+    if (order.status === 'received') {
+      throw new Error('Cannot cancel received orders');
+    }
+
+    mockDatabase.purchaseOrders[index].status = 'cancelled';
+    mockDatabase.purchaseOrders[index].cancelledAt = new Date().toISOString();
+    mockDatabase.purchaseOrders[index].cancelReason = reason || '';
+
+    return clone(mockDatabase.purchaseOrders[index]);
+  },
+
+  async markAsPaid(id) {
+    await delay();
+    const index = mockDatabase.purchaseOrders.findIndex(o => o._id === id);
+    if (index === -1) throw new Error('Purchase order not found');
+
+    mockDatabase.purchaseOrders[index].paymentStatus = 'paid';
+    mockDatabase.purchaseOrders[index].paidAt = new Date().toISOString();
+
+    return clone(mockDatabase.purchaseOrders[index]);
+  },
+
+  async getReorderSuggestions() {
+    await delay();
+
+    const products = mockDatabase.products.filter(p => p.type === 'product');
+    const suggestions = [];
+
+    products.forEach(product => {
+      const reorderPoint = product.lowStockAlert || 5;
+      if (product.stock <= reorderPoint) {
+        // Calculate suggested quantity based on avg usage
+        const suggestedQty = Math.max(20, reorderPoint * 3);
+
+        suggestions.push({
+          productId: product._id,
+          productName: product.name,
+          currentStock: product.stock,
+          reorderPoint,
+          suggestedQty,
+          unitCost: product.cost || 100,
+          estimatedTotal: suggestedQty * (product.cost || 100),
+          urgency: product.stock === 0 ? 'critical' : product.stock <= reorderPoint / 2 ? 'high' : 'medium'
+        });
+      }
+    });
+
+    return suggestions.sort((a, b) => {
+      const urgencyOrder = { critical: 0, high: 1, medium: 2 };
+      return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+    });
+  },
+
+  async getSummary() {
+    await delay();
+
+    const orders = mockDatabase.purchaseOrders;
+    const now = new Date();
+    const thisMonth = orders.filter(o => {
+      const orderDate = new Date(o.orderDate);
+      return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+    });
+
+    return {
+      totalOrders: orders.length,
+      pendingOrders: orders.filter(o => o.status === 'pending').length,
+      approvedOrders: orders.filter(o => o.status === 'approved').length,
+      receivedOrders: orders.filter(o => o.status === 'received').length,
+      cancelledOrders: orders.filter(o => o.status === 'cancelled').length,
+      pendingPayments: orders.filter(o => o.paymentStatus === 'pending' && o.status === 'received').length,
+      thisMonthTotal: thisMonth.reduce((sum, o) => sum + o.totalAmount, 0),
+      thisMonthCount: thisMonth.length
+    };
   }
 };
 
@@ -2948,5 +3843,7 @@ export default {
   cashDrawer: cashDrawerApi,
   productConsumption: productConsumptionApi,
   shiftSchedules: shiftSchedulesApi,
-  analytics: analyticsApi
+  analytics: analyticsApi,
+  suppliers: suppliersApi,
+  purchaseOrders: purchaseOrdersApi
 };

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
 import { getTherapists } from '../utils/employeeFilters';
+import { ConfirmDialog } from '../components/shared';
 
 const POS = () => {
   const { showToast } = useApp();
@@ -59,6 +60,9 @@ const POS = () => {
   const [rotationQueue, setRotationQueue] = useState([]);
   const [nextEmployee, setNextEmployee] = useState(null);
   const [showRotationQueue, setShowRotationQueue] = useState(true);
+
+  // Clear cart confirmation state
+  const [clearCartConfirm, setClearCartConfirm] = useState(false);
 
   // Scheduled employees for advance booking (based on selected date)
   const [scheduledEmployees, setScheduledEmployees] = useState([]);
@@ -287,11 +291,13 @@ const POS = () => {
 
   const clearCart = () => {
     if (cart.length === 0) return;
+    setClearCartConfirm(true);
+  };
 
-    if (window.confirm('Are you sure you want to clear the cart?')) {
-      setCart([]);
-      showToast('Cart cleared', 'info');
-    }
+  const confirmClearCart = () => {
+    setCart([]);
+    setClearCartConfirm(false);
+    showToast('Cart cleared', 'info');
   };
 
   const getCartSubtotal = () => {
@@ -1478,6 +1484,17 @@ const POS = () => {
           </div>
         </div>
       )}
+
+      {/* Clear Cart Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={clearCartConfirm}
+        onClose={() => setClearCartConfirm(false)}
+        onConfirm={confirmClearCart}
+        title="Clear Cart"
+        message="Are you sure you want to clear the cart? All items will be removed."
+        confirmText="Clear"
+        confirmVariant="warning"
+      />
 
       {/* Gift Certificate Validation Modal */}
       {showGCModal && (

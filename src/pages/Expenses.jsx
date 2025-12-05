@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { ConfirmDialog } from '../components/shared';
 
 const Expenses = () => {
   const { showToast } = useApp();
@@ -12,6 +13,7 @@ const Expenses = () => {
 
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterPayment, setFilterPayment] = useState('all');
+  const [filterExpenseType, setFilterExpenseType] = useState('all');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,9 +22,13 @@ const Expenses = () => {
   const [modalMode, setModalMode] = useState('create');
   const [selectedExpense, setSelectedExpense] = useState(null);
 
+  // Delete confirmation dialog state
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, expense: null });
+
   const [formData, setFormData] = useState({
     date: '',
     category: '',
+    expenseType: '',
     description: '',
     vendor: '',
     amount: '',
@@ -47,13 +53,38 @@ const Expenses = () => {
   const paymentMethods = ['Cash', 'Credit Card', 'Bank Transfer', 'Check', 'E-Wallet'];
   const recurringFrequencies = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
+  // Expense types with labels and icons
+  const expenseTypes = [
+    { value: 'fixed', label: 'Fixed Cost', icon: '🔒', color: '#3B82F6' },
+    { value: 'variable', label: 'Variable Cost', icon: '📊', color: '#F97316' },
+    { value: 'opex', label: 'Operating Expense', icon: '⚙️', color: '#8B5CF6' },
+    { value: 'capex', label: 'Capital Expense', icon: '🏗️', color: '#14B8A6' },
+    { value: 'direct', label: 'Direct Cost', icon: '🎯', color: '#10B981' },
+    { value: 'indirect', label: 'Indirect Cost', icon: '📋', color: '#6B7280' }
+  ];
+
+  // Default expense type based on category
+  const getDefaultExpenseType = (category) => {
+    const defaults = {
+      'Rent': 'fixed',
+      'Salaries': 'fixed',
+      'Utilities': 'variable',
+      'Office Supplies': 'direct',
+      'Marketing': 'opex',
+      'Maintenance': 'opex',
+      'Inventory': 'capex',
+      'Other': 'indirect'
+    };
+    return defaults[category] || 'opex';
+  };
+
   useEffect(() => {
     loadExpenses();
   }, []);
 
   useEffect(() => {
     filterExpensesList();
-  }, [expenses, filterCategory, filterPayment, filterDateFrom, filterDateTo, searchTerm]);
+  }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm]);
 
   const loadExpenses = async () => {
     try {
@@ -78,6 +109,11 @@ const Expenses = () => {
     // Payment method filter
     if (filterPayment !== 'all') {
       filtered = filtered.filter(e => e.paymentMethod === filterPayment);
+    }
+
+    // Expense type filter
+    if (filterExpenseType !== 'all') {
+      filtered = filtered.filter(e => e.expenseType === filterExpenseType);
     }
 
     // Date range filter
@@ -137,6 +173,7 @@ const Expenses = () => {
     setFormData({
       date: format(new Date(), 'yyyy-MM-dd'),
       category: '',
+      expenseType: '',
       description: '',
       vendor: '',
       amount: '',
@@ -155,6 +192,7 @@ const Expenses = () => {
     setFormData({
       date: expense.date,
       category: expense.category,
+      expenseType: expense.expenseType || getDefaultExpenseType(expense.category),
       description: expense.description,
       vendor: expense.vendor,
       amount: expense.amount.toString(),
@@ -169,6 +207,17 @@ const Expenses = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    // Auto-set expense type when category changes (only if expense type is empty)
+    if (name === 'category' && !formData.expenseType) {
+      setFormData(prev => ({
+        ...prev,
+        category: value,
+        expenseType: getDefaultExpenseType(value)
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -219,6 +268,7 @@ const Expenses = () => {
       const expenseData = {
         date: formData.date,
         category: formData.category,
+        expenseType: formData.expenseType || getDefaultExpenseType(formData.category),
         description: formData.description.trim(),
         vendor: formData.vendor.trim(),
         amount: parseFloat(formData.amount),
@@ -243,11 +293,17 @@ const Expenses = () => {
     }
   };
 
-  const handleDelete = async (expense) => {
-    if (!window.confirm(`Delete expense "${expense.description}"?`)) return;
+  const handleDelete = (expense) => {
+    setDeleteConfirm({ isOpen: true, expense });
+  };
+
+  const confirmDelete = async () => {
+    const expense = deleteConfirm.expense;
+    if (!expense) return;
     try {
       await mockApi.expenses.deleteExpense(expense._id);
       showToast('Expense deleted', 'success');
+      setDeleteConfirm({ isOpen: false, expense: null });
       loadExpenses();
     } catch (error) {
       showToast('Failed to delete', 'error');
@@ -260,10 +316,11 @@ const Expenses = () => {
       return;
     }
 
-    const headers = ['Date', 'Category', 'Description', 'Vendor', 'Amount', 'Payment Method', 'Notes'];
+    const headers = ['Date', 'Category', 'Expense Type', 'Description', 'Vendor', 'Amount', 'Payment Method', 'Notes'];
     const rows = filteredExpenses.map(e => [
       e.date,
       e.category,
+      getExpenseTypeInfo(e.expenseType).label,
       e.description,
       e.vendor,
       e.amount,
@@ -291,6 +348,10 @@ const Expenses = () => {
     return category.toLowerCase().replace(/\s+/g, '-');
   };
 
+  const getExpenseTypeInfo = (type) => {
+    return expenseTypes.find(t => t.value === type) || { value: type, label: type, icon: '📋', color: '#6B7280' };
+  };
+
   if (loading) {
     return <div className="page-loading"><div className="spinner"></div><p>Loading expenses...</p></div>;
   }
@@ -302,7 +363,7 @@ const Expenses = () => {
           <h1>Expenses</h1>
           <p>Track and manage business expenses</p>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+        <div className="flex gap-sm">
           <button className="export-btn" onClick={handleExport}>
             📊 Export CSV
           </button>
@@ -362,6 +423,15 @@ const Expenses = () => {
             </select>
           </div>
           <div className="form-group">
+            <label>Expense Type</label>
+            <select value={filterExpenseType} onChange={(e) => setFilterExpenseType(e.target.value)} className="form-control">
+              <option value="all">All Types</option>
+              {expenseTypes.map(type => (
+                <option key={type.value} value={type.value}>{type.icon} {type.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
             <label>Date From</label>
             <input
               type="date"
@@ -385,6 +455,7 @@ const Expenses = () => {
               onClick={() => {
                 setFilterCategory('all');
                 setFilterPayment('all');
+                setFilterExpenseType('all');
                 setFilterDateFrom('');
                 setFilterDateTo('');
                 setSearchTerm('');
@@ -395,7 +466,7 @@ const Expenses = () => {
             </button>
           </div>
         </div>
-        <div style={{ marginTop: 'var(--spacing-md)', color: 'var(--gray-600)', fontSize: '0.875rem' }}>
+        <div className="mt-md text-gray-600 text-sm">
           Showing {filteredExpenses.length} of {expenses.length} expenses
         </div>
       </div>
@@ -416,6 +487,7 @@ const Expenses = () => {
               <tr>
                 <th>Date</th>
                 <th>Category</th>
+                <th>Type</th>
                 <th>Description</th>
                 <th>Vendor</th>
                 <th>Amount</th>
@@ -433,6 +505,16 @@ const Expenses = () => {
                     <span className={`expense-category-badge ${getCategoryBadgeClass(expense.category)}`}>
                       {expense.category}
                     </span>
+                  </td>
+                  <td>
+                    {expense.expenseType && (
+                      <span
+                        className={`expense-type-badge ${expense.expenseType}`}
+                        title={getExpenseTypeInfo(expense.expenseType).label}
+                      >
+                        {getExpenseTypeInfo(expense.expenseType).icon} {getExpenseTypeInfo(expense.expenseType).label}
+                      </span>
+                    )}
                   </td>
                   <td>
                     <div className="expense-description-cell">
@@ -511,6 +593,25 @@ const Expenses = () => {
                       {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                   </div>
+                </div>
+                <div className="form-group">
+                  <label>Expense Type</label>
+                  <select
+                    name="expenseType"
+                    value={formData.expenseType}
+                    onChange={handleInputChange}
+                    className="form-control"
+                  >
+                    <option value="">Auto-detect from category</option>
+                    {expenseTypes.map(type => (
+                      <option key={type.value} value={type.value}>
+                        {type.icon} {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  <small style={{ color: 'var(--gray-500)', marginTop: '4px', display: 'block' }}>
+                    Classification helps with financial analysis and reporting
+                  </small>
                 </div>
                 <div className="form-group">
                   <label>Description *</label>
@@ -656,6 +757,17 @@ const Expenses = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, expense: null })}
+        onConfirm={confirmDelete}
+        title="Delete Expense"
+        message={`Are you sure you want to delete expense "${deleteConfirm.expense?.description}"? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 };

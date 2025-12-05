@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, isToday, parseISO } from 'date-fns';
+import { ConfirmDialog } from '../components/shared';
 
 const Customers = () => {
   const { showToast } = useApp();
@@ -10,6 +11,7 @@ const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [tierFilter, setTierFilter] = useState(''); // Filter by spend tier
   const [activeTab, setActiveTab] = useState('customers'); // 'customers', 'loyalty'
 
   const [showModal, setShowModal] = useState(false);
@@ -27,6 +29,9 @@ const Customers = () => {
   const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [redeemCustomer, setRedeemCustomer] = useState(null);
   const [selectedReward, setSelectedReward] = useState(null);
+
+  // Delete confirmation dialog state
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, customer: null });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -83,7 +88,7 @@ const Customers = () => {
 
   useEffect(() => {
     filterCustomersList();
-  }, [customers, searchTerm]);
+  }, [customers, searchTerm, tierFilter]);
 
   const loadCustomers = async () => {
     try {
@@ -102,11 +107,34 @@ const Customers = () => {
     if (searchTerm.trim()) {
       filtered = filtered.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm)
+        (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (c.phone && c.phone.includes(searchTerm))
       );
     }
+    // Filter by spend-based tier
+    if (tierFilter) {
+      filtered = filtered.filter(c => c.tier === tierFilter);
+    }
     setFilteredCustomers(filtered);
+  };
+
+  // Get tier stats for display
+  const getTierStats = () => {
+    return {
+      VIP: customers.filter(c => c.tier === 'VIP').length,
+      REGULAR: customers.filter(c => c.tier === 'REGULAR').length,
+      NEW: customers.filter(c => c.tier === 'NEW').length
+    };
+  };
+
+  // Get spend tier badge styling
+  const getSpendTierBadge = (tier) => {
+    const styles = {
+      VIP: { bg: 'linear-gradient(135deg, #ffd700, #ffb700)', color: '#7c4d00', icon: '👑' },
+      REGULAR: { bg: 'linear-gradient(135deg, #60a5fa, #3b82f6)', color: '#fff', icon: '⭐' },
+      NEW: { bg: 'linear-gradient(135deg, #a3e635, #84cc16)', color: '#365314', icon: '🌱' }
+    };
+    return styles[tier] || styles.NEW;
   };
 
   const openCreateModal = () => {
@@ -173,11 +201,17 @@ const Customers = () => {
     }
   };
 
-  const handleDelete = async (customer) => {
-    if (!window.confirm(`Delete "${customer.name}"?`)) return;
+  const handleDelete = (customer) => {
+    setDeleteConfirm({ isOpen: true, customer });
+  };
+
+  const confirmDelete = async () => {
+    const customer = deleteConfirm.customer;
+    if (!customer) return;
     try {
       await mockApi.customers.deleteCustomer(customer._id);
       showToast('Customer deleted', 'success');
+      setDeleteConfirm({ isOpen: false, customer: null });
       loadCustomers();
     } catch (error) {
       showToast('Failed to delete', 'error');
@@ -459,7 +493,78 @@ const Customers = () => {
                 onChange={(e) => setSearchTerm(e.target.value)} className="search-input" />
             </div>
             <div className="filters-row">
+              <select
+                value={tierFilter}
+                onChange={(e) => setTierFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="">All Tiers</option>
+                <option value="VIP">VIP ({getTierStats().VIP})</option>
+                <option value="REGULAR">Regular ({getTierStats().REGULAR})</option>
+                <option value="NEW">New ({getTierStats().NEW})</option>
+              </select>
               <div className="results-count">{filteredCustomers.length} customers</div>
+            </div>
+          </div>
+
+          {/* Tier Summary Cards */}
+          <div className="tier-summary-cards" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 'var(--spacing-md)',
+            marginBottom: 'var(--spacing-lg)'
+          }}>
+            <div
+              className={`tier-card ${tierFilter === 'VIP' ? 'active' : ''}`}
+              onClick={() => setTierFilter(tierFilter === 'VIP' ? '' : 'VIP')}
+              style={{
+                padding: 'var(--spacing-md)',
+                background: tierFilter === 'VIP' ? 'linear-gradient(135deg, #ffd700, #ffb700)' : 'var(--white)',
+                border: '1px solid var(--gray-200)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.2s'
+              }}
+            >
+              <div style={{ fontSize: '1.5rem' }}>👑</div>
+              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().VIP}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>VIP (₱50K+)</div>
+            </div>
+            <div
+              className={`tier-card ${tierFilter === 'REGULAR' ? 'active' : ''}`}
+              onClick={() => setTierFilter(tierFilter === 'REGULAR' ? '' : 'REGULAR')}
+              style={{
+                padding: 'var(--spacing-md)',
+                background: tierFilter === 'REGULAR' ? 'linear-gradient(135deg, #60a5fa, #3b82f6)' : 'var(--white)',
+                border: '1px solid var(--gray-200)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.2s',
+                color: tierFilter === 'REGULAR' ? 'white' : 'inherit'
+              }}
+            >
+              <div style={{ fontSize: '1.5rem' }}>⭐</div>
+              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().REGULAR}</div>
+              <div style={{ fontSize: '0.8rem', color: tierFilter === 'REGULAR' ? 'rgba(255,255,255,0.8)' : 'var(--gray-600)' }}>Regular (₱20K+)</div>
+            </div>
+            <div
+              className={`tier-card ${tierFilter === 'NEW' ? 'active' : ''}`}
+              onClick={() => setTierFilter(tierFilter === 'NEW' ? '' : 'NEW')}
+              style={{
+                padding: 'var(--spacing-md)',
+                background: tierFilter === 'NEW' ? 'linear-gradient(135deg, #a3e635, #84cc16)' : 'var(--white)',
+                border: '1px solid var(--gray-200)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.2s'
+              }}
+            >
+              <div style={{ fontSize: '1.5rem' }}>🌱</div>
+              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().NEW}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>New (&lt;₱20K)</div>
             </div>
           </div>
 
@@ -470,21 +575,44 @@ const Customers = () => {
         </div>
       ) : (
         <div className="customers-grid">
-          {filteredCustomers.map(customer => (
-            <div key={customer._id} className="customer-card">
+          {filteredCustomers.map(customer => {
+            const tierBadge = getSpendTierBadge(customer.tier);
+            return (
+              <div key={customer._id} className="customer-card">
               <div className="customer-header">
                 <div className="customer-avatar">
                   {customer.name.split(' ').map(n => n.charAt(0)).join('').slice(0, 2)}
                 </div>
-                {(customer.loyaltyPoints || 0) > 0 && (
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  {/* Spend-based Tier Badge */}
                   <div
-                    className={`loyalty-badge ${getCustomerTier(customer.loyaltyPoints || 0).name.toLowerCase()}`}
-                    onClick={() => openRedeemModal(customer)}
-                    title="Click to redeem rewards"
+                    className="spend-tier-badge"
+                    title={`${customer.tier} tier - ${customer.tierInfo?.discount || 0}% discount`}
+                    style={{
+                      background: tierBadge.bg,
+                      color: tierBadge.color,
+                      padding: '4px 10px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
                   >
-                    {getCustomerTier(customer.loyaltyPoints || 0).icon} {customer.loyaltyPoints} pts
+                    {tierBadge.icon} {customer.tier}
                   </div>
-                )}
+                  {/* Loyalty Points Badge */}
+                  {(customer.loyaltyPoints || 0) > 0 && (
+                    <div
+                      className={`loyalty-badge ${getCustomerTier(customer.loyaltyPoints || 0).name.toLowerCase()}`}
+                      onClick={() => openRedeemModal(customer)}
+                      title="Click to redeem rewards"
+                    >
+                      {getCustomerTier(customer.loyaltyPoints || 0).icon} {customer.loyaltyPoints} pts
+                    </div>
+                  )}
+                </div>
               </div>
               <h3 className="customer-name">
                 {customer.name}
@@ -510,14 +638,43 @@ const Customers = () => {
               </div>
               <div className="customer-stats">
                 <div className="stat-item">
-                  <span className="stat-value">{customer.visitCount || 0}</span>
+                  <span className="stat-value">{customer.totalVisits || customer.visitCount || 0}</span>
                   <span className="stat-label">Visits</span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-value">₱{customer.totalSpent?.toLocaleString() || 0}</span>
+                  <span className="stat-value">₱{(customer.totalSpent || 0).toLocaleString()}</span>
                   <span className="stat-label">Total Spent</span>
                 </div>
               </div>
+              {/* Tier Progress Indicator */}
+              {customer.tierInfo?.nextTier && customer.tierInfo.spendToNextTier > 0 && (
+                <div style={{
+                  padding: '8px 12px',
+                  background: 'var(--gray-50)',
+                  borderRadius: 'var(--radius-sm)',
+                  marginTop: 'var(--spacing-sm)',
+                  fontSize: '0.75rem',
+                  color: 'var(--gray-600)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span>Progress to {customer.tierInfo.nextTier}</span>
+                    <span>₱{customer.tierInfo.spendToNextTier.toLocaleString()} more</span>
+                  </div>
+                  <div style={{
+                    height: '4px',
+                    background: 'var(--gray-200)',
+                    borderRadius: '2px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      background: 'var(--primary)',
+                      width: `${Math.min(100, ((customer.totalSpent || 0) / (customer.tierInfo.nextTier === 'REGULAR' ? 20000 : 50000)) * 100)}%`,
+                      borderRadius: '2px'
+                    }}></div>
+                  </div>
+                </div>
+              )}
               {customer.notes && (
                 <div className="customer-notes">
                   💬 {customer.notes}
@@ -530,7 +687,8 @@ const Customers = () => {
                 <button className="btn btn-sm btn-error" onClick={() => handleDelete(customer)}>Delete</button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -904,6 +1062,17 @@ const Customers = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, customer: null })}
+        onConfirm={confirmDelete}
+        title="Delete Customer"
+        message={`Are you sure you want to delete "${deleteConfirm.customer?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 };

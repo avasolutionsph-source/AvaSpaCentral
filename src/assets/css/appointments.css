@@ -657,3 +657,220 @@
   color: var(--gray-600);
   max-width: 400px;
 }
+
+/* ============================================================================
+   CONFLICT WARNINGS
+   ============================================================================ */
+.conflict-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.conflict-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: #FEF3C7;
+  border: 1px solid #F59E0B;
+}
+
+.conflict-warning.therapist-conflict {
+  background: #FEE2E2;
+  border-color: #EF4444;
+}
+
+.conflict-warning.room-conflict {
+  background: #FEF3C7;
+  border-color: #F59E0B;
+}
+
+.conflict-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.conflict-details {
+  flex: 1;
+}
+
+.conflict-details strong {
+  display: block;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.conflict-details p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+.checking-availability {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--gray-50);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-md);
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   MOBILE OPTIMIZATIONS FOR APPOINTMENTS
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .appointments-page {
+    padding: var(--spacing-md);
+  }
+
+  .calendar-view {
+    padding: var(--spacing-md);
+  }
+
+  .calendar-header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: stretch;
+  }
+
+  .calendar-nav {
+    justify-content: center;
+  }
+
+  .calendar-title {
+    font-size: 1.125rem;
+    min-width: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .appointments-page {
+    padding: var(--spacing-sm);
+  }
+
+  .view-mode-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .view-mode-toggle .btn {
+    flex: 1;
+  }
+
+  .calendar-grid {
+    font-size: 0.75rem;
+  }
+
+  .calendar-day-header {
+    padding: var(--spacing-sm);
+    font-size: 0.6875rem;
+  }
+
+  .calendar-day {
+    min-height: 70px;
+    padding: var(--spacing-xs);
+  }
+
+  .calendar-day-number {
+    font-size: 0.75rem;
+  }
+
+  .calendar-appointment {
+    padding: 2px 4px;
+    font-size: 0.625rem;
+    margin-bottom: 2px;
+  }
+
+  /* List view optimizations */
+  .appointment-card {
+    padding: var(--spacing-md);
+  }
+
+  .appointment-card-header {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    align-items: flex-start;
+  }
+
+  .appointment-time {
+    font-size: 0.875rem;
+  }
+
+  .appointment-details {
+    gap: var(--spacing-sm);
+  }
+
+  .appointment-info {
+    font-size: 0.8125rem;
+  }
+
+  .appointment-actions {
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+
+  .appointment-actions .btn {
+    font-size: 0.75rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  /* Filters */
+  .appointments-filters {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .appointments-filters select,
+  .appointments-filters input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-view {
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+  }
+
+  .calendar-day {
+    min-height: 55px;
+  }
+
+  .calendar-day-header {
+    padding: var(--spacing-xs);
+  }
+
+  .calendar-appointment {
+    display: none;
+  }
+
+  .calendar-day .appointment-count {
+    display: block;
+    font-size: 0.625rem;
+    text-align: center;
+    background: var(--primary);
+    color: white;
+    border-radius: var(--radius-full);
+    padding: 2px 6px;
+    margin-top: 2px;
+  }
+}

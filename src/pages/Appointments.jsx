@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO } from 'date-fns';
 import AdvanceBookingsTab from '../components/AdvanceBookingsTab';
 import { getEmployeesForService, getTherapists } from '../utils/employeeFilters';
+import { ConfirmDialog } from '../components/shared';
 
 const Appointments = () => {
+  const navigate = useNavigate();
   const { showToast, user, canViewAll, isTherapist } = useApp();
 
   const [loading, setLoading] = useState(true);
@@ -24,6 +27,15 @@ const Appointments = () => {
   const [modalMode, setModalMode] = useState('create');
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
+
+  // Conflict detection state
+  const [conflicts, setConflicts] = useState({ therapist: null, room: null });
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+
+  // Confirmation dialog states
+  const [cancelConfirm, setCancelConfirm] = useState({ isOpen: false, appointment: null, fee: null });
+  const [noShowConfirm, setNoShowConfirm] = useState({ isOpen: false, appointment: null });
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, appointment: null });
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -106,6 +118,42 @@ const Appointments = () => {
     }
   };
 
+  // Check availability when relevant form fields change
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (!formData.date || !formData.time || !formData.duration) {
+        setConflicts({ therapist: null, room: null });
+        return;
+      }
+
+      if (!formData.employeeId && !formData.roomId) {
+        setConflicts({ therapist: null, room: null });
+        return;
+      }
+
+      setCheckingAvailability(true);
+      try {
+        const result = await mockApi.appointments.checkAvailability({
+          therapistId: formData.employeeId || null,
+          roomId: formData.roomId || null,
+          date: formData.date,
+          time: formData.time,
+          duration: parseInt(formData.duration),
+          excludeAppointmentId: modalMode === 'edit' ? selectedAppointment?._id : null
+        });
+        setConflicts(result);
+      } catch (error) {
+        console.error('Error checking availability:', error);
+      } finally {
+        setCheckingAvailability(false);
+      }
+    };
+
+    // Debounce the availability check
+    const timeoutId = setTimeout(checkAvailability, 300);
+    return () => clearTimeout(timeoutId);
+  }, [formData.employeeId, formData.roomId, formData.date, formData.time, formData.duration, modalMode, selectedAppointment]);
+
   const getFilteredAppointments = () => {
     let filtered = appointments;
 
@@ -134,6 +182,7 @@ const Appointments = () => {
     setModalMode('create');
     const selectedDateStr = date ? format(date, 'yyyy-MM-dd') : '';
     setSelectedDate(date);
+    setConflicts({ therapist: null, room: null });
     setFormData({
       customerId: '', customerName: '', serviceId: '', employeeId: '', roomId: '',
       date: selectedDateStr, time: '', duration: 60, bookingSource: 'walk-in', notes: ''
@@ -144,6 +193,7 @@ const Appointments = () => {
   const openEditModal = (appointment) => {
     setModalMode('edit');
     setSelectedAppointment(appointment);
+    setConflicts({ therapist: null, room: null });
     const apptDate = appointment.dateTime ? parseISO(appointment.dateTime) : new Date();
     setFormData({
       customerId: appointment.customer?._id || '',
@@ -181,6 +231,17 @@ const Appointments = () => {
     if (!formData.employeeId) { showToast('Employee is required', 'error'); return false; }
     if (!formData.date) { showToast('Date is required', 'error'); return false; }
     if (!formData.time) { showToast('Time is required', 'error'); return false; }
+
+    // Block submission if there are conflicts
+    if (conflicts.therapist) {
+      showToast(`Therapist is already booked at ${conflicts.therapist.time}. Please choose a different time or therapist.`, 'error');
+      return false;
+    }
+    if (conflicts.room) {
+      showToast(`Room is already booked at ${conflicts.room.time}. Please choose a different time or room.`, 'error');
+      return false;
+    }
+
     return true;
   };
 
@@ -215,8 +276,41 @@ const Appointments = () => {
     }
   };
 
+  // Cancellation Policy Configuration
+  const getCancellationFee = (appointment) => {
+    if (!appointment.dateTime) return { fee: 0, percentage: 0, policy: 'Unknown' };
+
+    const appointmentTime = parseISO(appointment.dateTime);
+    const now = new Date();
+    const hoursUntilAppointment = (appointmentTime - now) / (1000 * 60 * 60);
+    const servicePrice = appointment.service?.price || 0;
+
+    if (hoursUntilAppointment > 24) {
+      return { fee: 0, percentage: 0, policy: 'Free cancellation (>24 hours before)' };
+    } else if (hoursUntilAppointment >= 12) {
+      const fee = servicePrice * 0.5;
+      return { fee, percentage: 50, policy: '50% cancellation fee (12-24 hours before)' };
+    } else {
+      return { fee: servicePrice, percentage: 100, policy: 'Full charge (<12 hours before)' };
+    }
+  };
+
   const handleStatusChange = async (appointment, newStatus) => {
     try {
+      // Handle cancellation with policy
+      if (newStatus === 'cancelled') {
+        const cancellationInfo = getCancellationFee(appointment);
+        setCancelConfirm({ isOpen: true, appointment, fee: cancellationInfo });
+        return;
+      }
+
+      // Handle no-show with customer tracking
+      if (newStatus === 'no-show') {
+        setNoShowConfirm({ isOpen: true, appointment });
+        return;
+      }
+
+      // Default status change
       await mockApi.appointments.updateAppointment(appointment._id, { status: newStatus });
       showToast(`Appointment ${newStatus}!`, 'success');
       loadData();
@@ -225,11 +319,68 @@ const Appointments = () => {
     }
   };
 
-  const handleDelete = async (appointment) => {
-    if (!window.confirm('Delete this appointment?')) return;
+  const confirmCancellation = async () => {
+    const { appointment, fee } = cancelConfirm;
+    if (!appointment) return;
+
+    try {
+      await mockApi.appointments.updateAppointment(appointment._id, {
+        status: 'cancelled',
+        cancellationFee: fee.fee,
+        cancelledAt: new Date().toISOString()
+      });
+      showToast(`Appointment cancelled. Fee: ₱${fee.fee.toLocaleString()}`, 'info');
+      setCancelConfirm({ isOpen: false, appointment: null, fee: null });
+      loadData();
+    } catch (error) {
+      showToast('Failed to cancel appointment', 'error');
+    }
+  };
+
+  const confirmNoShow = async () => {
+    const { appointment } = noShowConfirm;
+    if (!appointment) return;
+
+    try {
+      // Update appointment status
+      await mockApi.appointments.updateAppointment(appointment._id, {
+        status: 'no-show',
+        noShowAt: new Date().toISOString()
+      });
+
+      // Update customer's no-show count
+      if (appointment.customer?._id) {
+        try {
+          const customer = await mockApi.customers.getCustomer(appointment.customer._id);
+          await mockApi.customers.updateCustomer(appointment.customer._id, {
+            noShowCount: (customer.noShowCount || 0) + 1,
+            lastNoShow: new Date().toISOString()
+          });
+        } catch (err) {
+          console.error('Failed to update customer no-show count:', err);
+        }
+      }
+
+      showToast('Appointment marked as No-Show', 'warning');
+      setNoShowConfirm({ isOpen: false, appointment: null });
+      loadData();
+    } catch (error) {
+      showToast('Failed to update status', 'error');
+    }
+  };
+
+  const handleDelete = (appointment) => {
+    setDeleteConfirm({ isOpen: true, appointment });
+  };
+
+  const confirmDelete = async () => {
+    const { appointment } = deleteConfirm;
+    if (!appointment) return;
+
     try {
       await mockApi.appointments.deleteAppointment(appointment._id);
       showToast('Appointment deleted', 'success');
+      setDeleteConfirm({ isOpen: false, appointment: null });
       loadData();
     } catch (error) {
       showToast('Failed to delete', 'error');
@@ -349,7 +500,7 @@ const Appointments = () => {
                   </div>
                 </div>
                 {appointment.notes && (
-                  <p style={{ fontSize: '0.875rem', color: 'var(--gray-600)', marginTop: 'var(--spacing-sm)' }}>
+                  <p className="text-sm text-gray-600 mt-sm">
                     💬 {appointment.notes}
                   </p>
                 )}
@@ -361,7 +512,10 @@ const Appointments = () => {
                     <button className="btn btn-sm btn-success" onClick={() => handleStatusChange(appointment, 'confirmed')}>Confirm</button>
                   )}
                   {appointment.status === 'confirmed' && (
-                    <button className="btn btn-sm btn-primary" onClick={() => handleStatusChange(appointment, 'completed')}>Complete</button>
+                    <>
+                      <button className="btn btn-sm btn-primary" onClick={() => handleStatusChange(appointment, 'completed')}>Complete</button>
+                      <button className="btn btn-sm btn-error" onClick={() => handleStatusChange(appointment, 'no-show')} title="Mark as No-Show">No-Show</button>
+                    </>
                   )}
                   {canViewAll() && (appointment.status === 'pending' || appointment.status === 'confirmed') && (
                     <button className="btn btn-sm btn-warning" onClick={() => handleStatusChange(appointment, 'cancelled')}>Cancel</button>
@@ -386,6 +540,12 @@ const Appointments = () => {
     <div className="appointments-page">
       <div className="page-header">
         <div>
+          <button
+            className="btn btn-secondary btn-sm back-to-calendar"
+            onClick={() => navigate('/calendar')}
+          >
+            ← Back to Calendar
+          </button>
           <h1>Appointments</h1>
           <p>{isTherapist() ? 'View your appointments' : 'Manage bookings and schedules'}</p>
         </div>
@@ -395,7 +555,7 @@ const Appointments = () => {
       </div>
 
       {/* Tabs */}
-      <div className="tabs-container" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <div className="tabs-container mb-lg">
         <button
           className={`tab ${activeTab === 'appointments' ? 'active' : ''}`}
           onClick={() => setActiveTab('appointments')}
@@ -434,6 +594,7 @@ const Appointments = () => {
                 <option value="confirmed">Confirmed</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="no-show">No-Show</option>
               </select>
               <div className="results-count">{getFilteredAppointments().length} appointments</div>
             </div>
@@ -459,11 +620,37 @@ const Appointments = () => {
                   {modalMode === 'create' ? (
                     <select name="customerId" value={formData.customerId} onChange={handleInputChange} className="form-control">
                       <option value="">Walk-in (or select existing)</option>
-                      {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                      {customers.map(c => (
+                        <option key={c._id} value={c._id}>
+                          {c.name} {(c.noShowCount || 0) >= 2 ? '⚠️' : ''}
+                        </option>
+                      ))}
                     </select>
                   ) : (
                     <input type="text" value={formData.customerName} className="form-control" disabled />
                   )}
+                  {/* No-Show Warning for selected customer */}
+                  {formData.customerId && (() => {
+                    const selectedCustomer = customers.find(c => c._id === formData.customerId);
+                    const noShowCount = selectedCustomer?.noShowCount || 0;
+                    if (noShowCount >= 2) {
+                      return (
+                        <div style={{
+                          marginTop: 'var(--spacing-sm)',
+                          padding: 'var(--spacing-sm) var(--spacing-md)',
+                          background: 'var(--warning-light)',
+                          border: '1px solid var(--warning)',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.85rem',
+                          color: 'var(--warning-dark)'
+                        }}>
+                          ⚠️ <strong>Warning:</strong> This customer has {noShowCount} no-show(s) on record.
+                          {noShowCount >= 3 && ' Consider requiring a deposit.'}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
                 {!formData.customerId && modalMode === 'create' && (
                   <div className="form-group">
@@ -544,6 +731,36 @@ const Appointments = () => {
                     ))}
                   </div>
                 </div>
+                {/* Conflict Warnings */}
+                {(conflicts.therapist || conflicts.room) && (
+                  <div className="conflict-warnings">
+                    {conflicts.therapist && (
+                      <div className="conflict-warning therapist-conflict">
+                        <span className="conflict-icon">⚠️</span>
+                        <div className="conflict-details">
+                          <strong>Therapist Conflict!</strong>
+                          <p>{conflicts.therapist.therapistName} is already booked at {conflicts.therapist.time} for {conflicts.therapist.serviceName} ({conflicts.therapist.duration} min) with {conflicts.therapist.customerName}.</p>
+                        </div>
+                      </div>
+                    )}
+                    {conflicts.room && (
+                      <div className="conflict-warning room-conflict">
+                        <span className="conflict-icon">⚠️</span>
+                        <div className="conflict-details">
+                          <strong>Room Conflict!</strong>
+                          <p>{conflicts.room.roomName} is already booked at {conflicts.room.time} for {conflicts.room.serviceName} ({conflicts.room.duration} min).</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {checkingAvailability && (
+                  <div className="checking-availability">
+                    <span className="spinner-sm"></span> Checking availability...
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label>Notes</label>
                   <textarea name="notes" value={formData.notes} onChange={handleInputChange}
@@ -558,6 +775,39 @@ const Appointments = () => {
           </div>
         </div>
       )}
+
+      {/* Cancellation Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={cancelConfirm.isOpen}
+        onClose={() => setCancelConfirm({ isOpen: false, appointment: null, fee: null })}
+        onConfirm={confirmCancellation}
+        title="Cancel Appointment"
+        message={cancelConfirm.fee ? `${cancelConfirm.fee.policy}\n\nCancellation fee: ₱${cancelConfirm.fee.fee.toLocaleString()} (${cancelConfirm.fee.percentage}%)\n\nProceed with cancellation?` : 'Cancel this appointment?'}
+        confirmText="Cancel Appointment"
+        confirmVariant="warning"
+      />
+
+      {/* No-Show Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={noShowConfirm.isOpen}
+        onClose={() => setNoShowConfirm({ isOpen: false, appointment: null })}
+        onConfirm={confirmNoShow}
+        title="Mark as No-Show"
+        message="This will be recorded on the customer's profile. Customers with multiple no-shows may be flagged for future bookings."
+        confirmText="Mark No-Show"
+        confirmVariant="warning"
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, appointment: null })}
+        onConfirm={confirmDelete}
+        title="Delete Appointment"
+        message="Are you sure you want to delete this appointment? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 };

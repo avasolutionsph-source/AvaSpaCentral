@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import {
@@ -14,6 +15,7 @@ const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const ShiftSchedules = () => {
+  const navigate = useNavigate();
   const { showToast, hasManagementAccess } = useApp();
 
   // State
@@ -224,6 +226,12 @@ const ShiftSchedules = () => {
       {/* Header */}
       <div className="page-header">
         <div>
+          <button
+            className="btn btn-secondary btn-sm back-to-calendar"
+            onClick={() => navigate('/calendar')}
+          >
+            ← Back to Calendar
+          </button>
           <h1>Shift Schedules</h1>
           <p>Manage employee work schedules and shifts</p>
         </div>

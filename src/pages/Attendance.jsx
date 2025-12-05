@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, parseISO, differenceInMinutes, isAfter, startOfDay } from 'date-fns';
+import CameraCapture from '../components/CameraCapture';
 
 const Attendance = () => {
+  const navigate = useNavigate();
   const { user, showToast, isTherapist, hasManagementAccess } = useApp();
 
   const [loading, setLoading] = useState(true);
@@ -18,6 +21,14 @@ const Attendance = () => {
 
   // Quick clock form
   const [quickEmployeeId, setQuickEmployeeId] = useState('');
+
+  // Camera capture state
+  const [showCamera, setShowCamera] = useState(false);
+  const [pendingClockAction, setPendingClockAction] = useState(null); // { type: 'in'|'out', employeeId: string }
+
+  // Photo viewer modal state
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -76,21 +87,46 @@ const Attendance = () => {
       return;
     }
 
+    // Open camera for photo capture
+    setPendingClockAction({ type, employeeId });
+    setShowCamera(true);
+  };
+
+  // Handle camera capture completion
+  const handleCameraCapture = async (captureData) => {
+    if (!pendingClockAction) return;
+
+    const { type, employeeId } = pendingClockAction;
+
     try {
       if (type === 'in') {
-        await mockApi.attendance.clockIn(employeeId);
-        showToast('Clocked in successfully!', 'success');
+        await mockApi.attendance.clockIn(employeeId, captureData);
+        showToast('Clocked in successfully with photo!', 'success');
       } else {
-        await mockApi.attendance.clockOut(employeeId);
-        showToast('Clocked out successfully!', 'success');
+        await mockApi.attendance.clockOut(employeeId, captureData);
+        showToast('Clocked out successfully with photo!', 'success');
       }
+
+      // Reset states
+      setShowCamera(false);
+      setPendingClockAction(null);
+      setShowClockModal(false);
       if (!isTherapist()) {
         setQuickEmployeeId('');
       }
+      setSelectedEmployeeId('');
       loadData();
     } catch (error) {
       showToast(error.message || 'Failed to clock', 'error');
+      setShowCamera(false);
+      setPendingClockAction(null);
     }
+  };
+
+  // Handle camera cancel
+  const handleCameraCancel = () => {
+    setShowCamera(false);
+    setPendingClockAction(null);
   };
 
   const handleModalClock = async () => {
@@ -99,20 +135,10 @@ const Attendance = () => {
       return;
     }
 
-    try {
-      if (clockType === 'in') {
-        await mockApi.attendance.clockIn(selectedEmployeeId);
-        showToast('Clocked in successfully!', 'success');
-      } else {
-        await mockApi.attendance.clockOut(selectedEmployeeId);
-        showToast('Clocked out successfully!', 'success');
-      }
-      setShowClockModal(false);
-      setSelectedEmployeeId('');
-      loadData();
-    } catch (error) {
-      showToast(error.message || 'Failed to clock', 'error');
-    }
+    // Open camera for photo capture from modal
+    setPendingClockAction({ type: clockType, employeeId: selectedEmployeeId });
+    setShowClockModal(false);
+    setShowCamera(true);
   };
 
   const getAttendanceStatus = (record) => {
@@ -145,6 +171,25 @@ const Attendance = () => {
     return todayAttendance.find(a => a.employee._id === employeeId);
   };
 
+  const hasPhotos = (record) => {
+    return record && (record.clockInPhoto || record.clockOutPhoto);
+  };
+
+  const openPhotoViewer = (record) => {
+    setSelectedRecord(record);
+    setShowPhotoModal(true);
+  };
+
+  const formatGpsCoords = (gps) => {
+    if (!gps || !gps.latitude || !gps.longitude) return null;
+    return `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}`;
+  };
+
+  const getGoogleMapsUrl = (gps) => {
+    if (!gps || !gps.latitude || !gps.longitude) return null;
+    return `https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`;
+  };
+
   if (loading) {
     return <div className="page-loading"><div className="spinner"></div><p>Loading attendance...</p></div>;
   }
@@ -153,11 +198,17 @@ const Attendance = () => {
     <div className="attendance-page">
       <div className="page-header">
         <div>
+          <button
+            className="btn btn-secondary btn-sm back-to-calendar"
+            onClick={() => navigate('/calendar')}
+          >
+            ← Back to Calendar
+          </button>
           <h1>{isTherapist() ? 'My Attendance' : 'Attendance'}</h1>
           <p>{isTherapist() ? 'Track your clock in/out and work hours' : 'Track employee clock in/out and work hours'}</p>
         </div>
         {!isTherapist() && (
-          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          <div className="flex gap-sm">
             <button className="btn btn-secondary" onClick={() => openClockModal('in')}>⏱ Clock In</button>
             <button className="btn btn-primary" onClick={() => openClockModal('out')}>⏱ Clock Out</button>
           </div>
@@ -188,14 +239,14 @@ const Attendance = () => {
 
       {/* Quick Clock In/Out */}
       <div className="quick-clock-section">
-        <h3 style={{ marginBottom: 'var(--spacing-md)', fontSize: '1rem' }}>
+        <h3 className="mb-md text-base">
           {isTherapist() ? 'My Attendance' : 'Quick Clock In/Out'}
         </h3>
         {isTherapist() ? (
           // Simplified UI for therapists - no dropdown
           <div className="quick-clock-form">
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-              <span style={{ fontSize: '1rem', fontWeight: '500' }}>
+            <div className="flex-1 flex items-center gap-sm">
+              <span className="text-base font-medium">
                 {user?.name || 'My Attendance'}
               </span>
             </div>
@@ -250,7 +301,7 @@ const Attendance = () => {
 
       {/* Today's Attendance Table */}
       <div className="attendance-table-section">
-        <h3 style={{ marginBottom: 'var(--spacing-lg)', fontSize: '1.1rem' }}>
+        <h3 className="mb-lg text-lg">
           {isTherapist() ? 'My Attendance Today' : "Today's Attendance"} - {format(new Date(), 'EEEE, MMMM dd, yyyy')}
         </h3>
         <table className="attendance-table">
@@ -262,6 +313,7 @@ const Attendance = () => {
               <th>Clock Out</th>
               <th>Hours Worked</th>
               <th>Overtime</th>
+              <th>Photos</th>
               {!isTherapist() && <th>Actions</th>}
             </tr>
           </thead>
@@ -315,6 +367,22 @@ const Attendance = () => {
                       <span className="overtime-badge">+{overtime}h OT</span>
                     )}
                   </td>
+                  <td>
+                    {hasPhotos(record) ? (
+                      <button
+                        className="photo-view-btn"
+                        onClick={() => openPhotoViewer(record)}
+                        title="View Photos"
+                      >
+                        📷
+                        {record.clockInPhoto && record.clockOutPhoto && (
+                          <span className="photo-count">2</span>
+                        )}
+                      </button>
+                    ) : (
+                      <span className="no-photos">-</span>
+                    )}
+                  </td>
                   {!isTherapist() && (
                     <td>
                       {!record?.clockIn ? (
@@ -334,7 +402,7 @@ const Attendance = () => {
                           Clock Out
                         </button>
                       ) : (
-                        <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Complete</span>
+                        <span className="text-sm text-gray-500">Complete</span>
                       )}
                     </td>
                   )}
@@ -383,6 +451,10 @@ const Attendance = () => {
                   })}
                 </select>
               </div>
+              <div className="camera-notice">
+                <span className="camera-icon">📷</span>
+                <p>A photo and GPS location will be captured when you clock {clockType}</p>
+              </div>
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={() => setShowClockModal(false)}>
@@ -394,7 +466,122 @@ const Attendance = () => {
                 onClick={handleModalClock}
                 disabled={!selectedEmployeeId}
               >
-                {clockType === 'in' ? '⏱ Clock In' : '⏱ Clock Out'}
+                {clockType === 'in' ? '📷 Clock In' : '📷 Clock Out'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera Capture Modal */}
+      <CameraCapture
+        isOpen={showCamera}
+        onCapture={handleCameraCapture}
+        onCancel={handleCameraCancel}
+      />
+
+      {/* Photo Viewer Modal */}
+      {showPhotoModal && selectedRecord && (
+        <div className="modal-overlay" onClick={() => setShowPhotoModal(false)}>
+          <div className="modal photo-viewer-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Attendance Photos - {selectedRecord.employee?.firstName} {selectedRecord.employee?.lastName}</h2>
+              <button className="modal-close" onClick={() => setShowPhotoModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="photo-viewer-grid">
+                {/* Clock In Photo */}
+                <div className="photo-section">
+                  <h3 className="photo-section-title">
+                    <span className="photo-type-icon">🟢</span>
+                    Clock In
+                  </h3>
+                  {selectedRecord.clockInPhoto ? (
+                    <div className="photo-container">
+                      <img
+                        src={selectedRecord.clockInPhoto}
+                        alt="Clock In Photo"
+                        className="attendance-photo"
+                      />
+                      <div className="photo-meta">
+                        <div className="photo-timestamp">
+                          <span className="meta-label">Time:</span>
+                          <span className="meta-value">{selectedRecord.clockIn || 'N/A'}</span>
+                        </div>
+                        {selectedRecord.clockInGps && (
+                          <div className="photo-location">
+                            <span className="meta-label">Location:</span>
+                            <span className="meta-value">
+                              {formatGpsCoords(selectedRecord.clockInGps)}
+                            </span>
+                            <a
+                              href={getGoogleMapsUrl(selectedRecord.clockInGps)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="map-link"
+                            >
+                              📍 View on Map
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="no-photo-placeholder">
+                      <span className="placeholder-icon">📷</span>
+                      <p>No clock-in photo</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Clock Out Photo */}
+                <div className="photo-section">
+                  <h3 className="photo-section-title">
+                    <span className="photo-type-icon">🔴</span>
+                    Clock Out
+                  </h3>
+                  {selectedRecord.clockOutPhoto ? (
+                    <div className="photo-container">
+                      <img
+                        src={selectedRecord.clockOutPhoto}
+                        alt="Clock Out Photo"
+                        className="attendance-photo"
+                      />
+                      <div className="photo-meta">
+                        <div className="photo-timestamp">
+                          <span className="meta-label">Time:</span>
+                          <span className="meta-value">{selectedRecord.clockOut || 'N/A'}</span>
+                        </div>
+                        {selectedRecord.clockOutGps && (
+                          <div className="photo-location">
+                            <span className="meta-label">Location:</span>
+                            <span className="meta-value">
+                              {formatGpsCoords(selectedRecord.clockOutGps)}
+                            </span>
+                            <a
+                              href={getGoogleMapsUrl(selectedRecord.clockOutGps)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="map-link"
+                            >
+                              📍 View on Map
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="no-photo-placeholder">
+                      <span className="placeholder-icon">📷</span>
+                      <p>No clock-out photo yet</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowPhotoModal(false)}>
+                Close
               </button>
             </div>
           </div>

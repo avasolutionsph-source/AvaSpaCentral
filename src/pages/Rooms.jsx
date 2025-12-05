@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi/mockApi';
 import { format, parseISO } from 'date-fns';
+import { ConfirmDialog } from '../components/shared';
 
 const Rooms = () => {
   const { user, showToast, isTherapist, canEdit } = useApp();
@@ -14,6 +15,9 @@ const Rooms = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [selectedRoom, setSelectedRoom] = useState(null);
+
+  // Delete confirmation dialog state
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, room: null });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -160,11 +164,17 @@ const Rooms = () => {
     }
   };
 
-  const handleDelete = async (room) => {
-    if (!window.confirm(`Delete "${room.name}"?`)) return;
+  const handleDelete = (room) => {
+    setDeleteConfirm({ isOpen: true, room });
+  };
+
+  const confirmDelete = async () => {
+    const room = deleteConfirm.room;
+    if (!room) return;
     try {
       await mockApi.rooms.deleteRoom(room._id);
       showToast('Room deleted', 'success');
+      setDeleteConfirm({ isOpen: false, room: null });
       loadRooms();
     } catch (error) {
       showToast('Failed to delete', 'error');
@@ -382,6 +392,17 @@ const Rooms = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, room: null })}
+        onConfirm={confirmDelete}
+        title="Delete Room"
+        message={`Are you sure you want to delete "${deleteConfirm.room?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 };

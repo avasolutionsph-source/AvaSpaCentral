@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import {
   format,
   startOfWeek,
@@ -17,7 +17,7 @@ import {
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-const MySchedule = () => {
+const MySchedule = ({ embedded = false, onDataChange }) => {
   const { showToast, user } = useApp();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [view, setView] = useState('calendar');
@@ -72,6 +72,7 @@ const MySchedule = () => {
         );
         setAppointments(myAppointments);
       }
+      if (onDataChange) onDataChange();
     } catch (error) {
       console.error('Failed to load schedule:', error);
       showToast('Failed to load schedule', 'error');
@@ -316,12 +317,24 @@ const MySchedule = () => {
   return (
     <div className="schedule-page">
       {/* Header */}
-      <div className="schedule-header">
-        <div className="schedule-header-info">
-          <h2>My Schedule</h2>
-          <p>View your shifts, appointments, and time off</p>
+      {!embedded && (
+        <div className="schedule-header">
+          <div className="schedule-header-info">
+            <h2>My Schedule</h2>
+            <p>View your shifts, appointments, and time off</p>
+          </div>
+          <div className="schedule-header-actions">
+            <button className="btn btn-secondary btn-sm" onClick={handleRequestTimeOff}>
+              📅 Request Time Off
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={handleExportSchedule}>
+              📥 Export Schedule
+            </button>
+          </div>
         </div>
-        <div className="schedule-header-actions">
+      )}
+      {embedded && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)', gap: 'var(--spacing-sm)' }}>
           <button className="btn btn-secondary btn-sm" onClick={handleRequestTimeOff}>
             📅 Request Time Off
           </button>
@@ -329,7 +342,7 @@ const MySchedule = () => {
             📥 Export Schedule
           </button>
         </div>
-      </div>
+      )}
 
       {/* Week Navigation */}
       <div className="week-navigation">

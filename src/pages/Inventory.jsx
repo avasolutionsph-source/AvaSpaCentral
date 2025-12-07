@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
 
-const Inventory = () => {
+const Inventory = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
   const { showToast, canEdit } = useApp();
 
@@ -417,12 +417,14 @@ const Inventory = () => {
 
   return (
     <div className="inventory-page">
-      <div className="page-header">
-        <div>
-          <h1>Inventory Management</h1>
-          <p>{canEdit() ? 'Track stock levels, manage orders, and monitor inventory valuation' : 'View stock levels and inventory valuation'}</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1>Inventory Management</h1>
+            <p>{canEdit() ? 'Track stock levels, manage orders, and monitor inventory valuation' : 'View stock levels and inventory valuation'}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Summary Cards */}
       <div className="inventory-summary-grid">

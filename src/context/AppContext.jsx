@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 
 const AppContext = createContext();
 

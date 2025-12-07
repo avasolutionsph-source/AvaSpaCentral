@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format, subDays, differenceInDays, addDays } from 'date-fns';
 import {
   Chart as ChartJS,
@@ -18,6 +18,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
 import '../assets/css/ava-sensei-ultrathink.css';
+import Reports from './Reports';
 
 ChartJS.register(
   CategoryScale,
@@ -776,6 +777,12 @@ const AvaSenseiUltrathink = () => {
           onClick={() => setActiveTab('performance')}
         >
           <span className="tab-icon">⭐</span> Performance
+        </button>
+        <button
+          className={`ava-tab ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          <span className="tab-icon">📋</span> Reports
         </button>
       </div>
 
@@ -2416,6 +2423,13 @@ const AvaSenseiUltrathink = () => {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Reports Tab - Embedded Reports Page */}
+      {activeTab === 'reports' && (
+        <div className="tab-content-wrapper">
+          <Reports embedded />
         </div>
       )}
     </div>

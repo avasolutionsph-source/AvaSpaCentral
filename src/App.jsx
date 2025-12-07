@@ -31,6 +31,11 @@ const ServiceHistory = lazy(() => import('./pages/ServiceHistory'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
 const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'));
+const InventoryHub = lazy(() => import('./pages/InventoryHub'));
+const HRHub = lazy(() => import('./pages/HRHub'));
+const FinanceHub = lazy(() => import('./pages/FinanceHub'));
+const ServiceHub = lazy(() => import('./pages/ServiceHub'));
+const MyPortal = lazy(() => import('./pages/MyPortal'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -157,6 +162,11 @@ function AppRoutes() {
           <Route path="inventory" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><Inventory /></Suspense></ProtectedRoute>} />
           <Route path="suppliers" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><Suppliers /></Suspense></ProtectedRoute>} />
           <Route path="purchase-orders" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><PurchaseOrders /></Suspense></ProtectedRoute>} />
+          <Route path="inventory-hub" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><InventoryHub /></Suspense></ProtectedRoute>} />
+          <Route path="hr-hub" element={<ProtectedRoute page="employees"><Suspense fallback={<PageLoader />}><HRHub /></Suspense></ProtectedRoute>} />
+          <Route path="finance-hub" element={<ProtectedRoute page="expenses"><Suspense fallback={<PageLoader />}><FinanceHub /></Suspense></ProtectedRoute>} />
+          <Route path="service-hub" element={<ProtectedRoute page="rooms"><Suspense fallback={<PageLoader />}><ServiceHub /></Suspense></ProtectedRoute>} />
+          <Route path="my-portal" element={<ProtectedRoute page="my-schedule"><Suspense fallback={<PageLoader />}><MyPortal /></Suspense></ProtectedRoute>} />
           <Route path="reports" element={<ProtectedRoute page="reports"><Suspense fallback={<PageLoader />}><Reports /></Suspense></ProtectedRoute>} />
           <Route path="calendar" element={<ProtectedRoute page="calendar"><Suspense fallback={<PageLoader />}><Calendar /></Suspense></ProtectedRoute>} />
           <Route path="ava-sensei" element={<ProtectedRoute page="ava-sensei"><Suspense fallback={<PageLoader />}><AvaSenseiUltrathink /></Suspense></ProtectedRoute>} />

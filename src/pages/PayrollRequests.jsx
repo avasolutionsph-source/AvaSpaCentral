@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 
-const PayrollRequests = () => {
+const PayrollRequests = ({ embedded = false, onDataChange }) => {
   const { showToast, user } = useApp();
   const [payrollHistory, setPayrollHistory] = useState([]);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
@@ -175,6 +175,7 @@ const PayrollRequests = () => {
       });
 
       setPayrollHistory(filtered);
+      if (onDataChange) onDataChange();
     } catch (error) {
       showToast('Failed to load payroll history', 'error');
     } finally {
@@ -307,15 +308,24 @@ Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
 
   return (
     <div className="payroll-requests-page">
-      <div className="page-header">
-        <div>
-          <h1>My Payroll</h1>
-          <p>View your payroll history and submit requests</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1>My Payroll</h1>
+            <p>View your payroll history and submit requests</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowRequestForm(!showRequestForm)}>
+            {showRequestForm ? '❌ Cancel Request' : '✉️ Submit Request'}
+          </button>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowRequestForm(!showRequestForm)}>
-          {showRequestForm ? '❌ Cancel Request' : '✉️ Submit Request'}
-        </button>
-      </div>
+      )}
+      {embedded && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
+          <button className="btn btn-primary" onClick={() => setShowRequestForm(!showRequestForm)}>
+            {showRequestForm ? '❌ Cancel Request' : '✉️ Submit Request'}
+          </button>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="employee-payroll-summary">

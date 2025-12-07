@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format, parseISO, subDays } from 'date-fns';
 
-const ServiceHistory = () => {
+const ServiceHistory = ({ embedded = false, onDataChange }) => {
   const { showToast, user, canViewAll, isTherapist } = useApp();
   const [transactions, setTransactions] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -66,6 +66,7 @@ const ServiceHistory = () => {
       }));
 
       setTransactions(formattedTransactions);
+      if (onDataChange) onDataChange();
     } catch (error) {
       showToast('Failed to load service history', 'error');
     } finally {
@@ -212,22 +213,34 @@ const ServiceHistory = () => {
 
   return (
     <div className="service-history-page">
-      <div className="page-header">
-        <div>
-          <h1>Service History</h1>
-          <p>{isTherapist() ? 'View your service history and earnings' : 'Complete transaction history and employee performance'}</p>
-        </div>
-        {canViewAll() && (
-          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-            <button className="btn btn-secondary" onClick={() => setShowPerformance(!showPerformance)}>
-              {showPerformance ? '📋 Hide Performance' : '📊 Show Performance'}
-            </button>
-            <button className="btn btn-primary" onClick={handleExport}>
-              📥 Export CSV
-            </button>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1>Service History</h1>
+            <p>{isTherapist() ? 'View your service history and earnings' : 'Complete transaction history and employee performance'}</p>
           </div>
-        )}
-      </div>
+          {canViewAll() && (
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+              <button className="btn btn-secondary" onClick={() => setShowPerformance(!showPerformance)}>
+                {showPerformance ? '📋 Hide Performance' : '📊 Show Performance'}
+              </button>
+              <button className="btn btn-primary" onClick={handleExport}>
+                📥 Export CSV
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {embedded && canViewAll() && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)', gap: 'var(--spacing-sm)' }}>
+          <button className="btn btn-secondary" onClick={() => setShowPerformance(!showPerformance)}>
+            {showPerformance ? '📋 Hide Performance' : '📊 Show Performance'}
+          </button>
+          <button className="btn btn-primary" onClick={handleExport}>
+            📥 Export CSV
+          </button>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="service-summary-grid">

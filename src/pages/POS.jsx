@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
 import { getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog } from '../components/shared';

@@ -1,16 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
-import { ConfirmDialog } from '../components/shared';
+import { useCrudOperations } from '../hooks';
+import { CrudModal, PageHeader, ConfirmDialog, EmptyState } from '../components/shared';
 
-const Expenses = () => {
+// Constants
+const CATEGORIES = [
+  'Office Supplies',
+  'Utilities',
+  'Salaries',
+  'Maintenance',
+  'Marketing',
+  'Inventory',
+  'Rent',
+  'Other'
+];
+
+const PAYMENT_METHODS = ['Cash', 'Credit Card', 'Bank Transfer', 'Check', 'E-Wallet'];
+const RECURRING_FREQUENCIES = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+
+const EXPENSE_TYPES = [
+  { value: 'fixed', label: 'Fixed Cost', icon: '🔒', color: '#3B82F6' },
+  { value: 'variable', label: 'Variable Cost', icon: '📊', color: '#F97316' },
+  { value: 'opex', label: 'Operating Expense', icon: '⚙️', color: '#8B5CF6' },
+  { value: 'capex', label: 'Capital Expense', icon: '🏗️', color: '#14B8A6' },
+  { value: 'direct', label: 'Direct Cost', icon: '🎯', color: '#10B981' },
+  { value: 'indirect', label: 'Indirect Cost', icon: '📋', color: '#6B7280' }
+];
+
+// Default expense type based on category
+const getDefaultExpenseType = (category) => {
+  const defaults = {
+    'Rent': 'fixed',
+    'Salaries': 'fixed',
+    'Utilities': 'variable',
+    'Office Supplies': 'direct',
+    'Marketing': 'opex',
+    'Maintenance': 'opex',
+    'Inventory': 'capex',
+    'Other': 'indirect'
+  };
+  return defaults[category] || 'opex';
+};
+
+const getExpenseTypeInfo = (type) => {
+  return EXPENSE_TYPES.find(t => t.value === type) || { value: type, label: type, icon: '📋', color: '#6B7280' };
+};
+
+const INITIAL_FORM_DATA = {
+  date: format(new Date(), 'yyyy-MM-dd'),
+  category: '',
+  expenseType: '',
+  description: '',
+  vendor: '',
+  amount: '',
+  paymentMethod: '',
+  notes: '',
+  isRecurring: false,
+  recurringFrequency: 'monthly',
+  receiptAttachment: null
+};
+
+const Expenses = ({ embedded = false, onDataChange }) => {
   const { showToast } = useApp();
 
-  const [loading, setLoading] = useState(true);
-  const [expenses, setExpenses] = useState([]);
-  const [filteredExpenses, setFilteredExpenses] = useState([]);
-
+  // Filters
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterPayment, setFilterPayment] = useState('all');
   const [filterExpenseType, setFilterExpenseType] = useState('all');
@@ -18,194 +73,96 @@ const Expenses = () => {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState('create');
-  const [selectedExpense, setSelectedExpense] = useState(null);
+  // Custom validation
+  const validateExpense = useCallback((data) => {
+    if (!data.date) {
+      showToast('Date is required', 'error');
+      return false;
+    }
+    if (!data.category) {
+      showToast('Category is required', 'error');
+      return false;
+    }
+    if (!data.description?.trim()) {
+      showToast('Description is required', 'error');
+      return false;
+    }
+    if (!data.vendor?.trim()) {
+      showToast('Vendor is required', 'error');
+      return false;
+    }
+    if (!data.amount || parseFloat(data.amount) <= 0) {
+      showToast('Valid amount is required', 'error');
+      return false;
+    }
+    if (!data.paymentMethod) {
+      showToast('Payment method is required', 'error');
+      return false;
+    }
+    return true;
+  }, [showToast]);
 
-  // Delete confirmation dialog state
-  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, expense: null });
+  // Transform for edit
+  const transformForEdit = useCallback((expense) => ({
+    date: expense.date,
+    category: expense.category,
+    expenseType: expense.expenseType || getDefaultExpenseType(expense.category),
+    description: expense.description,
+    vendor: expense.vendor,
+    amount: expense.amount.toString(),
+    paymentMethod: expense.paymentMethod,
+    notes: expense.notes || '',
+    isRecurring: expense.isRecurring || false,
+    recurringFrequency: expense.recurringFrequency || 'monthly',
+    receiptAttachment: expense.receiptAttachment || null
+  }), []);
 
-  const [formData, setFormData] = useState({
-    date: '',
-    category: '',
-    expenseType: '',
-    description: '',
-    vendor: '',
-    amount: '',
-    paymentMethod: '',
-    notes: '',
-    isRecurring: false,
-    recurringFrequency: 'monthly',
-    receiptAttachment: null
+  // Transform for submit
+  const transformForSubmit = useCallback((data) => ({
+    date: data.date,
+    category: data.category,
+    expenseType: data.expenseType || getDefaultExpenseType(data.category),
+    description: data.description.trim(),
+    vendor: data.vendor.trim(),
+    amount: parseFloat(data.amount),
+    paymentMethod: data.paymentMethod,
+    notes: data.notes?.trim() || undefined,
+    isRecurring: data.isRecurring,
+    recurringFrequency: data.isRecurring ? data.recurringFrequency : undefined,
+    receiptAttachment: data.receiptAttachment || undefined
+  }), []);
+
+  // CRUD operations
+  const {
+    items: expenses,
+    loading,
+    showModal,
+    modalMode,
+    formData,
+    isSubmitting,
+    openCreate,
+    openEdit,
+    closeModal,
+    handleInputChange: baseHandleInputChange,
+    handleSubmit,
+    deleteConfirm,
+    handleDelete,
+    confirmDelete,
+    cancelDelete,
+    setFormData,
+    reload
+  } = useCrudOperations({
+    entityName: 'expense',
+    api: mockApi.expenses,
+    initialFormData: INITIAL_FORM_DATA,
+    transformForEdit,
+    transformForSubmit,
+    validateForm: validateExpense,
+    onSuccess: onDataChange
   });
 
-  const categories = [
-    'Office Supplies',
-    'Utilities',
-    'Salaries',
-    'Maintenance',
-    'Marketing',
-    'Inventory',
-    'Rent',
-    'Other'
-  ];
-
-  const paymentMethods = ['Cash', 'Credit Card', 'Bank Transfer', 'Check', 'E-Wallet'];
-  const recurringFrequencies = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
-
-  // Expense types with labels and icons
-  const expenseTypes = [
-    { value: 'fixed', label: 'Fixed Cost', icon: '🔒', color: '#3B82F6' },
-    { value: 'variable', label: 'Variable Cost', icon: '📊', color: '#F97316' },
-    { value: 'opex', label: 'Operating Expense', icon: '⚙️', color: '#8B5CF6' },
-    { value: 'capex', label: 'Capital Expense', icon: '🏗️', color: '#14B8A6' },
-    { value: 'direct', label: 'Direct Cost', icon: '🎯', color: '#10B981' },
-    { value: 'indirect', label: 'Indirect Cost', icon: '📋', color: '#6B7280' }
-  ];
-
-  // Default expense type based on category
-  const getDefaultExpenseType = (category) => {
-    const defaults = {
-      'Rent': 'fixed',
-      'Salaries': 'fixed',
-      'Utilities': 'variable',
-      'Office Supplies': 'direct',
-      'Marketing': 'opex',
-      'Maintenance': 'opex',
-      'Inventory': 'capex',
-      'Other': 'indirect'
-    };
-    return defaults[category] || 'opex';
-  };
-
-  useEffect(() => {
-    loadExpenses();
-  }, []);
-
-  useEffect(() => {
-    filterExpensesList();
-  }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm]);
-
-  const loadExpenses = async () => {
-    try {
-      setLoading(true);
-      const data = await mockApi.expenses.getExpenses();
-      setExpenses(data);
-      setLoading(false);
-    } catch (error) {
-      showToast('Failed to load expenses', 'error');
-      setLoading(false);
-    }
-  };
-
-  const filterExpensesList = () => {
-    let filtered = [...expenses];
-
-    // Category filter
-    if (filterCategory !== 'all') {
-      filtered = filtered.filter(e => e.category === filterCategory);
-    }
-
-    // Payment method filter
-    if (filterPayment !== 'all') {
-      filtered = filtered.filter(e => e.paymentMethod === filterPayment);
-    }
-
-    // Expense type filter
-    if (filterExpenseType !== 'all') {
-      filtered = filtered.filter(e => e.expenseType === filterExpenseType);
-    }
-
-    // Date range filter
-    if (filterDateFrom && filterDateTo) {
-      filtered = filtered.filter(e => {
-        const expenseDate = parseISO(e.date);
-        const fromDate = parseISO(filterDateFrom);
-        const toDate = parseISO(filterDateTo);
-        return isWithinInterval(expenseDate, { start: fromDate, end: toDate });
-      });
-    }
-
-    // Search filter
-    if (searchTerm.trim()) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(e =>
-        e.description.toLowerCase().includes(search) ||
-        e.vendor.toLowerCase().includes(search) ||
-        e.category.toLowerCase().includes(search)
-      );
-    }
-
-    // Sort by date descending
-    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    setFilteredExpenses(filtered);
-  };
-
-  const calculateStats = () => {
-    const total = expenses.reduce((sum, e) => sum + e.amount, 0);
-
-    // Current month expenses
-    const now = new Date();
-    const monthStart = startOfMonth(now);
-    const monthEnd = endOfMonth(now);
-    const monthlyExpenses = expenses.filter(e => {
-      const expenseDate = parseISO(e.date);
-      return isWithinInterval(expenseDate, { start: monthStart, end: monthEnd });
-    });
-    const monthly = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-    // Unique categories count
-    const uniqueCategories = new Set(expenses.map(e => e.category));
-
-    return {
-      total,
-      monthly,
-      categories: uniqueCategories.size,
-      count: expenses.length
-    };
-  };
-
-  const stats = calculateStats();
-
-  const openCreateModal = () => {
-    setModalMode('create');
-    setFormData({
-      date: format(new Date(), 'yyyy-MM-dd'),
-      category: '',
-      expenseType: '',
-      description: '',
-      vendor: '',
-      amount: '',
-      paymentMethod: '',
-      notes: '',
-      isRecurring: false,
-      recurringFrequency: 'monthly',
-      receiptAttachment: null
-    });
-    setShowModal(true);
-  };
-
-  const openEditModal = (expense) => {
-    setModalMode('edit');
-    setSelectedExpense(expense);
-    setFormData({
-      date: expense.date,
-      category: expense.category,
-      expenseType: expense.expenseType || getDefaultExpenseType(expense.category),
-      description: expense.description,
-      vendor: expense.vendor,
-      amount: expense.amount.toString(),
-      paymentMethod: expense.paymentMethod,
-      notes: expense.notes || '',
-      isRecurring: expense.isRecurring || false,
-      recurringFrequency: expense.recurringFrequency || 'monthly',
-      receiptAttachment: expense.receiptAttachment || null
-    });
-    setShowModal(true);
-  };
-
-  const handleInputChange = (e) => {
+  // Custom input handler for category-based expense type auto-fill
+  const handleInputChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
 
     // Auto-set expense type when category changes (only if expense type is empty)
@@ -218,16 +175,17 @@ const Expenses = () => {
       return;
     }
 
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
+    if (type === 'checkbox') {
+      setFormData(prev => ({ ...prev, [name]: checked }));
+    } else {
+      baseHandleInputChange(e);
+    }
+  }, [formData.expenseType, baseHandleInputChange, setFormData]);
 
-  const handleReceiptUpload = (e) => {
+  // Handle receipt upload
+  const handleReceiptUpload = useCallback((e) => {
     const file = e.target.files[0];
     if (file) {
-      // Simulate file upload - in real app, upload to server
       const reader = new FileReader();
       reader.onload = (e) => {
         setFormData(prev => ({
@@ -243,74 +201,83 @@ const Expenses = () => {
       };
       reader.readAsDataURL(file);
     }
-  };
+  }, [setFormData, showToast]);
 
-  const removeReceipt = () => {
+  // Remove receipt
+  const removeReceipt = useCallback(() => {
     setFormData(prev => ({ ...prev, receiptAttachment: null }));
     showToast('Receipt removed', 'info');
-  };
+  }, [setFormData, showToast]);
 
-  const validateForm = () => {
-    if (!formData.date) { showToast('Date is required', 'error'); return false; }
-    if (!formData.category) { showToast('Category is required', 'error'); return false; }
-    if (!formData.description.trim()) { showToast('Description is required', 'error'); return false; }
-    if (!formData.vendor.trim()) { showToast('Vendor is required', 'error'); return false; }
-    if (!formData.amount || parseFloat(formData.amount) <= 0) { showToast('Valid amount is required', 'error'); return false; }
-    if (!formData.paymentMethod) { showToast('Payment method is required', 'error'); return false; }
-    return true;
-  };
+  // Filtered expenses
+  const filteredExpenses = useMemo(() => {
+    let filtered = [...expenses];
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    try {
-      const expenseData = {
-        date: formData.date,
-        category: formData.category,
-        expenseType: formData.expenseType || getDefaultExpenseType(formData.category),
-        description: formData.description.trim(),
-        vendor: formData.vendor.trim(),
-        amount: parseFloat(formData.amount),
-        paymentMethod: formData.paymentMethod,
-        notes: formData.notes.trim() || undefined,
-        isRecurring: formData.isRecurring,
-        recurringFrequency: formData.isRecurring ? formData.recurringFrequency : undefined,
-        receiptAttachment: formData.receiptAttachment || undefined
-      };
-
-      if (modalMode === 'create') {
-        await mockApi.expenses.createExpense(expenseData);
-        showToast('Expense recorded!', 'success');
-      } else {
-        await mockApi.expenses.updateExpense(selectedExpense._id, expenseData);
-        showToast('Expense updated!', 'success');
-      }
-      setShowModal(false);
-      loadExpenses();
-    } catch (error) {
-      showToast('Failed to save expense', 'error');
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter(e => e.category === filterCategory);
     }
-  };
-
-  const handleDelete = (expense) => {
-    setDeleteConfirm({ isOpen: true, expense });
-  };
-
-  const confirmDelete = async () => {
-    const expense = deleteConfirm.expense;
-    if (!expense) return;
-    try {
-      await mockApi.expenses.deleteExpense(expense._id);
-      showToast('Expense deleted', 'success');
-      setDeleteConfirm({ isOpen: false, expense: null });
-      loadExpenses();
-    } catch (error) {
-      showToast('Failed to delete', 'error');
+    if (filterPayment !== 'all') {
+      filtered = filtered.filter(e => e.paymentMethod === filterPayment);
     }
-  };
+    if (filterExpenseType !== 'all') {
+      filtered = filtered.filter(e => e.expenseType === filterExpenseType);
+    }
+    if (filterDateFrom && filterDateTo) {
+      filtered = filtered.filter(e => {
+        const expenseDate = parseISO(e.date);
+        const fromDate = parseISO(filterDateFrom);
+        const toDate = parseISO(filterDateTo);
+        return isWithinInterval(expenseDate, { start: fromDate, end: toDate });
+      });
+    }
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(e =>
+        e.description.toLowerCase().includes(search) ||
+        e.vendor.toLowerCase().includes(search) ||
+        e.category.toLowerCase().includes(search)
+      );
+    }
 
-  const handleExport = () => {
+    // Sort by date descending
+    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    return filtered;
+  }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    const monthlyExpenses = expenses.filter(e => {
+      const expenseDate = parseISO(e.date);
+      return isWithinInterval(expenseDate, { start: monthStart, end: monthEnd });
+    });
+    const monthly = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const uniqueCategories = new Set(expenses.map(e => e.category));
+
+    return {
+      total,
+      monthly,
+      categories: uniqueCategories.size,
+      count: expenses.length
+    };
+  }, [expenses]);
+
+  // Clear filters
+  const clearFilters = useCallback(() => {
+    setFilterCategory('all');
+    setFilterPayment('all');
+    setFilterExpenseType('all');
+    setFilterDateFrom('');
+    setFilterDateTo('');
+    setSearchTerm('');
+  }, []);
+
+  // Export to CSV
+  const handleExport = useCallback(() => {
     if (filteredExpenses.length === 0) {
       showToast('No expenses to export', 'error');
       return;
@@ -342,14 +309,10 @@ const Expenses = () => {
     URL.revokeObjectURL(url);
 
     showToast('Expenses exported to CSV', 'success');
-  };
+  }, [filteredExpenses, showToast]);
 
   const getCategoryBadgeClass = (category) => {
     return category.toLowerCase().replace(/\s+/g, '-');
-  };
-
-  const getExpenseTypeInfo = (type) => {
-    return expenseTypes.find(t => t.value === type) || { value: type, label: type, icon: '📋', color: '#6B7280' };
   };
 
   if (loading) {
@@ -358,18 +321,22 @@ const Expenses = () => {
 
   return (
     <div className="expenses-page">
-      <div className="page-header">
-        <div>
-          <h1>Expenses</h1>
-          <p>Track and manage business expenses</p>
+      {!embedded && (
+        <PageHeader
+          title="Expenses"
+          description="Track and manage business expenses"
+          actions={[
+            { label: '📊 Export CSV', onClick: handleExport, variant: 'secondary' },
+            { label: '+ Add Expense', onClick: openCreate }
+          ]}
+        />
+      )}
+      {embedded && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)', gap: 'var(--spacing-sm)' }}>
+          <button className="export-btn" onClick={handleExport}>📊 Export CSV</button>
+          <button className="btn btn-primary" onClick={openCreate}>+ Add Expense</button>
         </div>
-        <div className="flex gap-sm">
-          <button className="export-btn" onClick={handleExport}>
-            📊 Export CSV
-          </button>
-          <button className="btn btn-primary" onClick={openCreateModal}>+ Add Expense</button>
-        </div>
-      </div>
+      )}
 
       {/* Summary Cards */}
       <div className="expenses-summary-grid">
@@ -412,21 +379,21 @@ const Expenses = () => {
             <label>Category</label>
             <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="form-control">
               <option value="all">All Categories</option>
-              {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
           <div className="form-group">
             <label>Payment Method</label>
             <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="form-control">
               <option value="all">All Methods</option>
-              {paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+              {PAYMENT_METHODS.map(pm => <option key={pm} value={pm}>{pm}</option>)}
             </select>
           </div>
           <div className="form-group">
             <label>Expense Type</label>
             <select value={filterExpenseType} onChange={(e) => setFilterExpenseType(e.target.value)} className="form-control">
               <option value="all">All Types</option>
-              {expenseTypes.map(type => (
+              {EXPENSE_TYPES.map(type => (
                 <option key={type.value} value={type.value}>{type.icon} {type.label}</option>
               ))}
             </select>
@@ -450,18 +417,7 @@ const Expenses = () => {
             />
           </div>
           <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setFilterCategory('all');
-                setFilterPayment('all');
-                setFilterExpenseType('all');
-                setFilterDateFrom('');
-                setFilterDateTo('');
-                setSearchTerm('');
-              }}
-              style={{ width: '100%' }}
-            >
+            <button className="btn btn-secondary" onClick={clearFilters} style={{ width: '100%' }}>
               Clear Filters
             </button>
           </div>
@@ -473,13 +429,12 @@ const Expenses = () => {
 
       {/* Expenses Table */}
       {filteredExpenses.length === 0 ? (
-        <div className="empty-expenses">
-          <div className="empty-expenses-icon">💸</div>
-          <p>No expenses found</p>
-          {expenses.length === 0 && (
-            <button className="btn btn-primary" onClick={openCreateModal}>Add Your First Expense</button>
-          )}
-        </div>
+        <EmptyState
+          icon="💸"
+          title="No expenses found"
+          description={expenses.length === 0 ? 'Start tracking your expenses' : 'Try adjusting your filters'}
+          action={expenses.length === 0 ? { label: 'Add Your First Expense', onClick: openCreate } : null}
+        />
       ) : (
         <div className="expenses-table-container">
           <table className="expenses-table">
@@ -525,9 +480,7 @@ const Expenses = () => {
                         </span>
                       )}
                       {expense.receiptAttachment && (
-                        <span className="receipt-badge" title="Has receipt attached">
-                          📎
-                        </span>
+                        <span className="receipt-badge" title="Has receipt attached">📎</span>
                       )}
                     </div>
                     {expense.notes && (
@@ -543,12 +496,8 @@ const Expenses = () => {
                   </td>
                   <td>
                     <div className="expense-actions">
-                      <button className="btn btn-xs btn-secondary" onClick={() => openEditModal(expense)}>
-                        Edit
-                      </button>
-                      <button className="btn btn-xs btn-error" onClick={() => handleDelete(expense)}>
-                        Delete
-                      </button>
+                      <button className="btn btn-xs btn-secondary" onClick={() => openEdit(expense)}>Edit</button>
+                      <button className="btn btn-xs btn-error" onClick={() => handleDelete(expense)}>Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -559,212 +508,196 @@ const Expenses = () => {
       )}
 
       {/* Expense Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal expense-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{modalMode === 'create' ? 'Add Expense' : 'Edit Expense'}</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Date *</label>
-                    <input
-                      type="date"
-                      name="date"
-                      value={formData.date}
-                      onChange={handleInputChange}
-                      className="form-control"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Category *</label>
-                    <select
-                      name="category"
-                      value={formData.category}
-                      onChange={handleInputChange}
-                      className="form-control"
-                      required
-                    >
-                      <option value="">Select category...</option>
-                      {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Expense Type</label>
-                  <select
-                    name="expenseType"
-                    value={formData.expenseType}
-                    onChange={handleInputChange}
-                    className="form-control"
-                  >
-                    <option value="">Auto-detect from category</option>
-                    {expenseTypes.map(type => (
-                      <option key={type.value} value={type.value}>
-                        {type.icon} {type.label}
-                      </option>
-                    ))}
-                  </select>
-                  <small style={{ color: 'var(--gray-500)', marginTop: '4px', display: 'block' }}>
-                    Classification helps with financial analysis and reporting
-                  </small>
-                </div>
-                <div className="form-group">
-                  <label>Description *</label>
-                  <input
-                    type="text"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    placeholder="e.g., Monthly office rent payment"
-                    className="form-control"
-                    required
-                  />
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Vendor *</label>
-                    <input
-                      type="text"
-                      name="vendor"
-                      value={formData.vendor}
-                      onChange={handleInputChange}
-                      placeholder="e.g., ABC Supplies Inc."
-                      className="form-control"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Amount (₱) *</label>
-                    <input
-                      type="number"
-                      name="amount"
-                      value={formData.amount}
-                      onChange={handleInputChange}
-                      placeholder="0.00"
-                      className="form-control"
-                      min="0"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Payment Method *</label>
-                  <select
-                    name="paymentMethod"
-                    value={formData.paymentMethod}
-                    onChange={handleInputChange}
-                    className="form-control"
-                    required
-                  >
-                    <option value="">Select payment method...</option>
-                    {paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Notes</label>
-                  <textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleInputChange}
-                    placeholder="Additional notes (optional)"
-                    className="form-control"
-                    rows="3"
-                  ></textarea>
-                </div>
-
-                {/* Recurring Expense */}
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="isRecurring"
-                      checked={formData.isRecurring}
-                      onChange={handleInputChange}
-                    />
-                    <span>This is a recurring expense</span>
-                  </label>
-                </div>
-
-                {formData.isRecurring && (
-                  <div className="form-group">
-                    <label>Recurring Frequency *</label>
-                    <select
-                      name="recurringFrequency"
-                      value={formData.recurringFrequency}
-                      onChange={handleInputChange}
-                      className="form-control"
-                    >
-                      {recurringFrequencies.map(freq => (
-                        <option key={freq} value={freq}>
-                          {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Receipt Upload */}
-                <div className="form-group">
-                  <label>Receipt Attachment</label>
-                  {!formData.receiptAttachment ? (
-                    <div className="receipt-upload-area" onClick={() => document.getElementById('receipt-upload').click()}>
-                      <input
-                        id="receipt-upload"
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={handleReceiptUpload}
-                        style={{ display: 'none' }}
-                      />
-                      <div className="receipt-upload-icon">📎</div>
-                      <div className="receipt-upload-text">Click to upload receipt</div>
-                      <div className="receipt-upload-hint">PNG, JPG, PDF (Max 5MB)</div>
-                    </div>
-                  ) : (
-                    <div className="receipt-attached">
-                      <div className="receipt-info">
-                        <span className="receipt-icon">📄</span>
-                        <div className="receipt-details">
-                          <div className="receipt-name">{formData.receiptAttachment.name}</div>
-                          <div className="receipt-size">{(formData.receiptAttachment.size / 1024).toFixed(2)} KB</div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-error"
-                        onClick={removeReceipt}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {modalMode === 'create' ? 'Add Expense' : 'Update Expense'}
-                </button>
-              </div>
-            </form>
+      <CrudModal
+        isOpen={showModal}
+        onClose={closeModal}
+        mode={modalMode}
+        title="Expense"
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        submitLabel={modalMode === 'create' ? 'Add Expense' : 'Update Expense'}
+      >
+        <div className="form-row">
+          <div className="form-group">
+            <label>Date *</label>
+            <input
+              type="date"
+              name="date"
+              value={formData.date}
+              onChange={handleInputChange}
+              className="form-control"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Category *</label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleInputChange}
+              className="form-control"
+              required
+            >
+              <option value="">Select category...</option>
+              {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
           </div>
         </div>
-      )}
+        <div className="form-group">
+          <label>Expense Type</label>
+          <select
+            name="expenseType"
+            value={formData.expenseType}
+            onChange={handleInputChange}
+            className="form-control"
+          >
+            <option value="">Auto-detect from category</option>
+            {EXPENSE_TYPES.map(type => (
+              <option key={type.value} value={type.value}>
+                {type.icon} {type.label}
+              </option>
+            ))}
+          </select>
+          <small style={{ color: 'var(--gray-500)', marginTop: '4px', display: 'block' }}>
+            Classification helps with financial analysis and reporting
+          </small>
+        </div>
+        <div className="form-group">
+          <label>Description *</label>
+          <input
+            type="text"
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            placeholder="e.g., Monthly office rent payment"
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Vendor *</label>
+            <input
+              type="text"
+              name="vendor"
+              value={formData.vendor}
+              onChange={handleInputChange}
+              placeholder="e.g., ABC Supplies Inc."
+              className="form-control"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Amount (₱) *</label>
+            <input
+              type="number"
+              name="amount"
+              value={formData.amount}
+              onChange={handleInputChange}
+              placeholder="0.00"
+              className="form-control"
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+        </div>
+        <div className="form-group">
+          <label>Payment Method *</label>
+          <select
+            name="paymentMethod"
+            value={formData.paymentMethod}
+            onChange={handleInputChange}
+            className="form-control"
+            required
+          >
+            <option value="">Select payment method...</option>
+            {PAYMENT_METHODS.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Notes</label>
+          <textarea
+            name="notes"
+            value={formData.notes}
+            onChange={handleInputChange}
+            placeholder="Additional notes (optional)"
+            className="form-control"
+            rows="3"
+          />
+        </div>
+
+        {/* Recurring Expense */}
+        <div className="form-group">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              name="isRecurring"
+              checked={formData.isRecurring}
+              onChange={handleInputChange}
+            />
+            <span>This is a recurring expense</span>
+          </label>
+        </div>
+
+        {formData.isRecurring && (
+          <div className="form-group">
+            <label>Recurring Frequency *</label>
+            <select
+              name="recurringFrequency"
+              value={formData.recurringFrequency}
+              onChange={handleInputChange}
+              className="form-control"
+            >
+              {RECURRING_FREQUENCIES.map(freq => (
+                <option key={freq} value={freq}>
+                  {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Receipt Upload */}
+        <div className="form-group">
+          <label>Receipt Attachment</label>
+          {!formData.receiptAttachment ? (
+            <div className="receipt-upload-area" onClick={() => document.getElementById('receipt-upload').click()}>
+              <input
+                id="receipt-upload"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={handleReceiptUpload}
+                style={{ display: 'none' }}
+              />
+              <div className="receipt-upload-icon">📎</div>
+              <div className="receipt-upload-text">Click to upload receipt</div>
+              <div className="receipt-upload-hint">PNG, JPG, PDF (Max 5MB)</div>
+            </div>
+          ) : (
+            <div className="receipt-attached">
+              <div className="receipt-info">
+                <span className="receipt-icon">📄</span>
+                <div className="receipt-details">
+                  <div className="receipt-name">{formData.receiptAttachment.name}</div>
+                  <div className="receipt-size">{(formData.receiptAttachment.size / 1024).toFixed(2)} KB</div>
+                </div>
+              </div>
+              <button type="button" className="btn btn-sm btn-error" onClick={removeReceipt}>
+                Remove
+              </button>
+            </div>
+          )}
+        </div>
+      </CrudModal>
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        onClose={() => setDeleteConfirm({ isOpen: false, expense: null })}
+        onClose={cancelDelete}
         onConfirm={confirmDelete}
         title="Delete Expense"
-        message={`Are you sure you want to delete expense "${deleteConfirm.expense?.description}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete expense "${deleteConfirm.item?.description}"? This action cannot be undone.`}
         confirmText="Delete"
         confirmVariant="danger"
       />

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, subDays, isWithinInterval } from 'date-fns';
 
-const Payroll = () => {
+const Payroll = ({ embedded = false, onDataChange }) => {
   const { showToast } = useApp();
 
   const [loading, setLoading] = useState(false);
@@ -443,23 +443,40 @@ const Payroll = () => {
 
   return (
     <div className="payroll-page">
-      <div className="page-header">
-        <div>
-          <h1>Payroll Management</h1>
-          <p>Calculate and manage employee payroll with Philippine labor law compliance</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1>Payroll Management</h1>
+            <p>Calculate and manage employee payroll with Philippine labor law compliance</p>
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+            <button className="btn btn-secondary" onClick={() => setShowGovRemittance(!showGovRemittance)}>
+              📊 Government Remittances
+            </button>
+            <button className="btn btn-secondary" onClick={handleGeneratePayslips} disabled={payrollData.length === 0}>
+              📄 Generate Payslips
+            </button>
+            <button className="btn btn-primary" onClick={handleCalculatePayroll}>
+              💰 Calculate Payroll
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+      )}
+
+      {/* Embedded header with just action buttons */}
+      {embedded && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
           <button className="btn btn-secondary" onClick={() => setShowGovRemittance(!showGovRemittance)}>
-            📊 Government Remittances
+            📊 Remittances
           </button>
           <button className="btn btn-secondary" onClick={handleGeneratePayslips} disabled={payrollData.length === 0}>
-            📄 Generate Payslips
+            📄 Payslips
           </button>
           <button className="btn btn-primary" onClick={handleCalculatePayroll}>
-            💰 Calculate Payroll
+            💰 Calculate
           </button>
         </div>
-      </div>
+      )}
 
       {/* Period Selector */}
       <div className="period-selector-section">

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
+import OfflineIndicator from './OfflineIndicator';
 
 const MainLayout = () => {
   const { user, logout, hasPermission } = useApp();
@@ -15,29 +16,12 @@ const MainLayout = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = React.useRef(null);
 
-  // Track which groups are expanded (all collapsed by default)
-  const [expandedGroups, setExpandedGroups] = useState({
-    'Main': false,
-    'Operations': false,
-    'Products': false,
-    'Finance': false,
-    'HR & Payroll': false,
-    'My Profile': false,
-    'Analytics': false,
-    'System': false
-  });
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const toggleGroup = (groupLabel) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupLabel]: !prev[groupLabel]
-    }));
-  };
 
   // Check for notifications on mount and periodically
   useEffect(() => {
@@ -493,69 +477,77 @@ const MainLayout = () => {
   // Menu items organized by logical groups - Professional icons
   const menuGroups = [
     {
-      label: 'Main',
+      label: 'Core',
       items: [
-        { path: '/dashboard', label: 'Dashboard', icon: '⊞', page: 'dashboard' },
-        { path: '/pos', label: 'POS', icon: '▣', page: 'pos' },
-        { path: '/calendar', label: 'Calendar', icon: '▦', page: 'calendar' },
-      ]
+        { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', page: 'dashboard' },
+        { path: '/pos', label: 'POS', icon: 'pos', page: 'pos' },
+        { path: '/calendar', label: 'Calendar', icon: 'calendar', page: 'calendar' },
+      ],
+      hasDivider: true
     },
     {
-      label: 'Operations',
+      label: 'Business',
       items: [
-        { path: '/rooms', label: 'Rooms', icon: '⊟', page: 'rooms' },
-        { path: '/customers', label: 'Customers', icon: '◉', page: 'customers' },
-        { path: '/service-history', label: 'Service History', icon: '☰', page: 'service-history' },
-      ]
+        { path: '/service-hub', label: 'Service Hub', icon: 'service', page: 'rooms' },
+        { path: '/customers', label: 'Customers', icon: 'customers', page: 'customers' },
+        { path: '/inventory-hub', label: 'Inventory Hub', icon: 'inventory', page: 'inventory' },
+        { path: '/gift-certificates', label: 'Gift Certificates', icon: 'gift', page: 'gift-certificates' },
+      ],
+      hasDivider: true
     },
     {
-      label: 'Products',
+      label: 'Management',
       items: [
-        { path: '/products', label: 'Products & Services', icon: '▤', page: 'products' },
-        { path: '/inventory', label: 'Inventory', icon: '▥', page: 'inventory' },
-        { path: '/suppliers', label: 'Suppliers', icon: '⌂', page: 'inventory' },
-        { path: '/purchase-orders', label: 'Purchase Orders', icon: '▧', page: 'inventory' },
-        { path: '/gift-certificates', label: 'Gift Certificates', icon: '◈', page: 'gift-certificates' },
-      ]
+        { path: '/finance-hub', label: 'Finance Hub', icon: 'finance', page: 'expenses' },
+        { path: '/hr-hub', label: 'HR Hub', icon: 'hr', page: 'employees' },
+      ],
+      hasDivider: true
     },
     {
-      label: 'Finance',
+      label: 'Personal',
       items: [
-        { path: '/expenses', label: 'Expenses', icon: '○', page: 'expenses' },
-        { path: '/cash-drawer-history', label: 'Cash Drawer', icon: '▭', page: 'cash-drawer-history' },
-      ]
+        { path: '/my-portal', label: 'My Portal', icon: 'portal', page: 'my-schedule' },
+      ],
+      hasDivider: true
     },
     {
-      label: 'HR & Payroll',
+      label: 'Intelligence',
       items: [
-        { path: '/employees', label: 'Employees', icon: '◎', page: 'employees' },
-        { path: '/attendance', label: 'Attendance', icon: '◔', page: 'attendance' },
-        { path: '/payroll', label: 'Payroll', icon: '▢', page: 'payroll' },
-      ]
-    },
-    {
-      label: 'My Profile',
-      items: [
-        { path: '/my-schedule', label: 'My Schedule', icon: '◧', page: 'my-schedule' },
-        { path: '/payroll-requests', label: 'My Payroll', icon: '◨', page: 'payroll-requests' },
-      ]
-    },
-    {
-      label: 'Analytics',
-      items: [
-        { path: '/ava-sensei', label: 'Ava Sensei', icon: '◬', page: 'ava-sensei' },
-        { path: '/reports', label: 'Reports', icon: '▩', page: 'reports' },
-        { path: '/ai-chatbot', label: 'Ava AI', icon: '◍', page: 'ai-chatbot' },
-      ]
+        { path: '/ava-sensei', label: 'Ava Sensei', icon: 'sensei', page: 'ava-sensei' },
+        { path: '/ai-chatbot', label: 'Ava AI', icon: 'ai', page: 'ai-chatbot' },
+      ],
+      hasDivider: true
     },
     {
       label: 'System',
       items: [
-        { path: '/activity-logs', label: 'Activity Logs', icon: '≡', page: 'activity-logs' },
-        { path: '/settings', label: 'Settings', icon: '⚙', page: 'settings' },
-      ]
+        { path: '/activity-logs', label: 'Activity Logs', icon: 'logs', page: 'activity-logs' },
+        { path: '/settings', label: 'Settings', icon: 'settings', page: 'settings' },
+      ],
+      hasDivider: false
     }
   ];
+
+  // Icon mapping for cleaner, consistent SVG-like icons
+  const getIcon = (iconName) => {
+    const icons = {
+      dashboard: '⊞',
+      pos: '◰',
+      calendar: '▦',
+      service: '◫',
+      customers: '◉',
+      inventory: '▤',
+      gift: '◇',
+      finance: '◎',
+      hr: '◈',
+      portal: '◧',
+      sensei: '◬',
+      ai: '◍',
+      logs: '≡',
+      settings: '⚙'
+    };
+    return icons[iconName] || '•';
+  };
 
   // Filter menu groups based on user role permissions
   const filteredGroups = menuGroups.map(group => ({
@@ -565,6 +557,9 @@ const MainLayout = () => {
 
   return (
     <div className="main-layout">
+      {/* Offline/Sync Status Indicator */}
+      <OfflineIndicator />
+
       {/* Skip to main content link for keyboard users */}
       <a href="#main-content" className="skip-link">
         Skip to main content
@@ -590,27 +585,9 @@ const MainLayout = () => {
         </div>
 
         <nav className="sidebar-nav" role="navigation" aria-label="Primary">
-          {filteredGroups.map((group) => (
-            <div key={group.label} className={`nav-group ${expandedGroups[group.label] ? 'expanded' : 'collapsed'}`}>
-              {sidebarOpen && (
-                <button
-                  type="button"
-                  className="nav-group-label"
-                  onClick={() => toggleGroup(group.label)}
-                  aria-expanded={expandedGroups[group.label]}
-                  aria-controls={`nav-group-${group.label.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  <span className="nav-group-text">{group.label}</span>
-                  <span className={`nav-group-arrow ${expandedGroups[group.label] ? 'expanded' : ''}`} aria-hidden="true">
-                    ▼
-                  </span>
-                </button>
-              )}
-              <div
-                id={`nav-group-${group.label.toLowerCase().replace(/\s+/g, '-')}`}
-                className={`nav-group-items ${expandedGroups[group.label] || !sidebarOpen ? 'show' : 'hide'}`}
-                role="list"
-              >
+          <div className="nav-items-flat" role="list">
+            {filteredGroups.map((group, groupIndex) => (
+              <React.Fragment key={group.label}>
                 {group.items.map((item) => (
                   <NavLink
                     key={item.path}
@@ -619,16 +596,19 @@ const MainLayout = () => {
                       `nav-item ${isActive ? 'active' : ''}`
                     }
                     role="listitem"
-                    aria-current={({ isActive }) => isActive ? 'page' : undefined}
+                    title={item.label}
                   >
-                    <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="nav-icon" aria-hidden="true">{getIcon(item.icon)}</span>
                     {sidebarOpen && <span className="nav-label">{item.label}</span>}
                     {!sidebarOpen && <span className="visually-hidden">{item.label}</span>}
                   </NavLink>
                 ))}
-              </div>
-            </div>
-          ))}
+                {group.hasDivider && groupIndex < filteredGroups.length - 1 && (
+                  <div className="nav-divider" aria-hidden="true"></div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
         </nav>
 
         <div className="sidebar-footer">

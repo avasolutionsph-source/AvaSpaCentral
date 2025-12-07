@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format } from 'date-fns';
 import '../assets/css/purchase-orders.css';
 import { ConfirmDialog } from '../components/shared';
 
-const PurchaseOrders = () => {
+const PurchaseOrders = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { showToast } = useApp();
@@ -339,20 +339,31 @@ const PurchaseOrders = () => {
   return (
     <div className="purchase-orders-page">
       {/* Page Header */}
-      <div className="page-header">
-        <div>
-          <h1>Purchase Orders</h1>
-          <p>Manage purchase orders and inventory replenishment</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1>Purchase Orders</h1>
+            <p>Manage purchase orders and inventory replenishment</p>
+          </div>
+          <div className="header-actions">
+            <button className="btn btn-secondary" onClick={() => navigate('/suppliers')}>
+              Manage Suppliers
+            </button>
+            <button className="btn btn-primary" onClick={openCreateModal}>
+              + New Purchase Order
+            </button>
+          </div>
         </div>
-        <div className="header-actions">
-          <button className="btn btn-secondary" onClick={() => navigate('/suppliers')}>
-            Manage Suppliers
-          </button>
+      )}
+
+      {/* Embedded header with just the action button */}
+      {embedded && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
           <button className="btn btn-primary" onClick={openCreateModal}>
             + New Purchase Order
           </button>
         </div>
-      </div>
+      )}
 
       {/* Summary Cards */}
       <div className="po-summary">

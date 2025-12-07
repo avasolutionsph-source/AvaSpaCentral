@@ -15,7 +15,7 @@ import {
   parseISO
 } from 'date-fns';
 import { advanceBookingApi } from '../mockApi/advanceBookingApi';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 
 const Calendar = () => {
   const navigate = useNavigate();

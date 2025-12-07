@@ -1,0 +1,105 @@
+/**
+ * CashDrawerRepository - Cash drawer sessions storage
+ */
+import BaseRepository from '../BaseRepository';
+
+class CashDrawerRepository extends BaseRepository {
+  constructor() {
+    super('cashDrawerSessions');
+  }
+
+  /**
+   * Get sessions with filters
+   */
+  async getSessions(filters = {}) {
+    let sessions = await this.getAll();
+
+    if (filters.status) {
+      sessions = sessions.filter(s => s.status === filters.status);
+    }
+    if (filters.userId) {
+      sessions = sessions.filter(s => s.userId === filters.userId);
+    }
+
+    // Sort by openTime descending
+    return sessions.sort((a, b) => new Date(b.openTime) - new Date(a.openTime));
+  }
+
+  /**
+   * Create a new session
+   */
+  async createSession(data) {
+    const session = {
+      ...data,
+      openTime: new Date().toISOString(),
+      closeTime: null,
+      status: 'open',
+      transactions: [],
+      variance: null
+    };
+
+    return this.create(session);
+  }
+
+  /**
+   * Close a session
+   */
+  async closeSession(sessionId, actualCash) {
+    const session = await this.getById(sessionId);
+    if (!session) throw new Error('Session not found');
+
+    const cashTransactions = (session.transactions || []).filter(t => t.method === 'Cash');
+    const expectedCash = (session.openingFloat || 0) + cashTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+    return this.update(sessionId, {
+      closeTime: new Date().toISOString(),
+      status: 'closed',
+      expectedCash,
+      actualCash,
+      variance: actualCash - expectedCash
+    });
+  }
+
+  /**
+   * Add transaction to session
+   */
+  async addTransaction(sessionId, transaction) {
+    const session = await this.getById(sessionId);
+    if (!session) throw new Error('Session not found');
+
+    const newTransaction = {
+      _id: 'cdt_' + Date.now(),
+      ...transaction,
+      time: new Date().toISOString()
+    };
+
+    const transactions = [...(session.transactions || []), newTransaction];
+
+    return this.update(sessionId, { transactions });
+  }
+
+  /**
+   * Get open session for user
+   */
+  async getOpenSession(userId) {
+    const session = await this.findOne(s => s.status === 'open' && s.userId === userId);
+    return session || null;
+  }
+
+  /**
+   * Get sessions by date
+   */
+  async getByDate(dateString) {
+    return this.find(s => s.openTime && s.openTime.startsWith(dateString));
+  }
+
+  /**
+   * Get open sessions count
+   */
+  async getOpenCount() {
+    const open = await this.find(s => s.status === 'open');
+    return open.length;
+  }
+}
+
+export default new CashDrawerRepository();

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format, subDays, addDays, startOfMonth, endOfMonth, differenceInDays, parseISO, isSameDay, startOfWeek, endOfWeek } from 'date-fns';
 import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-const Reports = () => {
+const Reports = ({ embedded = false }) => {
   const { showToast, user, isTherapist, canViewAll } = useApp();
 
   const [loading, setLoading] = useState(false);
@@ -2521,12 +2521,14 @@ const Reports = () => {
   if (!selectedCategory) {
     return (
       <div className="reports-page">
-        <div className="page-header">
-          <div>
-            <h1>Reports & Analytics</h1>
-            <p>Comprehensive business intelligence and performance insights</p>
+        {!embedded && (
+          <div className="page-header">
+            <div>
+              <h1>Reports & Analytics</h1>
+              <p>Comprehensive business intelligence and performance insights</p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="report-categories">
           {reportCategories.map(category => (

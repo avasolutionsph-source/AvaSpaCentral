@@ -379,26 +379,28 @@ const AdvanceBookingCheckout = ({
             </>
           )}
 
-          {/* Client Notes/Preferences - New Field */}
-          <div className="form-group" style={{ marginTop: 'var(--spacing-md)' }}>
-            <label>Client Notes & Preferences</label>
-            <textarea
-              value={bookingData.clientNotes}
-              onChange={(e) => handleChange('clientNotes', e.target.value)}
-              placeholder="e.g., Allergic to lavender, prefers firm pressure, sensitive skin..."
-              rows="3"
-              style={{
-                width: '100%',
-                padding: 'var(--spacing-sm)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--gray-300)',
-                fontSize: '0.9rem'
-              }}
-            />
-            <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginTop: 'var(--spacing-xs)' }}>
-              📝 Record allergies, preferences, or special requirements
-            </p>
-          </div>
+          {/* Client Notes/Preferences - Only show for new customers */}
+          {customerType === 'walk-in' && (
+            <div className="form-group" style={{ marginTop: 'var(--spacing-md)' }}>
+              <label>Client Notes & Preferences</label>
+              <textarea
+                value={bookingData.clientNotes}
+                onChange={(e) => handleChange('clientNotes', e.target.value)}
+                placeholder="e.g., Allergic to lavender, prefers firm pressure, sensitive skin..."
+                rows="3"
+                style={{
+                  width: '100%',
+                  padding: 'var(--spacing-sm)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--gray-300)',
+                  fontSize: '0.9rem'
+                }}
+              />
+              <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginTop: 'var(--spacing-xs)' }}>
+                📝 Record allergies, preferences, or special requirements
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Booking Details */}

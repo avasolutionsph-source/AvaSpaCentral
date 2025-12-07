@@ -1,52 +1,91 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
-import { ConfirmDialog } from '../components/shared';
 
-const Rooms = () => {
+// Import new shared components and hooks
+import { useCrudOperations } from '../hooks';
+import {
+  ConfirmDialog,
+  PageHeader,
+  FilterBar,
+  CrudModal,
+  PageLoading,
+  EmptyState
+} from '../components/shared';
+import { roomValidation, validateWithToast } from '../validation/schemas';
+
+const Rooms = ({ embedded = false, onDataChange }) => {
   const { user, showToast, isTherapist, canEdit } = useApp();
 
-  const [loading, setLoading] = useState(true);
-  const [rooms, setRooms] = useState([]);
-  const [upcomingBookings, setUpcomingBookings] = useState([]);
+  // Filter state (kept separate as it's page-specific)
   const [filterStatus, setFilterStatus] = useState('all');
+  const [upcomingBookings, setUpcomingBookings] = useState([]);
 
-  const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState('create');
-  const [selectedRoom, setSelectedRoom] = useState(null);
+  // Room types and amenities options
+  const roomTypes = ['Treatment Room', 'VIP Suite', 'Couples Room', 'Massage Room', 'Facial Room'];
+  const availableAmenities = ['Air Conditioning', 'Hot Stone', 'Jacuzzi', 'Music System', 'Aromatherapy', 'Private Shower', 'Locker', 'Massage Table'];
 
-  // Delete confirmation dialog state
-  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, room: null });
-
-  const [formData, setFormData] = useState({
+  // Initial form data for rooms
+  const initialFormData = {
     name: '',
     type: '',
     capacity: '',
     amenities: [],
     status: 'available'
-  });
-
-  const roomTypes = ['Treatment Room', 'VIP Suite', 'Couples Room', 'Massage Room', 'Facial Room'];
-  const availableAmenities = ['Air Conditioning', 'Hot Stone', 'Jacuzzi', 'Music System', 'Aromatherapy', 'Private Shower', 'Locker', 'Massage Table'];
-
-  useEffect(() => {
-    loadRooms();
-    loadUpcomingBookings();
-  }, [user]);
-
-  const loadRooms = async () => {
-    try {
-      setLoading(true);
-      const data = await mockApi.rooms.getRooms();
-      setRooms(data);
-      setLoading(false);
-    } catch (error) {
-      showToast('Failed to load rooms', 'error');
-      setLoading(false);
-    }
   };
 
+  // Use the unified CRUD hook
+  const {
+    items: rooms,
+    loading,
+    showModal,
+    modalMode,
+    formData,
+    isSubmitting,
+    openCreate,
+    openEdit,
+    closeModal,
+    handleInputChange,
+    setFieldValue,
+    handleSubmit,
+    deleteConfirm,
+    handleDelete,
+    confirmDelete,
+    cancelDelete,
+    isDeleting,
+    loadData: loadRooms
+  } = useCrudOperations({
+    entityName: 'room',
+    api: {
+      getAll: mockApi.rooms.getRooms,
+      create: mockApi.rooms.createRoom,
+      update: mockApi.rooms.updateRoom,
+      delete: mockApi.rooms.deleteRoom
+    },
+    initialFormData,
+    transformForEdit: (room) => ({
+      name: room.name,
+      type: room.type,
+      capacity: room.capacity.toString(),
+      amenities: room.amenities || [],
+      status: room.status
+    }),
+    transformForSubmit: (data) => ({
+      name: data.name.trim(),
+      type: data.type,
+      capacity: parseInt(data.capacity),
+      amenities: data.amenities,
+      status: data.status
+    }),
+    validateForm: (data) => validateWithToast(roomValidation, data, showToast),
+    onSuccess: () => {
+      if (onDataChange) onDataChange();
+      loadUpcomingBookings();
+    }
+  });
+
+  // Load upcoming bookings (separate from CRUD operations)
   const loadUpcomingBookings = async () => {
     try {
       let bookings = await mockApi.advanceBooking.listAdvanceBookings();
@@ -69,7 +108,13 @@ const Rooms = () => {
     }
   };
 
-  const getFilteredRooms = () => {
+  // Load bookings on mount and when user changes
+  useEffect(() => {
+    loadUpcomingBookings();
+  }, [user]);
+
+  // Filter rooms based on status and role
+  const filteredRooms = useMemo(() => {
     let filtered = rooms;
 
     // Filter by therapist if user is therapist
@@ -85,75 +130,18 @@ const Rooms = () => {
     }
 
     return filtered;
-  };
+  }, [rooms, filterStatus, isTherapist, user]);
 
-  const openCreateModal = () => {
-    setModalMode('create');
-    setFormData({ name: '', type: '', capacity: '', amenities: [], status: 'available' });
-    setShowModal(true);
-  };
-
-  const openEditModal = (room) => {
-    setModalMode('edit');
-    setSelectedRoom(room);
-    setFormData({
-      name: room.name,
-      type: room.type,
-      capacity: room.capacity.toString(),
-      amenities: room.amenities || [],
-      status: room.status
-    });
-    setShowModal(true);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
+  // Handle amenity toggle (custom handler for checkbox array)
   const handleAmenityToggle = (amenity) => {
-    setFormData(prev => ({
-      ...prev,
-      amenities: prev.amenities.includes(amenity)
-        ? prev.amenities.filter(a => a !== amenity)
-        : [...prev.amenities, amenity]
-    }));
+    setFieldValue('amenities',
+      formData.amenities.includes(amenity)
+        ? formData.amenities.filter(a => a !== amenity)
+        : [...formData.amenities, amenity]
+    );
   };
 
-  const validateForm = () => {
-    if (!formData.name.trim()) { showToast('Room name is required', 'error'); return false; }
-    if (!formData.type) { showToast('Room type is required', 'error'); return false; }
-    if (!formData.capacity || parseInt(formData.capacity) < 1) { showToast('Valid capacity is required', 'error'); return false; }
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    try {
-      const roomData = {
-        name: formData.name.trim(),
-        type: formData.type,
-        capacity: parseInt(formData.capacity),
-        amenities: formData.amenities,
-        status: formData.status
-      };
-
-      if (modalMode === 'create') {
-        await mockApi.rooms.createRoom(roomData);
-        showToast('Room created!', 'success');
-      } else {
-        await mockApi.rooms.updateRoom(selectedRoom._id, roomData);
-        showToast('Room updated!', 'success');
-      }
-      setShowModal(false);
-      loadRooms();
-    } catch (error) {
-      showToast('Failed to save room', 'error');
-    }
-  };
-
+  // Handle room status change
   const handleStatusChange = async (room, newStatus) => {
     try {
       await mockApi.rooms.updateRoomStatus(room._id, newStatus);
@@ -164,23 +152,25 @@ const Rooms = () => {
     }
   };
 
-  const handleDelete = (room) => {
-    setDeleteConfirm({ isOpen: true, room });
-  };
-
-  const confirmDelete = async () => {
-    const room = deleteConfirm.room;
-    if (!room) return;
+  // Handle starting a service from booking
+  const handleStartService = async (booking) => {
     try {
-      await mockApi.rooms.deleteRoom(room._id);
-      showToast('Room deleted', 'success');
-      setDeleteConfirm({ isOpen: false, room: null });
+      await mockApi.advanceBooking.startServiceFromBooking(booking.id);
+      const bookingTime = new Date(booking.bookingDateTime);
+      const now = new Date();
+      if (now < bookingTime) {
+        showToast('Starting service earlier than scheduled (demo)', 'info');
+      } else {
+        showToast('Service started successfully', 'success');
+      }
       loadRooms();
+      loadUpcomingBookings();
     } catch (error) {
-      showToast('Failed to delete', 'error');
+      showToast(error.message || 'Failed to start service', 'error');
     }
   };
 
+  // Room icon helper
   const getRoomIcon = (type) => {
     const icons = {
       'Treatment Room': '🛏️',
@@ -192,43 +182,64 @@ const Rooms = () => {
     return icons[type] || '🚪';
   };
 
+  // Filter configuration for FilterBar
+  const filterConfig = [
+    {
+      key: 'status',
+      value: filterStatus,
+      options: [
+        { value: 'all', label: 'All Status' },
+        { value: 'available', label: 'Available' },
+        { value: 'occupied', label: 'Occupied' },
+        { value: 'maintenance', label: 'Maintenance' }
+      ]
+    }
+  ];
+
+  // Loading state
   if (loading) {
-    return <div className="page-loading"><div className="spinner"></div><p>Loading rooms...</p></div>;
+    return <PageLoading message="Loading rooms..." />;
   }
 
   return (
     <div className="rooms-page">
-      <div className="page-header">
-        <div>
-          <h1>Rooms Management</h1>
-          <p>{isTherapist() ? 'View your assigned rooms and their availability' : 'Manage treatment rooms and their availability'}</p>
-        </div>
-        {canEdit() && (
-          <button className="btn btn-primary" onClick={openCreateModal}>+ Add Room</button>
-        )}
-      </div>
+      {/* Page Header */}
+      {!embedded && (
+        <PageHeader
+          title="Rooms Management"
+          description={isTherapist() ? 'View your assigned rooms and their availability' : 'Manage treatment rooms and their availability'}
+          action={canEdit() ? { label: '+ Add Room', onClick: openCreate } : null}
+          showAction={canEdit()}
+        />
+      )}
 
-      <div className="filters-section">
-        <div className="filters-row">
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
-            <option value="all">All Status</option>
-            <option value="available">Available</option>
-            <option value="occupied">Occupied</option>
-            <option value="maintenance">Maintenance</option>
-          </select>
-          <div className="results-count">{getFilteredRooms().length} rooms</div>
+      {/* Embedded Add Button */}
+      {embedded && canEdit() && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
+          <button className="btn btn-primary" onClick={openCreate}>+ Add Room</button>
         </div>
-      </div>
+      )}
 
-      {getFilteredRooms().length === 0 ? (
-        <div className="empty-rooms">
-          <div className="empty-rooms-icon">🚪</div>
-          <p>No rooms found</p>
-          <button className="btn btn-primary" onClick={openCreateModal}>Add Your First Room</button>
-        </div>
+      {/* Filters */}
+      <FilterBar
+        showSearch={false}
+        filters={filterConfig}
+        onFilterChange={(key, value) => setFilterStatus(value)}
+        resultCount={filteredRooms.length}
+        resultLabel="rooms"
+      />
+
+      {/* Rooms Grid or Empty State */}
+      {filteredRooms.length === 0 ? (
+        <EmptyState
+          icon="🚪"
+          title="No rooms found"
+          description="Try adjusting your filters"
+          action={canEdit() ? { label: 'Add Your First Room', onClick: openCreate } : null}
+        />
       ) : (
         <div className="rooms-grid">
-          {getFilteredRooms().map(room => (
+          {filteredRooms.map(room => (
             <div key={room._id} className={`room-card ${room.status}`}>
               <div className="room-header">
                 <div className="room-icon">{getRoomIcon(room.type)}</div>
@@ -271,7 +282,7 @@ const Rooms = () => {
               </div>
               {canEdit() && (
                 <div className="room-actions">
-                  <button className="btn btn-secondary" onClick={() => openEditModal(room)}>Edit</button>
+                  <button className="btn btn-secondary" onClick={() => openEdit(room)}>Edit</button>
                   <button className="btn btn-error" onClick={() => handleDelete(room)}>Delete</button>
                 </div>
               )}
@@ -309,22 +320,7 @@ const Rooms = () => {
                 <div className="booking-card-footer">
                   <button
                     className="btn btn-sm btn-primary"
-                    onClick={async () => {
-                      try {
-                        await mockApi.advanceBooking.startServiceFromBooking(booking.id);
-                        const bookingTime = new Date(booking.bookingDateTime);
-                        const now = new Date();
-                        if (now < bookingTime) {
-                          showToast('Starting service earlier than scheduled (demo)', 'info');
-                        } else {
-                          showToast('Service started successfully', 'success');
-                        }
-                        loadRooms();
-                        loadUpcomingBookings();
-                      } catch (error) {
-                        showToast(error.message || 'Failed to start service', 'error');
-                      }
-                    }}
+                    onClick={() => handleStartService(booking)}
                   >
                     Start Service
                   </button>
@@ -335,73 +331,98 @@ const Rooms = () => {
         </div>
       )}
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal room-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{modalMode === 'create' ? 'Add Room' : 'Edit Room'}</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Room Name *</label>
-                  <input type="text" name="name" value={formData.name} onChange={handleInputChange}
-                    placeholder="e.g., Room 1, VIP Suite A" className="form-control" required />
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Room Type *</label>
-                    <select name="type" value={formData.type} onChange={handleInputChange} className="form-control" required>
-                      <option value="">Select type...</option>
-                      {roomTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Capacity *</label>
-                    <input type="number" name="capacity" value={formData.capacity} onChange={handleInputChange}
-                      placeholder="1" className="form-control" min="1" required />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <select name="status" value={formData.status} onChange={handleInputChange} className="form-control">
-                    <option value="available">Available</option>
-                    <option value="occupied">Occupied</option>
-                    <option value="maintenance">Maintenance</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Amenities</label>
-                  <div className="amenities-selector">
-                    {availableAmenities.map(amenity => (
-                      <label key={amenity} className="amenity-checkbox">
-                        <input type="checkbox" checked={formData.amenities.includes(amenity)}
-                          onChange={() => handleAmenityToggle(amenity)} />
-                        <span>{amenity}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{modalMode === 'create' ? 'Create' : 'Update'}</button>
-              </div>
-            </form>
+      {/* Room Modal using CrudModal */}
+      <CrudModal
+        isOpen={showModal}
+        onClose={closeModal}
+        mode={modalMode}
+        title={{ create: 'Add Room', edit: 'Edit Room' }}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        className="room-modal"
+      >
+        <div className="form-group">
+          <label>Room Name *</label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            placeholder="e.g., Room 1, VIP Suite A"
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Room Type *</label>
+            <select
+              name="type"
+              value={formData.type}
+              onChange={handleInputChange}
+              className="form-control"
+              required
+            >
+              <option value="">Select type...</option>
+              {roomTypes.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Capacity *</label>
+            <input
+              type="number"
+              name="capacity"
+              value={formData.capacity}
+              onChange={handleInputChange}
+              placeholder="1"
+              className="form-control"
+              min="1"
+              required
+            />
           </div>
         </div>
-      )}
+        <div className="form-group">
+          <label>Status</label>
+          <select
+            name="status"
+            value={formData.status}
+            onChange={handleInputChange}
+            className="form-control"
+          >
+            <option value="available">Available</option>
+            <option value="occupied">Occupied</option>
+            <option value="maintenance">Maintenance</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Amenities</label>
+          <div className="amenities-selector">
+            {availableAmenities.map(amenity => (
+              <label key={amenity} className="amenity-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.amenities.includes(amenity)}
+                  onChange={() => handleAmenityToggle(amenity)}
+                />
+                <span>{amenity}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </CrudModal>
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        onClose={() => setDeleteConfirm({ isOpen: false, room: null })}
+        onClose={cancelDelete}
         onConfirm={confirmDelete}
         title="Delete Room"
-        message={`Are you sure you want to delete "${deleteConfirm.room?.name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deleteConfirm.item?.name}"? This action cannot be undone.`}
         confirmText="Delete"
         confirmVariant="danger"
+        isLoading={isDeleting}
       />
     </div>
   );

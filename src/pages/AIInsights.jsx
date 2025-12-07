@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 import { format, subDays, differenceInDays, addDays } from 'date-fns';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import '../assets/css/ai-insights.css';

@@ -1,27 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import mockApi from '../mockApi/mockApi';
-import { ConfirmDialog } from '../components/shared';
+import mockApi from '../mockApi';
 
-const Products = () => {
+// Import shared components and hooks
+import { useCrudOperations } from '../hooks';
+import {
+  ConfirmDialog,
+  PageHeader,
+  FilterBar,
+  CrudModal,
+  PageLoading,
+  EmptyState
+} from '../components/shared';
+
+const Products = ({ embedded = false, onDataChange }) => {
   const { showToast, canEdit } = useApp();
 
-  const [loading, setLoading] = useState(true);
-  const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
+  // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState('create');
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
 
-  // Delete confirmation dialog state
-  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, product: null });
-
-  const [formData, setFormData] = useState({
+  // Initial form data
+  const initialFormData = {
     name: '',
     category: '',
     type: 'service',
@@ -31,169 +35,131 @@ const Products = () => {
     stock: '',
     lowStockAlert: '',
     description: '',
-    itemsUsed: [] // For services: products consumed during the service
-  });
-
-  // Get retail products for the items used dropdown
-  const retailProducts = products.filter(p => p.type === 'product' && p.active);
-
-  const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
-
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  useEffect(() => {
-    filterProductsList();
-  }, [products, searchTerm, filterType, filterCategory, filterStatus]);
-
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
-      const data = await mockApi.products.getProducts();
-      setProducts(data);
-      setLoading(false);
-    } catch (error) {
-      showToast('Failed to load products', 'error');
-      setLoading(false);
-    }
+    itemsUsed: []
   };
 
-  const filterProductsList = () => {
+  // Custom validation for products (more complex than schema-based)
+  const validateProduct = (data) => {
+    if (!data.name.trim()) {
+      showToast('Product name is required', 'error');
+      return false;
+    }
+    if (!data.category) {
+      showToast('Category is required', 'error');
+      return false;
+    }
+    if (!data.price || parseFloat(data.price) <= 0) {
+      showToast('Valid price is required', 'error');
+      return false;
+    }
+    if (data.type === 'product') {
+      if (!data.stock || parseInt(data.stock) < 0) {
+        showToast('Valid stock is required', 'error');
+        return false;
+      }
+      if (!data.cost || parseFloat(data.cost) <= 0) {
+        showToast('Valid cost is required', 'error');
+        return false;
+      }
+    }
+    if (data.type === 'service' && (!data.duration || parseInt(data.duration) <= 0)) {
+      showToast('Valid duration is required', 'error');
+      return false;
+    }
+    return true;
+  };
+
+  // Use CRUD hook
+  const {
+    items: products,
+    loading,
+    showModal,
+    modalMode,
+    formData,
+    isSubmitting,
+    openCreate,
+    openEdit,
+    closeModal,
+    handleInputChange,
+    setFieldValue,
+    handleSubmit,
+    deleteConfirm,
+    handleDelete,
+    confirmDelete,
+    cancelDelete,
+    isDeleting,
+    loadData: loadProducts
+  } = useCrudOperations({
+    entityName: 'product',
+    api: {
+      getAll: mockApi.products.getProducts,
+      create: mockApi.products.createProduct,
+      update: mockApi.products.updateProduct,
+      delete: mockApi.products.deleteProduct,
+      toggleStatus: mockApi.products.toggleStatus
+    },
+    initialFormData,
+    transformForEdit: (product) => ({
+      name: product.name,
+      category: product.category,
+      type: product.type,
+      price: product.price.toString(),
+      cost: product.cost?.toString() || '',
+      duration: product.duration?.toString() || '',
+      stock: product.stock?.toString() || '',
+      lowStockAlert: product.lowStockAlert?.toString() || '',
+      description: product.description || '',
+      itemsUsed: product.itemsUsed || []
+    }),
+    transformForSubmit: (data) => ({
+      name: data.name.trim(),
+      category: data.category,
+      type: data.type,
+      price: parseFloat(data.price),
+      cost: data.type === 'product' ? parseFloat(data.cost) : undefined,
+      duration: data.type === 'service' ? parseInt(data.duration) : undefined,
+      stock: data.type === 'product' ? parseInt(data.stock) : undefined,
+      lowStockAlert: data.type === 'product' && data.lowStockAlert ? parseInt(data.lowStockAlert) : undefined,
+      description: data.description.trim(),
+      itemsUsed: data.type === 'service' ? data.itemsUsed : []
+    }),
+    validateForm: validateProduct,
+    onSuccess: () => {
+      if (onDataChange) onDataChange();
+    }
+  });
+
+  // Get retail products for items used dropdown
+  const retailProducts = useMemo(() =>
+    products.filter(p => p.type === 'product' && p.active),
+    [products]
+  );
+
+  // Filter products
+  const filteredProducts = useMemo(() => {
     let filtered = [...products];
+
     if (searchTerm.trim()) {
       filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.category.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    if (filterType !== 'all') filtered = filtered.filter(p => p.type === filterType);
-    if (filterCategory !== 'all') filtered = filtered.filter(p => p.category === filterCategory);
+    if (filterType !== 'all') {
+      filtered = filtered.filter(p => p.type === filterType);
+    }
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter(p => p.category === filterCategory);
+    }
     if (filterStatus !== 'all') {
       const isActive = filterStatus === 'active';
       filtered = filtered.filter(p => p.active === isActive);
     }
-    setFilteredProducts(filtered);
-  };
 
-  const openCreateModal = () => {
-    setModalMode('create');
-    setFormData({
-      name: '', category: '', type: 'service', price: '', cost: '', duration: '',
-      stock: '', lowStockAlert: '', description: '', itemsUsed: []
-    });
-    setShowModal(true);
-  };
+    return filtered;
+  }, [products, searchTerm, filterType, filterCategory, filterStatus]);
 
-  const openEditModal = (product) => {
-    setModalMode('edit');
-    setSelectedProduct(product);
-    setFormData({
-      name: product.name, category: product.category, type: product.type,
-      price: product.price.toString(), cost: product.cost?.toString() || '',
-      duration: product.duration?.toString() || '', stock: product.stock?.toString() || '',
-      lowStockAlert: product.lowStockAlert?.toString() || '',
-      description: product.description || '',
-      itemsUsed: product.itemsUsed || []
-    });
-    setShowModal(true);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Add item to items used list
-  const handleAddItemUsed = (productId) => {
-    if (!productId) return;
-
-    const product = retailProducts.find(p => p._id === productId);
-    if (!product) return;
-
-    // Check if already added
-    if (formData.itemsUsed.some(item => item.productId === productId)) {
-      showToast('Product already added', 'error');
-      return;
-    }
-
-    const newItem = {
-      productId: product._id,
-      productName: product.name,
-      quantity: 0.05, // Default quantity
-      unit: 'bottle'
-    };
-
-    setFormData(prev => ({
-      ...prev,
-      itemsUsed: [...prev.itemsUsed, newItem]
-    }));
-  };
-
-  // Remove item from items used list
-  const handleRemoveItemUsed = (productId) => {
-    setFormData(prev => ({
-      ...prev,
-      itemsUsed: prev.itemsUsed.filter(item => item.productId !== productId)
-    }));
-  };
-
-  // Update item quantity
-  const handleUpdateItemQuantity = (productId, quantity) => {
-    setFormData(prev => ({
-      ...prev,
-      itemsUsed: prev.itemsUsed.map(item =>
-        item.productId === productId
-          ? { ...item, quantity: parseFloat(quantity) || 0 }
-          : item
-      )
-    }));
-  };
-
-  const validateForm = () => {
-    if (!formData.name.trim()) { showToast('Product name is required', 'error'); return false; }
-    if (!formData.category) { showToast('Category is required', 'error'); return false; }
-    if (!formData.price || parseFloat(formData.price) <= 0) { showToast('Valid price is required', 'error'); return false; }
-    if (formData.type === 'product') {
-      if (!formData.stock || parseInt(formData.stock) < 0) { showToast('Valid stock is required', 'error'); return false; }
-      if (!formData.cost || parseFloat(formData.cost) <= 0) { showToast('Valid cost is required', 'error'); return false; }
-    }
-    if (formData.type === 'service' && (!formData.duration || parseInt(formData.duration) <= 0)) {
-      showToast('Valid duration is required', 'error'); return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    try {
-      const productData = {
-        name: formData.name.trim(), category: formData.category, type: formData.type,
-        price: parseFloat(formData.price),
-        cost: formData.type === 'product' ? parseFloat(formData.cost) : undefined,
-        duration: formData.type === 'service' ? parseInt(formData.duration) : undefined,
-        stock: formData.type === 'product' ? parseInt(formData.stock) : undefined,
-        lowStockAlert: formData.type === 'product' && formData.lowStockAlert ? parseInt(formData.lowStockAlert) : undefined,
-        description: formData.description.trim(),
-        itemsUsed: formData.type === 'service' ? formData.itemsUsed : []
-      };
-
-      if (modalMode === 'create') {
-        await mockApi.products.createProduct(productData);
-        showToast('Product created!', 'success');
-      } else {
-        await mockApi.products.updateProduct(selectedProduct._id, productData);
-        showToast('Product updated!', 'success');
-      }
-      setShowModal(false);
-      loadProducts();
-    } catch (error) {
-      showToast('Failed to save product', 'error');
-    }
-  };
-
+  // Toggle product status
   const handleToggleStatus = async (product) => {
     try {
       await mockApi.products.toggleStatus(product._id);
@@ -204,74 +170,122 @@ const Products = () => {
     }
   };
 
-  const handleDelete = (product) => {
-    setDeleteConfirm({ isOpen: true, product });
+  // Items used handlers
+  const handleAddItemUsed = (productId) => {
+    if (!productId) return;
+
+    const product = retailProducts.find(p => p._id === productId);
+    if (!product) return;
+
+    if (formData.itemsUsed.some(item => item.productId === productId)) {
+      showToast('Product already added', 'error');
+      return;
+    }
+
+    const newItem = {
+      productId: product._id,
+      productName: product.name,
+      quantity: 0.05,
+      unit: 'bottle'
+    };
+
+    setFieldValue('itemsUsed', [...formData.itemsUsed, newItem]);
   };
 
-  const confirmDelete = async () => {
-    const product = deleteConfirm.product;
-    if (!product) return;
-    try {
-      await mockApi.products.deleteProduct(product._id);
-      showToast('Product deleted', 'success');
-      setDeleteConfirm({ isOpen: false, product: null });
-      loadProducts();
-    } catch (error) {
-      showToast('Failed to delete', 'error');
+  const handleRemoveItemUsed = (productId) => {
+    setFieldValue('itemsUsed', formData.itemsUsed.filter(item => item.productId !== productId));
+  };
+
+  const handleUpdateItemQuantity = (productId, quantity) => {
+    setFieldValue('itemsUsed', formData.itemsUsed.map(item =>
+      item.productId === productId
+        ? { ...item, quantity: parseFloat(quantity) || 0 }
+        : item
+    ));
+  };
+
+  // Filter configuration
+  const filterConfig = [
+    {
+      key: 'type',
+      value: filterType,
+      options: [
+        { value: 'all', label: 'All Types' },
+        { value: 'service', label: 'Services' },
+        { value: 'product', label: 'Products' }
+      ]
+    },
+    {
+      key: 'category',
+      value: filterCategory,
+      options: [
+        { value: 'all', label: 'All Categories' },
+        ...categories.map(cat => ({ value: cat, label: cat }))
+      ]
+    },
+    {
+      key: 'status',
+      value: filterStatus,
+      options: [
+        { value: 'all', label: 'All Status' },
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' }
+      ]
     }
+  ];
+
+  const handleFilterChange = (key, value) => {
+    if (key === 'type') setFilterType(value);
+    else if (key === 'category') setFilterCategory(value);
+    else if (key === 'status') setFilterStatus(value);
   };
 
   if (loading) {
-    return <div className="page-loading"><div className="spinner"></div><p>Loading products...</p></div>;
+    return <PageLoading message="Loading products..." />;
   }
 
   return (
     <div className="products-page">
-      <div className="page-header">
-        <div><h1>Products & Services</h1><p>{canEdit() ? 'Manage your service menu and retail products' : 'View service menu and retail products'}</p></div>
-        {canEdit() && (
-          <button className="btn btn-primary" onClick={openCreateModal}>+ Add Product/Service</button>
-        )}
-      </div>
+      {/* Page Header */}
+      {!embedded && (
+        <PageHeader
+          title="Products & Services"
+          description={canEdit() ? 'Manage your service menu and retail products' : 'View service menu and retail products'}
+          action={canEdit() ? { label: '+ Add Product/Service', onClick: openCreate } : null}
+          showAction={canEdit()}
+        />
+      )}
 
-      <div className="filters-section">
-        <div className="search-box">
-          <input type="text" placeholder="Search..." value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)} className="search-input" />
+      {/* Embedded header */}
+      {embedded && canEdit() && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
+          <button className="btn btn-primary" onClick={openCreate}>+ Add Product/Service</button>
         </div>
-        <div className="filters-row">
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="filter-select">
-            <option value="all">All Types</option>
-            <option value="service">Services</option>
-            <option value="product">Products</option>
-          </select>
-          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="filter-select">
-            <option value="all">All Categories</option>
-            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <div className="results-count">{filteredProducts.length} items</div>
-        </div>
-      </div>
+      )}
 
+      {/* Filters */}
+      <FilterBar
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Search..."
+        filters={filterConfig}
+        onFilterChange={handleFilterChange}
+        resultCount={filteredProducts.length}
+        resultLabel="items"
+      />
+
+      {/* Products Grid */}
       <div className="products-grid">
         {filteredProducts.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📦</div>
-            <h3>No products found</h3>
-            <p>Try adjusting your filters or search term</p>
-            {canEdit() && (
-              <button className="btn btn-primary" onClick={openCreateModal}>+ Add Your First Product</button>
-            )}
-          </div>
+          <EmptyState
+            icon="📦"
+            title="No products found"
+            description="Try adjusting your filters or search term"
+            action={canEdit() ? { label: '+ Add Your First Product', onClick: openCreate } : null}
+          />
         ) : (
           filteredProducts.map(product => (
             <div key={product._id} className={`product-card-compact ${!product.active ? 'inactive' : ''}`}>
-              {/* Header Row - Status, Title, Type Badge */}
               <div className="product-card-header">
                 <div className="product-header-left">
                   <span className={`status-dot ${product.active ? 'active' : 'inactive'}`}></span>
@@ -280,7 +294,6 @@ const Products = () => {
                 <span className="type-badge">{product.type.toUpperCase()}</span>
               </div>
 
-              {/* Body - Price and Info in Compact Rows */}
               <div className="product-card-body">
                 <div className="product-info-row">
                   <span className="info-label">Category:</span>
@@ -304,12 +317,11 @@ const Products = () => {
                 </div>
               </div>
 
-              {/* Actions - Icon Buttons */}
               {canEdit() && (
                 <div className="product-card-actions">
                   <button
                     className="action-icon-btn edit-btn"
-                    onClick={() => openEditModal(product)}
+                    onClick={() => openEdit(product)}
                     title="Edit product"
                   >
                     ✏️
@@ -335,148 +347,232 @@ const Products = () => {
         )}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal product-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{modalMode === 'create' ? 'Add Product/Service' : 'Edit Product/Service'}</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Type *</label>
-                  <div className="radio-group">
-                    <label><input type="radio" name="type" value="service" checked={formData.type === 'service'} onChange={handleInputChange} />Service</label>
-                    <label><input type="radio" name="type" value="product" checked={formData.type === 'product'} onChange={handleInputChange} />Product</label>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Name *</label>
-                  <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Enter name" className="form-control" required />
-                </div>
-                <div className="form-group">
-                  <label>Category *</label>
-                  <select name="category" value={formData.category} onChange={handleInputChange} className="form-control" required>
-                    <option value="">Select...</option>
-                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Price (₱) *</label>
-                  <input type="number" name="price" value={formData.price} onChange={handleInputChange} placeholder="0.00" className="form-control" min="0" step="0.01" required />
-                </div>
-                {formData.type === 'product' && (
-                  <>
-                    <div className="form-group">
-                      <label>Cost (₱) *</label>
-                      <input type="number" name="cost" value={formData.cost} onChange={handleInputChange} placeholder="0.00" className="form-control" min="0" step="0.01" required />
-                    </div>
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Stock *</label>
-                        <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} placeholder="0" className="form-control" min="0" required />
-                      </div>
-                      <div className="form-group">
-                        <label>Low Stock Alert</label>
-                        <input type="number" name="lowStockAlert" value={formData.lowStockAlert} onChange={handleInputChange} placeholder="10" className="form-control" min="0" />
-                      </div>
-                    </div>
-                  </>
-                )}
-                {formData.type === 'service' && (
-                  <>
-                    <div className="form-group">
-                      <label>Duration (min) *</label>
-                      <input type="number" name="duration" value={formData.duration} onChange={handleInputChange} placeholder="60" className="form-control" min="1" required />
-                    </div>
-
-                    {/* Items Used Section */}
-                    <div className="form-group">
-                      <label>Items Used in Service</label>
-                      <p className="form-hint">Select products consumed when performing this service (for AI tracking)</p>
-
-                      {/* Dropdown to add products */}
-                      <div className="items-used-add">
-                        <select
-                          className="form-control"
-                          onChange={(e) => {
-                            handleAddItemUsed(e.target.value);
-                            e.target.value = '';
-                          }}
-                          defaultValue=""
-                        >
-                          <option value="">+ Add product...</option>
-                          {retailProducts
-                            .filter(p => !formData.itemsUsed.some(item => item.productId === p._id))
-                            .map(p => (
-                              <option key={p._id} value={p._id}>{p.name}</option>
-                            ))
-                          }
-                        </select>
-                      </div>
-
-                      {/* List of added items */}
-                      {formData.itemsUsed.length > 0 && (
-                        <div className="items-used-list">
-                          {formData.itemsUsed.map(item => (
-                            <div key={item.productId} className="items-used-item">
-                              <span className="item-name">🧴 {item.productName}</span>
-                              <div className="item-quantity">
-                                <input
-                                  type="number"
-                                  value={item.quantity}
-                                  onChange={(e) => handleUpdateItemQuantity(item.productId, e.target.value)}
-                                  min="0.01"
-                                  step="0.01"
-                                  className="form-control quantity-input"
-                                />
-                                <span className="item-unit">per service</span>
-                              </div>
-                              <button
-                                type="button"
-                                className="btn-remove-item"
-                                onClick={() => handleRemoveItemUsed(item.productId)}
-                                title="Remove"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {formData.itemsUsed.length === 0 && (
-                        <div className="items-used-empty">
-                          No products linked. Add products to enable AI consumption tracking.
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-                <div className="form-group">
-                  <label>Description</label>
-                  <textarea name="description" value={formData.description} onChange={handleInputChange} placeholder="Optional" className="form-control" rows="3"></textarea>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{modalMode === 'create' ? 'Create' : 'Update'}</button>
-              </div>
-            </form>
+      {/* Create/Edit Modal */}
+      <CrudModal
+        isOpen={showModal}
+        onClose={closeModal}
+        mode={modalMode}
+        title={{ create: 'Add Product/Service', edit: 'Edit Product/Service' }}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        className="product-modal"
+      >
+        <div className="form-group">
+          <label>Type *</label>
+          <div className="radio-group">
+            <label>
+              <input
+                type="radio"
+                name="type"
+                value="service"
+                checked={formData.type === 'service'}
+                onChange={handleInputChange}
+              />
+              Service
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="type"
+                value="product"
+                checked={formData.type === 'product'}
+                onChange={handleInputChange}
+              />
+              Product
+            </label>
           </div>
         </div>
-      )}
+
+        <div className="form-group">
+          <label>Name *</label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            placeholder="Enter name"
+            className="form-control"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Category *</label>
+          <select
+            name="category"
+            value={formData.category}
+            onChange={handleInputChange}
+            className="form-control"
+            required
+          >
+            <option value="">Select...</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Price (₱) *</label>
+          <input
+            type="number"
+            name="price"
+            value={formData.price}
+            onChange={handleInputChange}
+            placeholder="0.00"
+            className="form-control"
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+
+        {formData.type === 'product' && (
+          <>
+            <div className="form-group">
+              <label>Cost (₱) *</label>
+              <input
+                type="number"
+                name="cost"
+                value={formData.cost}
+                onChange={handleInputChange}
+                placeholder="0.00"
+                className="form-control"
+                min="0"
+                step="0.01"
+                required
+              />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Stock *</label>
+                <input
+                  type="number"
+                  name="stock"
+                  value={formData.stock}
+                  onChange={handleInputChange}
+                  placeholder="0"
+                  className="form-control"
+                  min="0"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Low Stock Alert</label>
+                <input
+                  type="number"
+                  name="lowStockAlert"
+                  value={formData.lowStockAlert}
+                  onChange={handleInputChange}
+                  placeholder="10"
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {formData.type === 'service' && (
+          <>
+            <div className="form-group">
+              <label>Duration (min) *</label>
+              <input
+                type="number"
+                name="duration"
+                value={formData.duration}
+                onChange={handleInputChange}
+                placeholder="60"
+                className="form-control"
+                min="1"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Items Used in Service</label>
+              <p className="form-hint">Select products consumed when performing this service (for AI tracking)</p>
+
+              <div className="items-used-add">
+                <select
+                  className="form-control"
+                  onChange={(e) => {
+                    handleAddItemUsed(e.target.value);
+                    e.target.value = '';
+                  }}
+                  defaultValue=""
+                >
+                  <option value="">+ Add product...</option>
+                  {retailProducts
+                    .filter(p => !formData.itemsUsed.some(item => item.productId === p._id))
+                    .map(p => (
+                      <option key={p._id} value={p._id}>{p.name}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              {formData.itemsUsed.length > 0 && (
+                <div className="items-used-list">
+                  {formData.itemsUsed.map(item => (
+                    <div key={item.productId} className="items-used-item">
+                      <span className="item-name">🧴 {item.productName}</span>
+                      <div className="item-quantity">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateItemQuantity(item.productId, e.target.value)}
+                          min="0.01"
+                          step="0.01"
+                          className="form-control quantity-input"
+                        />
+                        <span className="item-unit">per service</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-remove-item"
+                        onClick={() => handleRemoveItemUsed(item.productId)}
+                        title="Remove"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {formData.itemsUsed.length === 0 && (
+                <div className="items-used-empty">
+                  No products linked. Add products to enable AI consumption tracking.
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        <div className="form-group">
+          <label>Description</label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            placeholder="Optional"
+            className="form-control"
+            rows="3"
+          ></textarea>
+        </div>
+      </CrudModal>
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        onClose={() => setDeleteConfirm({ isOpen: false, product: null })}
+        onClose={cancelDelete}
         onConfirm={confirmDelete}
         title="Delete Product"
-        message={`Are you sure you want to delete "${deleteConfirm.product?.name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deleteConfirm.item?.name}"? This action cannot be undone.`}
         confirmText="Delete"
         confirmVariant="danger"
+        isLoading={isDeleting}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 # Ava Solutions Demo SPA ERP
 
-**Version:** 3.0.0
+**Version:** 3.1.0
 **Brand:** Ava Solutions AI Business Assistant
 **Demo Type:** Frontend-only Single Page Application (SPA)
 
@@ -38,7 +38,8 @@ npm run build
 - **Dates**: date-fns 3.0
 - **Styling**: Custom CSS (index.css)
 - **State**: React Context API
-- **Data**: Mock API (localStorage persistence)
+- **Storage**: Dexie.js (IndexedDB) - Offline-first architecture
+- **Data**: Mock API with offline persistence
 
 ## Project Structure
 
@@ -49,33 +50,103 @@ src/
 ├── components/
 │   ├── MainLayout.jsx         # App shell with sidebar
 │   ├── AdvanceBookingCheckout.jsx
+│   ├── OfflineIndicator.jsx   # Network status banner
 │   └── ProtectedRoute.jsx
+├── db/
+│   └── index.js               # Dexie database schema
+├── hooks/
+│   ├── useCrudOperations.js   # Reusable CRUD logic
+│   ├── useNetworkStatus.js    # Online/offline detection
+│   └── useSyncStatus.js       # Sync queue status
 ├── mockApi/
 │   ├── mockData.js            # Database schema & seed data
-│   ├── mockApi.js             # All API functions
+│   ├── mockApi.js             # Non-migrated APIs (auth, analytics)
+│   ├── offlineApi.js          # Offline-first API layer
 │   └── advanceBookingApi.js   # Advance booking API
-├── pages/
-│   ├── Dashboard.jsx          # Main dashboard with AI insights
-│   ├── POS.jsx                # Point of Sale
-│   ├── Products.jsx           # Products & Services CRUD
-│   ├── Customers.jsx          # Customer management
-│   ├── Appointments.jsx       # Booking management
-│   ├── Calendar.jsx           # Calendar view
-│   ├── Inventory.jsx          # Stock management
-│   ├── Employees.jsx          # Staff management
-│   ├── Attendance.jsx         # Clock in/out
-│   ├── Payroll.jsx            # Payroll processing
-│   ├── PayrollRequests.jsx    # Cash advance/loans
-│   ├── Reports.jsx            # Business reports
-│   ├── AIInsights.jsx         # AI-powered analytics
-│   ├── AIChatbot.jsx          # AI assistant
-│   ├── GiftCertificates.jsx   # Gift card management
-│   ├── ServiceHistory.jsx     # Transaction history
-│   ├── CashDrawerHistory.jsx  # Cash drawer sessions
-│   ├── ActivityLogs.jsx       # Audit trail
-│   └── Settings.jsx           # System settings
-└── utils/                     # Utility functions
+├── pages/                     # All page components
+├── services/
+│   ├── api/
+│   │   └── StorageAdapter.js  # Dexie-backed API adapters
+│   ├── storage/
+│   │   ├── index.js           # StorageService facade
+│   │   ├── BaseRepository.js  # Generic CRUD + sync
+│   │   └── repositories/      # Entity-specific repos
+│   ├── sync/
+│   │   ├── SyncManager.js     # Sync orchestration
+│   │   ├── SyncQueue.js       # Pending operations
+│   │   └── NetworkDetector.js # Connection monitoring
+│   └── InitializationService.js
+└── validation/
+    └── schemas.js             # Form validation schemas
 ```
+
+## Offline-First Architecture
+
+The app uses an offline-first design with Dexie.js (IndexedDB wrapper) for persistent local storage. All data operations work without an internet connection.
+
+### How It Works
+
+```
+┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
+│   React Pages   │────▶│  offlineApi  │────▶│ StorageAdapter  │
+│  (UI Components)│     │  (API Layer) │     │ (Dexie Bridge)  │
+└─────────────────┘     └──────────────┘     └────────┬────────┘
+                                                      │
+                        ┌──────────────┐     ┌────────▼────────┐
+                        │  SyncQueue   │◀────│ StorageService  │
+                        │ (Pending Ops)│     │ (Repositories)  │
+                        └──────────────┘     └────────┬────────┘
+                                                      │
+                                             ┌────────▼────────┐
+                                             │  Dexie/IndexedDB │
+                                             │  (Browser Store) │
+                                             └─────────────────┘
+```
+
+### Key Components
+
+| Component | Purpose |
+|-----------|---------|
+| `offlineApi.js` | Drop-in replacement for mockApi with offline support |
+| `StorageAdapter.js` | Bridges API calls to Dexie repositories |
+| `StorageService` | Unified facade for all data repositories |
+| `BaseRepository.js` | Generic CRUD operations with sync tracking |
+| `SyncQueue` | Tracks pending changes for future server sync |
+| `NetworkDetector` | Monitors online/offline status |
+
+### Data Flow
+
+1. **Read**: Page → offlineApi → StorageAdapter → Repository → Dexie → IndexedDB
+2. **Write**: Same path, plus adds entry to SyncQueue for future sync
+3. **First Run**: InitializationService seeds data from mockData.js
+4. **Migration**: Existing localStorage data migrated to IndexedDB
+
+### Sync Strategy (Future Backend)
+
+- **Server-wins**: When conflicts occur, server data takes precedence
+- **Queue-based**: All writes queued locally, synced when online
+- **Idempotent**: Operations can be safely retried
+
+### Storage Tables
+
+| Table | Description |
+|-------|-------------|
+| products | Services & retail products |
+| employees | Staff records |
+| customers | Customer profiles |
+| transactions | Sales/checkout records |
+| appointments | Bookings |
+| attendance | Clock in/out records |
+| expenses | Business expenses |
+| rooms | Treatment rooms |
+| giftCertificates | Gift cards |
+| purchaseOrders | Supplier orders |
+| suppliers | Vendor records |
+| payrollRequests | Cash advances/loans |
+| cashDrawerSessions | Cash drawer records |
+| shiftSchedules | Employee schedules |
+| activityLogs | Audit trail |
+| syncQueue | Pending sync operations |
 
 ## Key Features
 
@@ -148,6 +219,28 @@ src/
 - 5+ Expense records
 - 90 days of consumption history
 
+## Development
+
+### Reset Database
+
+To reset all data to initial seed state, open browser DevTools console and run:
+
+```javascript
+// Access via window for debugging
+window.resetDatabase?.() // If exposed
+// Or clear IndexedDB manually in DevTools > Application > IndexedDB
+```
+
+### Adding New Entities
+
+1. Create repository in `src/services/storage/repositories/`
+2. Add to `StorageService` in `src/services/storage/index.js`
+3. Create adapter in `src/services/api/StorageAdapter.js`
+4. Export from `src/services/api/index.js`
+5. Add API wrapper in `src/mockApi/offlineApi.js`
+6. Add seed data in `src/mockApi/mockData.js`
+7. Add seeding in `src/services/InitializationService.js`
+
 ---
 
-**Built by Ava Solutions** | **SPA Demo ERP v3.0.0**
+**Built by Ava Solutions** | **SPA Demo ERP v3.1.0** | Offline-First Edition

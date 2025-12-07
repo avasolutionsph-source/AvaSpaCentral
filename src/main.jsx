@@ -24,6 +24,22 @@ import './assets/css/settings.css'
 import './assets/css/shift-schedules.css'
 import './assets/css/analytics-dashboard.css'
 
+// Initialize offline-first storage
+import InitializationService from './services/InitializationService'
+
+// Initialize app before rendering
+InitializationService.initialize()
+  .then(({ isFirstRun }) => {
+    if (isFirstRun) {
+      console.log('[App] First run - data has been seeded');
+    }
+    console.log('[App] Initialization complete, rendering app');
+  })
+  .catch((error) => {
+    console.error('[App] Initialization failed:', error);
+    // App will still render, but may have limited functionality
+  });
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

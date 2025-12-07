@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
-import mockApi from '../mockApi/mockApi';
+import mockApi from '../mockApi';
 
-const CashDrawerHistory = () => {
+const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
   const { showToast } = useApp();
   const [sessions, setSessions] = useState([]);
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -136,6 +136,7 @@ const CashDrawerHistory = () => {
       }
 
       setSessions(filtered);
+      if (onDataChange) onDataChange();
     } catch (error) {
       showToast('Failed to load cash drawer history', 'error');
     } finally {
@@ -194,12 +195,14 @@ const CashDrawerHistory = () => {
 
   return (
     <div className="cash-drawer-page">
-      <div className="page-header">
-        <div>
-          <h1>Cash Drawer History</h1>
-          <p>Track and manage cash drawer sessions</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1>Cash Drawer History</h1>
+            <p>Track and manage cash drawer sessions</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Summary Cards */}
       <div className="cash-drawer-summary-grid">

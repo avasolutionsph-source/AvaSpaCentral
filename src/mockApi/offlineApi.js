@@ -173,7 +173,12 @@ export const shiftSchedulesApi = {
   createSchedule: shiftSchedulesAdapter.createSchedule,
   updateSchedule: shiftSchedulesAdapter.updateSchedule,
   deleteSchedule: shiftSchedulesAdapter.deleteSchedule,
-  applyTemplate: shiftSchedulesAdapter.applyTemplate
+  applyTemplate: shiftSchedulesAdapter.applyTemplate,
+  // Time-off requests
+  getTimeOffRequests: shiftSchedulesAdapter.getTimeOffRequests,
+  createTimeOffRequest: shiftSchedulesAdapter.createTimeOffRequest,
+  updateTimeOffRequest: shiftSchedulesAdapter.updateTimeOffRequest,
+  deleteTimeOffRequest: shiftSchedulesAdapter.deleteTimeOffRequest
 };
 
 // Re-export APIs that we haven't migrated yet

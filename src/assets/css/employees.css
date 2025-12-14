@@ -272,6 +272,26 @@
   overflow-y: auto;
 }
 
+/* Rate Type Toggle */
+.rate-type-toggle {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+}
+
+.rate-type-toggle .btn {
+  flex: 1;
+  min-width: 100px;
+}
+
+/* Form Help Text */
+.form-help {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-top: var(--spacing-xs);
+}
+
 .skills-selector {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

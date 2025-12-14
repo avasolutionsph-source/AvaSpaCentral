@@ -258,12 +258,6 @@ export const mockDatabase = {
     }
   },
 
-  // Monthly Financial Snapshots - Empty array (generated from real data)
-  monthlySnapshots: [],
-
-  // Hourly Sales Data - Empty array (generated from real transactions)
-  hourlySalesData: [],
-
   // Product Bundles - Empty array (created through UI)
   productBundles: [],
 

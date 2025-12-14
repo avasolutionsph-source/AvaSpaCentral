@@ -4,11 +4,18 @@ import mockApi from '../mockApi';
 import { useCrudOperations } from '../hooks';
 import { CrudModal, FilterBar, PageHeader, ConfirmDialog, EmptyState } from '../components/shared';
 
-// Constants
-const DEPARTMENTS = ['Massage', 'Facial', 'Body Treatment', 'Nails', 'Reception', 'Management', 'Housekeeping'];
-const ROLES = ['employee', 'manager', 'owner'];
-const POSITIONS = ['Massage Therapist', 'Facial Specialist', 'Body Treatment Specialist', 'Nail Technician', 'Receptionist', 'Manager', 'Supervisor', 'Housekeeper'];
+// Constants - 4 positions that map directly to roles
+const POSITIONS = [
+  { value: 'Owner', label: 'Owner', role: 'Owner', department: 'Management' },
+  { value: 'Manager', label: 'Manager', role: 'Manager', department: 'Management' },
+  { value: 'Therapist', label: 'Therapist', role: 'Therapist', department: 'Services' },
+  { value: 'Receptionist', label: 'Receptionist', role: 'Receptionist', department: 'Front Desk' }
+];
+const DEPARTMENTS = ['Management', 'Services', 'Front Desk'];
 const SKILLS_LIST = ['Swedish Massage', 'Deep Tissue', 'Hot Stone', 'Aromatherapy', 'Facial Treatment', 'Body Scrub', 'Manicure', 'Pedicure', 'Nail Art', 'Waxing'];
+
+// Hours per month for rate calculation (22 working days * 8 hours)
+const HOURS_PER_MONTH = 176;
 
 const INITIAL_FORM_DATA = {
   firstName: '',
@@ -17,9 +24,11 @@ const INITIAL_FORM_DATA = {
   phone: '',
   position: '',
   department: '',
-  role: 'employee',
+  role: '',
   commission: { type: 'percentage', value: '' },
   hourlyRate: '',
+  monthlyRate: '',
+  rateType: 'hourly', // 'hourly' or 'monthly'
   hireDate: '',
   skills: []
 };
@@ -65,10 +74,7 @@ const Employees = ({ embedded = false, onDataChange }) => {
       showToast('Position is required', 'error');
       return false;
     }
-    if (!data.department) {
-      showToast('Department is required', 'error');
-      return false;
-    }
+    // Commission validation
     if (!data.commission?.value || parseFloat(data.commission.value) < 0) {
       showToast('Valid commission is required', 'error');
       return false;
@@ -77,8 +83,11 @@ const Employees = ({ embedded = false, onDataChange }) => {
       showToast('Commission percentage cannot exceed 100%', 'error');
       return false;
     }
-    if (!data.hourlyRate || parseFloat(data.hourlyRate) <= 0) {
-      showToast('Hourly rate must be greater than 0', 'error');
+    // Rate validation - check based on rate type
+    const hourlyRate = parseFloat(data.hourlyRate) || 0;
+    const monthlyRate = parseFloat(data.monthlyRate) || 0;
+    if (hourlyRate <= 0 && monthlyRate <= 0) {
+      showToast('Either hourly rate or monthly rate must be greater than 0', 'error');
       return false;
     }
     if (!data.hireDate) {
@@ -89,34 +98,46 @@ const Employees = ({ embedded = false, onDataChange }) => {
   }, [showToast]);
 
   // Transform for edit
-  const transformForEdit = useCallback((employee) => ({
-    firstName: employee.firstName,
-    lastName: employee.lastName,
-    email: employee.email,
-    phone: employee.phone,
-    position: employee.position,
-    department: employee.department,
-    role: employee.role,
-    commission: { type: employee.commission.type, value: employee.commission.value.toString() },
-    hourlyRate: employee.hourlyRate?.toString() || '',
-    hireDate: employee.hireDate || '',
-    skills: employee.skills || []
-  }), []);
+  const transformForEdit = useCallback((employee) => {
+    const hourlyRate = employee.hourlyRate || 0;
+    const monthlyRate = employee.monthlyRate || (hourlyRate * HOURS_PER_MONTH);
+    return {
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      email: employee.email,
+      phone: employee.phone,
+      position: employee.position,
+      department: employee.department,
+      role: employee.role,
+      commission: { type: employee.commission?.type || 'percentage', value: employee.commission?.value?.toString() || '' },
+      hourlyRate: hourlyRate.toString(),
+      monthlyRate: monthlyRate.toString(),
+      rateType: employee.rateType || 'hourly',
+      hireDate: employee.hireDate || '',
+      skills: employee.skills || []
+    };
+  }, []);
 
   // Transform for submit
-  const transformForSubmit = useCallback((data) => ({
-    firstName: data.firstName.trim(),
-    lastName: data.lastName.trim(),
-    email: data.email.trim(),
-    phone: data.phone.trim(),
-    position: data.position,
-    department: data.department,
-    role: data.role,
-    commission: { type: data.commission.type, value: parseFloat(data.commission.value) },
-    hourlyRate: parseFloat(data.hourlyRate),
-    hireDate: data.hireDate,
-    skills: data.skills
-  }), []);
+  const transformForSubmit = useCallback((data) => {
+    const hourlyRate = parseFloat(data.hourlyRate) || 0;
+    const monthlyRate = parseFloat(data.monthlyRate) || 0;
+    return {
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      email: data.email.trim(),
+      phone: data.phone.trim(),
+      position: data.position,
+      department: data.department,
+      role: data.role, // role = position
+      commission: { type: data.commission.type, value: parseFloat(data.commission.value) || 0 },
+      hourlyRate: hourlyRate,
+      monthlyRate: monthlyRate,
+      rateType: data.rateType,
+      hireDate: data.hireDate,
+      skills: data.skills
+    };
+  }, []);
 
   // CRUD operations
   const {
@@ -146,12 +167,45 @@ const Employees = ({ embedded = false, onDataChange }) => {
     validateForm: validateEmployee
   });
 
-  // Custom handler for nested commission fields
+  // Custom handler for nested commission fields and position-role-department auto-linking
   const handleFieldChange = useCallback((e) => {
     const { name, value } = e.target;
     if (name.startsWith('commission.')) {
       const field = name.split('.')[1];
       setFormData(prev => ({ ...prev, commission: { ...prev.commission, [field]: value } }));
+    } else if (name === 'position') {
+      // When position changes, auto-set role and department
+      const positionConfig = POSITIONS.find(p => p.value === value);
+      if (positionConfig) {
+        setFormData(prev => ({
+          ...prev,
+          position: value,
+          role: positionConfig.role,
+          department: positionConfig.department
+        }));
+      } else {
+        setFormData(prev => ({ ...prev, position: value }));
+      }
+    } else if (name === 'hourlyRate') {
+      // When hourly rate changes, auto-calculate monthly rate
+      const hourly = parseFloat(value) || 0;
+      const monthly = hourly * HOURS_PER_MONTH;
+      setFormData(prev => ({
+        ...prev,
+        hourlyRate: value,
+        monthlyRate: monthly > 0 ? monthly.toFixed(2) : ''
+      }));
+    } else if (name === 'monthlyRate') {
+      // When monthly rate changes, auto-calculate hourly rate
+      const monthly = parseFloat(value) || 0;
+      const hourly = monthly / HOURS_PER_MONTH;
+      setFormData(prev => ({
+        ...prev,
+        monthlyRate: value,
+        hourlyRate: hourly > 0 ? hourly.toFixed(2) : ''
+      }));
+    } else if (name === 'rateType') {
+      setFormData(prev => ({ ...prev, rateType: value }));
     } else {
       handleInputChange(e);
     }
@@ -210,7 +264,7 @@ const Employees = ({ embedded = false, onDataChange }) => {
       value: filterRole,
       options: [
         { value: 'all', label: 'All Roles' },
-        ...ROLES.map(role => ({ value: role, label: role.charAt(0).toUpperCase() + role.slice(1) }))
+        ...POSITIONS.map(pos => ({ value: pos.role, label: pos.label }))
       ]
     },
     {
@@ -323,11 +377,14 @@ const Employees = ({ embedded = false, onDataChange }) => {
                   <>
                     <div className="detail-row">
                       <span className="label">Commission:</span>
-                      <span className="value">{employee.commission.value}{employee.commission.type === 'percentage' ? '%' : ' PHP'}</span>
+                      <span className="value">{employee.commission?.value || 0}{employee.commission?.type === 'percentage' ? '%' : ' PHP'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="label">Hourly Rate:</span>
-                      <span className="value">₱{employee.hourlyRate?.toLocaleString() || 0}</span>
+                      <span className="label">Rate:</span>
+                      <span className="value">
+                        ₱{employee.hourlyRate?.toLocaleString() || 0}/hr
+                        {employee.monthlyRate && ` (₱${employee.monthlyRate?.toLocaleString()}/mo)`}
+                      </span>
                     </div>
                   </>
                 )}
@@ -472,7 +529,7 @@ const Employees = ({ embedded = false, onDataChange }) => {
         </div>
         <div className="form-row">
           <div className="form-group">
-            <label>Position *</label>
+            <label>Position / Role *</label>
             <select
               name="position"
               value={formData.position}
@@ -481,51 +538,13 @@ const Employees = ({ embedded = false, onDataChange }) => {
               required
             >
               <option value="">Select position...</option>
-              {POSITIONS.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+              {POSITIONS.map(pos => <option key={pos.value} value={pos.value}>{pos.label}</option>)}
             </select>
-          </div>
-          <div className="form-group">
-            <label>Department *</label>
-            <select
-              name="department"
-              value={formData.department}
-              onChange={handleFieldChange}
-              className="form-control"
-              required
-            >
-              <option value="">Select department...</option>
-              {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="form-group">
-          <label>Role *</label>
-          <select
-            name="role"
-            value={formData.role}
-            onChange={handleFieldChange}
-            className="form-control"
-            required
-          >
-            {ROLES.map(role => (
-              <option key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Hourly Rate (₱) *</label>
-            <input
-              type="number"
-              name="hourlyRate"
-              value={formData.hourlyRate}
-              onChange={handleFieldChange}
-              placeholder="0.00"
-              className="form-control"
-              min="0"
-              step="0.01"
-              required
-            />
+            {formData.position && (
+              <small className="form-help">
+                Department: {formData.department} | Role: {formData.role}
+              </small>
+            )}
           </div>
           <div className="form-group">
             <label>Hire Date *</label>
@@ -537,6 +556,57 @@ const Employees = ({ embedded = false, onDataChange }) => {
               className="form-control"
               required
             />
+          </div>
+        </div>
+        <div className="form-group">
+          <label>Rate Type *</label>
+          <div className="rate-type-toggle">
+            <button
+              type="button"
+              className={`btn btn-sm ${formData.rateType === 'hourly' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => handleFieldChange({ target: { name: 'rateType', value: 'hourly' } })}
+            >
+              Hourly
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${formData.rateType === 'monthly' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => handleFieldChange({ target: { name: 'rateType', value: 'monthly' } })}
+            >
+              Monthly
+            </button>
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Hourly Rate (₱) {formData.rateType === 'hourly' ? '*' : ''}</label>
+            <input
+              type="number"
+              name="hourlyRate"
+              value={formData.hourlyRate}
+              onChange={handleFieldChange}
+              placeholder="0.00"
+              className="form-control"
+              min="0"
+              step="0.01"
+              required={formData.rateType === 'hourly'}
+            />
+            <small className="form-help">Per hour rate</small>
+          </div>
+          <div className="form-group">
+            <label>Monthly Rate (₱) {formData.rateType === 'monthly' ? '*' : ''}</label>
+            <input
+              type="number"
+              name="monthlyRate"
+              value={formData.monthlyRate}
+              onChange={handleFieldChange}
+              placeholder="0.00"
+              className="form-control"
+              min="0"
+              step="0.01"
+              required={formData.rateType === 'monthly'}
+            />
+            <small className="form-help">Based on {HOURS_PER_MONTH} hrs/month</small>
           </div>
         </div>
         <div className="form-group">

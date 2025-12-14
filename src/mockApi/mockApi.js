@@ -1657,12 +1657,23 @@ export const analyticsApi = {
     // Commission analysis
     const totalCommissions = monthlyTransactions.reduce((sum, t) => sum + (t.employee?.commission || 0), 0);
 
-    // Health status with colors
+    // Get industry benchmarks from mockData
+    const benchmarks = mockDatabase.industryBenchmarks;
+    const salaryHealthBenchmarks = benchmarks?.salaryHealth || {
+      excellent: { max: 25, score: 100, label: 'Excellent', color: '#10B981' },
+      healthy: { max: 30, score: 80, label: 'Healthy', color: '#34D399' },
+      atLimit: { max: 35, score: 60, label: 'At Limit', color: '#FBBF24' },
+      warning: { max: 40, score: 40, label: 'Warning', color: '#F97316' },
+      critical: { max: 100, score: 20, label: 'Critical', color: '#EF4444' }
+    };
+
+    // Health status using industry benchmarks
     const getHealthStatus = (ratio) => {
-      if (ratio < 25) return { status: 'excellent', color: '#10b981', label: 'Excellent' };
-      if (ratio < 35) return { status: 'healthy', color: '#3b82f6', label: 'Healthy' };
-      if (ratio < 45) return { status: 'warning', color: '#f59e0b', label: 'Warning' };
-      return { status: 'critical', color: '#ef4444', label: 'Critical' };
+      if (ratio < salaryHealthBenchmarks.excellent.max) return { status: 'excellent', color: salaryHealthBenchmarks.excellent.color, label: salaryHealthBenchmarks.excellent.label };
+      if (ratio < salaryHealthBenchmarks.healthy.max) return { status: 'healthy', color: salaryHealthBenchmarks.healthy.color, label: salaryHealthBenchmarks.healthy.label };
+      if (ratio < salaryHealthBenchmarks.atLimit.max) return { status: 'atLimit', color: salaryHealthBenchmarks.atLimit.color, label: salaryHealthBenchmarks.atLimit.label };
+      if (ratio < salaryHealthBenchmarks.warning.max) return { status: 'warning', color: salaryHealthBenchmarks.warning.color, label: salaryHealthBenchmarks.warning.label };
+      return { status: 'critical', color: salaryHealthBenchmarks.critical.color, label: salaryHealthBenchmarks.critical.label };
     };
 
     const healthStatus = getHealthStatus(payrollRatio);
@@ -1982,12 +1993,21 @@ export const analyticsApi = {
     const lastMonthOpex = lastMonthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const fixedCostsTotal = Object.values(fixedCosts).reduce((a, b) => a + b, 0);
 
-    // Tax estimates (Philippine rates)
-    const vatRate = 0.12;
+    // Get industry benchmarks from mockData
+    const benchmarks = mockDatabase.industryBenchmarks || {};
+    const opexBenchmark = benchmarks.totalOpex || { min: 55, max: 70, ideal: 60, label: 'Total OPEX' };
+
+    // Tax estimates (Philippine rates from taxConfig)
+    const taxConfig = mockDatabase.taxConfig || {};
+    const vatRate = taxConfig.vatRate || 0.12;
     const incomeTaxRate = 0.25;
     const vatCollected = monthlyRevenue * vatRate;
     const grossProfit = monthlyRevenue - totalOpex - fixedCostsTotal;
     const estimatedIncomeTax = Math.max(0, grossProfit * incomeTaxRate);
+
+    // Calculate OPEX ratio and compare to benchmark
+    const opexRatio = monthlyRevenue > 0 ? (totalOpex / monthlyRevenue) * 100 : 0;
+    const opexVsBenchmark = opexBenchmark.ideal - opexRatio;
 
     return {
       period: thisMonth,
@@ -2017,11 +2037,26 @@ export const analyticsApi = {
       profitability: {
         grossProfit,
         netProfit: grossProfit - estimatedIncomeTax,
-        opexToRevenueRatio: monthlyRevenue > 0 ? ((totalOpex / monthlyRevenue) * 100).toFixed(1) : 0
+        opexToRevenueRatio: opexRatio.toFixed(1)
+      },
+      benchmarks: {
+        opex: opexBenchmark,
+        payroll: benchmarks.payroll || { min: 25, max: 30, ideal: 27, label: 'Payroll' },
+        rent: benchmarks.rent || { min: 8, max: 12, ideal: 10, label: 'Rent' },
+        utilities: benchmarks.utilities || { min: 3, max: 5, ideal: 4, label: 'Utilities' },
+        marketing: benchmarks.marketing || { min: 3, max: 5, ideal: 4, label: 'Marketing' }
+      },
+      comparison: {
+        opexVsIdeal: opexVsBenchmark.toFixed(1),
+        isAboveBenchmark: opexRatio > opexBenchmark.max,
+        isBelowBenchmark: opexRatio < opexBenchmark.min,
+        isIdeal: opexRatio >= opexBenchmark.min && opexRatio <= opexBenchmark.max
       },
       insights: [
         totalOpex > lastMonthOpex * 1.2 ? 'OPEX increased by more than 20% this month.' : null,
-        parseFloat(((totalOpex / monthlyRevenue) * 100).toFixed(1)) > 40 ? 'Operating expenses are high relative to revenue.' : null
+        opexRatio > opexBenchmark.max ? `Operating expenses (${opexRatio.toFixed(1)}%) are above industry benchmark (${opexBenchmark.max}%).` : null,
+        opexRatio < opexBenchmark.min ? `Operating expenses (${opexRatio.toFixed(1)}%) are below industry benchmark - review if underspending.` : null,
+        opexRatio >= opexBenchmark.min && opexRatio <= opexBenchmark.max ? `OPEX ratio is within healthy industry range (${opexBenchmark.min}-${opexBenchmark.max}%).` : null
       ].filter(Boolean)
     };
   },
@@ -2182,6 +2217,89 @@ export const analyticsApi = {
     const totalGrossProfit = productMetrics.reduce((sum, p) => sum + p.grossProfit, 0);
     const avgGPM = totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : 0;
 
+    // ========== BUNDLE SUGGESTIONS ==========
+    // Analyze frequently bought together patterns from transactions
+    const productPairs = {};
+    transactions.forEach(t => {
+      const items = t.items || [];
+      if (items.length < 2) return;
+
+      // Get all pairs in this transaction
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const pairKey = [items[i].name, items[j].name].sort().join('|||');
+          if (!productPairs[pairKey]) {
+            productPairs[pairKey] = {
+              products: [items[i].name, items[j].name].sort(),
+              frequency: 0,
+              prices: [items[i].price || 0, items[j].price || 0]
+            };
+          }
+          productPairs[pairKey].frequency++;
+        }
+      }
+    });
+
+    // Generate bundle suggestions for pairs with frequency >= 2
+    const bundleSuggestions = Object.values(productPairs)
+      .filter(pair => pair.frequency >= 2)
+      .sort((a, b) => b.frequency - a.frequency)
+      .slice(0, 5)
+      .map(pair => {
+        const combinedPrice = pair.prices[0] + pair.prices[1];
+        const suggestedDiscount = 0.1; // 10% bundle discount
+        const suggestedBundlePrice = Math.round(combinedPrice * (1 - suggestedDiscount));
+        return {
+          products: pair.products,
+          frequency: pair.frequency,
+          correlation: Math.min(95, Math.round(50 + pair.frequency * 10)),
+          combinedPrice,
+          suggestedBundlePrice,
+          savings: combinedPrice - suggestedBundlePrice
+        };
+      });
+
+    // ========== CANNIBALIZATION ANALYSIS ==========
+    // Find products in same category competing for sales
+    const cannibalization = [];
+    const categoryGroups = {};
+
+    productMetrics.forEach(p => {
+      if (!p.category) return;
+      if (!categoryGroups[p.category]) categoryGroups[p.category] = [];
+      categoryGroups[p.category].push(p);
+    });
+
+    Object.entries(categoryGroups).forEach(([category, prods]) => {
+      if (prods.length < 2) return;
+
+      // Sort by price similarity
+      const sorted = [...prods].sort((a, b) => a.price - b.price);
+
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const productA = sorted[i];
+        const productB = sorted[i + 1];
+
+        // Check if prices are within 20% of each other
+        const priceDiff = Math.abs(productA.price - productB.price);
+        const avgPrice = (productA.price + productB.price) / 2;
+        const priceProximity = avgPrice > 0 ? priceDiff / avgPrice : 1;
+
+        if (priceProximity < 0.2 && productA.revenue > 0 && productB.revenue > 0) {
+          const lowerPerformer = productA.revenue < productB.revenue ? productA : productB;
+          const higherPerformer = productA.revenue >= productB.revenue ? productA : productB;
+
+          cannibalization.push({
+            productA: higherPerformer.name,
+            productB: lowerPerformer.name,
+            category,
+            revenueImpact: Math.round(lowerPerformer.revenue * 0.3),
+            recommendation: `Consider differentiating ${lowerPerformer.name} with unique features or adjusting its price point.`
+          });
+        }
+      }
+    });
+
     return {
       period: thisMonth,
       summary: {
@@ -2197,12 +2315,16 @@ export const analyticsApi = {
       services: services.sort((a, b) => b.revenue - a.revenue),
       products: retailProducts.sort((a, b) => b.revenue - a.revenue),
       stockAlerts: retailProducts.filter(p => p.stockStatus === 'Low Stock' || p.stockStatus === 'Out of Stock'),
+      bundleSuggestions,
+      cannibalization: cannibalization.slice(0, 5),
       insights: [
         byRevenue[0] ? `${byRevenue[0].name} is the best seller with ₱${byRevenue[0].revenue.toLocaleString()} revenue.` : null,
         retailProducts.filter(p => p.stockStatus === 'Low Stock').length > 0
           ? `${retailProducts.filter(p => p.stockStatus === 'Low Stock').length} products need restocking.`
           : null,
-        avgGPM < 50 ? 'Average gross profit margin is below 50%. Review pricing strategy.' : null
+        avgGPM < 50 ? 'Average gross profit margin is below 50%. Review pricing strategy.' : null,
+        bundleSuggestions.length > 0 ? `${bundleSuggestions.length} bundle opportunities identified.` : null,
+        cannibalization.length > 0 ? `${cannibalization.length} potential cannibalization issues detected.` : null
       ].filter(Boolean)
     };
   },

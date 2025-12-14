@@ -12,6 +12,7 @@
 
 import storageService from '../storage';
 import { mockDatabase } from '../../mockApi/mockData';
+import { db } from '../../db';
 
 // Simulate network delay (optional, for realistic feel during development)
 const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
@@ -1115,6 +1116,72 @@ export const shiftSchedulesAdapter = {
     }, employee);
 
     return clone(schedule);
+  },
+
+  // =========================================================================
+  // TIME-OFF REQUESTS
+  // =========================================================================
+
+  async getTimeOffRequests(filters = {}) {
+    await delay();
+    let requests = await db.timeOffRequests.toArray();
+
+    // Apply filters
+    if (filters.employeeId) {
+      requests = requests.filter(r => r.employeeId === filters.employeeId);
+    }
+    if (filters.status) {
+      requests = requests.filter(r => r.status === filters.status);
+    }
+
+    // Sort by creation date (newest first)
+    requests.sort((a, b) => new Date(b._createdAt || b.createdAt) - new Date(a._createdAt || a.createdAt));
+
+    // Enrich with employee names
+    const employees = await storageService.employees.getAll();
+    const employeeMap = {};
+    employees.forEach(e => { employeeMap[e._id] = e; });
+
+    return clone(requests.map(r => ({
+      ...r,
+      employeeName: employeeMap[r.employeeId]
+        ? `${employeeMap[r.employeeId].firstName} ${employeeMap[r.employeeId].lastName}`
+        : 'Unknown'
+    })));
+  },
+
+  async createTimeOffRequest(data) {
+    await delay();
+    const now = new Date().toISOString();
+    const request = {
+      _id: `tor_${Date.now()}`,
+      ...data,
+      status: 'pending',
+      _createdAt: now,
+      _updatedAt: now
+    };
+    await db.timeOffRequests.put(request);
+    return clone(request);
+  },
+
+  async updateTimeOffRequest(requestId, updates) {
+    await delay();
+    const existing = await db.timeOffRequests.get(requestId);
+    if (!existing) throw new Error('Time-off request not found');
+
+    const updated = {
+      ...existing,
+      ...updates,
+      _updatedAt: new Date().toISOString()
+    };
+    await db.timeOffRequests.put(updated);
+    return clone(updated);
+  },
+
+  async deleteTimeOffRequest(requestId) {
+    await delay();
+    await db.timeOffRequests.delete(requestId);
+    return { success: true };
   }
 };
 

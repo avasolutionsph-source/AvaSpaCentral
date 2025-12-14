@@ -5,6 +5,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import MySchedule from './MySchedule';
 import PayrollRequests from './PayrollRequests';
+import MyAttendanceHistory from './MyAttendanceHistory';
 import CameraCapture from '../components/CameraCapture';
 import '../assets/css/hub-pages.css';
 
@@ -156,6 +157,12 @@ const MyPortal = () => {
       id: 'attendance',
       label: 'Clock In/Out',
       icon: '⏱️',
+      badge: null
+    },
+    {
+      id: 'history',
+      label: 'My History',
+      icon: '📋',
       badge: null
     },
     {
@@ -530,6 +537,7 @@ const MyPortal = () => {
       {/* Tab Content */}
       <div className="hub-content">
         {activeTab === 'attendance' && renderAttendanceTab()}
+        {activeTab === 'history' && <MyAttendanceHistory embedded />}
         {activeTab === 'schedule' && <MySchedule embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <PayrollRequests embedded onDataChange={loadStats} />}
       </div>

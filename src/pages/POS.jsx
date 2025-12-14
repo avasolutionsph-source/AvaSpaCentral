@@ -255,7 +255,7 @@ const POS = () => {
         price: product.price,
         quantity: 1,
         subtotal: product.price,
-        commission: product.commission,
+        commission: product.commission || { type: 'fixed', value: 0 },
         duration: product.duration || null
       }]);
       showToast(`${product.name} added to cart`, 'success');
@@ -451,6 +451,13 @@ const POS = () => {
     try {
       const employee = employees.find(e => e._id === selectedEmployee);
 
+      // Verify employee was found
+      if (!employee) {
+        showToast('Selected employee not found. Please select again.', 'error');
+        setCheckoutLoading(false);
+        return;
+      }
+
       // If walk-in customer with provided info, save customer first
       let customerData = null;
       if (customerType === 'walk-in' && walkInCustomerData.name && walkInCustomerData.phone) {
@@ -550,11 +557,12 @@ const POS = () => {
         const sequence = Math.floor(Math.random() * 9999) + 1;
         const receiptNumber = `RCP-${today}-${sequence.toString().padStart(4, '0')}`;
 
-        // Calculate commission
+        // Calculate commission (handle missing commission data)
         const commissionAmount = cart.reduce((sum, item) => {
+          if (!item.commission || !item.commission.type) return sum;
           const commission = item.commission.type === 'percentage'
             ? (item.subtotal * item.commission.value / 100)
-            : item.commission.value;
+            : (item.commission.value || 0);
           return sum + commission;
         }, 0);
 

@@ -18,7 +18,10 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(cat:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(timeout 5 node:*)",
+      "Bash(timeout:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

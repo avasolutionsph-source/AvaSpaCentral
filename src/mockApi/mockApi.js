@@ -160,42 +160,38 @@ export const authApi = {
     // First, check against users in Dexie database
     const users = await db.users.toArray();
 
-    if (users.length > 0) {
-      // Users exist in database - use database authentication
-      const matchedUser = users.find(
-        u => u.email?.toLowerCase() === email?.toLowerCase() && u.password === password
-      );
+    // Try to find matching user in database
+    const matchedUser = users.find(
+      u => u.email?.toLowerCase() === email?.toLowerCase() && u.password === password
+    );
 
-      if (matchedUser) {
-        // Check if user is active
-        if (matchedUser.status !== 'active') {
-          throw new Error('Account is inactive. Please contact administrator.');
-        }
-
-        const token = 'mock_jwt_token_' + Date.now();
-        const user = clone(matchedUser);
-        delete user.password;
-
-        // Update last login time
-        await db.users.update(matchedUser._id, {
-          lastLogin: new Date().toISOString()
-        });
-
-        // Store in localStorage
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-
-        return {
-          success: true,
-          token,
-          user
-        };
+    if (matchedUser) {
+      // Check if user is active
+      if (matchedUser.status !== 'active') {
+        throw new Error('Account is inactive. Please contact administrator.');
       }
 
-      throw new Error('Invalid email or password');
+      const token = 'mock_jwt_token_' + Date.now();
+      const user = clone(matchedUser);
+      delete user.password;
+
+      // Update last login time
+      await db.users.update(matchedUser._id, {
+        lastLogin: new Date().toISOString()
+      });
+
+      // Store in localStorage
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+
+      return {
+        success: true,
+        token,
+        user
+      };
     }
 
-    // Fallback: No users in database - use demo credentials
+    // Fallback: Check demo credentials (always available)
     // Check against testUser first (owner@example.com)
     if (email === mockDatabase.testUser.email && password === mockDatabase.testUser.password) {
       const token = 'mock_jwt_token_' + Date.now();

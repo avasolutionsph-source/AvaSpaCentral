@@ -844,13 +844,23 @@ export const attendanceAdapter = {
       );
     }
 
+    // Enrich with employee info
+    const employees = await storageService.employees.getAll();
+    const employeeMap = {};
+    employees.forEach(e => { employeeMap[e._id] = e; });
+
+    records = records.map(r => ({
+      ...r,
+      employee: employeeMap[r.employeeId] || null
+    }));
+
     return clone(records);
   },
 
-  async clockIn(employeeId) {
+  async clockIn(employeeId, captureData = {}) {
     await delay();
     const today = new Date().toISOString().split('T')[0];
-    const now = new Date().toISOString();
+    const nowTime = new Date().toTimeString().slice(0, 5); // HH:mm format
 
     // Check if already clocked in today
     const existing = await storageService.attendance.find(
@@ -861,20 +871,31 @@ export const attendanceAdapter = {
       throw new Error('Already clocked in');
     }
 
+    // Get employee info
+    const employee = await storageService.employees.getById(employeeId);
+
     const record = await storageService.attendance.create({
       employeeId,
       date: today,
-      clockIn: now,
+      clockIn: nowTime,
+      clockInPhoto: captureData.photo || null,
+      clockInGps: captureData.gps || null,
       status: 'present'
     });
 
-    return { success: true, attendance: clone(record) };
+    return {
+      success: true,
+      attendance: clone({
+        ...record,
+        employee: employee || null
+      })
+    };
   },
 
-  async clockOut(employeeId) {
+  async clockOut(employeeId, captureData = {}) {
     await delay();
     const today = new Date().toISOString().split('T')[0];
-    const now = new Date().toISOString();
+    const nowTime = new Date().toTimeString().slice(0, 5); // HH:mm format
 
     const existing = await storageService.attendance.find(
       a => a.employeeId === employeeId && a.date === today && a.clockIn && !a.clockOut
@@ -886,10 +907,21 @@ export const attendanceAdapter = {
 
     const record = existing[0];
     const updated = await storageService.attendance.update(record._id, {
-      clockOut: now
+      clockOut: nowTime,
+      clockOutPhoto: captureData.photo || null,
+      clockOutGps: captureData.gps || null
     });
 
-    return { success: true, attendance: clone(updated) };
+    // Get employee info
+    const employee = await storageService.employees.getById(employeeId);
+
+    return {
+      success: true,
+      attendance: clone({
+        ...updated,
+        employee: employee || null
+      })
+    };
   }
 };
 

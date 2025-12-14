@@ -75,7 +75,7 @@ const MyPortal = () => {
       const attendance = await mockApi.attendance.getAttendance();
       const today = format(new Date(), 'yyyy-MM-dd');
       const myRecord = attendance.find(
-        a => a.date === today && a.employee?._id === user.employeeId
+        a => a.date === today && (a.employeeId === user.employeeId || a.employee?._id === user.employeeId)
       );
       setTodayAttendance(myRecord || null);
     } catch (error) {
@@ -131,12 +131,21 @@ const MyPortal = () => {
   const calculateHoursWorked = () => {
     if (!todayAttendance?.clockIn || !todayAttendance?.clockOut) return null;
 
-    const clockIn = parseISO(`${todayAttendance.date}T${todayAttendance.clockIn}`);
-    const clockOut = parseISO(`${todayAttendance.date}T${todayAttendance.clockOut}`);
-    const minutes = differenceInMinutes(clockOut, clockIn);
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+    try {
+      // Handle both HH:mm and HH:mm:ss formats
+      const clockInTime = todayAttendance.clockIn.includes(':') ? todayAttendance.clockIn : '00:00';
+      const clockOutTime = todayAttendance.clockOut.includes(':') ? todayAttendance.clockOut : '00:00';
+
+      const clockIn = parseISO(`${todayAttendance.date}T${clockInTime}:00`);
+      const clockOut = parseISO(`${todayAttendance.date}T${clockOutTime}:00`);
+      const minutes = differenceInMinutes(clockOut, clockIn);
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${hours}h ${mins}m`;
+    } catch (error) {
+      console.error('Error calculating hours:', error);
+      return null;
+    }
   };
 
   const tabs = [

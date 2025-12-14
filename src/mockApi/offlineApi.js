@@ -56,7 +56,13 @@ export const employeesApi = {
   getEmployee: employeesAdapter.getEmployee,
   createEmployee: employeesAdapter.createEmployee,
   updateEmployee: employeesAdapter.updateEmployee,
-  deleteEmployee: employeesAdapter.deleteEmployee
+  deleteEmployee: employeesAdapter.deleteEmployee,
+  toggleStatus: employeesAdapter.toggleStatus,
+  // Aliases for useCrudOperations hook
+  getAll: employeesAdapter.getEmployees,
+  create: employeesAdapter.createEmployee,
+  update: employeesAdapter.updateEmployee,
+  delete: employeesAdapter.deleteEmployee
 };
 
 export const customersApi = {

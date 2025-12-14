@@ -132,6 +132,16 @@ export const employeesAdapter = {
     await delay();
     await storageService.employees.delete(id);
     return { success: true };
+  },
+
+  async toggleStatus(id) {
+    await delay();
+    const employee = await storageService.employees.getById(id);
+    if (!employee) throw new Error('Employee not found');
+
+    const newStatus = employee.status === 'active' ? 'inactive' : 'active';
+    const updated = await storageService.employees.update(id, { status: newStatus });
+    return { success: true, employee: clone(updated) };
   }
 };
 

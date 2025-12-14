@@ -50,7 +50,31 @@ export const AppProvider = ({ children }) => {
       try {
         const sessionUser = localStorage.getItem('user');
         if (sessionUser) {
-          setUser(JSON.parse(sessionUser));
+          let userData = JSON.parse(sessionUser);
+
+          // FIX: Refresh employeeId from mockData if missing (for existing sessions before fix)
+          if (!userData.employeeId) {
+            const { mockDatabase } = await import('../mockApi/mockData');
+
+            // Check testUser first
+            if (userData.email === mockDatabase.testUser.email && mockDatabase.testUser.employeeId) {
+              userData.employeeId = mockDatabase.testUser.employeeId;
+            } else {
+              // Check demoUsers
+              const demoUser = mockDatabase.demoUsers.find(u => u.email === userData.email);
+              if (demoUser?.employeeId) {
+                userData.employeeId = demoUser.employeeId;
+              }
+            }
+
+            // Update localStorage with refreshed data
+            if (userData.employeeId) {
+              localStorage.setItem('user', JSON.stringify(userData));
+              console.log('[AppContext] Refreshed employeeId for existing session:', userData.employeeId);
+            }
+          }
+
+          setUser(userData);
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);

@@ -138,55 +138,7 @@ const Calendar = () => {
         };
       });
 
-      if (transformedAppointments.length === 0) {
-        const mockAppointments = [
-          {
-            id: 'demo_1',
-            type: 'appointment',
-            customer: 'Maria Santos',
-            service: 'Swedish Massage (90 min)',
-            therapist: 'John Doe',
-            date: new Date().toISOString(),
-            startTime: '09:00',
-            endTime: '10:30',
-            status: 'confirmed',
-            room: 'Room 1',
-            price: 1200,
-            notes: 'Customer prefers firm pressure'
-          },
-          {
-            id: 'demo_2',
-            type: 'appointment',
-            customer: 'Anna Cruz',
-            service: 'Hot Stone Therapy',
-            therapist: 'Jane Smith',
-            date: new Date().toISOString(),
-            startTime: '11:00',
-            endTime: '12:30',
-            status: 'pending',
-            room: 'Room 2',
-            price: 1500,
-            notes: ''
-          },
-          {
-            id: 'demo_3',
-            type: 'appointment',
-            customer: 'Lisa Garcia',
-            service: 'Aromatherapy Massage',
-            therapist: 'Mike Johnson',
-            date: addDays(new Date(), 1).toISOString(),
-            startTime: '14:00',
-            endTime: '15:00',
-            status: 'confirmed',
-            room: 'Room 3',
-            price: 1000,
-            notes: 'Allergic to lavender oil'
-          }
-        ];
-        setAppointments(mockAppointments);
-      } else {
-        setAppointments(transformedAppointments);
-      }
+      setAppointments(transformedAppointments);
     } catch (error) {
       if (!isMounted) return;
       console.error('Failed to load appointments:', error);
@@ -278,34 +230,6 @@ const Calendar = () => {
               startTime: schedule.startTime || '09:00',
               endTime: schedule.endTime || '17:00',
               status: schedule.status || 'scheduled'
-            });
-          }
-        });
-      }
-
-      // Generate demo shifts if none exist
-      if (transformedShifts.length === 0) {
-        const activeEmployees = emps.filter(e => e.status === 'active').slice(0, 5);
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-
-        activeEmployees.forEach((emp, empIndex) => {
-          for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-            // Skip some days for variety
-            if ((empIndex + dayOffset) % 7 === 6) continue; // Day off pattern
-
-            const shiftDate = addDays(weekStart, dayOffset);
-            const isNightShift = empIndex % 2 === 1 && dayOffset % 2 === 0;
-
-            transformedShifts.push({
-              id: `shift_demo_${emp._id || emp.id}_${dayOffset}`,
-              type: 'shift',
-              employeeId: emp._id || emp.id,
-              employeeName: `${emp.firstName} ${emp.lastName}`,
-              date: format(shiftDate, 'yyyy-MM-dd'),
-              shiftType: isNightShift ? 'night' : 'day',
-              startTime: isNightShift ? '13:00' : '09:00',
-              endTime: isNightShift ? '21:00' : '17:00',
-              status: 'scheduled'
             });
           }
         });

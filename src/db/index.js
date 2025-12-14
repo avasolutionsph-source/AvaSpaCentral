@@ -113,6 +113,114 @@ db.version(2).stores({
   serviceRotation: 'date'
 });
 
+// Version 3: Add product consumption logs table
+db.version(3).stores({
+  // === CORE BUSINESS ===
+  business: '_id',
+  users: '_id, email, role, status',
+
+  // === PRODUCTS & SERVICES ===
+  products: '_id, type, category, active, name',
+
+  // === PEOPLE ===
+  employees: '_id, status, department, position, email',
+  customers: '_id, status, phone, email, name, tier',
+  suppliers: '_id, status, name',
+
+  // === OPERATIONS ===
+  transactions: '_id, date, status, employeeId, customerId',
+  appointments: '_id, scheduledDateTime, status, employeeId, roomId, customerId',
+  rooms: '_id, type, status, name',
+
+  // === INVENTORY ===
+  purchaseOrders: '_id, supplierId, orderDate, status',
+  inventoryMovements: '_id, productId, date, type',
+  stockHistory: '++id, productId, date, type',
+  // Product consumption logs for AI analysis
+  productConsumption: '_id, productId, date, month',
+
+  // === FINANCIAL ===
+  expenses: '_id, date, category, status, expenseType',
+  cashDrawerSessions: '_id, oduserId, status, openTime',
+  giftCertificates: '_id, code, status, recipientEmail',
+
+  // === HR ===
+  attendance: '_id, date, employeeId',
+  shiftSchedules: '_id, employeeId, isActive',
+  payrollRequests: '_id, employeeId, status, createdAt',
+
+  // === LOGS ===
+  activityLogs: '_id, userId, type, timestamp',
+
+  // === SYNC INFRASTRUCTURE ===
+  syncQueue: '++id, entityType, entityId, operation, status, createdAt',
+  syncMetadata: 'entityType, lastSyncTimestamp',
+
+  // === localStorage migration tables ===
+  loyaltyHistory: '++id, customerId, date, type',
+  advanceBookings: '_id, status, bookingDateTime, employeeId',
+  activeServices: '_id, roomId, status, advanceBookingId',
+  settings: 'key',
+  payrollConfig: 'key',
+  payrollConfigLogs: '++id, timestamp, userId',
+  serviceRotation: 'date'
+});
+
+// Version 4: Add businessConfig table for fixedCosts, cashAccounts, business settings
+db.version(4).stores({
+  // === CORE BUSINESS ===
+  business: '_id',
+  users: '_id, email, role, status',
+
+  // === PRODUCTS & SERVICES ===
+  products: '_id, type, category, active, name',
+
+  // === PEOPLE ===
+  employees: '_id, status, department, position, email',
+  customers: '_id, status, phone, email, name, tier',
+  suppliers: '_id, status, name',
+
+  // === OPERATIONS ===
+  transactions: '_id, date, status, employeeId, customerId',
+  appointments: '_id, scheduledDateTime, status, employeeId, roomId, customerId',
+  rooms: '_id, type, status, name',
+
+  // === INVENTORY ===
+  purchaseOrders: '_id, supplierId, orderDate, status',
+  inventoryMovements: '_id, productId, date, type',
+  stockHistory: '++id, productId, date, type',
+  productConsumption: '_id, productId, date, month',
+
+  // === FINANCIAL ===
+  expenses: '_id, date, category, status, expenseType',
+  cashDrawerSessions: '_id, oduserId, status, openTime',
+  giftCertificates: '_id, code, status, recipientEmail',
+
+  // === HR ===
+  attendance: '_id, date, employeeId',
+  shiftSchedules: '_id, employeeId, isActive',
+  payrollRequests: '_id, employeeId, status, createdAt',
+
+  // === LOGS ===
+  activityLogs: '_id, userId, type, timestamp',
+
+  // === SYNC INFRASTRUCTURE ===
+  syncQueue: '++id, entityType, entityId, operation, status, createdAt',
+  syncMetadata: 'entityType, lastSyncTimestamp',
+
+  // === localStorage migration tables ===
+  loyaltyHistory: '++id, customerId, date, type',
+  advanceBookings: '_id, status, bookingDateTime, employeeId',
+  activeServices: '_id, roomId, status, advanceBookingId',
+  settings: 'key',
+  payrollConfig: 'key',
+  payrollConfigLogs: '++id, timestamp, userId',
+  serviceRotation: 'date',
+
+  // === Business Configuration (v4) ===
+  businessConfig: 'key'  // For fixedCosts, cashAccounts, business settings
+});
+
 // Database event hooks for debugging
 db.on('populate', () => {
   console.log('[Dexie] Database created for the first time');
@@ -156,7 +264,11 @@ export const {
   settings,
   payrollConfig,
   payrollConfigLogs,
-  serviceRotation
+  serviceRotation,
+  // New tables from v3
+  productConsumption,
+  // New tables from v4
+  businessConfig
 } = db;
 
 export default db;

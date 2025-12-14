@@ -546,7 +546,8 @@ const Settings = () => {
         'purchaseOrders', 'attendance', 'shiftSchedules', 'activityLogs',
         'stockHistory', 'loyaltyHistory', 'advanceBookings', 'activeServices',
         'settings', 'payrollConfig', 'payrollConfigLogs', 'serviceRotation',
-        'inventoryMovements', 'cashDrawerSessions', 'payrollRequests'
+        'inventoryMovements', 'cashDrawerSessions', 'payrollRequests',
+        'productConsumption', 'businessConfig'
       ];
 
       const backupData = {

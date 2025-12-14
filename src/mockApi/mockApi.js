@@ -2,16 +2,145 @@
 // All functions return Promises to simulate network latency
 //
 // NOTE: Most APIs have been migrated to Dexie-based adapters in offlineApi.js
-// This file now only contains APIs that haven't been migrated yet:
-// - authApi (uses localStorage for session)
-// - businessApi (uses mockDatabase settings)
+// This file contains the remaining APIs:
+// - authApi (uses localStorage for session, mockDatabase for demo users)
+// - businessApi (uses Dexie via BusinessConfigRepository)
 // - payrollConfigApi (uses Dexie)
 // - serviceRotationApi (uses Dexie)
-// - productConsumptionApi (uses mockDatabase)
-// - analyticsApi (read-only metrics calculations)
+// - productConsumptionApi (uses Dexie via db.productConsumption)
+// - analyticsApi (read-only metrics calculations from Dexie)
+//
+// All data is now persisted to IndexedDB (Dexie) except auth session data.
 
 import mockDatabase from './mockData';
 import { db } from '../db';
+import storageService from '../services/storage';
+import BusinessConfigRepository from '../services/storage/repositories/BusinessConfigRepository';
+
+// =============================================================================
+// DEXIE DATA HELPERS - Get data from IndexedDB for analytics
+// =============================================================================
+
+// Cache for analytics data to avoid repeated DB calls within same request
+let analyticsCache = {
+  products: null,
+  customers: null,
+  employees: null,
+  transactions: null,
+  expenses: null,
+  appointments: null,
+  rooms: null,
+  suppliers: null,
+  purchaseOrders: null,
+  attendance: null,
+  shiftSchedules: null,
+  inventoryMovements: null,
+  timestamp: 0
+};
+
+// Clear cache after 5 seconds to ensure fresh data
+const CACHE_TTL = 5000;
+
+const clearCacheIfStale = () => {
+  if (Date.now() - analyticsCache.timestamp > CACHE_TTL) {
+    analyticsCache = { ...analyticsCache, timestamp: Date.now() };
+    Object.keys(analyticsCache).forEach(key => {
+      if (key !== 'timestamp') analyticsCache[key] = null;
+    });
+  }
+};
+
+// Get data from Dexie with caching
+const getData = {
+  async products() {
+    clearCacheIfStale();
+    if (!analyticsCache.products) {
+      analyticsCache.products = await storageService.products.getAll();
+    }
+    return analyticsCache.products || [];
+  },
+  async customers() {
+    clearCacheIfStale();
+    if (!analyticsCache.customers) {
+      analyticsCache.customers = await storageService.customers.getAll();
+    }
+    return analyticsCache.customers || [];
+  },
+  async employees() {
+    clearCacheIfStale();
+    if (!analyticsCache.employees) {
+      analyticsCache.employees = await storageService.employees.getAll();
+    }
+    return analyticsCache.employees || [];
+  },
+  async transactions() {
+    clearCacheIfStale();
+    if (!analyticsCache.transactions) {
+      analyticsCache.transactions = await storageService.transactions.getAll();
+    }
+    return analyticsCache.transactions || [];
+  },
+  async expenses() {
+    clearCacheIfStale();
+    if (!analyticsCache.expenses) {
+      analyticsCache.expenses = await storageService.expenses.getAll();
+    }
+    return analyticsCache.expenses || [];
+  },
+  async appointments() {
+    clearCacheIfStale();
+    if (!analyticsCache.appointments) {
+      analyticsCache.appointments = await storageService.appointments.getAll();
+    }
+    return analyticsCache.appointments || [];
+  },
+  async rooms() {
+    clearCacheIfStale();
+    if (!analyticsCache.rooms) {
+      analyticsCache.rooms = await storageService.rooms.getAll();
+    }
+    return analyticsCache.rooms || [];
+  },
+  async suppliers() {
+    clearCacheIfStale();
+    if (!analyticsCache.suppliers) {
+      analyticsCache.suppliers = await storageService.suppliers.getAll();
+    }
+    return analyticsCache.suppliers || [];
+  },
+  async purchaseOrders() {
+    clearCacheIfStale();
+    if (!analyticsCache.purchaseOrders) {
+      analyticsCache.purchaseOrders = await storageService.purchaseOrders.getAll();
+    }
+    return analyticsCache.purchaseOrders || [];
+  },
+  async attendance() {
+    clearCacheIfStale();
+    if (!analyticsCache.attendance) {
+      analyticsCache.attendance = await storageService.attendance.getAll();
+    }
+    return analyticsCache.attendance || [];
+  },
+  async shiftSchedules() {
+    clearCacheIfStale();
+    if (!analyticsCache.shiftSchedules) {
+      analyticsCache.shiftSchedules = await storageService.shiftSchedules.getAll();
+    }
+    return analyticsCache.shiftSchedules || [];
+  },
+  async inventoryMovements() {
+    clearCacheIfStale();
+    if (!analyticsCache.inventoryMovements) {
+      try {
+        analyticsCache.inventoryMovements = await db.inventoryMovements.toArray();
+      } catch {
+        analyticsCache.inventoryMovements = [];
+      }
+    }
+    return analyticsCache.inventoryMovements || [];
+  }
+};
 
 // Simulate network delay (50-300ms for realistic feel)
 const delay = (ms = 200) => new Promise(resolve => setTimeout(resolve, ms + Math.random() * 100));
@@ -28,7 +157,24 @@ export const authApi = {
   async login(email, password) {
     await delay(800); // Simulate auth check
 
-    // Check against all demo users
+    // Check against testUser first (owner@example.com)
+    if (email === mockDatabase.testUser.email && password === mockDatabase.testUser.password) {
+      const token = 'mock_jwt_token_' + Date.now();
+      const user = clone(mockDatabase.testUser);
+      delete user.password;
+
+      // Store in localStorage
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+
+      return {
+        success: true,
+        token,
+        user
+      };
+    }
+
+    // Check against additional demo users (if any)
     const matchedUser = mockDatabase.demoUsers.find(
       u => u.email === email && u.password === password
     );
@@ -104,24 +250,35 @@ export const authApi = {
 // =============================================================================
 
 export const businessApi = {
-  // Get business settings
+  // Get business settings (now persisted to Dexie via BusinessConfigRepository)
   async getSettings() {
     await delay();
-    return clone(mockDatabase.business);
+    return await BusinessConfigRepository.getFullBusinessConfig();
   },
 
   // Update daily goal
   async updateDailyGoal(goal) {
     await delay();
-    mockDatabase.business.settings.dailyGoal = goal;
+    await BusinessConfigRepository.setDailyGoal(goal);
     return { success: true, dailyGoal: goal };
   },
 
   // Update settings
   async updateSettings(settings) {
     await delay();
-    mockDatabase.business.settings = { ...mockDatabase.business.settings, ...settings };
-    return { success: true, settings: mockDatabase.business.settings };
+    const current = await BusinessConfigRepository.getBusinessSettings();
+    const updated = { ...current, ...settings };
+    await BusinessConfigRepository.setBusinessSettings(updated);
+    return { success: true, settings: updated };
+  },
+
+  // Update business info (name, address, phone, etc.)
+  async updateBusinessInfo(info) {
+    await delay();
+    const current = await BusinessConfigRepository.getBusinessInfo();
+    const updated = { ...current, ...info };
+    await BusinessConfigRepository.setBusinessInfo(updated);
+    return { success: true, businessInfo: updated };
   }
 };
 
@@ -469,7 +626,7 @@ export const productConsumptionApi = {
   async getConsumptionLogs(filters = {}) {
     await delay();
 
-    let logs = clone(mockDatabase.productConsumption || []);
+    let logs = await db.productConsumption.toArray();
 
     // Filter by product
     if (filters.productId) {
@@ -489,7 +646,7 @@ export const productConsumptionApi = {
       logs = logs.filter(l => l.month === filters.month);
     }
 
-    return logs;
+    return clone(logs);
   },
 
   // Log a consumption event (when inventory is updated)
@@ -509,7 +666,7 @@ export const productConsumptionApi = {
       createdAt: new Date().toISOString()
     };
 
-    mockDatabase.productConsumption.unshift(log);
+    await db.productConsumption.put(log);
 
     return { success: true, log: clone(log) };
   },
@@ -518,7 +675,8 @@ export const productConsumptionApi = {
   async getConsumptionAnalysis(productId) {
     await delay();
 
-    const logs = mockDatabase.productConsumption.filter(l => l.productId === productId);
+    const allLogs = await db.productConsumption.toArray();
+    const logs = allLogs.filter(l => l.productId === productId);
 
     if (logs.length === 0) {
       return {
@@ -588,11 +746,13 @@ export const productConsumptionApi = {
   async getAllProductsAnalysis() {
     await delay();
 
-    const products = mockDatabase.products.filter(p => p.type === 'product');
+    const allProducts = await getData.products();
+    const products = allProducts.filter(p => p.type === 'product');
+    const allConsumptionLogs = await db.productConsumption.toArray();
     const analyses = [];
 
     for (const product of products) {
-      const logs = mockDatabase.productConsumption.filter(l => l.productId === product._id);
+      const logs = allConsumptionLogs.filter(l => l.productId === product._id);
 
       if (logs.length > 0) {
         const totalUnits = logs.reduce((sum, l) => sum + l.quantityUsed, 0);
@@ -636,37 +796,43 @@ export const analyticsApi = {
   async getBreakEvenMetrics() {
     await delay();
 
-    const fixedCosts = clone(mockDatabase.fixedCosts);
+    // Get data from Dexie
+    const allProducts = await getData.products();
+    const allTransactions = await getData.transactions();
+
+    const fixedCosts = await BusinessConfigRepository.getFixedCosts();
     const totalFixedCosts = Object.values(fixedCosts).reduce((a, b) => a + b, 0);
 
     // Calculate average service price and variable cost
-    const services = mockDatabase.products.filter(p => p.type === 'service' && p.active);
-    const avgServicePrice = services.reduce((sum, s) => sum + s.price, 0) / services.length;
+    const services = allProducts.filter(p => p.type === 'service' && p.active !== false);
+    const avgServicePrice = services.length > 0
+      ? services.reduce((sum, s) => sum + (s.price || 0), 0) / services.length
+      : 1000; // Default if no services
 
     // Variable costs: labor (commission ~15%), supplies (~10%), utilities per service (~5%)
     const variableCostPerService = avgServicePrice * 0.30;
     const contributionMargin = avgServicePrice - variableCostPerService;
 
     // BEP in units (services)
-    const bepUnits = Math.ceil(totalFixedCosts / contributionMargin);
+    const bepUnits = contributionMargin > 0 ? Math.ceil(totalFixedCosts / contributionMargin) : 0;
 
     // BEP in revenue
     const bepRevenue = bepUnits * avgServicePrice;
 
     // Today's progress toward BEP
     const today = new Date().toISOString().split('T')[0];
-    const todayTransactions = mockDatabase.transactions.filter(t =>
-      t.date.startsWith(today)
+    const todayTransactions = allTransactions.filter(t =>
+      t.date && t.date.startsWith(today)
     );
-    const todayRevenue = todayTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+    const todayRevenue = todayTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const todayUnits = todayTransactions.length;
 
     // Monthly progress
     const thisMonth = new Date().toISOString().substring(0, 7);
-    const monthlyTransactions = mockDatabase.transactions.filter(t =>
-      t.date.startsWith(thisMonth)
+    const monthlyTransactions = allTransactions.filter(t =>
+      t.date && t.date.startsWith(thisMonth)
     );
-    const monthlyRevenue = monthlyTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+    const monthlyRevenue = monthlyTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const monthlyUnits = monthlyTransactions.length;
 
     return {
@@ -705,6 +871,11 @@ export const analyticsApi = {
   async getProfitabilityMetrics(period = 'month') {
     await delay();
 
+    // Get data from Dexie
+    const allTransactions = await getData.transactions();
+    const allExpenses = await getData.expenses();
+    const allMovements = await getData.inventoryMovements();
+
     const now = new Date();
     let startDate;
 
@@ -727,24 +898,24 @@ export const analyticsApi = {
     }
 
     // Get transactions in period
-    const transactions = mockDatabase.transactions.filter(t =>
-      new Date(t.date) >= startDate && new Date(t.date) <= now
+    const transactions = allTransactions.filter(t =>
+      t.date && new Date(t.date) >= startDate && new Date(t.date) <= now
     );
 
-    const revenue = transactions.reduce((sum, t) => sum + t.totalAmount, 0);
+    const revenue = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
     // Calculate COGS from inventory movements
-    const movements = mockDatabase.inventoryMovements.filter(m =>
-      new Date(m.date) >= startDate && new Date(m.date) <= now
+    const movements = allMovements.filter(m =>
+      m.date && new Date(m.date) >= startDate && new Date(m.date) <= now
     );
 
     const purchases = movements
       .filter(m => m.type === 'purchase')
-      .reduce((sum, m) => sum + (m.quantity * m.unitCost), 0);
+      .reduce((sum, m) => sum + ((m.quantity || 0) * (m.unitCost || 0)), 0);
 
     const salesCost = movements
       .filter(m => m.type === 'sale')
-      .reduce((sum, m) => sum + (Math.abs(m.quantity) * m.unitCost), 0);
+      .reduce((sum, m) => sum + (Math.abs(m.quantity || 0) * (m.unitCost || 0)), 0);
 
     const cogs = salesCost; // Simplified: COGS = cost of items sold
 
@@ -753,10 +924,10 @@ export const analyticsApi = {
     const grossProfitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
     // Operating Expenses
-    const expenses = mockDatabase.expenses.filter(e =>
-      new Date(e.date) >= startDate && new Date(e.date) <= now
+    const expenses = allExpenses.filter(e =>
+      e.date && new Date(e.date) >= startDate && new Date(e.date) <= now
     );
-    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
     // Net Profit
     const netProfit = grossProfit - totalExpenses;
@@ -774,9 +945,9 @@ export const analyticsApi = {
       const dateStr = date.toISOString().split('T')[0];
 
       const dayTransactions = transactions.filter(t =>
-        t.date.split('T')[0] === dateStr
+        t.date && t.date.split('T')[0] === dateStr
       );
-      const dayRevenue = dayTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+      const dayRevenue = dayTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
       const dayCogs = Math.round(dayRevenue * 0.35); // Estimate 35% COGS
 
       trend.push({
@@ -823,36 +994,41 @@ export const analyticsApi = {
   async getBurnRateAndRunway() {
     await delay();
 
+    // Get data from Dexie
+    const allExpenses = await getData.expenses();
+    const allTransactions = await getData.transactions();
+
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Last 30 days expenses
-    const recentExpenses = mockDatabase.expenses.filter(e => {
+    const recentExpenses = allExpenses.filter(e => {
       const expDate = new Date(e.date);
       return expDate >= lastMonth;
     });
 
-    const last30DaysExpenses = recentExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const last30DaysExpenses = recentExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
     // Add fixed costs (monthly)
-    const fixedCostsTotal = Object.values(mockDatabase.fixedCosts).reduce((a, b) => a + b, 0);
+    const fixedCostsData = await BusinessConfigRepository.getFixedCosts();
+    const fixedCostsTotal = Object.values(fixedCostsData).reduce((a, b) => a + b, 0);
 
     // Monthly burn rate (variable expenses + portion of fixed costs)
     const monthlyBurnRate = (last30DaysExpenses / 30) * 30 + (fixedCostsTotal * 0.7);
 
-    // Cash position
-    const cash = clone(mockDatabase.cashAccounts);
-    const totalCash = cash.totalCash;
+    // Cash position from BusinessConfigRepository
+    const cash = await BusinessConfigRepository.getCashAccounts();
+    const totalCash = cash.totalCash || 0;
 
     // Runway in months
     const runwayMonths = monthlyBurnRate > 0 ? totalCash / monthlyBurnRate : 999;
 
     // Monthly revenue for context
-    const monthlyTransactions = mockDatabase.transactions.filter(t =>
-      new Date(t.date) >= thisMonthStart
+    const monthlyTransactions = allTransactions.filter(t =>
+      t.date && new Date(t.date) >= thisMonthStart
     );
-    const monthlyRevenue = monthlyTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+    const monthlyRevenue = monthlyTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
     // Net burn (burn - revenue)
     const netBurn = monthlyBurnRate - monthlyRevenue;
@@ -884,8 +1060,12 @@ export const analyticsApi = {
   async getInventoryMetrics() {
     await delay();
 
-    const products = mockDatabase.products.filter(p => p.type === 'product' && p.active);
-    const movements = mockDatabase.inventoryMovements;
+    // Get data from Dexie
+    const allProducts = await getData.products();
+    const allMovements = await getData.inventoryMovements();
+
+    const products = allProducts.filter(p => p.type === 'product' && p.active !== false);
+    const movements = allMovements;
 
     // Current inventory value
     const currentInventoryValue = products.reduce((sum, p) =>
@@ -975,8 +1155,12 @@ export const analyticsApi = {
   async getCustomerMetrics() {
     await delay();
 
-    const customers = clone(mockDatabase.customers);
-    const transactions = mockDatabase.transactions;
+    // Get data from Dexie
+    const allCustomers = await getData.customers();
+    const allTransactions = await getData.transactions();
+
+    const customers = clone(allCustomers);
+    const transactions = allTransactions;
 
     // Calculate per-customer metrics
     const customerData = customers.map(c => {
@@ -1070,8 +1254,12 @@ export const analyticsApi = {
   async getSupplierMetrics() {
     await delay();
 
-    const suppliers = clone(mockDatabase.suppliers);
-    const orders = clone(mockDatabase.purchaseOrders);
+    // Get data from Dexie
+    const allSuppliers = await getData.suppliers();
+    const allOrders = await getData.purchaseOrders();
+
+    const suppliers = clone(allSuppliers);
+    const orders = clone(allOrders);
 
     const supplierAnalysis = suppliers.map(s => {
       const supplierOrders = orders.filter(o => o.supplierId === s._id);
@@ -1142,6 +1330,11 @@ export const analyticsApi = {
   async getEmployeeMetrics(period = 'month') {
     await delay();
 
+    // Get data from Dexie
+    const allEmployees = await getData.employees();
+    const allTransactions = await getData.transactions();
+    const allAttendance = await getData.attendance();
+
     const now = new Date();
     let startDate;
 
@@ -1160,11 +1353,11 @@ export const analyticsApi = {
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
-    const employees = clone(mockDatabase.employees).filter(e => e.status === 'active');
-    const transactions = mockDatabase.transactions.filter(t =>
-      new Date(t.date) >= startDate && new Date(t.date) <= now
+    const employees = clone(allEmployees).filter(e => e.status === 'active');
+    const transactions = allTransactions.filter(t =>
+      t.date && new Date(t.date) >= startDate && new Date(t.date) <= now
     );
-    const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+    const attendance = allAttendance;
 
     const employeeData = employees.map(emp => {
       // Transactions handled by this employee
@@ -1264,8 +1457,13 @@ export const analyticsApi = {
         startDate.setDate(now.getDate() - 7);
     }
 
-    const rooms = clone(mockDatabase.rooms);
-    const appointments = mockDatabase.appointments.filter(a =>
+    // Get data from Dexie
+    const allRooms = await getData.rooms();
+    const allAppointments = await getData.appointments();
+
+    const rooms = clone(allRooms);
+    const appointments = allAppointments.filter(a =>
+      a.scheduledDateTime &&
       new Date(a.scheduledDateTime) >= startDate &&
       new Date(a.scheduledDateTime) <= now &&
       a.status !== 'cancelled'
@@ -1357,7 +1555,7 @@ export const analyticsApi = {
     await delay();
 
     const now = new Date();
-    const transactions = mockDatabase.transactions;
+    const transactions = await getData.transactions();
 
     // Get historical data for the same period last year/month
     const daysToForecast = period === 'week' ? 7 : period === 'month' ? 30 : 90;
@@ -1367,10 +1565,10 @@ export const analyticsApi = {
     last30Days.setDate(last30Days.getDate() - 30);
 
     const recentTransactions = transactions.filter(t =>
-      new Date(t.date) >= last30Days && new Date(t.date) <= now
+      t.date && new Date(t.date) >= last30Days && new Date(t.date) <= now
     );
 
-    const totalRevenue = recentTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+    const totalRevenue = recentTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const avgDailyRevenue = totalRevenue / 30;
 
     // Generate forecast data with some variance
@@ -1431,8 +1629,9 @@ export const analyticsApi = {
   async getSalaryHealthMetrics() {
     await delay();
 
-    const employees = mockDatabase.employees.filter(e => e.status === 'active');
-    const transactions = mockDatabase.transactions;
+    const allEmployees = await getData.employees();
+    const employees = allEmployees.filter(e => e.status === 'active');
+    const transactions = await getData.transactions();
 
     // Calculate total payroll
     const totalMonthlyPayroll = employees.reduce((sum, emp) => {
@@ -1445,11 +1644,11 @@ export const analyticsApi = {
     const thisMonth = now.toISOString().substring(0, 7);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
 
-    const monthlyTransactions = transactions.filter(t => t.date.startsWith(thisMonth));
-    const lastMonthTransactions = transactions.filter(t => t.date.startsWith(lastMonth));
+    const monthlyTransactions = transactions.filter(t => t.date && t.date.startsWith(thisMonth));
+    const lastMonthTransactions = transactions.filter(t => t.date && t.date.startsWith(lastMonth));
 
-    const monthlyRevenue = monthlyTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
-    const lastMonthRevenue = lastMonthTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+    const monthlyRevenue = monthlyTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const lastMonthRevenue = lastMonthTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
     // Payroll to revenue ratio (healthy is 25-35%)
     const payrollRatio = monthlyRevenue > 0 ? (totalMonthlyPayroll / monthlyRevenue) * 100 : 0;
@@ -1509,20 +1708,22 @@ export const analyticsApi = {
   async getInsights() {
     await delay();
 
-    const transactions = mockDatabase.transactions;
-    const employees = mockDatabase.employees.filter(e => e.status === 'active');
-    const products = mockDatabase.products.filter(p => p.active);
+    const transactions = await getData.transactions();
+    const allEmployees = await getData.employees();
+    const allProducts = await getData.products();
+    const employees = allEmployees.filter(e => e.status === 'active');
+    const products = allProducts.filter(p => p.active !== false);
 
     const now = new Date();
     const thisMonth = now.toISOString().substring(0, 7);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
 
     // This month's data
-    const thisMonthTx = transactions.filter(t => t.date.startsWith(thisMonth));
-    const lastMonthTx = transactions.filter(t => t.date.startsWith(lastMonth));
+    const thisMonthTx = transactions.filter(t => t.date && t.date.startsWith(thisMonth));
+    const lastMonthTx = transactions.filter(t => t.date && t.date.startsWith(lastMonth));
 
-    const thisMonthRevenue = thisMonthTx.reduce((sum, t) => sum + t.totalAmount, 0);
-    const lastMonthRevenue = lastMonthTx.reduce((sum, t) => sum + t.totalAmount, 0);
+    const thisMonthRevenue = thisMonthTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const lastMonthRevenue = lastMonthTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const revenueGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
 
     // Top services
@@ -1598,25 +1799,25 @@ export const analyticsApi = {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-    const transactions = mockDatabase.transactions;
-    const expenses = mockDatabase.expenses;
+    const transactions = await getData.transactions();
+    const expenses = await getData.expenses();
 
     // Today's metrics
-    const todayTx = transactions.filter(t => t.date.startsWith(today));
-    const todayRevenue = todayTx.reduce((sum, t) => sum + t.totalAmount, 0);
-    const todayExpenses = expenses.filter(e => e.date.startsWith(today))
-      .reduce((sum, e) => sum + e.amount, 0);
+    const todayTx = transactions.filter(t => t.date && t.date.startsWith(today));
+    const todayRevenue = todayTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const todayExpenses = expenses.filter(e => e.date && e.date.startsWith(today))
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
     const todayProfit = todayRevenue - todayExpenses;
 
     // Yesterday's metrics for comparison
-    const yesterdayTx = transactions.filter(t => t.date.startsWith(yesterdayStr));
-    const yesterdayRevenue = yesterdayTx.reduce((sum, t) => sum + t.totalAmount, 0);
+    const yesterdayTx = transactions.filter(t => t.date && t.date.startsWith(yesterdayStr));
+    const yesterdayRevenue = yesterdayTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
     // This week's metrics
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - now.getDay());
-    const weekTx = transactions.filter(t => new Date(t.date) >= weekStart);
-    const weekRevenue = weekTx.reduce((sum, t) => sum + t.totalAmount, 0);
+    const weekTx = transactions.filter(t => t.date && new Date(t.date) >= weekStart);
+    const weekRevenue = weekTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
     // Estimated costs (35% of revenue as baseline)
     const estimatedCosts = todayRevenue * 0.35;
@@ -1677,10 +1878,13 @@ export const analyticsApi = {
         startDate.setDate(now.getDate() - 7);
     }
 
-    const rooms = clone(mockDatabase.rooms);
-    const employees = mockDatabase.employees.filter(e => e.status === 'active');
-    const appointments = mockDatabase.appointments.filter(a =>
-      new Date(a.scheduledDateTime) >= startDate && a.status !== 'cancelled'
+    const allRooms = await getData.rooms();
+    const rooms = clone(allRooms);
+    const allEmployees = await getData.employees();
+    const employees = allEmployees.filter(e => e.status === 'active');
+    const allAppointments = await getData.appointments();
+    const appointments = allAppointments.filter(a =>
+      a.scheduledDateTime && new Date(a.scheduledDateTime) >= startDate && a.status !== 'cancelled'
     );
 
     // Calculate hours in period
@@ -1755,13 +1959,14 @@ export const analyticsApi = {
     const thisMonth = now.toISOString().substring(0, 7);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().substring(0, 7);
 
-    const expenses = clone(mockDatabase.expenses);
-    const transactions = mockDatabase.transactions;
-    const fixedCosts = clone(mockDatabase.fixedCosts);
+    const allExpenses = await getData.expenses();
+    const expenses = clone(allExpenses);
+    const transactions = await getData.transactions();
+    const fixedCosts = await BusinessConfigRepository.getFixedCosts();
 
     // This month's expenses by category
-    const thisMonthExpenses = expenses.filter(e => e.date.startsWith(thisMonth));
-    const lastMonthExpenses = expenses.filter(e => e.date.startsWith(lastMonth));
+    const thisMonthExpenses = expenses.filter(e => e.date && e.date.startsWith(thisMonth));
+    const lastMonthExpenses = expenses.filter(e => e.date && e.date.startsWith(lastMonth));
 
     const expensesByCategory = {};
     thisMonthExpenses.forEach(e => {
@@ -1769,12 +1974,12 @@ export const analyticsApi = {
     });
 
     // Revenue for tax calculation
-    const thisMonthTx = transactions.filter(t => t.date.startsWith(thisMonth));
-    const monthlyRevenue = thisMonthTx.reduce((sum, t) => sum + t.totalAmount, 0);
+    const thisMonthTx = transactions.filter(t => t.date && t.date.startsWith(thisMonth));
+    const monthlyRevenue = thisMonthTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
     // Total OPEX
-    const totalOpex = thisMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const lastMonthOpex = lastMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalOpex = thisMonthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const lastMonthOpex = lastMonthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const fixedCostsTotal = Object.values(fixedCosts).reduce((a, b) => a + b, 0);
 
     // Tax estimates (Philippine rates)
@@ -1831,8 +2036,10 @@ export const analyticsApi = {
     const now = new Date();
     const thisMonth = now.toISOString().substring(0, 7);
 
-    const employees = mockDatabase.employees.filter(e => e.status === 'active');
-    const transactions = mockDatabase.transactions.filter(t => t.date.startsWith(thisMonth));
+    const allEmployees = await getData.employees();
+    const employees = allEmployees.filter(e => e.status === 'active');
+    const allTransactions = await getData.transactions();
+    const transactions = allTransactions.filter(t => t.date && t.date.startsWith(thisMonth));
 
     const employeeMetrics = employees.map(emp => {
       const empName = `${emp.firstName} ${emp.lastName}`;
@@ -1840,7 +2047,7 @@ export const analyticsApi = {
         t.employee?._id === emp._id || t.employee?.name === empName
       );
 
-      const revenue = empTx.reduce((sum, t) => sum + t.totalAmount, 0);
+      const revenue = empTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
       const services = empTx.reduce((sum, t) =>
         sum + (t.items?.filter(i => i.type === 'service').length || 0), 0
       );
@@ -1855,7 +2062,7 @@ export const analyticsApi = {
       const avgServicesPerDay = services / workingDays;
 
       // Productivity score (0-100)
-      const avgTeamRevenue = transactions.reduce((sum, t) => sum + t.totalAmount, 0) / employees.length;
+      const avgTeamRevenue = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0) / (employees.length || 1);
       const productivityScore = avgTeamRevenue > 0
         ? Math.min(100, Math.round((revenue / avgTeamRevenue) * 50 + 50))
         : 50;
@@ -1916,8 +2123,10 @@ export const analyticsApi = {
     const now = new Date();
     const thisMonth = now.toISOString().substring(0, 7);
 
-    const products = clone(mockDatabase.products).filter(p => p.active);
-    const transactions = mockDatabase.transactions.filter(t => t.date.startsWith(thisMonth));
+    const allProducts = await getData.products();
+    const products = clone(allProducts).filter(p => p.active !== false);
+    const allTransactions = await getData.transactions();
+    const transactions = allTransactions.filter(t => t.date && t.date.startsWith(thisMonth));
 
     // Calculate sales for each product/service
     const productMetrics = products.map(product => {
@@ -2009,8 +2218,9 @@ export const analyticsApi = {
     const last30Days = new Date(now);
     last30Days.setDate(last30Days.getDate() - 30);
 
-    const transactions = mockDatabase.transactions.filter(t =>
-      new Date(t.date) >= last30Days
+    const allTransactions = await getData.transactions();
+    const transactions = allTransactions.filter(t =>
+      t.date && new Date(t.date) >= last30Days
     );
 
     // Initialize heatmap grid (7 days x 24 hours)
@@ -2029,7 +2239,7 @@ export const analyticsApi = {
       const date = new Date(t.date);
       const day = days[date.getDay()];
       const hour = date.getHours();
-      heatmap[day][hour].revenue += t.totalAmount;
+      heatmap[day][hour].revenue += (t.totalAmount || 0);
       heatmap[day][hour].transactions++;
     });
 

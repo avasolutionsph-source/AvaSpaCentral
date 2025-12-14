@@ -41,83 +41,11 @@ const migrateFromLocalStorage = async () => {
   }
 };
 
-// Initialize with demo data if empty
+// Initialize advance bookings (no auto-seeding - starts empty)
 const initAdvanceBookings = async () => {
-  // First check for migration
+  // First check for migration from localStorage
   await migrateFromLocalStorage();
-
-  const bookings = await db.advanceBookings.toArray();
-  if (bookings.length > 0) return bookings;
-
-  // Initialize with demo data on first load
-  const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(10, 0, 0, 0);
-
-  const nextWeek = new Date(now);
-  nextWeek.setDate(nextWeek.getDate() + 7);
-  nextWeek.setHours(14, 30, 0, 0);
-
-  const initialData = [
-    {
-      _id: 'booking_001',
-      id: 'booking_001',
-      bookingDateTime: tomorrow.toISOString(),
-      employeeId: 'emp_003',
-      employeeName: 'Sarah Lee',
-      serviceName: 'Swedish Massage (90 min)',
-      estimatedDuration: 90,
-      servicePrice: 1200,
-      roomId: 'room_001',
-      roomName: 'Room 1',
-      isHomeService: false,
-      clientName: 'Maria Santos',
-      clientPhone: '+63 912 345 6789',
-      clientEmail: 'maria.santos@example.com',
-      clientAddress: null,
-      paymentMethod: 'gcash',
-      paymentTiming: 'pay-now',
-      paymentStatus: 'paid',
-      transactionId: 'txn_adv_001',
-      status: 'scheduled',
-      specialRequests: 'Please use lavender oil',
-      actualStartTime: null,
-      actualEndTime: null,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString()
-    },
-    {
-      _id: 'booking_002',
-      id: 'booking_002',
-      bookingDateTime: nextWeek.toISOString(),
-      employeeId: 'emp_002',
-      employeeName: 'Juan Dela Cruz',
-      serviceName: 'Deep Tissue Massage + Hot Stone',
-      estimatedDuration: 120,
-      servicePrice: 1800,
-      roomId: null,
-      roomName: null,
-      isHomeService: true,
-      clientName: 'John Smith',
-      clientPhone: '+63 923 456 7890',
-      clientEmail: null,
-      clientAddress: '123 Main St, Philippines',
-      paymentMethod: 'cash',
-      paymentTiming: 'pay-after',
-      paymentStatus: 'pending',
-      transactionId: 'txn_adv_002',
-      status: 'confirmed',
-      specialRequests: null,
-      actualStartTime: null,
-      actualEndTime: null,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString()
-    }
-  ];
-
-  await db.advanceBookings.bulkPut(initialData);
-  return initialData;
+  return await db.advanceBookings.toArray();
 };
 
 const initActiveServices = async () => {

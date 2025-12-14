@@ -13,7 +13,8 @@ export const mockDatabase = {
     role: 'Owner',
     firstName: 'Admin',
     lastName: 'User',
-    businessName: 'My SPA Business'
+    businessName: 'My SPA Business',
+    employeeId: 'emp_owner_001'
   },
 
   // Demo Users for All Roles - For Quick Demo Login buttons
@@ -26,7 +27,8 @@ export const mockDatabase = {
       role: 'Manager',
       firstName: 'Manager',
       lastName: 'User',
-      businessName: 'My SPA Business'
+      businessName: 'My SPA Business',
+      employeeId: 'emp_manager_001'
     },
     {
       _id: 'user_003',
@@ -36,7 +38,8 @@ export const mockDatabase = {
       role: 'Therapist',
       firstName: 'Therapist',
       lastName: 'User',
-      businessName: 'My SPA Business'
+      businessName: 'My SPA Business',
+      employeeId: 'emp_therapist_001'
     },
     {
       _id: 'user_004',
@@ -46,7 +49,8 @@ export const mockDatabase = {
       role: 'Receptionist',
       firstName: 'Receptionist',
       lastName: 'User',
-      businessName: 'My SPA Business'
+      businessName: 'My SPA Business',
+      employeeId: 'emp_receptionist_001'
     }
   ],
 

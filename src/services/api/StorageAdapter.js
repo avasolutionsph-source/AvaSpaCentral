@@ -833,7 +833,9 @@ export const attendanceAdapter = {
     let records = await storageService.attendance.getAll();
 
     if (filters.employeeId) {
-      records = records.filter(a => a.employeeId === filters.employeeId);
+      // Use string comparison to handle potential type mismatches
+      const targetId = String(filters.employeeId);
+      records = records.filter(a => String(a.employeeId) === targetId);
     }
     if (filters.date) {
       records = records.filter(a => a.date === filters.date);
@@ -861,10 +863,11 @@ export const attendanceAdapter = {
     await delay();
     const today = new Date().toISOString().split('T')[0];
     const nowTime = new Date().toTimeString().slice(0, 5); // HH:mm format
+    const empId = String(employeeId);
 
     // Check if already clocked in today
     const existing = await storageService.attendance.find(
-      a => a.employeeId === employeeId && a.date === today
+      a => String(a.employeeId) === empId && a.date === today
     );
 
     if (existing.length > 0) {
@@ -903,9 +906,10 @@ export const attendanceAdapter = {
     await delay();
     const today = new Date().toISOString().split('T')[0];
     const nowTime = new Date().toTimeString().slice(0, 5); // HH:mm format
+    const empId = String(employeeId);
 
     const existing = await storageService.attendance.find(
-      a => a.employeeId === employeeId && a.date === today && a.clockIn && !a.clockOut
+      a => String(a.employeeId) === empId && a.date === today && a.clockIn && !a.clockOut
     );
 
     if (existing.length === 0) {

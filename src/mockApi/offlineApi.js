@@ -219,8 +219,7 @@ export {
   serviceRotationApi,
   productConsumptionApi,
   analyticsApi,
-  advanceBookingApi,
-  usersApi
+  advanceBookingApi
 };
 
 // Default export - matches the original mockApi structure

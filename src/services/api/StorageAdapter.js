@@ -867,8 +867,15 @@ export const attendanceAdapter = {
       a => a.employeeId === employeeId && a.date === today
     );
 
-    if (existing.length > 0 && existing[0].clockIn && !existing[0].clockOut) {
-      throw new Error('Already clocked in');
+    if (existing.length > 0) {
+      // Already have a record for today
+      if (existing[0].clockIn && !existing[0].clockOut) {
+        throw new Error('Already clocked in');
+      }
+      // If already clocked in AND out, don't allow another clock in
+      if (existing[0].clockIn && existing[0].clockOut) {
+        throw new Error('Already completed attendance for today');
+      }
     }
 
     // Get employee info

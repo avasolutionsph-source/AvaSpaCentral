@@ -72,12 +72,15 @@ const MyPortal = () => {
 
     try {
       setLoadingAttendance(true);
-      const attendance = await mockApi.attendance.getAttendance();
       const today = format(new Date(), 'yyyy-MM-dd');
-      const myRecord = attendance.find(
-        a => a.date === today && (a.employeeId === user.employeeId || a.employee?._id === user.employeeId)
-      );
-      setTodayAttendance(myRecord || null);
+      // Fetch attendance filtered by employee and date for better performance
+      const attendance = await mockApi.attendance.getAttendance({
+        employeeId: user.employeeId,
+        date: today
+      });
+      // Get the first (and should be only) record for today
+      const myRecord = attendance.length > 0 ? attendance[0] : null;
+      setTodayAttendance(myRecord);
     } catch (error) {
       console.error('Failed to load attendance:', error);
     } finally {

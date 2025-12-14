@@ -24,6 +24,7 @@ import CashDrawerRepository from './repositories/CashDrawerRepository';
 import ShiftScheduleRepository from './repositories/ShiftScheduleRepository';
 import SettingsRepository from './repositories/SettingsRepository';
 import BusinessConfigRepository from './repositories/BusinessConfigRepository';
+import UserRepository from './repositories/UserRepository';
 
 /**
  * StorageService class - provides unified access to all repositories
@@ -48,6 +49,7 @@ class StorageService {
     this.shiftSchedules = ShiftScheduleRepository;
     this.settings = SettingsRepository;
     this.businessConfig = BusinessConfigRepository;
+    this.users = UserRepository;
 
     // Database reference
     this.db = db;
@@ -205,5 +207,6 @@ export {
   CashDrawerRepository,
   ShiftScheduleRepository,
   SettingsRepository,
-  BusinessConfigRepository
+  BusinessConfigRepository,
+  UserRepository
 };

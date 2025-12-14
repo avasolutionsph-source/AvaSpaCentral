@@ -31,5 +31,6 @@ export {
   activityLogsAdapter,
   payrollRequestsAdapter,
   cashDrawerAdapter,
-  shiftSchedulesAdapter
+  shiftSchedulesAdapter,
+  usersAdapter
 } from './StorageAdapter';

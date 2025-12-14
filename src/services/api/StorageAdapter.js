@@ -1027,6 +1027,122 @@ export const cashDrawerAdapter = {
 };
 
 // =============================================================================
+// USERS API ADAPTER
+// =============================================================================
+
+export const usersAdapter = {
+  async getUsers(filters = {}) {
+    await delay();
+
+    let users = await storageService.users.getAll();
+
+    if (filters.status) {
+      users = users.filter(u => u.status === filters.status);
+    }
+    if (filters.role) {
+      users = users.filter(u => u.role === filters.role);
+    }
+
+    // Enrich with employee info
+    const employees = await storageService.employees.getAll();
+    const employeeMap = {};
+    employees.forEach(e => { employeeMap[e._id] = e; });
+
+    return clone(users.map(u => ({
+      ...u,
+      employee: employeeMap[u.employeeId] || null
+    })));
+  },
+
+  async getUser(id) {
+    await delay();
+    const user = await storageService.users.getById(id);
+    if (!user) throw new Error('User not found');
+
+    // Enrich with employee info
+    if (user.employeeId) {
+      const employee = await storageService.employees.getById(user.employeeId);
+      user.employee = employee || null;
+    }
+
+    return clone(user);
+  },
+
+  async createUser(data) {
+    await delay();
+
+    // Check if email already exists
+    const existingEmail = await storageService.users.emailExists(data.email);
+    if (existingEmail) {
+      throw new Error('Email already in use');
+    }
+
+    // Check if employee already has an account
+    if (data.employeeId) {
+      const existingEmployee = await storageService.users.getByEmployeeId(data.employeeId);
+      if (existingEmployee) {
+        throw new Error('Employee already has an account');
+      }
+    }
+
+    const user = await storageService.users.create({
+      businessId: 'biz_001',
+      ...data,
+      status: data.status || 'active',
+      lastLogin: null
+    });
+
+    return { success: true, user: clone(user) };
+  },
+
+  async updateUser(id, data) {
+    await delay();
+
+    // Check if email already exists (excluding current user)
+    if (data.email) {
+      const existingEmail = await storageService.users.emailExists(data.email, id);
+      if (existingEmail) {
+        throw new Error('Email already in use');
+      }
+    }
+
+    const user = await storageService.users.update(id, data);
+    if (!user) throw new Error('User not found');
+    return { success: true, user: clone(user) };
+  },
+
+  async deleteUser(id) {
+    await delay();
+    await storageService.users.delete(id);
+    return { success: true };
+  },
+
+  async toggleStatus(id) {
+    await delay();
+    const user = await storageService.users.toggleStatus(id);
+    return { success: true, user: clone(user) };
+  },
+
+  async updatePassword(id, newPassword) {
+    await delay();
+    const user = await storageService.users.updatePassword(id, newPassword);
+    return { success: true, user: clone(user) };
+  },
+
+  async getByEmail(email) {
+    await delay();
+    const user = await storageService.users.getByEmail(email);
+    return user ? clone(user) : null;
+  },
+
+  async getByEmployeeId(employeeId) {
+    await delay();
+    const user = await storageService.users.getByEmployeeId(employeeId);
+    return user ? clone(user) : null;
+  }
+};
+
+// =============================================================================
 // SHIFT SCHEDULES API ADAPTER
 // =============================================================================
 
@@ -1214,5 +1330,6 @@ export default {
   activityLogs: activityLogsAdapter,
   payrollRequests: payrollRequestsAdapter,
   cashDrawer: cashDrawerAdapter,
-  shiftSchedules: shiftSchedulesAdapter
+  shiftSchedules: shiftSchedulesAdapter,
+  users: usersAdapter
 };

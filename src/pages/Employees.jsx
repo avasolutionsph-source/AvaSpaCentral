@@ -83,11 +83,11 @@ const Employees = ({ embedded = false, onDataChange }) => {
       showToast('Commission percentage cannot exceed 100%', 'error');
       return false;
     }
-    // Rate validation - check based on rate type
+    // Rate validation - allow 0 values, just ensure they're valid numbers
     const hourlyRate = parseFloat(data.hourlyRate) || 0;
     const monthlyRate = parseFloat(data.monthlyRate) || 0;
-    if (hourlyRate <= 0 && monthlyRate <= 0) {
-      showToast('Either hourly rate or monthly rate must be greater than 0', 'error');
+    if (hourlyRate < 0 || monthlyRate < 0) {
+      showToast('Rates cannot be negative', 'error');
       return false;
     }
     if (!data.hireDate) {

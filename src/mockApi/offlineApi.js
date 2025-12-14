@@ -27,7 +27,8 @@ import {
   activityLogsAdapter,
   payrollRequestsAdapter,
   cashDrawerAdapter,
-  shiftSchedulesAdapter
+  shiftSchedulesAdapter,
+  usersAdapter
 } from '../services/api';
 
 // Import APIs that we haven't migrated yet from the original mockApi
@@ -173,6 +174,24 @@ export const cashDrawerApi = {
   getCurrentDrawer: cashDrawerAdapter.getCurrentDrawer
 };
 
+// Users API (now using Dexie)
+export const usersApi = {
+  getUsers: usersAdapter.getUsers,
+  getUser: usersAdapter.getUser,
+  createUser: usersAdapter.createUser,
+  updateUser: usersAdapter.updateUser,
+  deleteUser: usersAdapter.deleteUser,
+  toggleStatus: usersAdapter.toggleStatus,
+  updatePassword: usersAdapter.updatePassword,
+  getByEmail: usersAdapter.getByEmail,
+  getByEmployeeId: usersAdapter.getByEmployeeId,
+  // Aliases for useCrudOperations hook
+  getAll: usersAdapter.getUsers,
+  create: usersAdapter.createUser,
+  update: usersAdapter.updateUser,
+  delete: usersAdapter.deleteUser
+};
+
 // Shift Schedules API (now using Dexie)
 export const shiftSchedulesApi = {
   getShiftConfig: shiftSchedulesAdapter.getShiftConfig,
@@ -200,7 +219,8 @@ export {
   serviceRotationApi,
   productConsumptionApi,
   analyticsApi,
-  advanceBookingApi
+  advanceBookingApi,
+  usersApi
 };
 
 // Default export - matches the original mockApi structure
@@ -227,5 +247,6 @@ export default {
   shiftSchedules: shiftSchedulesApi,
   analytics: analyticsApi,
   suppliers: suppliersApi,
-  purchaseOrders: purchaseOrdersApi
+  purchaseOrders: purchaseOrdersApi,
+  users: usersApi
 };

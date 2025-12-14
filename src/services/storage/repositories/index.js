@@ -20,3 +20,4 @@ export { default as CashDrawerRepository } from './CashDrawerRepository';
 export { default as ShiftScheduleRepository } from './ShiftScheduleRepository';
 export { default as SettingsRepository } from './SettingsRepository';
 export { default as BusinessConfigRepository } from './BusinessConfigRepository';
+export { default as UserRepository } from './UserRepository';

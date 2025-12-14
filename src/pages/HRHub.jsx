@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
+import { usersApi } from '../mockApi/offlineApi';
 import Employees from './Employees';
 import Payroll from './Payroll';
+import EmployeeAccounts from './EmployeeAccounts';
 import '../assets/css/hub-pages.css';
 
 const HRHub = () => {
+  const { isOwner } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'employees';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -14,7 +18,8 @@ const HRHub = () => {
   const [stats, setStats] = useState({
     totalEmployees: 0,
     activeEmployees: 0,
-    pendingRequests: 0
+    pendingRequests: 0,
+    totalAccounts: 0
   });
 
   useEffect(() => {
@@ -23,9 +28,10 @@ const HRHub = () => {
 
   const loadStats = async () => {
     try {
-      const [employees, payrollRequests] = await Promise.all([
+      const [employees, payrollRequests, users] = await Promise.all([
         mockApi.employees.getEmployees(),
-        mockApi.payrollRequests.getRequests()
+        mockApi.payrollRequests.getRequests(),
+        usersApi.getUsers()
       ]);
 
       const activeEmployees = employees.filter(e => e.status === 'active').length;
@@ -34,7 +40,8 @@ const HRHub = () => {
       setStats({
         totalEmployees: employees.length,
         activeEmployees,
-        pendingRequests
+        pendingRequests,
+        totalAccounts: users.length
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -46,6 +53,7 @@ const HRHub = () => {
     setSearchParams({ tab });
   };
 
+  // Build tabs array - Accounts tab only visible to Owner
   const tabs = [
     {
       id: 'employees',
@@ -59,7 +67,15 @@ const HRHub = () => {
       icon: '💰',
       badge: stats.pendingRequests > 0 ? stats.pendingRequests : null,
       badgeType: 'warning'
-    }
+    },
+    // Only show Accounts tab to Owner
+    ...(isOwner() ? [{
+      id: 'accounts',
+      label: 'Accounts',
+      icon: '🔐',
+      badge: stats.totalAccounts > 0 ? stats.totalAccounts : null,
+      badgeType: 'info'
+    }] : [])
   ];
 
   return (
@@ -115,6 +131,7 @@ const HRHub = () => {
       <div className="hub-content">
         {activeTab === 'employees' && <Employees embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} />}
+        {activeTab === 'accounts' && isOwner() && <EmployeeAccounts embedded onDataChange={loadStats} />}
       </div>
     </div>
   );

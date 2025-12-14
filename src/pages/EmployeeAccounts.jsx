@@ -602,7 +602,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange }) => {
           width: 48px;
           height: 48px;
           border-radius: 50%;
-          background: var(--accent-gradient);
+          background: var(--primary);
           color: white;
           display: flex;
           align-items: center;

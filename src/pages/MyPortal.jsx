@@ -286,7 +286,7 @@ const MyPortal = () => {
           }
 
           .clock-display-card {
-            background: var(--accent-gradient);
+            background: var(--primary);
             color: white;
             padding: var(--spacing-xl);
             border-radius: var(--radius-lg);

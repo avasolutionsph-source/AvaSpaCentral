@@ -21,7 +21,8 @@
       "Bash(xargs:*)",
       "Bash(timeout 5 node:*)",
       "Bash(timeout:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

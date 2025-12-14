@@ -52,25 +52,36 @@ export const AppProvider = ({ children }) => {
         if (sessionUser) {
           let userData = JSON.parse(sessionUser);
 
-          // FIX: Refresh employeeId from mockData if missing (for existing sessions before fix)
+          // FIX: Refresh employeeId from source if missing (for existing sessions before fix)
           if (!userData.employeeId) {
-            const { mockDatabase } = await import('../mockApi/mockData');
+            // First, check Dexie users table (for custom accounts created via Employee Accounts)
+            const db = (await import('../db')).default;
+            const dexieUser = await db.users.get(userData._id);
 
-            // Check testUser first
-            if (userData.email === mockDatabase.testUser.email && mockDatabase.testUser.employeeId) {
-              userData.employeeId = mockDatabase.testUser.employeeId;
+            if (dexieUser?.employeeId) {
+              userData.employeeId = dexieUser.employeeId;
+              console.log('[AppContext] Refreshed employeeId from Dexie:', userData.employeeId);
             } else {
-              // Check demoUsers
-              const demoUser = mockDatabase.demoUsers.find(u => u.email === userData.email);
-              if (demoUser?.employeeId) {
-                userData.employeeId = demoUser.employeeId;
+              // Fallback: Check mockData demo users
+              const { mockDatabase } = await import('../mockApi/mockData');
+
+              if (userData.email === mockDatabase.testUser.email && mockDatabase.testUser.employeeId) {
+                userData.employeeId = mockDatabase.testUser.employeeId;
+              } else {
+                const demoUser = mockDatabase.demoUsers.find(u => u.email === userData.email);
+                if (demoUser?.employeeId) {
+                  userData.employeeId = demoUser.employeeId;
+                }
+              }
+
+              if (userData.employeeId) {
+                console.log('[AppContext] Refreshed employeeId from mockData:', userData.employeeId);
               }
             }
 
             // Update localStorage with refreshed data
             if (userData.employeeId) {
               localStorage.setItem('user', JSON.stringify(userData));
-              console.log('[AppContext] Refreshed employeeId for existing session:', userData.employeeId);
             }
           }
 

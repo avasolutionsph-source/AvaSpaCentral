@@ -404,6 +404,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange }) => {
             className={`form-control ${formErrors.employeeId ? 'error' : ''}`}
             disabled={modalMode === 'edit'}
             required
+            autoComplete="off"
           >
             <option value="">Select an employee...</option>
             {modalMode === 'edit' ? (
@@ -512,6 +513,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange }) => {
               className={`form-control ${formErrors.password ? 'error' : ''}`}
               placeholder={modalMode === 'create' ? 'Enter password' : 'Enter new password'}
               required={modalMode === 'create'}
+              autoComplete="new-password"
             />
             <button
               type="button"
@@ -536,6 +538,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange }) => {
               className={`form-control ${formErrors.confirmPassword ? 'error' : ''}`}
               placeholder="Confirm password"
               required={modalMode === 'create' || formData.password}
+              autoComplete="new-password"
             />
             <button
               type="button"

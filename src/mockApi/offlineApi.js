@@ -99,7 +99,12 @@ export const expensesApi = {
   createExpense: expensesAdapter.createExpense,
   updateExpense: expensesAdapter.updateExpense,
   deleteExpense: expensesAdapter.deleteExpense,
-  approveExpense: expensesAdapter.approveExpense
+  approveExpense: expensesAdapter.approveExpense,
+  // Aliases for useCrudOperations hook
+  getAll: expensesAdapter.getExpenses,
+  create: expensesAdapter.createExpense,
+  update: expensesAdapter.updateExpense,
+  delete: expensesAdapter.deleteExpense
 };
 
 export const transactionsApi = {

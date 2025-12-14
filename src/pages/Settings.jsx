@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../components/shared';
 import { SettingsRepository } from '../services/storage/repositories';
 import { SyncManager, NetworkDetector } from '../services/sync';
 import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
+import db from '../db';
 
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, hasManagementAccess } = useApp();
@@ -130,6 +131,12 @@ const Settings = () => {
   });
   const [testingConnection, setTestingConnection] = useState(false);
   const [syncOperation, setSyncOperation] = useState(null); // 'push' | 'pull' | 'sync'
+
+  // Backup/Export State
+  const [backupOperation, setBackupOperation] = useState(null); // 'export' | 'import'
+  const [importConfirm, setImportConfirm] = useState(false);
+  const [pendingImportData, setPendingImportData] = useState(null);
+  const fileInputRef = useRef(null);
 
   const handleBusinessInfoChange = (e) => {
     const { name, value } = e.target;
@@ -523,6 +530,146 @@ const Settings = () => {
     } finally {
       setSyncOperation(null);
       loadSyncStatus();
+    }
+  };
+
+  // Export all data as JSON backup
+  const handleExportBackup = async () => {
+    if (backupOperation) return;
+    setBackupOperation('export');
+
+    try {
+      // Tables to export
+      const tablesToExport = [
+        'products', 'employees', 'customers', 'suppliers', 'rooms',
+        'transactions', 'appointments', 'expenses', 'giftCertificates',
+        'purchaseOrders', 'attendance', 'shiftSchedules', 'activityLogs',
+        'stockHistory', 'loyaltyHistory', 'advanceBookings', 'activeServices',
+        'settings', 'payrollConfig', 'payrollConfigLogs', 'serviceRotation',
+        'inventoryMovements', 'cashDrawerSessions', 'payrollRequests'
+      ];
+
+      const backupData = {
+        version: '2.0',
+        exportDate: new Date().toISOString(),
+        appName: 'SpaERP',
+        data: {}
+      };
+
+      // Export each table
+      for (const tableName of tablesToExport) {
+        try {
+          if (db[tableName]) {
+            const tableData = await db[tableName].toArray();
+            backupData.data[tableName] = tableData;
+          }
+        } catch (e) {
+          console.warn(`[Backup] Could not export ${tableName}:`, e);
+        }
+      }
+
+      // Create JSON blob and download
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `spa-erp-backup-${format(new Date(), 'yyyy-MM-dd-HHmm')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast('Backup exported successfully!', 'success');
+    } catch (error) {
+      console.error('[Backup] Export error:', error);
+      showToast('Failed to export backup: ' + error.message, 'error');
+    } finally {
+      setBackupOperation(null);
+    }
+  };
+
+  // Handle file selection for import
+  const handleImportFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Reset file input
+    e.target.value = '';
+
+    if (!file.name.endsWith('.json')) {
+      showToast('Please select a JSON backup file', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+
+        // Validate backup file structure
+        if (!data.version || !data.data || !data.appName) {
+          showToast('Invalid backup file format', 'error');
+          return;
+        }
+
+        if (data.appName !== 'SpaERP') {
+          showToast('This backup file is not from SpaERP', 'error');
+          return;
+        }
+
+        // Store parsed data and show confirmation
+        setPendingImportData(data);
+        setImportConfirm(true);
+      } catch (error) {
+        showToast('Failed to parse backup file: ' + error.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Confirm and execute import
+  const handleConfirmImport = async () => {
+    if (!pendingImportData || backupOperation) return;
+
+    setImportConfirm(false);
+    setBackupOperation('import');
+
+    try {
+      const { data } = pendingImportData;
+      let imported = 0;
+      let errors = 0;
+
+      // Import each table
+      for (const [tableName, tableData] of Object.entries(data)) {
+        if (!Array.isArray(tableData) || tableData.length === 0) continue;
+
+        try {
+          if (db[tableName]) {
+            // Clear existing data and import new
+            await db[tableName].clear();
+            await db[tableName].bulkPut(tableData);
+            imported += tableData.length;
+          }
+        } catch (e) {
+          console.warn(`[Backup] Could not import ${tableName}:`, e);
+          errors++;
+        }
+      }
+
+      showToast(`Import complete: ${imported} records imported${errors > 0 ? `, ${errors} tables had errors` : ''}`, 'success');
+
+      // Reload page to reflect imported data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+
+    } catch (error) {
+      console.error('[Backup] Import error:', error);
+      showToast('Failed to import backup: ' + error.message, 'error');
+    } finally {
+      setBackupOperation(null);
+      setPendingImportData(null);
     }
   };
 
@@ -1340,6 +1487,77 @@ const Settings = () => {
           </div>
         )}
 
+        {/* Backup & Export - Owner/Manager only */}
+        {hasManagementAccess() && (
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">💾</div>
+              <div className="settings-section-title">
+                <h2>Backup & Export</h2>
+                <p>Export your data for backup or import from a previous backup</p>
+              </div>
+            </div>
+            <div className="settings-section-body">
+              {/* Hidden file input for import */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={handleImportFileSelect}
+              />
+
+              <div className="backup-info-banner">
+                <div className="info-banner-icon">ℹ️</div>
+                <div className="info-banner-content">
+                  <strong>Local Backup</strong>
+                  <p>Export your data as a JSON file that you can save locally. This backup works independently of server sync.</p>
+                </div>
+              </div>
+
+              <div className="backup-actions-grid">
+                <div className="backup-action-card">
+                  <div className="backup-action-icon">📤</div>
+                  <div className="backup-action-info">
+                    <div className="backup-action-title">Export Backup</div>
+                    <div className="backup-action-desc">
+                      Download all your data as a JSON file. Keep this file safe for restoration.
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleExportBackup}
+                    disabled={backupOperation}
+                  >
+                    {backupOperation === 'export' ? '📤 Exporting...' : '📤 Export Data'}
+                  </button>
+                </div>
+
+                <div className="backup-action-card">
+                  <div className="backup-action-icon">📥</div>
+                  <div className="backup-action-info">
+                    <div className="backup-action-title">Import Backup</div>
+                    <div className="backup-action-desc">
+                      Restore data from a previously exported JSON backup file.
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={backupOperation}
+                  >
+                    {backupOperation === 'import' ? '📥 Importing...' : '📥 Import Data'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="backup-warning-notice">
+                ⚠️ <strong>Warning:</strong> Importing a backup will replace all existing data. Make sure to export your current data first if needed.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Theme Settings */}
         <div className="settings-section">
           <div className="settings-section-header">
@@ -1403,6 +1621,20 @@ const Settings = () => {
         title="Reset Payroll Settings"
         message="Are you sure you want to reset all payroll rates to default values? This action cannot be undone."
         confirmText="Reset"
+        confirmVariant="warning"
+      />
+
+      {/* Import Backup Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={importConfirm}
+        onClose={() => {
+          setImportConfirm(false);
+          setPendingImportData(null);
+        }}
+        onConfirm={handleConfirmImport}
+        title="Import Backup Data"
+        message={`Are you sure you want to import this backup? This will REPLACE all existing data with the backup from ${pendingImportData ? format(parseISO(pendingImportData.exportDate), 'MMM dd, yyyy h:mm a') : 'unknown date'}. This action cannot be undone.`}
+        confirmText="Import"
         confirmVariant="warning"
       />
 

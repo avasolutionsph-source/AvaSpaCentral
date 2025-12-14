@@ -832,13 +832,22 @@ export const attendanceAdapter = {
 
     let records = await storageService.attendance.getAll();
 
+    console.log('[AttendanceAdapter] getAttendance - filters:', filters);
+    console.log('[AttendanceAdapter] getAttendance - total records before filter:', records.length);
+
     if (filters.employeeId) {
       // Use string comparison to handle potential type mismatches
       const targetId = String(filters.employeeId);
       records = records.filter(a => String(a.employeeId) === targetId);
+      console.log('[AttendanceAdapter] getAttendance - after employeeId filter:', records.length);
     }
     if (filters.date) {
+      const recordsBeforeFilter = [...records]; // Copy for logging
       records = records.filter(a => a.date === filters.date);
+      console.log('[AttendanceAdapter] getAttendance - after date filter:', records.length, '(from', recordsBeforeFilter.length, ')');
+      if (records.length === 0 && recordsBeforeFilter.length > 0) {
+        console.log('[AttendanceAdapter] getAttendance - date mismatch! Filter date:', filters.date, 'Record dates:', recordsBeforeFilter.map(r => r.date));
+      }
     }
     if (filters.startDate && filters.endDate) {
       records = records.filter(a =>
@@ -861,14 +870,21 @@ export const attendanceAdapter = {
 
   async clockIn(employeeId, captureData = {}) {
     await delay();
-    const today = new Date().toISOString().split('T')[0];
-    const nowTime = new Date().toTimeString().slice(0, 5); // HH:mm format
+    // Use local date format to match MyPortal's format(new Date(), 'yyyy-MM-dd')
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const nowTime = now.toTimeString().slice(0, 5); // HH:mm format
     const empId = String(employeeId);
+
+    console.log('[AttendanceAdapter] clockIn - employeeId:', employeeId, 'type:', typeof employeeId);
+    console.log('[AttendanceAdapter] clockIn - date:', today);
 
     // Check if already clocked in today
     const existing = await storageService.attendance.find(
       a => String(a.employeeId) === empId && a.date === today
     );
+
+    console.log('[AttendanceAdapter] clockIn - existing records for today:', existing.length);
 
     if (existing.length > 0) {
       // Already have a record for today
@@ -893,6 +909,8 @@ export const attendanceAdapter = {
       status: 'present'
     });
 
+    console.log('[AttendanceAdapter] clockIn - created record:', record._id, 'employeeId:', record.employeeId, 'date:', record.date);
+
     return {
       success: true,
       attendance: clone({
@@ -904,8 +922,10 @@ export const attendanceAdapter = {
 
   async clockOut(employeeId, captureData = {}) {
     await delay();
-    const today = new Date().toISOString().split('T')[0];
-    const nowTime = new Date().toTimeString().slice(0, 5); // HH:mm format
+    // Use local date format to match MyPortal's format(new Date(), 'yyyy-MM-dd')
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const nowTime = now.toTimeString().slice(0, 5); // HH:mm format
     const empId = String(employeeId);
 
     const existing = await storageService.attendance.find(

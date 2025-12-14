@@ -3,6 +3,9 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
+import { SettingsRepository } from '../services/storage/repositories';
+import { SyncManager, NetworkDetector } from '../services/sync';
+import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
 
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, hasManagementAccess } = useApp();
@@ -116,6 +119,18 @@ const Settings = () => {
   // Reset confirmation state
   const [resetConfirm, setResetConfirm] = useState(false);
 
+  // Sync Settings State
+  const [syncConfig, setSyncConfig] = useState({
+    apiBaseUrl: '',
+    isOnline: false,
+    isSyncing: false,
+    lastSync: null,
+    pendingCount: 0,
+    failedCount: 0
+  });
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [syncOperation, setSyncOperation] = useState(null); // 'push' | 'pull' | 'sync'
+
   const handleBusinessInfoChange = (e) => {
     const { name, value } = e.target;
     setBusinessInfo(prev => ({ ...prev, [name]: value }));
@@ -152,7 +167,7 @@ const Settings = () => {
     setProfileData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     // Validate business hours
     const enabledHours = businessHours.filter(h => h.enabled);
     if (enabledHours.length === 0) {
@@ -160,13 +175,20 @@ const Settings = () => {
       return;
     }
 
-    // Save settings (in real app, this would call an API)
-    localStorage.setItem('businessInfo', JSON.stringify(businessInfo));
-    localStorage.setItem('businessHours', JSON.stringify(businessHours));
-    localStorage.setItem('taxSettings', JSON.stringify(taxSettings));
-    localStorage.setItem('theme', theme);
+    try {
+      // Save settings to Dexie
+      await SettingsRepository.setMany({
+        businessInfo: businessInfo,
+        businessHours: businessHours,
+        taxSettings: taxSettings,
+        theme: theme
+      });
 
-    showToast('Settings saved successfully!', 'success');
+      showToast('Settings saved successfully!', 'success');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      showToast('Failed to save settings', 'error');
+    }
   };
 
   const handleUpdateProfile = () => {
@@ -201,19 +223,68 @@ const Settings = () => {
   };
 
   useEffect(() => {
-    // Load saved settings
-    const savedBusinessInfo = localStorage.getItem('businessInfo');
-    const savedBusinessHours = localStorage.getItem('businessHours');
-    const savedTaxSettings = localStorage.getItem('taxSettings');
-    const savedTheme = localStorage.getItem('theme');
+    // Load saved settings from Dexie
+    const loadSettings = async () => {
+      try {
+        // Check for localStorage migration first
+        const localStorageKeys = ['businessInfo', 'businessHours', 'taxSettings', 'theme', 'securitySettings', 'twoFactorEnabled'];
+        for (const key of localStorageKeys) {
+          const storedValue = localStorage.getItem(key);
+          if (storedValue) {
+            const value = key === 'theme' ? storedValue : JSON.parse(storedValue);
+            await SettingsRepository.set(key, value);
+            localStorage.removeItem(key);
+            console.log(`[Settings] Migrated ${key} from localStorage to Dexie`);
+          }
+        }
 
-    if (savedBusinessInfo) setBusinessInfo(JSON.parse(savedBusinessInfo));
-    if (savedBusinessHours) setBusinessHours(JSON.parse(savedBusinessHours));
-    if (savedTaxSettings) setTaxSettings(JSON.parse(savedTaxSettings));
-    if (savedTheme) setTheme(savedTheme);
+        // Load from Dexie
+        const savedBusinessInfo = await SettingsRepository.get('businessInfo');
+        const savedBusinessHours = await SettingsRepository.get('businessHours');
+        const savedTaxSettings = await SettingsRepository.get('taxSettings');
+        const savedTheme = await SettingsRepository.get('theme');
+        const savedSecuritySettings = await SettingsRepository.get('securitySettings');
+        const saved2FA = await SettingsRepository.get('twoFactorEnabled');
+
+        if (savedBusinessInfo) setBusinessInfo(savedBusinessInfo);
+        if (savedBusinessHours) setBusinessHours(savedBusinessHours);
+        if (savedTaxSettings) setTaxSettings(savedTaxSettings);
+        if (savedTheme) setTheme(savedTheme);
+        if (savedSecuritySettings) setSecuritySettings(savedSecuritySettings);
+        if (saved2FA !== undefined) setTwoFactorEnabled(saved2FA);
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      }
+    };
+
+    loadSettings();
 
     // Load payroll configuration
     loadPayrollConfig();
+
+    // Load sync configuration
+    loadSyncConfig();
+
+    // Subscribe to sync status changes
+    const unsubscribeSync = SyncManager.subscribe((status) => {
+      if (status.type === 'sync_complete' || status.type === 'push_complete' || status.type === 'pull_complete') {
+        loadSyncStatus();
+        setSyncOperation(null);
+      } else if (status.type === 'sync_error' || status.type === 'push_error' || status.type === 'pull_error') {
+        setSyncOperation(null);
+        showToast(status.error || 'Sync operation failed', 'error');
+      }
+    });
+
+    // Subscribe to network status changes
+    const unsubscribeNetwork = NetworkDetector.subscribe((isOnline) => {
+      setSyncConfig(prev => ({ ...prev, isOnline }));
+    });
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeNetwork();
+    };
   }, []);
 
   // Load payroll configuration
@@ -332,6 +403,129 @@ const Settings = () => {
     return `${(rate * 100).toFixed(0)}%`;
   };
 
+  // Load sync configuration
+  const loadSyncConfig = async () => {
+    try {
+      await loadApiConfig();
+      const config = getApiConfig();
+      setSyncConfig(prev => ({
+        ...prev,
+        apiBaseUrl: config.baseUrl
+      }));
+      await loadSyncStatus();
+    } catch (error) {
+      console.error('Failed to load sync config:', error);
+    }
+  };
+
+  // Load current sync status
+  const loadSyncStatus = async () => {
+    try {
+      const status = await SyncManager.getStatus();
+      setSyncConfig(prev => ({
+        ...prev,
+        isOnline: status.isOnline,
+        isSyncing: status.isSyncing,
+        lastSync: status.lastSync,
+        pendingCount: status.pendingCount,
+        failedCount: status.failedCount
+      }));
+    } catch (error) {
+      console.error('Failed to load sync status:', error);
+    }
+  };
+
+  // Handle API URL change
+  const handleApiUrlChange = (e) => {
+    setSyncConfig(prev => ({ ...prev, apiBaseUrl: e.target.value }));
+  };
+
+  // Save API URL
+  const handleSaveApiUrl = async () => {
+    try {
+      await setApiBaseUrl(syncConfig.apiBaseUrl);
+      showToast('API URL saved successfully', 'success');
+    } catch (error) {
+      showToast('Failed to save API URL', 'error');
+    }
+  };
+
+  // Test API connection
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    try {
+      const isReachable = await httpClient.healthCheck();
+      if (isReachable) {
+        showToast('Connection successful! API is reachable.', 'success');
+        setSyncConfig(prev => ({ ...prev, isOnline: true }));
+      } else {
+        showToast('Connection failed. API is not reachable.', 'error');
+        setSyncConfig(prev => ({ ...prev, isOnline: false }));
+      }
+    } catch (error) {
+      showToast('Connection test failed: ' + error.message, 'error');
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  // Trigger sync
+  const handleSync = async () => {
+    if (syncOperation) return;
+    setSyncOperation('sync');
+    try {
+      const result = await SyncManager.sync();
+      if (result.success) {
+        showToast(`Sync complete: ${result.synced} items synced`, 'success');
+      } else {
+        showToast(result.message || 'Sync failed', 'error');
+      }
+    } catch (error) {
+      showToast('Sync failed: ' + error.message, 'error');
+    } finally {
+      setSyncOperation(null);
+      loadSyncStatus();
+    }
+  };
+
+  // Force push all data
+  const handleForcePush = async () => {
+    if (syncOperation) return;
+    setSyncOperation('push');
+    try {
+      const result = await SyncManager.forcePush();
+      if (result.success) {
+        showToast(`Push complete: ${result.pushed} items pushed`, 'success');
+      } else {
+        showToast(result.message || 'Push failed', 'error');
+      }
+    } catch (error) {
+      showToast('Push failed: ' + error.message, 'error');
+    } finally {
+      setSyncOperation(null);
+      loadSyncStatus();
+    }
+  };
+
+  // Force pull all data
+  const handleForcePull = async () => {
+    if (syncOperation) return;
+    setSyncOperation('pull');
+    try {
+      const result = await SyncManager.forcePull(true); // Full sync
+      if (result.success) {
+        showToast(`Pull complete: ${result.pulled} items pulled`, 'success');
+      } else {
+        showToast(result.message || 'Pull failed', 'error');
+      }
+    } catch (error) {
+      showToast('Pull failed: ' + error.message, 'error');
+    } finally {
+      setSyncOperation(null);
+      loadSyncStatus();
+    }
+  };
+
   const getInitials = () => {
     return `${profileData.firstName.charAt(0)}${profileData.lastName.charAt(0)}`.toUpperCase();
   };
@@ -390,10 +584,17 @@ const Settings = () => {
     setSecuritySettings(prev => ({ ...prev, [setting]: value }));
   };
 
-  const handleSaveSecuritySettings = () => {
-    localStorage.setItem('securitySettings', JSON.stringify(securitySettings));
-    localStorage.setItem('twoFactorEnabled', JSON.stringify(twoFactorEnabled));
-    showToast('Security settings saved successfully!', 'success');
+  const handleSaveSecuritySettings = async () => {
+    try {
+      await SettingsRepository.setMany({
+        securitySettings: securitySettings,
+        twoFactorEnabled: twoFactorEnabled
+      });
+      showToast('Security settings saved successfully!', 'success');
+    } catch (error) {
+      console.error('Failed to save security settings:', error);
+      showToast('Failed to save security settings', 'error');
+    }
   };
 
   return (
@@ -1003,6 +1204,141 @@ const Settings = () => {
             </div>
           </div>
         </div>
+
+        {/* Data Sync Settings - Owner/Manager only */}
+        {hasManagementAccess() && (
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">🔄</div>
+              <div className="settings-section-title">
+                <h2>Data Synchronization</h2>
+                <p>Configure backend API connection and sync settings</p>
+              </div>
+            </div>
+            <div className="settings-section-body">
+              {/* Connection Status */}
+              <div className="sync-status-banner">
+                <div className={`sync-status-indicator ${syncConfig.isOnline ? 'online' : 'offline'}`}>
+                  <span className="sync-status-dot"></span>
+                  <span>{syncConfig.isOnline ? 'Connected' : 'Disconnected'}</span>
+                </div>
+                {syncConfig.lastSync && (
+                  <div className="sync-last-time">
+                    Last sync: {format(parseISO(syncConfig.lastSync), 'MMM dd, yyyy h:mm a')}
+                  </div>
+                )}
+                {(syncConfig.pendingCount > 0 || syncConfig.failedCount > 0) && (
+                  <div className="sync-queue-status">
+                    {syncConfig.pendingCount > 0 && (
+                      <span className="sync-pending-badge">{syncConfig.pendingCount} pending</span>
+                    )}
+                    {syncConfig.failedCount > 0 && (
+                      <span className="sync-failed-badge">{syncConfig.failedCount} failed</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* API Configuration */}
+              <div className="sync-config-section">
+                <h3>API Configuration</h3>
+                <div className="settings-form-group">
+                  <label>API Base URL</label>
+                  <div className="sync-url-input-row">
+                    <input
+                      type="url"
+                      value={syncConfig.apiBaseUrl}
+                      onChange={handleApiUrlChange}
+                      placeholder="http://localhost:3001/api"
+                      disabled={!isOwner()}
+                    />
+                    {isOwner() && (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleSaveApiUrl}
+                      >
+                        Save
+                      </button>
+                    )}
+                  </div>
+                  <div className="settings-form-hint">
+                    Enter the base URL of your backend API server
+                  </div>
+                </div>
+
+                <div className="sync-test-connection">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleTestConnection}
+                    disabled={testingConnection}
+                  >
+                    {testingConnection ? '🔄 Testing...' : '🔌 Test Connection'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Sync Actions */}
+              <div className="sync-actions-section">
+                <h3>Sync Actions</h3>
+                <div className="sync-actions-grid">
+                  <div className="sync-action-card">
+                    <div className="sync-action-info">
+                      <div className="sync-action-title">Sync Pending Changes</div>
+                      <div className="sync-action-desc">
+                        Push local changes to the server ({syncConfig.pendingCount} pending)
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleSync}
+                      disabled={!syncConfig.isOnline || syncOperation || syncConfig.pendingCount === 0}
+                    >
+                      {syncOperation === 'sync' ? '🔄 Syncing...' : '🔄 Sync Now'}
+                    </button>
+                  </div>
+
+                  <div className="sync-action-card">
+                    <div className="sync-action-info">
+                      <div className="sync-action-title">Push All Data</div>
+                      <div className="sync-action-desc">
+                        Upload all local data to the server (backup)
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleForcePush}
+                      disabled={!syncConfig.isOnline || syncOperation}
+                    >
+                      {syncOperation === 'push' ? '⬆️ Pushing...' : '⬆️ Push All'}
+                    </button>
+                  </div>
+
+                  <div className="sync-action-card">
+                    <div className="sync-action-info">
+                      <div className="sync-action-title">Pull All Data</div>
+                      <div className="sync-action-desc">
+                        Download all data from the server (restore)
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleForcePull}
+                      disabled={!syncConfig.isOnline || syncOperation}
+                    >
+                      {syncOperation === 'pull' ? '⬇️ Pulling...' : '⬇️ Pull All'}
+                    </button>
+                  </div>
+                </div>
+
+                {!syncConfig.isOnline && (
+                  <div className="sync-offline-notice">
+                    ⚠️ You are currently offline. Sync actions will be available when connected.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Theme Settings */}
         <div className="settings-section">

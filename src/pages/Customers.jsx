@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, isToday, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
+import { db } from '../db';
 
 const Customers = () => {
   const { showToast } = useApp();
@@ -252,18 +253,22 @@ const Customers = () => {
         loyaltyPoints: newPoints
       });
 
-      // Save points history to localStorage
-      const historyKey = `loyalty_history_${loyaltyCustomer._id}`;
-      const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
-      existingHistory.unshift({
-        id: Date.now(),
+      // Save points history to Dexie
+      await db.loyaltyHistory.add({
+        customerId: loyaltyCustomer._id,
         type: 'earn',
         points: points,
         reason: pointsReason,
         date: new Date().toISOString(),
         balance: newPoints
       });
-      localStorage.setItem(historyKey, JSON.stringify(existingHistory));
+
+      // Clear cache to force reload
+      setPointsHistoryCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[loyaltyCustomer._id];
+        return newCache;
+      });
 
       showToast(`Added ${points} points to ${loyaltyCustomer.name}!`, 'success');
       setShowLoyaltyModal(false);
@@ -293,18 +298,22 @@ const Customers = () => {
         loyaltyPoints: newPoints
       });
 
-      // Save points history
-      const historyKey = `loyalty_history_${redeemCustomer._id}`;
-      const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
-      existingHistory.unshift({
-        id: Date.now(),
+      // Save points history to Dexie
+      await db.loyaltyHistory.add({
+        customerId: redeemCustomer._id,
         type: 'redeem',
         points: -selectedReward.points,
         reason: `Redeemed: ${selectedReward.name}`,
         date: new Date().toISOString(),
         balance: newPoints
       });
-      localStorage.setItem(historyKey, JSON.stringify(existingHistory));
+
+      // Clear cache to force reload
+      setPointsHistoryCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[redeemCustomer._id];
+        return newCache;
+      });
 
       showToast(`Successfully redeemed "${selectedReward.name}" for ${redeemCustomer.name}!`, 'success');
       setShowRedeemModal(false);
@@ -314,10 +323,61 @@ const Customers = () => {
     }
   };
 
+  const [pointsHistoryCache, setPointsHistoryCache] = useState({});
+
+  const loadPointsHistory = useCallback(async (customerId) => {
+    try {
+      // Check if we already have it cached
+      if (pointsHistoryCache[customerId]) {
+        return pointsHistoryCache[customerId];
+      }
+
+      // Load from Dexie
+      let history = await db.loyaltyHistory
+        .where('customerId')
+        .equals(customerId)
+        .reverse()
+        .sortBy('date');
+
+      // If no data in Dexie, check localStorage for migration
+      if (history.length === 0) {
+        const historyKey = `loyalty_history_${customerId}`;
+        const storedHistory = localStorage.getItem(historyKey);
+        if (storedHistory) {
+          const parsed = JSON.parse(storedHistory);
+          // Migrate to Dexie
+          const migrationData = parsed.map(entry => ({
+            ...entry,
+            customerId
+          }));
+          await db.loyaltyHistory.bulkAdd(migrationData);
+          history = migrationData;
+          // Clear localStorage after migration
+          localStorage.removeItem(historyKey);
+          console.log(`[Customers] Migrated loyalty_history for customer ${customerId} to Dexie`);
+        }
+      }
+
+      // Cache the result
+      setPointsHistoryCache(prev => ({ ...prev, [customerId]: history }));
+      return history;
+    } catch (error) {
+      console.error('[Customers] Failed to load points history:', error);
+      return [];
+    }
+  }, [pointsHistoryCache]);
+
   const getPointsHistory = (customerId) => {
-    const historyKey = `loyalty_history_${customerId}`;
-    return JSON.parse(localStorage.getItem(historyKey) || '[]');
+    // Return cached data or empty array (will be loaded async)
+    return pointsHistoryCache[customerId] || [];
   };
+
+  // Load points history when loyalty modal opens
+  useEffect(() => {
+    if (showLoyaltyModal && loyaltyCustomer) {
+      loadPointsHistory(loyaltyCustomer._id);
+    }
+  }, [showLoyaltyModal, loyaltyCustomer, loadPointsHistory]);
 
   const getLoyaltyStats = () => {
     const stats = {

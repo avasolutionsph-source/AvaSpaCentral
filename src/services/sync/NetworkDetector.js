@@ -3,9 +3,11 @@
  *
  * Provides real-time network status detection with:
  * - Browser online/offline events
- * - Periodic connectivity checks
+ * - Periodic connectivity checks against API health endpoint
  * - Event callbacks for status changes
  */
+
+import { httpClient } from '../api';
 
 class NetworkDetector {
   constructor() {
@@ -76,30 +78,44 @@ class NetworkDetector {
 
   /**
    * Manually check connectivity
-   * Uses a simple fetch to check if we can reach the network
+   * Pings the API health endpoint to verify actual connectivity
    */
   async _checkConnectivity() {
     try {
-      // Try to fetch a small resource
-      // In production, this would be your API health endpoint
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      // First check browser's online status
+      if (!navigator.onLine) {
+        if (this._isOnline) {
+          this._isOnline = false;
+          this._notifyListeners();
+        }
+        return;
+      }
 
-      // For now, just use navigator.onLine since we don't have a real backend
-      const newStatus = navigator.onLine;
-      clearTimeout(timeoutId);
+      // Then check if API is actually reachable
+      const isApiReachable = await httpClient.healthCheck();
 
-      if (newStatus !== this._isOnline) {
-        this._isOnline = newStatus;
+      if (isApiReachable !== this._isOnline) {
+        this._isOnline = isApiReachable;
         this._notifyListeners();
+        console.log(`[NetworkDetector] API ${isApiReachable ? 'reachable' : 'unreachable'}`);
       }
     } catch (error) {
-      // If fetch fails, assume offline
+      // If check fails, mark as offline
       if (this._isOnline) {
         this._isOnline = false;
         this._notifyListeners();
+        console.log('[NetworkDetector] API check failed, marking offline');
       }
     }
+  }
+
+  /**
+   * Force an immediate connectivity check
+   * @returns {Promise<boolean>} Current online status
+   */
+  async checkNow() {
+    await this._checkConnectivity();
+    return this._isOnline;
   }
 
   /**

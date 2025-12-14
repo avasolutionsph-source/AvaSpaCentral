@@ -15,3 +15,4 @@ export { default as GiftCertificateRepository } from './GiftCertificateRepositor
 export { default as PurchaseOrderRepository } from './PurchaseOrderRepository';
 export { default as AttendanceRepository } from './AttendanceRepository';
 export { default as ActivityLogRepository } from './ActivityLogRepository';
+export { default as SettingsRepository } from './SettingsRepository';

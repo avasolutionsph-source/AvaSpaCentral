@@ -5,12 +5,13 @@
 // This file now only contains APIs that haven't been migrated yet:
 // - authApi (uses localStorage for session)
 // - businessApi (uses mockDatabase settings)
-// - payrollConfigApi (uses localStorage)
-// - serviceRotationApi (uses localStorage)
+// - payrollConfigApi (uses Dexie)
+// - serviceRotationApi (uses Dexie)
 // - productConsumptionApi (uses mockDatabase)
 // - analyticsApi (read-only metrics calculations)
 
 import mockDatabase from './mockData';
+import { db } from '../db';
 
 // Simulate network delay (50-300ms for realistic feel)
 const delay = (ms = 200) => new Promise(resolve => setTimeout(resolve, ms + Math.random() * 100));
@@ -139,31 +140,62 @@ const defaultPayrollConfig = {
   specialHolidayOT: { enabled: true, rate: 1.69, label: 'Special Holiday + Overtime', description: 'OT on special holiday (169% of hourly rate)' }
 };
 
-// Initialize payroll config in localStorage if not exists
-const initPayrollConfig = () => {
-  const stored = localStorage.getItem('payrollConfig');
-  if (!stored) {
-    localStorage.setItem('payrollConfig', JSON.stringify(defaultPayrollConfig));
-    return defaultPayrollConfig;
+// Initialize payroll config in Dexie
+const initPayrollConfig = async () => {
+  // Check for localStorage migration first
+  const storedLS = localStorage.getItem('payrollConfig');
+  if (storedLS) {
+    const config = JSON.parse(storedLS);
+    // Migrate each key-value to Dexie
+    for (const [key, value] of Object.entries(config)) {
+      await db.payrollConfig.put({ key, value });
+    }
+    localStorage.removeItem('payrollConfig');
+    console.log('[PayrollConfigApi] Migrated payrollConfig from localStorage to Dexie');
+    return config;
   }
-  return JSON.parse(stored);
-};
 
-// Activity logs for payroll config changes
-let payrollConfigLogs = JSON.parse(localStorage.getItem('payrollConfigLogs') || '[]');
+  // Migrate logs if exist
+  const storedLogs = localStorage.getItem('payrollConfigLogs');
+  if (storedLogs) {
+    const logs = JSON.parse(storedLogs);
+    if (logs.length > 0) {
+      await db.payrollConfigLogs.bulkPut(logs.map((log, index) => ({
+        ...log,
+        id: log._id || log.id || (Date.now() + index)
+      })));
+      console.log('[PayrollConfigApi] Migrated payrollConfigLogs from localStorage to Dexie');
+    }
+    localStorage.removeItem('payrollConfigLogs');
+  }
+
+  // Load from Dexie
+  const records = await db.payrollConfig.toArray();
+  if (records.length > 0) {
+    const config = {};
+    records.forEach(r => { config[r.key] = r.value; });
+    return config;
+  }
+
+  // Initialize with defaults
+  for (const [key, value] of Object.entries(defaultPayrollConfig)) {
+    await db.payrollConfig.put({ key, value });
+  }
+  return defaultPayrollConfig;
+};
 
 export const payrollConfigApi = {
   // Get current payroll configuration
   async getPayrollConfig() {
     await delay();
-    return clone(initPayrollConfig());
+    return clone(await initPayrollConfig());
   },
 
   // Update payroll configuration (Owner only)
   async updatePayrollConfig(newConfig, userId, userName) {
     await delay(500);
 
-    const oldConfig = initPayrollConfig();
+    const oldConfig = await initPayrollConfig();
 
     // Create change log entry
     const changes = [];
@@ -200,17 +232,21 @@ export const payrollConfigApi = {
         summary: `Updated ${changes.length} payroll setting(s)`
       };
 
-      payrollConfigLogs.unshift(logEntry);
+      await db.payrollConfigLogs.add(logEntry);
+
       // Keep only last 100 logs
-      if (payrollConfigLogs.length > 100) {
-        payrollConfigLogs = payrollConfigLogs.slice(0, 100);
+      const allLogs = await db.payrollConfigLogs.orderBy('timestamp').reverse().toArray();
+      if (allLogs.length > 100) {
+        const toDelete = allLogs.slice(100).map(l => l.id);
+        await db.payrollConfigLogs.bulkDelete(toDelete);
       }
-      localStorage.setItem('payrollConfigLogs', JSON.stringify(payrollConfigLogs));
     }
 
-    // Save updated config
+    // Save updated config to Dexie
     const updatedConfig = { ...oldConfig, ...newConfig };
-    localStorage.setItem('payrollConfig', JSON.stringify(updatedConfig));
+    for (const [key, value] of Object.entries(updatedConfig)) {
+      await db.payrollConfig.put({ key, value });
+    }
 
     return {
       success: true,
@@ -222,14 +258,15 @@ export const payrollConfigApi = {
   // Get payroll config change logs
   async getPayrollConfigLogs() {
     await delay();
-    return clone(payrollConfigLogs);
+    const logs = await db.payrollConfigLogs.orderBy('timestamp').reverse().toArray();
+    return clone(logs);
   },
 
   // Reset to default configuration
   async resetPayrollConfig(userId, userName) {
     await delay(500);
 
-    const oldConfig = initPayrollConfig();
+    const oldConfig = await initPayrollConfig();
 
     // Log the reset
     const logEntry = {
@@ -242,11 +279,13 @@ export const payrollConfigApi = {
       summary: 'Reset all payroll settings to default values'
     };
 
-    payrollConfigLogs.unshift(logEntry);
-    localStorage.setItem('payrollConfigLogs', JSON.stringify(payrollConfigLogs));
+    await db.payrollConfigLogs.add(logEntry);
 
-    // Reset to defaults
-    localStorage.setItem('payrollConfig', JSON.stringify(defaultPayrollConfig));
+    // Reset to defaults in Dexie
+    await db.payrollConfig.clear();
+    for (const [key, value] of Object.entries(defaultPayrollConfig)) {
+      await db.payrollConfig.put({ key, value });
+    }
 
     return {
       success: true,
@@ -266,25 +305,37 @@ export const payrollConfigApi = {
 
 // Service rotation tracks employee queue based on clock-in time
 // First to clock in = first to serve customer
-const getServiceRotationKey = () => {
-  const today = new Date().toISOString().split('T')[0];
-  return `serviceRotation_${today}`;
-};
+const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
-const initServiceRotation = () => {
-  const key = getServiceRotationKey();
-  const stored = localStorage.getItem(key);
-  if (!stored) {
-    const initial = {
-      date: new Date().toISOString().split('T')[0],
-      queue: [], // Employees sorted by clock-in time
-      serviceCount: {}, // Track services per employee { empId: count }
-      lastServed: null // Last employee who served a customer
-    };
-    localStorage.setItem(key, JSON.stringify(initial));
-    return initial;
+const initServiceRotation = async () => {
+  const today = getTodayDateString();
+
+  // Check for localStorage migration
+  const oldKey = `serviceRotation_${today}`;
+  const storedLS = localStorage.getItem(oldKey);
+  if (storedLS) {
+    const data = JSON.parse(storedLS);
+    await db.serviceRotation.put({ date: today, ...data });
+    localStorage.removeItem(oldKey);
+    console.log('[ServiceRotationApi] Migrated serviceRotation from localStorage to Dexie');
+    return data;
   }
-  return JSON.parse(stored);
+
+  // Load from Dexie
+  const record = await db.serviceRotation.get(today);
+  if (record) {
+    return record;
+  }
+
+  // Initialize new rotation for today
+  const initial = {
+    date: today,
+    queue: [],
+    serviceCount: {},
+    lastServed: null
+  };
+  await db.serviceRotation.put(initial);
+  return initial;
 };
 
 export const serviceRotationApi = {
@@ -292,14 +343,12 @@ export const serviceRotationApi = {
   async getRotationQueue() {
     await delay();
 
-    const rotation = initServiceRotation();
-    const today = new Date().toISOString().split('T')[0];
+    const rotation = await initServiceRotation();
+    const today = getTodayDateString();
 
-    // Get today's attendance to build queue
-    const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
-    const todayAttendance = attendance.filter(a =>
-      a.date === today && a.clockIn && !a.clockOut
-    );
+    // Get today's attendance from Dexie
+    const attendanceRecords = await db.attendance.where('date').equals(today).toArray();
+    const todayAttendance = attendanceRecords.filter(a => a.clockIn && !a.clockOut);
 
     // Sort by clock-in time (earliest first)
     todayAttendance.sort((a, b) => {
@@ -310,24 +359,21 @@ export const serviceRotationApi = {
 
     // Build queue with employee details and service count
     const queue = todayAttendance.map((att, index) => ({
-      employeeId: att.employee._id,
-      employeeName: `${att.employee.firstName} ${att.employee.lastName}`,
-      position: att.employee.position,
+      employeeId: att.employee?._id || att.employeeId,
+      employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
+      position: att.employee?.position || '',
       clockInTime: att.clockIn,
-      servicesCompleted: rotation.serviceCount[att.employee._id] || 0,
+      servicesCompleted: rotation.serviceCount[att.employee?._id || att.employeeId] || 0,
       queuePosition: index + 1,
-      isNext: index === 0 && rotation.lastServed !== att.employee._id
+      isNext: index === 0 && rotation.lastServed !== (att.employee?._id || att.employeeId)
     }));
 
     // Determine who should be next based on rotation
-    // After serving, employee goes to back of queue
     if (queue.length > 0) {
       const lastServedIndex = queue.findIndex(q => q.employeeId === rotation.lastServed);
       if (lastServedIndex >= 0 && lastServedIndex < queue.length - 1) {
-        // Next person after last served
         queue.forEach((q, i) => q.isNext = i === lastServedIndex + 1);
       } else {
-        // Back to first person
         queue.forEach((q, i) => q.isNext = i === 0);
       }
     }
@@ -344,14 +390,14 @@ export const serviceRotationApi = {
   async recordService(employeeId) {
     await delay();
 
-    const key = getServiceRotationKey();
-    const rotation = initServiceRotation();
+    const today = getTodayDateString();
+    const rotation = await initServiceRotation();
 
     // Increment service count
     rotation.serviceCount[employeeId] = (rotation.serviceCount[employeeId] || 0) + 1;
     rotation.lastServed = employeeId;
 
-    localStorage.setItem(key, JSON.stringify(rotation));
+    await db.serviceRotation.put({ date: today, ...rotation });
 
     return {
       success: true,
@@ -370,7 +416,7 @@ export const serviceRotationApi = {
   async getServiceStats() {
     await delay();
 
-    const rotation = initServiceRotation();
+    const rotation = await initServiceRotation();
     const stats = Object.entries(rotation.serviceCount).map(([empId, count]) => ({
       employeeId: empId,
       servicesCompleted: count
@@ -387,12 +433,11 @@ export const serviceRotationApi = {
   async skipEmployee(employeeId) {
     await delay();
 
-    const key = getServiceRotationKey();
-    const rotation = initServiceRotation();
+    const today = getTodayDateString();
+    const rotation = await initServiceRotation();
 
-    // Mark as "last served" so rotation moves to next person
     rotation.lastServed = employeeId;
-    localStorage.setItem(key, JSON.stringify(rotation));
+    await db.serviceRotation.put({ date: today, ...rotation });
 
     return { success: true };
   },
@@ -401,14 +446,14 @@ export const serviceRotationApi = {
   async resetRotation() {
     await delay();
 
-    const key = getServiceRotationKey();
+    const today = getTodayDateString();
     const initial = {
-      date: new Date().toISOString().split('T')[0],
+      date: today,
       queue: [],
       serviceCount: {},
       lastServed: null
     };
-    localStorage.setItem(key, JSON.stringify(initial));
+    await db.serviceRotation.put(initial);
 
     return { success: true };
   }

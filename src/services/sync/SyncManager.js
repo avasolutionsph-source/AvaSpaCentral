@@ -5,13 +5,20 @@
  * - Processes sync queue when online
  * - Handles server-wins conflict resolution
  * - Provides sync status and progress
- *
- * Note: This is prepared for future backend integration.
- * Currently operates in "offline-only" mode.
+ * - Push/Pull data to/from backend API
  */
 
 import SyncQueue from './SyncQueue';
 import NetworkDetector from './NetworkDetector';
+import { httpClient, HttpError } from '../api';
+import { db, syncMetadata } from '../../db';
+
+// Entity types that can be synced
+const SYNCABLE_ENTITIES = [
+  'products', 'employees', 'customers', 'suppliers', 'rooms',
+  'transactions', 'appointments', 'expenses', 'giftCertificates',
+  'purchaseOrders', 'attendance', 'shiftSchedules', 'activityLogs'
+];
 
 class SyncManager {
   constructor() {
@@ -205,42 +212,194 @@ class SyncManager {
   }
 
   /**
-   * Process a single sync item
-   * This is where backend API calls would go
+   * Process a single sync item - makes real API calls
+   * @param {object} item - Sync queue item with entityType, entityId, operation, data
    */
   async _processItem(item) {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 100));
+    const { entityType, entityId, operation, data } = item;
+    const endpoint = `/sync/${entityType}`;
 
-    // In a real implementation, this would:
-    // 1. POST to /api/{entityType} for creates
-    // 2. PUT to /api/{entityType}/{id} for updates
-    // 3. DELETE to /api/{entityType}/{id} for deletes
-    // 4. Handle server response and conflicts
+    console.log(`[SyncManager] Processing: ${operation} ${entityType}/${entityId}`);
 
-    // For now, just log and mark as synced
-    console.log(`[SyncManager] Processed: ${item.operation} ${item.entityType}/${item.entityId}`);
-    return true;
+    try {
+      switch (operation) {
+        case 'create':
+          return await httpClient.post(endpoint, data);
+
+        case 'update':
+          return await httpClient.put(`${endpoint}/${entityId}`, data);
+
+        case 'delete':
+          return await httpClient.delete(`${endpoint}/${entityId}`);
+
+        default:
+          throw new Error(`Unknown operation: ${operation}`);
+      }
+    } catch (error) {
+      // Handle specific error cases
+      if (error instanceof HttpError) {
+        if (error.isNotFound && operation === 'delete') {
+          // Item already deleted on server - consider this a success
+          console.log(`[SyncManager] Item ${entityId} already deleted on server`);
+          return { success: true, alreadyDeleted: true };
+        }
+
+        if (error.isUnauthorized) {
+          // Auth error - may need to re-login
+          console.error('[SyncManager] Authentication error - token may be expired');
+        }
+      }
+
+      throw error;
+    }
   }
 
   /**
    * Force push all local data to server
-   * Used for initial sync or full resync
+   * Used for initial sync or full backup to server
    */
   async forcePush() {
-    // This would push all local data to the server
-    console.log('[SyncManager] Force push not implemented (offline-only mode)');
-    return { success: true, message: 'Offline-only mode' };
+    if (!this.isOnline) {
+      return { success: false, message: 'Offline - cannot push' };
+    }
+
+    console.log('[SyncManager] Starting force push...');
+    this._notifyListeners({ type: 'push_start' });
+
+    const results = { pushed: 0, failed: 0, errors: [] };
+
+    try {
+      for (const entityType of SYNCABLE_ENTITIES) {
+        try {
+          const localData = await db[entityType].toArray();
+
+          if (localData.length === 0) {
+            console.log(`[SyncManager] No ${entityType} data to push`);
+            continue;
+          }
+
+          console.log(`[SyncManager] Pushing ${localData.length} ${entityType}...`);
+
+          const response = await httpClient.post(`/sync/${entityType}/bulk`, {
+            items: localData
+          });
+
+          results.pushed += localData.length;
+          console.log(`[SyncManager] Pushed ${localData.length} ${entityType}`);
+
+          // Update sync metadata
+          await syncMetadata.put({
+            entityType,
+            lastSyncTimestamp: new Date().toISOString(),
+            lastPushTimestamp: new Date().toISOString(),
+            itemCount: localData.length
+          });
+
+        } catch (error) {
+          console.error(`[SyncManager] Failed to push ${entityType}:`, error);
+          results.failed++;
+          results.errors.push({ entityType, error: error.message });
+        }
+      }
+
+      this._notifyListeners({ type: 'push_complete', ...results });
+      console.log(`[SyncManager] Force push complete: ${results.pushed} pushed, ${results.failed} entity types failed`);
+
+      return { success: results.failed === 0, ...results };
+
+    } catch (error) {
+      console.error('[SyncManager] Force push error:', error);
+      this._notifyListeners({ type: 'push_error', error: error.message });
+      return { success: false, error: error.message };
+    }
   }
 
   /**
    * Pull all data from server
    * Used for initial sync or to get latest data
+   * @param {boolean} fullSync - If true, pulls all data. If false, only changes since last sync.
    */
-  async forcePull() {
-    // This would pull all data from the server
-    console.log('[SyncManager] Force pull not implemented (offline-only mode)');
-    return { success: true, message: 'Offline-only mode' };
+  async forcePull(fullSync = false) {
+    if (!this.isOnline) {
+      return { success: false, message: 'Offline - cannot pull' };
+    }
+
+    console.log(`[SyncManager] Starting force pull (fullSync=${fullSync})...`);
+    this._notifyListeners({ type: 'pull_start' });
+
+    const results = { pulled: 0, failed: 0, errors: [] };
+
+    try {
+      for (const entityType of SYNCABLE_ENTITIES) {
+        try {
+          // Get last sync timestamp for incremental sync
+          let since = null;
+          if (!fullSync) {
+            const lastSync = await syncMetadata.get(entityType);
+            since = lastSync?.lastSyncTimestamp;
+          }
+
+          console.log(`[SyncManager] Pulling ${entityType}${since ? ` since ${since}` : ' (full)'}...`);
+
+          const response = await httpClient.get(`/sync/${entityType}`, {
+            since: since || ''
+          });
+
+          const { items, timestamp } = response;
+
+          if (items && items.length > 0) {
+            // Server-wins merge: bulkPut overwrites local data
+            await db[entityType].bulkPut(items);
+            results.pulled += items.length;
+            console.log(`[SyncManager] Pulled ${items.length} ${entityType}`);
+          }
+
+          // Update sync metadata
+          await syncMetadata.put({
+            entityType,
+            lastSyncTimestamp: timestamp || new Date().toISOString(),
+            lastPullTimestamp: new Date().toISOString(),
+            itemCount: items?.length || 0
+          });
+
+        } catch (error) {
+          console.error(`[SyncManager] Failed to pull ${entityType}:`, error);
+          results.failed++;
+          results.errors.push({ entityType, error: error.message });
+        }
+      }
+
+      this._lastSync = new Date().toISOString();
+      this._notifyListeners({ type: 'pull_complete', ...results });
+      console.log(`[SyncManager] Force pull complete: ${results.pulled} pulled, ${results.failed} entity types failed`);
+
+      return { success: results.failed === 0, ...results };
+
+    } catch (error) {
+      console.error('[SyncManager] Force pull error:', error);
+      this._notifyListeners({ type: 'pull_error', error: error.message });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get sync metadata for all entity types
+   */
+  async getSyncMetadata() {
+    const metadata = {};
+    for (const entityType of SYNCABLE_ENTITIES) {
+      const data = await syncMetadata.get(entityType);
+      metadata[entityType] = data || null;
+    }
+    return metadata;
+  }
+
+  /**
+   * Clear sync metadata (useful for forcing full resync)
+   */
+  async clearSyncMetadata() {
+    await syncMetadata.clear();
+    console.log('[SyncManager] Sync metadata cleared');
   }
 }
 

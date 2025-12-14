@@ -1,18 +1,53 @@
 // Mock Advance Booking API
-// Frontend-only simulation with localStorage persistence
+// Frontend-only simulation with Dexie (IndexedDB) persistence
+
+import { db } from '../db';
 
 const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Helper to clone objects
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
-// LocalStorage persistence
-const STORAGE_KEY = 'advanceBookings';
-const SERVICES_KEY = 'activeServices';
+// Migration helper - migrate from localStorage to Dexie
+const migrateFromLocalStorage = async () => {
+  const STORAGE_KEY = 'advanceBookings';
+  const SERVICES_KEY = 'activeServices';
 
-const initAdvanceBookings = () => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) return JSON.parse(stored);
+  // Migrate advanceBookings
+  const storedBookings = localStorage.getItem(STORAGE_KEY);
+  if (storedBookings) {
+    const bookings = JSON.parse(storedBookings);
+    const existingCount = await db.advanceBookings.count();
+    if (existingCount === 0 && bookings.length > 0) {
+      // Add _id field for Dexie compatibility
+      const migrationData = bookings.map(b => ({ ...b, _id: b.id }));
+      await db.advanceBookings.bulkPut(migrationData);
+      console.log('[AdvanceBookingApi] Migrated advanceBookings from localStorage to Dexie');
+    }
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  // Migrate activeServices
+  const storedServices = localStorage.getItem(SERVICES_KEY);
+  if (storedServices) {
+    const services = JSON.parse(storedServices);
+    const existingCount = await db.activeServices.count();
+    if (existingCount === 0 && services.length > 0) {
+      const migrationData = services.map(s => ({ ...s, _id: s.id }));
+      await db.activeServices.bulkPut(migrationData);
+      console.log('[AdvanceBookingApi] Migrated activeServices from localStorage to Dexie');
+    }
+    localStorage.removeItem(SERVICES_KEY);
+  }
+};
+
+// Initialize with demo data if empty
+const initAdvanceBookings = async () => {
+  // First check for migration
+  await migrateFromLocalStorage();
+
+  const bookings = await db.advanceBookings.toArray();
+  if (bookings.length > 0) return bookings;
 
   // Initialize with demo data on first load
   const now = new Date();
@@ -26,6 +61,7 @@ const initAdvanceBookings = () => {
 
   const initialData = [
     {
+      _id: 'booking_001',
       id: 'booking_001',
       bookingDateTime: tomorrow.toISOString(),
       employeeId: 'emp_003',
@@ -52,6 +88,7 @@ const initAdvanceBookings = () => {
       updatedAt: now.toISOString()
     },
     {
+      _id: 'booking_002',
       id: 'booking_002',
       bookingDateTime: nextWeek.toISOString(),
       employeeId: 'emp_002',
@@ -79,34 +116,43 @@ const initAdvanceBookings = () => {
     }
   ];
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(initialData));
+  await db.advanceBookings.bulkPut(initialData);
   return initialData;
 };
 
-const saveAdvanceBookings = (bookings) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+const initActiveServices = async () => {
+  await migrateFromLocalStorage();
+  return await db.activeServices.toArray();
 };
 
-const initActiveServices = () => {
-  const stored = localStorage.getItem(SERVICES_KEY);
-  return stored ? JSON.parse(stored) : [];
+// Helper to get next booking ID from existing data
+const getNextBookingId = async () => {
+  const bookings = await db.advanceBookings.toArray();
+  if (bookings.length === 0) {
+    return 'booking_001';
+  }
+  // Find the highest numeric ID
+  let maxNum = 0;
+  for (const booking of bookings) {
+    const match = booking._id?.match(/booking_(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  return `booking_${String(maxNum + 1).padStart(3, '0')}`;
 };
-
-const saveActiveServices = (services) => {
-  localStorage.setItem(SERVICES_KEY, JSON.stringify(services));
-};
-
-let bookingIdCounter = 3;
 
 // API Methods
 export const advanceBookingApi = {
   async createAdvanceBooking(bookingInput) {
     await delay(600);
-    const bookings = initAdvanceBookings();
-    const id = `booking_${String(bookingIdCounter++).padStart(3, '0')}`;
+    await initAdvanceBookings(); // Ensure initialized
+    const id = await getNextBookingId();
     const now = new Date().toISOString();
 
     const newBooking = {
+      _id: id,
       id,
       ...bookingInput,
       status: bookingInput.status || 'scheduled',
@@ -116,43 +162,43 @@ export const advanceBookingApi = {
       updatedAt: now
     };
 
-    bookings.push(newBooking);
-    saveAdvanceBookings(bookings);
+    await db.advanceBookings.put(newBooking);
     return clone(newBooking);
   },
 
   async listAdvanceBookings() {
     await delay(400);
-    return clone(initAdvanceBookings());
+    const bookings = await initAdvanceBookings();
+    return clone(bookings);
   },
 
   async getAdvanceBooking(id) {
     await delay(300);
-    const bookings = initAdvanceBookings();
-    const booking = bookings.find(b => b.id === id);
+    await initAdvanceBookings();
+    const booking = await db.advanceBookings.get(id);
     if (!booking) throw new Error('Booking not found');
     return clone(booking);
   },
 
   async updateAdvanceBooking(id, updates) {
     await delay(500);
-    const bookings = initAdvanceBookings();
-    const index = bookings.findIndex(b => b.id === id);
-    if (index === -1) throw new Error('Booking not found');
+    await initAdvanceBookings();
+    const booking = await db.advanceBookings.get(id);
+    if (!booking) throw new Error('Booking not found');
 
-    bookings[index] = {
-      ...bookings[index],
+    const updatedBooking = {
+      ...booking,
       ...updates,
       updatedAt: new Date().toISOString()
     };
 
-    saveAdvanceBookings(bookings);
-    return clone(bookings[index]);
+    await db.advanceBookings.put(updatedBooking);
+    return clone(updatedBooking);
   },
 
   async listAdvanceBookingsByDate(dateString) {
     await delay(400);
-    const bookings = initAdvanceBookings();
+    const bookings = await initAdvanceBookings();
     const targetDate = new Date(dateString);
     const filtered = bookings.filter(booking => {
       const bookingDate = new Date(booking.bookingDateTime);
@@ -167,22 +213,22 @@ export const advanceBookingApi = {
 
   async startServiceFromBooking(bookingId) {
     await delay(600);
-    const bookings = initAdvanceBookings();
-    const bookingIndex = bookings.findIndex(b => b.id === bookingId);
-    if (bookingIndex === -1) throw new Error('Booking not found');
+    await initAdvanceBookings();
+    const booking = await db.advanceBookings.get(bookingId);
+    if (!booking) throw new Error('Booking not found');
 
-    const booking = bookings[bookingIndex];
-    bookings[bookingIndex] = {
+    const updatedBooking = {
       ...booking,
       status: 'in-progress',
       actualStartTime: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    saveAdvanceBookings(bookings);
+    await db.advanceBookings.put(updatedBooking);
 
-    const activeServices = initActiveServices();
+    const serviceId = `service_${Date.now()}`;
     const activeService = {
-      id: `service_${Date.now()}`,
+      _id: serviceId,
+      id: serviceId,
       roomId: booking.roomId,
       roomName: booking.roomName,
       isHomeService: booking.isHomeService,
@@ -198,21 +244,19 @@ export const advanceBookingApi = {
       status: 'in-progress',
       advanceBookingId: booking.id
     };
-    activeServices.push(activeService);
-    saveActiveServices(activeServices);
+    await db.activeServices.put(activeService);
 
-    return { booking: clone(bookings[bookingIndex]), activeService: clone(activeService) };
+    return { booking: clone(updatedBooking), activeService: clone(activeService) };
   },
 
   async completeServiceFromBooking(bookingId, paymentData = {}) {
     await delay(700);
-    const bookings = initAdvanceBookings();
-    const bookingIndex = bookings.findIndex(b => b.id === bookingId);
-    if (bookingIndex === -1) throw new Error('Booking not found');
+    await initAdvanceBookings();
+    const booking = await db.advanceBookings.get(bookingId);
+    if (!booking) throw new Error('Booking not found');
 
-    const booking = bookings[bookingIndex];
     const now = new Date().toISOString();
-    bookings[bookingIndex] = {
+    const updatedBooking = {
       ...booking,
       status: 'completed',
       actualEndTime: now,
@@ -220,15 +264,15 @@ export const advanceBookingApi = {
       ...paymentData,
       updatedAt: now
     };
-    saveAdvanceBookings(bookings);
+    await db.advanceBookings.put(updatedBooking);
 
-    const activeServices = initActiveServices();
-    const serviceIndex = activeServices.findIndex(s => s.advanceBookingId === bookingId);
-    let activeService = null;
-    if (serviceIndex !== -1) {
-      activeService = { ...activeServices[serviceIndex], status: 'completed' };
-      activeServices.splice(serviceIndex, 1);
-      saveActiveServices(activeServices);
+    // Find and remove active service
+    const activeServices = await db.activeServices.toArray();
+    const activeService = activeServices.find(s => s.advanceBookingId === bookingId);
+    let completedService = null;
+    if (activeService) {
+      completedService = { ...activeService, status: 'completed' };
+      await db.activeServices.delete(activeService._id);
     }
 
     const transaction = {
@@ -245,41 +289,42 @@ export const advanceBookingApi = {
       advanceBookingId: booking.id
     };
 
-    return { booking: clone(bookings[bookingIndex]), transaction: clone(transaction), activeService: activeService ? clone(activeService) : null };
+    return { booking: clone(updatedBooking), transaction: clone(transaction), activeService: completedService ? clone(completedService) : null };
   },
 
   async cancelAdvanceBooking(bookingId, reason = '') {
     await delay(500);
-    const bookings = initAdvanceBookings();
-    const index = bookings.findIndex(b => b.id === bookingId);
-    if (index === -1) throw new Error('Booking not found');
+    await initAdvanceBookings();
+    const booking = await db.advanceBookings.get(bookingId);
+    if (!booking) throw new Error('Booking not found');
 
-    bookings[index] = {
-      ...bookings[index],
+    const updatedBooking = {
+      ...booking,
       status: 'cancelled',
-      specialRequests: bookings[index].specialRequests
-        ? `${bookings[index].specialRequests}\nCancellation reason: ${reason}`
+      specialRequests: booking.specialRequests
+        ? `${booking.specialRequests}\nCancellation reason: ${reason}`
         : `Cancellation reason: ${reason}`,
       updatedAt: new Date().toISOString()
     };
-    saveAdvanceBookings(bookings);
-    return clone(bookings[index]);
+    await db.advanceBookings.put(updatedBooking);
+    return clone(updatedBooking);
   },
 
   async getActiveServices() {
     await delay(300);
-    return clone(initActiveServices());
+    const services = await initActiveServices();
+    return clone(services);
   },
 
   async getActiveServicesByRoom(roomId) {
     await delay(300);
-    const services = initActiveServices();
-    return clone(services.filter(s => s.roomId === roomId));
+    const services = await db.activeServices.where('roomId').equals(roomId).toArray();
+    return clone(services);
   },
 
   async getPendingRevenue() {
     await delay(300);
-    const bookings = initAdvanceBookings();
+    const bookings = await initAdvanceBookings();
     const pending = bookings.filter(
       b => b.paymentTiming === 'pay-after' && b.paymentStatus === 'pending' && b.status !== 'cancelled'
     );
@@ -289,7 +334,7 @@ export const advanceBookingApi = {
 
   async getTodaysBookingsCount() {
     await delay(300);
-    const bookings = initAdvanceBookings();
+    const bookings = await initAdvanceBookings();
     const today = new Date();
     const todayBookings = bookings.filter(booking => {
       if (booking.status === 'cancelled' || booking.status === 'completed') return false;
@@ -305,9 +350,9 @@ export const advanceBookingApi = {
 
   async resetDemoData() {
     await delay(200);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(SERVICES_KEY);
-    initAdvanceBookings();
+    await db.advanceBookings.clear();
+    await db.activeServices.clear();
+    await initAdvanceBookings();
     return { success: true };
   }
 };

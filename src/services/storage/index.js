@@ -22,6 +22,7 @@ import ActivityLogRepository from './repositories/ActivityLogRepository';
 import PayrollRequestRepository from './repositories/PayrollRequestRepository';
 import CashDrawerRepository from './repositories/CashDrawerRepository';
 import ShiftScheduleRepository from './repositories/ShiftScheduleRepository';
+import SettingsRepository from './repositories/SettingsRepository';
 
 /**
  * StorageService class - provides unified access to all repositories
@@ -44,6 +45,7 @@ class StorageService {
     this.payrollRequests = PayrollRequestRepository;
     this.cashDrawerSessions = CashDrawerRepository;
     this.shiftSchedules = ShiftScheduleRepository;
+    this.settings = SettingsRepository;
 
     // Database reference
     this.db = db;
@@ -87,7 +89,10 @@ class StorageService {
       'products', 'employees', 'customers', 'suppliers', 'rooms',
       'expenses', 'appointments', 'transactions', 'giftCertificates',
       'purchaseOrders', 'attendance', 'activityLogs', 'payrollRequests',
-      'cashDrawerSessions', 'shiftSchedules'
+      'cashDrawerSessions', 'shiftSchedules',
+      // v2 tables
+      'stockHistory', 'loyaltyHistory', 'advanceBookings', 'activeServices',
+      'settings', 'payrollConfig', 'payrollConfigLogs', 'serviceRotation'
     ];
 
     for (const table of tables) {
@@ -125,7 +130,10 @@ class StorageService {
       'products', 'employees', 'customers', 'suppliers', 'rooms',
       'expenses', 'appointments', 'transactions', 'giftCertificates',
       'purchaseOrders', 'attendance', 'activityLogs', 'payrollRequests',
-      'cashDrawerSessions', 'shiftSchedules'
+      'cashDrawerSessions', 'shiftSchedules',
+      // v2 tables
+      'stockHistory', 'loyaltyHistory', 'advanceBookings', 'activeServices',
+      'settings', 'payrollConfig', 'payrollConfigLogs', 'serviceRotation'
     ];
 
     for (const table of tables) {
@@ -193,5 +201,6 @@ export {
   ActivityLogRepository,
   PayrollRequestRepository,
   CashDrawerRepository,
-  ShiftScheduleRepository
+  ShiftScheduleRepository,
+  SettingsRepository
 };

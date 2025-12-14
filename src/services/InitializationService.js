@@ -51,10 +51,11 @@ class InitializationService {
       const isFirstRun = Object.values(stats).every(count => count === 0);
 
       if (isFirstRun) {
-        console.log('[InitService] First run detected, seeding data...');
-        await this._seedInitialData();
+        // Skip auto-seeding to allow testing with empty database
+        console.log('[InitService] First run detected - starting with empty database');
+        console.log('[InitService] Use initService.seedData() to populate mock data if needed');
       } else {
-        console.log('[InitService] Existing data found, skipping seed');
+        console.log('[InitService] Existing data found');
       }
 
       // 3. Migrate any legacy localStorage data
@@ -162,6 +163,12 @@ class InitializationService {
 
   /**
    * Migrate data from localStorage to IndexedDB
+   * Note: Most migrations are now handled lazily in their respective modules:
+   * - stockHistory: Inventory.jsx
+   * - advanceBookings/activeServices: advanceBookingApi.js
+   * - loyalty_history_*: Customers.jsx
+   * - payrollConfig/payrollConfigLogs: mockApi.js
+   * This method handles migrations NOT covered by lazy loading
    */
   async _migrateLocalStorage() {
     console.log('[InitService] Checking for localStorage data to migrate...');
@@ -169,14 +176,7 @@ class InitializationService {
     const migratedKeys = [];
 
     try {
-      // Migrate stock history
-      const stockHistory = localStorage.getItem('stockHistory');
-      if (stockHistory) {
-        // Stock history is now part of inventoryMovements
-        // For now, just log that we found it
-        console.log('[InitService] Found stockHistory in localStorage');
-        migratedKeys.push('stockHistory');
-      }
+      // Note: stockHistory migration removed - handled lazily by Inventory.jsx
 
       // Migrate attendance data
       const attendance = localStorage.getItem('attendance');
@@ -184,13 +184,13 @@ class InitializationService {
         try {
           const attendanceData = JSON.parse(attendance);
           if (Array.isArray(attendanceData) && attendanceData.length > 0) {
-            // Check if already migrated
             const existingCount = await storageService.attendance.count();
             if (existingCount === 0) {
               await storageService.attendance.createMany(attendanceData);
               console.log(`[InitService] Migrated ${attendanceData.length} attendance records`);
             }
           }
+          localStorage.removeItem('attendance');
           migratedKeys.push('attendance');
         } catch (e) {
           console.warn('[InitService] Failed to parse attendance data:', e);
@@ -209,6 +209,7 @@ class InitializationService {
               console.log(`[InitService] Migrated ${requestsData.length} payroll requests`);
             }
           }
+          localStorage.removeItem('payrollRequests');
           migratedKeys.push('payrollRequests');
         } catch (e) {
           console.warn('[InitService] Failed to parse payroll requests:', e);
@@ -227,17 +228,59 @@ class InitializationService {
               console.log(`[InitService] Migrated ${logsData.length} activity logs`);
             }
           }
+          localStorage.removeItem('activityLogs');
           migratedKeys.push('activityLogs');
         } catch (e) {
           console.warn('[InitService] Failed to parse activity logs:', e);
         }
       }
 
-      // Note: We don't delete localStorage data immediately
-      // to allow rollback if needed. These can be cleaned up later.
+      // Note: advanceBookings migration removed - handled lazily by advanceBookingApi.js
+      // Note: activeServices migration removed - handled lazily by advanceBookingApi.js
+
+      // Migrate settings to Dexie settings table
+      const settingsKeys = ['businessInfo', 'businessHours', 'taxSettings', 'theme', 'securitySettings', 'twoFactorEnabled'];
+      for (const key of settingsKeys) {
+        const value = localStorage.getItem(key);
+        if (value) {
+          try {
+            const existingValue = await db.settings.get(key);
+            if (!existingValue) {
+              const parsedValue = key === 'theme' ? value : JSON.parse(value);
+              await db.settings.put({ key, value: parsedValue, _updatedAt: new Date().toISOString() });
+              console.log(`[InitService] Migrated setting: ${key}`);
+            }
+            localStorage.removeItem(key);
+            migratedKeys.push(key);
+          } catch (e) {
+            console.warn(`[InitService] Failed to migrate setting ${key}:`, e);
+          }
+        }
+      }
+
+      // Note: loyalty_history_* migration removed - handled lazily by Customers.jsx
+
+      // Migrate service rotation (per date) - not handled elsewhere
+      const localStorageKeysToCheck = Object.keys(localStorage);
+      for (const key of localStorageKeysToCheck) {
+        if (key.startsWith('serviceRotation_')) {
+          try {
+            const date = key.replace('serviceRotation_', '');
+            const rotationData = JSON.parse(localStorage.getItem(key));
+            if (rotationData) {
+              await db.serviceRotation.put({ date, ...rotationData });
+              console.log(`[InitService] Migrated service rotation for ${date}`);
+            }
+            localStorage.removeItem(key);
+            migratedKeys.push(key);
+          } catch (e) {
+            console.warn(`[InitService] Failed to migrate ${key}:`, e);
+          }
+        }
+      }
 
       if (migratedKeys.length > 0) {
-        console.log(`[InitService] Migration checked for keys: ${migratedKeys.join(', ')}`);
+        console.log(`[InitService] Migrated ${migratedKeys.length} localStorage keys to Dexie`);
       } else {
         console.log('[InitService] No localStorage data to migrate');
       }
@@ -269,6 +312,41 @@ class InitializationService {
 
     console.log('[InitService] Database reset complete');
   }
+
+  /**
+   * Clear all data (for testing with empty database)
+   */
+  async clearAllData() {
+    console.log('[InitService] Clearing all data...');
+    await storageService.clearAll();
+    console.log('[InitService] All data cleared - refresh the page to start fresh');
+  }
+
+  /**
+   * Seed mock data manually
+   */
+  async seedData() {
+    console.log('[InitService] Seeding mock data...');
+    await this._seedInitialData();
+    console.log('[InitService] Mock data seeded - refresh the page to see data');
+  }
+
+  /**
+   * Get current database stats
+   */
+  async getStats() {
+    return await storageService.getStats();
+  }
 }
 
-export default new InitializationService();
+const initService = new InitializationService();
+
+// Expose to window for console debugging
+if (typeof window !== 'undefined') {
+  window.initService = initService;
+  window.storageService = storageService;
+  console.log('[InitService] Debug: window.initService and window.storageService available');
+  console.log('[InitService] Commands: initService.clearAllData(), initService.seedData(), initService.getStats()');
+}
+
+export default initService;

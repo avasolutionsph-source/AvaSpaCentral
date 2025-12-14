@@ -55,6 +55,64 @@ db.version(1).stores({
   syncMetadata: 'entityType, lastSyncTimestamp'
 });
 
+// Version 2: Add tables for localStorage migration
+db.version(2).stores({
+  // === CORE BUSINESS ===
+  business: '_id',
+  users: '_id, email, role, status',
+
+  // === PRODUCTS & SERVICES ===
+  products: '_id, type, category, active, name',
+
+  // === PEOPLE ===
+  employees: '_id, status, department, position, email',
+  customers: '_id, status, phone, email, name, tier',
+  suppliers: '_id, status, name',
+
+  // === OPERATIONS ===
+  transactions: '_id, date, status, employeeId, customerId',
+  appointments: '_id, scheduledDateTime, status, employeeId, roomId, customerId',
+  rooms: '_id, type, status, name',
+
+  // === INVENTORY ===
+  purchaseOrders: '_id, supplierId, orderDate, status',
+  inventoryMovements: '_id, productId, date, type',
+  stockHistory: '++id, productId, date, type',
+
+  // === FINANCIAL ===
+  expenses: '_id, date, category, status, expenseType',
+  cashDrawerSessions: '_id, oduserId, status, openTime',
+  giftCertificates: '_id, code, status, recipientEmail',
+
+  // === HR ===
+  attendance: '_id, date, employeeId',
+  shiftSchedules: '_id, employeeId, isActive',
+  payrollRequests: '_id, employeeId, status, createdAt',
+
+  // === LOGS ===
+  activityLogs: '_id, userId, type, timestamp',
+
+  // === SYNC INFRASTRUCTURE ===
+  syncQueue: '++id, entityType, entityId, operation, status, createdAt',
+  syncMetadata: 'entityType, lastSyncTimestamp',
+
+  // === NEW: localStorage migration tables ===
+  // Customer loyalty points history
+  loyaltyHistory: '++id, customerId, date, type',
+  // Advance bookings (separate from regular appointments)
+  advanceBookings: '_id, status, bookingDateTime, employeeId',
+  // Active service sessions
+  activeServices: '_id, roomId, status, advanceBookingId',
+  // Key-value settings storage (businessInfo, businessHours, taxSettings, theme, security)
+  settings: 'key',
+  // Payroll configuration
+  payrollConfig: 'key',
+  // Payroll config change logs
+  payrollConfigLogs: '++id, timestamp, userId',
+  // Daily employee service rotation
+  serviceRotation: 'date'
+});
+
 // Database event hooks for debugging
 db.on('populate', () => {
   console.log('[Dexie] Database created for the first time');
@@ -81,6 +139,7 @@ export const {
   rooms,
   purchaseOrders,
   inventoryMovements,
+  stockHistory,
   expenses,
   cashDrawerSessions,
   giftCertificates,
@@ -89,7 +148,15 @@ export const {
   payrollRequests,
   activityLogs,
   syncQueue,
-  syncMetadata
+  syncMetadata,
+  // New tables from v2
+  loyaltyHistory,
+  advanceBookings,
+  activeServices,
+  settings,
+  payrollConfig,
+  payrollConfigLogs,
+  serviceRotation
 } = db;
 
 export default db;

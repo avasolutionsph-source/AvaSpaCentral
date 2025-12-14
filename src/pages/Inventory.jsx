@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
+import { db } from '../db';
 
 const Inventory = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
@@ -66,63 +67,81 @@ const Inventory = ({ embedded = false, onDataChange }) => {
     }
   };
 
-  const loadStockHistory = () => {
-    // Load from localStorage or use demo data
-    const storedHistory = localStorage.getItem('stockHistory');
-    if (storedHistory) {
-      setStockHistory(JSON.parse(storedHistory));
-    } else {
-      // Seed with demo data
-      const mockHistory = [
-        {
-          id: 'sh_demo_1',
-          type: 'purchase',
-          productName: 'Massage Oil (500ml)',
-          quantity: 50,
-          oldStock: 20,
-          newStock: 70,
-          cost: 150,
-          totalCost: 7500,
-          reason: 'Purchase Order #PO-2025-001',
-          user: 'Admin User',
-          date: new Date().toISOString()
-        },
-        {
-          id: 'sh_demo_2',
-          type: 'adjustment',
-          productName: 'Face Mask',
-          quantity: -5,
-          oldStock: 30,
-          newStock: 25,
-          reason: 'Damaged products during inspection',
-          user: 'Manager User',
-          date: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          id: 'sh_demo_3',
-          type: 'subtraction',
-          productName: 'Aromatic Candles',
-          quantity: -10,
-          oldStock: 50,
-          newStock: 40,
-          reason: 'Sales - POS Transaction',
-          user: 'Cashier User',
-          date: new Date(Date.now() - 172800000).toISOString()
-        },
-        {
-          id: 'sh_demo_4',
-          type: 'addition',
-          productName: 'Hot Stone Set',
-          quantity: 3,
-          oldStock: 5,
-          newStock: 8,
-          reason: 'Stock replenishment from supplier',
-          user: 'Admin User',
-          date: new Date(Date.now() - 259200000).toISOString()
+  const loadStockHistory = async () => {
+    try {
+      // Load from Dexie IndexedDB
+      const history = await db.stockHistory.orderBy('date').reverse().toArray();
+
+      if (history.length > 0) {
+        setStockHistory(history);
+      } else {
+        // Migrate from localStorage if exists, otherwise seed with demo data
+        const storedHistory = localStorage.getItem('stockHistory');
+        if (storedHistory) {
+          const parsed = JSON.parse(storedHistory);
+          // Migrate to Dexie
+          await db.stockHistory.bulkAdd(parsed);
+          setStockHistory(parsed);
+          // Clear localStorage after migration
+          localStorage.removeItem('stockHistory');
+          console.log('[Inventory] Migrated stockHistory from localStorage to Dexie');
+        } else {
+          // Seed with demo data
+          const mockHistory = [
+            {
+              id: 'sh_demo_1',
+              type: 'purchase',
+              productName: 'Massage Oil (500ml)',
+              quantity: 50,
+              oldStock: 20,
+              newStock: 70,
+              cost: 150,
+              totalCost: 7500,
+              reason: 'Purchase Order #PO-2025-001',
+              user: 'Admin User',
+              date: new Date().toISOString()
+            },
+            {
+              id: 'sh_demo_2',
+              type: 'adjustment',
+              productName: 'Face Mask',
+              quantity: -5,
+              oldStock: 30,
+              newStock: 25,
+              reason: 'Damaged products during inspection',
+              user: 'Manager User',
+              date: new Date(Date.now() - 86400000).toISOString()
+            },
+            {
+              id: 'sh_demo_3',
+              type: 'subtraction',
+              productName: 'Aromatic Candles',
+              quantity: -10,
+              oldStock: 50,
+              newStock: 40,
+              reason: 'Sales - POS Transaction',
+              user: 'Cashier User',
+              date: new Date(Date.now() - 172800000).toISOString()
+            },
+            {
+              id: 'sh_demo_4',
+              type: 'addition',
+              productName: 'Hot Stone Set',
+              quantity: 3,
+              oldStock: 5,
+              newStock: 8,
+              reason: 'Stock replenishment from supplier',
+              user: 'Admin User',
+              date: new Date(Date.now() - 259200000).toISOString()
+            }
+          ];
+          await db.stockHistory.bulkAdd(mockHistory);
+          setStockHistory(mockHistory);
         }
-      ];
-      localStorage.setItem('stockHistory', JSON.stringify(mockHistory));
-      setStockHistory(mockHistory);
+      }
+    } catch (error) {
+      console.error('[Inventory] Failed to load stock history:', error);
+      setStockHistory([]);
     }
   };
 
@@ -231,7 +250,7 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       // Persist to API
       await mockApi.products.updateProduct(selectedProduct._id, { stock: newStock });
 
-      // Add to history (persisted in localStorage)
+      // Add to history (persisted in Dexie)
       const historyEntry = {
         id: 'sh_' + Date.now(),
         type: adjustmentType === 'add' ? 'addition' : 'subtraction',
@@ -245,10 +264,8 @@ const Inventory = ({ embedded = false, onDataChange }) => {
         date: new Date().toISOString()
       };
 
-      // Persist stock history to localStorage
-      const storedHistory = JSON.parse(localStorage.getItem('stockHistory') || '[]');
-      storedHistory.unshift(historyEntry);
-      localStorage.setItem('stockHistory', JSON.stringify(storedHistory));
+      // Persist stock history to Dexie
+      await db.stockHistory.add(historyEntry);
       setStockHistory([historyEntry, ...stockHistory]);
 
       // Log activity
@@ -315,7 +332,6 @@ const Inventory = ({ embedded = false, onDataChange }) => {
     }
 
     try {
-      const storedHistory = JSON.parse(localStorage.getItem('stockHistory') || '[]');
       const newHistoryEntries = [];
 
       // Update inventory and history
@@ -353,10 +369,9 @@ const Inventory = ({ embedded = false, onDataChange }) => {
         }
       }
 
-      // Persist stock history to localStorage
-      const updatedHistory = [...newHistoryEntries, ...storedHistory];
-      localStorage.setItem('stockHistory', JSON.stringify(updatedHistory));
-      setStockHistory(updatedHistory);
+      // Persist stock history to Dexie
+      await db.stockHistory.bulkAdd(newHistoryEntries);
+      setStockHistory([...newHistoryEntries, ...stockHistory]);
 
       // Log activity
       await mockApi.activityLogs.createLog({

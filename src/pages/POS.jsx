@@ -633,7 +633,7 @@ const POS = () => {
         await mockApi.transactions.createTransaction(transaction);
 
         // Log the transaction activity
-        logTransaction(user, transaction.receiptNumber, transaction.total, transaction.paymentMethod);
+        logTransaction(user, transaction.receiptNumber, transaction.totalAmount, transaction.paymentMethod);
 
         // If gift certificate was used, redeem it
         if (discountType === 'gc' && appliedGC) {

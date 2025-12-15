@@ -41,6 +41,9 @@ const ShiftSchedules = () => {
   const [showTimeOffModal, setShowTimeOffModal] = useState(false);
   const [timeOffRequests, setTimeOffRequests] = useState([]);
 
+  // Add employee modal
+  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+
   // Week navigation
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -189,6 +192,42 @@ const ShiftSchedules = () => {
     }
   };
 
+  // Get employees without schedules
+  const employeesWithoutSchedules = employees.filter(
+    emp => !schedules.some(s => s.employeeId === emp._id)
+  );
+
+  // Add employee to schedule
+  const handleAddEmployeeToSchedule = async (employee) => {
+    try {
+      // Create default weekly schedule (all day shifts)
+      const defaultWeeklySchedule = {};
+      DAYS.forEach(day => {
+        defaultWeeklySchedule[day] = {
+          shift: day === 'sunday' ? 'off' : 'day',
+          startTime: day === 'sunday' ? null : (shiftConfig?.dayShift?.startTime || '09:00'),
+          endTime: day === 'sunday' ? null : (shiftConfig?.dayShift?.endTime || '17:00')
+        };
+      });
+
+      await mockApi.shiftSchedules.createSchedule({
+        employeeId: employee._id,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        employeePosition: employee.position,
+        department: employee.department,
+        weeklySchedule: defaultWeeklySchedule,
+        isActive: true,
+        effectiveFrom: format(weekStart, 'yyyy-MM-dd')
+      });
+
+      showToast(`${employee.firstName} ${employee.lastName} added to schedule!`, 'success');
+      setShowAddEmployeeModal(false);
+      loadData();
+    } catch (error) {
+      showToast('Failed to add employee to schedule', 'error');
+    }
+  };
+
   // Calculate summary stats
   const calculateStats = () => {
     let totalShifts = 0;
@@ -236,6 +275,14 @@ const ShiftSchedules = () => {
           <p>Manage employee work schedules and shifts</p>
         </div>
         <div className="header-actions">
+          {employeesWithoutSchedules.length > 0 && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowAddEmployeeModal(true)}
+            >
+              + Add Employee
+            </button>
+          )}
           <button
             className="btn btn-secondary"
             onClick={() => setShowTimeOffModal(true)}
@@ -600,6 +647,89 @@ const ShiftSchedules = () => {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowTimeOffModal(false)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Employee to Schedule Modal */}
+      {showAddEmployeeModal && (
+        <div className="modal-overlay" onClick={() => setShowAddEmployeeModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2>Add Employee to Schedule</h2>
+              <button className="modal-close" onClick={() => setShowAddEmployeeModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {employeesWithoutSchedules.length === 0 ? (
+                <div className="empty-state">
+                  <h3>No Employees Available</h3>
+                  <p>All active employees already have schedules</p>
+                </div>
+              ) : (
+                <div className="employee-select-list">
+                  <p style={{ marginBottom: '16px', color: '#666' }}>
+                    Select an employee to add to the shift schedule:
+                  </p>
+                  {employeesWithoutSchedules.map(employee => (
+                    <div
+                      key={employee._id}
+                      className="employee-select-item"
+                      onClick={() => handleAddEmployeeToSchedule(employee)}
+                      style={{
+                        padding: '12px 16px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
+                        marginBottom: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: 'white'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f5f5f5';
+                        e.currentTarget.style.borderColor = '#1B5E37';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.borderColor = '#e0e0e0';
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          backgroundColor: '#1B5E37',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: '600',
+                          fontSize: '14px'
+                        }}
+                      >
+                        {employee.firstName?.charAt(0)}{employee.lastName?.charAt(0)}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '500' }}>
+                          {employee.firstName} {employee.lastName}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          {employee.position} • {employee.department}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowAddEmployeeModal(false)}>
+                Cancel
               </button>
             </div>
           </div>

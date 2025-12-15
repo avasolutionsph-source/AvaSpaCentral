@@ -5,6 +5,7 @@ import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
 import { getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog } from '../components/shared';
 import { logTransaction } from '../utils/activityLogger';
+import '../assets/css/pos.css';
 
 const POS = () => {
   const { showToast, user } = useApp();

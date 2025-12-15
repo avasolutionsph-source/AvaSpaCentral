@@ -4,9 +4,10 @@ import mockApi from '../mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
 import { getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog } from '../components/shared';
+import { logTransaction } from '../utils/activityLogger';
 
 const POS = () => {
-  const { showToast } = useApp();
+  const { showToast, user } = useApp();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -629,6 +630,9 @@ const POS = () => {
 
         // Save transaction
         await mockApi.transactions.createTransaction(transaction);
+
+        // Log the transaction activity
+        logTransaction(user, transaction.receiptNumber, transaction.total, transaction.paymentMethod);
 
         // If gift certificate was used, redeem it
         if (discountType === 'gc' && appliedGC) {

@@ -37,24 +37,7 @@ const ActivityLogs = () => {
     setLoading(true);
     try {
       const apiLogs = await mockApi.activityLogs.getLogs();
-
-      // If no logs in API, seed with demo data
-      if (apiLogs.length === 0) {
-        const demoLogs = [
-          { type: 'login', action: 'User Login', description: 'Maria Santos logged into the system', user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' }, severity: 'info', ipAddress: '192.168.1.100', details: { method: 'Email/Password', device: 'Chrome on Windows' } },
-          { type: 'create', action: 'Customer Created', description: 'New customer "John Smith" added to the system', user: { firstName: 'Anna', lastName: 'Cruz', role: 'Receptionist' }, severity: 'success', ipAddress: '192.168.1.101', details: { customerId: 'CUST-1234', customerName: 'John Smith' } },
-          { type: 'transaction', action: 'Sale Completed', description: 'Sale transaction of ₱2,450 completed at POS', user: { firstName: 'Maria', lastName: 'Santos', role: 'Cashier' }, severity: 'success', ipAddress: '192.168.1.100', details: { transactionId: 'TXN-9012', amount: 2450, paymentMethod: 'Cash' } },
-          { type: 'update', action: 'Product Price Updated', description: 'Updated price for "Swedish Massage"', user: { firstName: 'Admin', lastName: 'User', role: 'Administrator' }, severity: 'info', ipAddress: '192.168.1.1', details: { productId: 'PROD-101', oldPrice: 800, newPrice: 850 } },
-          { type: 'system', action: 'System Started', description: 'Application initialized successfully', user: { firstName: 'System', lastName: '', role: 'System' }, severity: 'info', ipAddress: 'localhost', details: { version: '3.0.0' } }
-        ];
-        for (const log of demoLogs) {
-          await mockApi.activityLogs.createLog(log);
-        }
-        const seededLogs = await mockApi.activityLogs.getLogs();
-        setLogs(seededLogs.map((l, i) => ({ ...l, id: l._id || i + 1 })));
-      } else {
-        setLogs(apiLogs.map((l, i) => ({ ...l, id: l._id || i + 1 })));
-      }
+      setLogs(apiLogs.map((l, i) => ({ ...l, id: l._id || i + 1 })));
     } catch (error) {
       showToast('Failed to load activity logs', 'error');
     } finally {

@@ -7,6 +7,7 @@ import MySchedule from './MySchedule';
 import PayrollRequests from './PayrollRequests';
 import MyAttendanceHistory from './MyAttendanceHistory';
 import CameraCapture from '../components/CameraCapture';
+import { logClockIn, logClockOut } from '../utils/activityLogger';
 import '../assets/css/hub-pages.css';
 
 const MyPortal = () => {
@@ -108,12 +109,15 @@ const MyPortal = () => {
     if (!clockAction || !user?.employeeId) return;
 
     try {
+      const employeeName = `${user.firstName} ${user.lastName}`;
       if (clockAction === 'in') {
         await mockApi.attendance.clockIn(user.employeeId, captureData);
         showToast('Clocked in successfully!', 'success');
+        logClockIn(user, employeeName);
       } else {
         await mockApi.attendance.clockOut(user.employeeId, captureData);
         showToast('Clocked out successfully!', 'success');
+        logClockOut(user, employeeName);
       }
 
       setShowCamera(false);

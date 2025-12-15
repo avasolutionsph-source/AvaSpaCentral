@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import mockApi from '../mockApi';
+import { logLogin, logLogout } from '../utils/activityLogger';
 
 const AppContext = createContext();
 
@@ -113,6 +114,8 @@ export const AppProvider = ({ children }) => {
       const response = await mockApi.auth.login(email, password);
       setUser(response.user);
       showToast('Login successful!', 'success');
+      // Log the login activity
+      logLogin(response.user);
       return response;
     } catch (error) {
       showToast(error.message, 'error');
@@ -121,6 +124,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const logout = () => {
+    // Log the logout activity before clearing user
+    if (user) {
+      logLogout(user);
+    }
     mockApi.auth.logout();
     setUser(null);
     showToast('Logged out successfully', 'info');

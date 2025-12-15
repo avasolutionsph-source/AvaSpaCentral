@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO, differenceInMinutes, isAfter, startOfDay } from 'date-fns';
 import CameraCapture from '../components/CameraCapture';
+import { logClockIn, logClockOut } from '../utils/activityLogger';
 
 const Attendance = () => {
   const navigate = useNavigate();
@@ -99,12 +100,18 @@ const Attendance = () => {
     const { type, employeeId } = pendingClockAction;
 
     try {
+      // Find employee name for logging
+      const employee = employees.find(e => e._id === employeeId);
+      const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown';
+
       if (type === 'in') {
         await mockApi.attendance.clockIn(employeeId, captureData);
         showToast('Clocked in successfully with photo!', 'success');
+        logClockIn(user, employeeName);
       } else {
         await mockApi.attendance.clockOut(employeeId, captureData);
         showToast('Clocked out successfully with photo!', 'success');
+        logClockOut(user, employeeName);
       }
 
       // Reset states

@@ -401,10 +401,10 @@ const Employees = ({ embedded = false, onDataChange }) => {
                 <div className="employee-actions">
                   <button className="btn btn-sm btn-secondary" onClick={() => openEdit(employee)}>Edit</button>
                   <button
-                    className={`btn btn-sm ${employee.active ? 'btn-warning' : 'btn-success'}`}
+                    className={`btn btn-sm ${employee.status === 'active' ? 'btn-warning' : 'btn-success'}`}
                     onClick={() => toggleStatus(employee)}
                   >
-                    {employee.active ? 'Deactivate' : 'Activate'}
+                    {employee.status === 'active' ? 'Deactivate' : 'Activate'}
                   </button>
                   <button className="btn btn-sm btn-error" onClick={() => handleDelete(employee)}>Delete</button>
                 </div>
@@ -429,7 +429,7 @@ const Employees = ({ embedded = false, onDataChange }) => {
             </thead>
             <tbody>
               {filteredEmployees.map(employee => (
-                <tr key={employee._id} className={!employee.active ? 'inactive-row' : ''}>
+                <tr key={employee._id} className={employee.status !== 'active' ? 'inactive-row' : ''}>
                   <td className="employee-name-cell">
                     <div className="table-avatar">
                       {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
@@ -442,18 +442,18 @@ const Employees = ({ embedded = false, onDataChange }) => {
                   <td className="small-text">{employee.email}</td>
                   <td>{employee.phone}</td>
                   <td>
-                    <span className={`status-badge ${employee.active ? 'status-active' : 'status-inactive'}`}>
-                      {employee.active ? 'Active' : 'Inactive'}
+                    <span className={`status-badge ${employee.status === 'active' ? 'status-active' : 'status-inactive'}`}>
+                      {employee.status === 'active' ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   {canEdit() && (
                     <td className="actions-cell">
                       <button className="btn btn-xs btn-secondary" onClick={() => openEdit(employee)}>Edit</button>
                       <button
-                        className={`btn btn-xs ${employee.active ? 'btn-warning' : 'btn-success'}`}
+                        className={`btn btn-xs ${employee.status === 'active' ? 'btn-warning' : 'btn-success'}`}
                         onClick={() => toggleStatus(employee)}
                       >
-                        {employee.active ? 'Deactivate' : 'Activate'}
+                        {employee.status === 'active' ? 'Deactivate' : 'Activate'}
                       </button>
                       <button className="btn btn-xs btn-error" onClick={() => handleDelete(employee)}>Delete</button>
                     </td>

@@ -62,20 +62,20 @@ const FilterBar = memo(function FilterBar({
 
   return (
     <div className={`filters-section ${className}`.trim()}>
-      {showSearch && (
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder={searchPlaceholder}
-            value={searchValue}
-            onChange={handleSearchChange}
-            className="search-input"
-            aria-label="Search"
-          />
-        </div>
-      )}
-
       <div className="filters-row">
+        {showSearch && (
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder={searchPlaceholder}
+              value={searchValue}
+              onChange={handleSearchChange}
+              className="search-input"
+              aria-label="Search"
+            />
+          </div>
+        )}
+
         {filters.map((filter) => (
           <select
             key={filter.key}
@@ -100,7 +100,7 @@ const FilterBar = memo(function FilterBar({
             className="btn btn-sm btn-secondary clear-filters-btn"
             onClick={onClearFilters}
           >
-            Clear Filters
+            Clear
           </button>
         )}
 

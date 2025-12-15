@@ -1,6 +1,6 @@
 # Ava Solutions Demo SPA ERP
 
-**Version:** 3.1.0
+**Version:** 3.2.0
 **Brand:** Ava Solutions AI Business Assistant
 **Demo Type:** Frontend-only Single Page Application (SPA)
 
@@ -175,7 +175,15 @@ The app uses an offline-first design with Dexie.js (IndexedDB wrapper) for persi
 - Staff profiles with commission rates
 - Skills tracking
 - Service rotation queue
-- Clock in/out attendance
+- Clock in/out attendance with timezone fix
+- My Attendance History in employee portal
+
+### Activity Logging
+- Real-time activity tracking across all modules
+- Login/logout logging
+- Transaction and POS activity logging
+- Attendance clock in/out logging
+- Portal activity logging
 
 ### Payroll System
 - Philippine labor law compliant rates
@@ -243,4 +251,4 @@ window.resetDatabase?.() // If exposed
 
 ---
 
-**Built by Ava Solutions** | **SPA Demo ERP v3.1.0** | Offline-First Edition
+**Built by Ava Solutions** | **SPA Demo ERP v3.2.0** | Offline-First Edition

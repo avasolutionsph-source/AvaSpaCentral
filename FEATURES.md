@@ -156,6 +156,15 @@ Go to **Settings** > **Payroll Rates**:
 3. System records time and calculates if late
 4. At end of shift, click "Clock Out"
 5. Hours worked calculated automatically
+6. Timezone-aware date handling (local time)
+
+### My Attendance History
+
+Employees can view their own attendance history in **My Portal**:
+- View all past clock in/out records
+- See hours worked per day
+- Track late arrivals
+- Filter by date range
 
 ### Late Tracking
 
@@ -227,12 +236,14 @@ commission: { type: 'fixed', value: 50 }       // PHP 50 per service
 
 ### Tracked Actions
 
-- Login/logout
-- Transaction creation
-- Inventory updates
-- Employee clock in/out
+- Login/logout with user details
+- Transaction creation and POS activity
+- Inventory updates and stock changes
+- Employee clock in/out with timestamps
 - Settings changes
 - Gift certificate actions
+- Portal activity (My Portal access)
+- Real-time activity logging across all modules
 
 ### Log Entry Format
 

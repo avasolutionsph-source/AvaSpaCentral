@@ -2467,25 +2467,26 @@ select {
   gap: var(--spacing-lg);
 }
 
-/* Filters Section */
+/* Filters Section - Compact Inline Design */
 .filters-section {
   background: var(--white);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--gray-200);
 }
 
-.search-box {
-  margin-bottom: var(--spacing-md);
+.filters-section .search-box {
+  margin-bottom: 0;
+  flex: 0 0 220px;
 }
 
 .search-input {
   width: 100%;
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-md);
-  font-size: 1rem;
+  font-size: 0.875rem;
   transition: all var(--transition-fast);
 }
 
@@ -2497,19 +2498,19 @@ select {
 
 .filters-row {
   display: flex;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   align-items: center;
   flex-wrap: wrap;
 }
 
 .filter-select {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-md);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   background: var(--white);
   cursor: pointer;
-  min-width: 140px;
+  min-width: 120px;
 }
 
 .filter-select:focus {
@@ -2519,9 +2520,10 @@ select {
 
 .results-count {
   margin-left: auto;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   color: var(--gray-600);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Products Grid */

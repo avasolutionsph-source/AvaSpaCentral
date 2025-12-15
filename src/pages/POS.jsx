@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
@@ -193,6 +193,18 @@ const POS = () => {
 
     loadScheduledEmployees();
   }, [isAdvanceBooking, advanceBookingData?.bookingDateTime]);
+
+  // Get employees currently doing services (assigned to occupied rooms)
+  const busyEmployeeIds = useMemo(() => {
+    return rooms
+      .filter(room => room.status === 'occupied' && room.assignedEmployeeId)
+      .map(room => room.assignedEmployeeId);
+  }, [rooms]);
+
+  // Filter rotation queue to exclude busy employees
+  const availableRotationQueue = useMemo(() => {
+    return rotationQueue.filter(emp => !busyEmployeeIds.includes(emp.employeeId));
+  }, [rotationQueue, busyEmployeeIds]);
 
   // Select employee from rotation queue
   const selectFromRotation = (employeeId) => {
@@ -666,10 +678,16 @@ const POS = () => {
               return total + ((item.type === 'service' && item.duration) ? item.duration * item.quantity : 0);
             }, 0) || 60; // Default 60 min if no duration
 
+            // Get employee name for display on room card
+            const selectedEmp = employees.find(e => e._id === selectedEmployee);
+            const employeeName = selectedEmp ? `${selectedEmp.firstName} ${selectedEmp.lastName}` : null;
+
             await mockApi.rooms.updateRoomStatus(selectedRoom, 'occupied', {
               startTime: new Date().toISOString(),
               serviceDuration: totalDuration,
-              transactionId: receiptNumber
+              transactionId: receiptNumber,
+              employeeId: selectedEmployee,
+              employeeName: employeeName
             });
           } catch (error) {
             console.error('Failed to update room status:', error);
@@ -944,10 +962,10 @@ const POS = () => {
                   <div className="rotation-queue-panel">
                     <div className="rotation-queue-header">
                       <span className="rotation-queue-title">🔄 Service Rotation Queue</span>
-                      <span className="rotation-queue-count">{rotationQueue.length} clocked in</span>
+                      <span className="rotation-queue-count">{availableRotationQueue.length} available</span>
                     </div>
                     <div className="rotation-queue-list">
-                      {rotationQueue.map((emp, index) => (
+                      {availableRotationQueue.map((emp, index) => (
                         <div
                           key={emp.employeeId}
                           className={`rotation-queue-item ${emp.isNext ? 'next-in-line' : ''} ${selectedEmployee === emp.employeeId ? 'selected' : ''}`}
@@ -979,7 +997,7 @@ const POS = () => {
                         </div>
                       ))}
                     </div>
-                    {nextEmployee && (
+                    {nextEmployee && !busyEmployeeIds.includes(nextEmployee.employeeId) && (
                       <div className="rotation-next-indicator">
                         <strong>Next to serve:</strong> {nextEmployee.employeeName}
                       </div>
@@ -1053,18 +1071,24 @@ const POS = () => {
                       );
                     }
 
-                    // For regular POS: check if therapist is clocked in
+                    // For regular POS: check if therapist is clocked in and not busy
                     const inQueue = rotationQueue.find(q => q.employeeId === emp._id);
                     const isClockedIn = !!inQueue;
+                    const isBusy = busyEmployeeIds.includes(emp._id);
+                    const canSelect = isClockedIn && !isBusy;
                     return (
                       <option
                         key={emp._id}
                         value={emp._id}
-                        disabled={!isClockedIn}
-                        style={!isClockedIn ? { color: '#999999' } : {}}
+                        disabled={!canSelect}
+                        style={!canSelect ? { color: '#999999' } : {}}
                       >
                         {emp.firstName} {emp.lastName} - {emp.position}
-                        {isClockedIn ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)` : ' (Not clocked in)'}
+                        {isBusy
+                          ? ' (🔴 Doing service)'
+                          : isClockedIn
+                            ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)`
+                            : ' (Not clocked in)'}
                       </option>
                     );
                   })}

@@ -358,16 +358,20 @@ export const roomsAdapter = {
     await delay();
     const updateData = { status };
 
-    // Store timing data when room becomes occupied
+    // Store timing and employee data when room becomes occupied
     if (status === 'occupied' && timingData.startTime) {
       updateData.startTime = timingData.startTime;
       updateData.serviceDuration = timingData.serviceDuration;
       updateData.transactionId = timingData.transactionId;
+      updateData.assignedEmployeeId = timingData.employeeId || null;
+      updateData.assignedEmployeeName = timingData.employeeName || null;
     } else if (status === 'available') {
-      // Clear timing data when room becomes available
+      // Clear timing and employee data when room becomes available
       updateData.startTime = null;
       updateData.serviceDuration = null;
       updateData.transactionId = null;
+      updateData.assignedEmployeeId = null;
+      updateData.assignedEmployeeName = null;
     }
 
     const room = await storageService.rooms.update(id, updateData);

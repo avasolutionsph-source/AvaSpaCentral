@@ -100,6 +100,28 @@
   margin-bottom: var(--spacing-md);
 }
 
+/* Assigned Employee - Shows who is doing the service */
+.room-assigned-employee {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  margin-bottom: var(--spacing-md);
+}
+
+.room-assigned-employee .employee-icon {
+  font-size: 1rem;
+}
+
+.room-assigned-employee .employee-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--error);
+}
+
 /* Room Details - Cleaner */
 .room-details {
   margin: var(--spacing-md) 0;

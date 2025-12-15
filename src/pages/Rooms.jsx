@@ -275,6 +275,13 @@ const Rooms = ({ embedded = false, onDataChange }) => {
               </div>
               <h3 className="room-name">{room.name}</h3>
               <p className="room-type">{room.type}</p>
+              {/* Show assigned employee when room is occupied */}
+              {room.status === 'occupied' && room.assignedEmployeeName && (
+                <div className="room-assigned-employee">
+                  <span className="employee-icon">👤</span>
+                  <span className="employee-name">{room.assignedEmployeeName}</span>
+                </div>
+              )}
               <div className="room-details">
                 <div className="room-detail-row">
                   <span className="room-detail-label">Capacity</span>

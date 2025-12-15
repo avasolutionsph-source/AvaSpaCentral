@@ -92,11 +92,22 @@ export const getRelativeTime = (date) => {
 };
 
 /**
- * Get today's date in YYYY-MM-DD format
+ * Get today's date in YYYY-MM-DD format (local timezone)
  * @returns {string} Today's date
  */
 export const getToday = () => {
-  return new Date().toISOString().split('T')[0];
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+/**
+ * Format a date to YYYY-MM-DD in local timezone
+ * @param {Date|string} date - The date to format
+ * @returns {string} Formatted date string
+ */
+export const toLocalDateString = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 /**

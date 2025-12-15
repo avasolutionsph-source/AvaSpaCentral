@@ -3,6 +3,12 @@
  */
 import BaseRepository from '../BaseRepository';
 
+// Helper to get local date string (YYYY-MM-DD)
+const toLocalDate = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 class TransactionRepository extends BaseRepository {
   constructor() {
     super('transactions');
@@ -12,9 +18,9 @@ class TransactionRepository extends BaseRepository {
    * Get transactions by date
    */
   async getByDate(date) {
-    const targetDate = new Date(date).toISOString().split('T')[0];
+    const targetDate = toLocalDate(date);
     return this.find(t => {
-      const transactionDate = new Date(t.date).toISOString().split('T')[0];
+      const transactionDate = typeof t.date === 'string' ? t.date : toLocalDate(t.date);
       return transactionDate === targetDate;
     });
   }
@@ -23,9 +29,11 @@ class TransactionRepository extends BaseRepository {
    * Get transactions by date range
    */
   async getByDateRange(startDate, endDate) {
+    const start = toLocalDate(startDate);
+    const end = toLocalDate(endDate);
     return this.find(t => {
-      const transactionDate = new Date(t.date);
-      return transactionDate >= new Date(startDate) && transactionDate <= new Date(endDate);
+      const transactionDate = typeof t.date === 'string' ? t.date : toLocalDate(t.date);
+      return transactionDate >= start && transactionDate <= end;
     });
   }
 
@@ -54,7 +62,7 @@ class TransactionRepository extends BaseRepository {
    * Get today's transactions
    */
   async getToday() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDate(new Date());
     return this.getByDate(today);
   }
 

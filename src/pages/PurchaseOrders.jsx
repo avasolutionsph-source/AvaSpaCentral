@@ -103,10 +103,10 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
       filtered = filtered.filter(o => new Date(o.orderDate) <= new Date(dateRange.end));
     }
 
-    // Sort by date descending
-    filtered.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
+    // Sort by date descending (create new array to avoid mutation)
+    const sorted = [...filtered].sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
 
-    setFilteredOrders(filtered);
+    setFilteredOrders(sorted);
   };
 
   const openCreateModal = () => {

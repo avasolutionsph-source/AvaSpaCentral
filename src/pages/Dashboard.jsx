@@ -60,8 +60,9 @@ const Dashboard = () => {
         if (!isMounted) return;
         setDailyGoal(business.settings.dailyGoal);
 
-        // Get today's date
-        const today = new Date().toISOString().split('T')[0];
+        // Get today's date (local timezone)
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
         // Fetch all data
         const [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount, salaryHealthData] =
@@ -142,8 +143,9 @@ const Dashboard = () => {
       const business = await mockApi.business.getSettings();
       setDailyGoal(business.settings.dailyGoal);
 
-      // Get today's date
-      const today = new Date().toISOString().split('T')[0];
+      // Get today's date (local timezone)
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       // Fetch all data
       const [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount] =
@@ -654,7 +656,8 @@ const Dashboard = () => {
 
   const exportDailySales = useCallback(async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const transactions = await mockApi.transactions.getTransactions({
         startDate: today,
         endDate: today

@@ -3,6 +3,12 @@
  */
 import BaseRepository from '../BaseRepository';
 
+// Helper to get local date string (YYYY-MM-DD)
+const toLocalDate = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 class AttendanceRepository extends BaseRepository {
   constructor() {
     super('attendance');
@@ -19,9 +25,10 @@ class AttendanceRepository extends BaseRepository {
    * Get by date
    */
   async getByDate(date) {
-    const targetDate = new Date(date).toISOString().split('T')[0];
+    const targetDate = toLocalDate(date);
     return this.find(a => {
-      const attendanceDate = new Date(a.date).toISOString().split('T')[0];
+      // Handle both string dates and Date objects
+      const attendanceDate = typeof a.date === 'string' ? a.date : toLocalDate(a.date);
       return attendanceDate === targetDate;
     });
   }
@@ -30,20 +37,22 @@ class AttendanceRepository extends BaseRepository {
    * Get employee attendance for a date
    */
   async getEmployeeAttendance(employeeId, date) {
-    const targetDate = new Date(date).toISOString().split('T')[0];
-    return this.findOne(a =>
-      a.employeeId === employeeId &&
-      new Date(a.date).toISOString().split('T')[0] === targetDate
-    );
+    const targetDate = toLocalDate(date);
+    return this.findOne(a => {
+      const attendanceDate = typeof a.date === 'string' ? a.date : toLocalDate(a.date);
+      return a.employeeId === employeeId && attendanceDate === targetDate;
+    });
   }
 
   /**
    * Get attendance by date range
    */
   async getByDateRange(startDate, endDate, employeeId = null) {
+    const start = toLocalDate(startDate);
+    const end = toLocalDate(endDate);
     return this.find(a => {
-      const attendanceDate = new Date(a.date);
-      const inRange = attendanceDate >= new Date(startDate) && attendanceDate <= new Date(endDate);
+      const attendanceDate = typeof a.date === 'string' ? a.date : toLocalDate(a.date);
+      const inRange = attendanceDate >= start && attendanceDate <= end;
       if (!inRange) return false;
       if (employeeId) return a.employeeId === employeeId;
       return true;
@@ -54,7 +63,7 @@ class AttendanceRepository extends BaseRepository {
    * Clock in
    */
   async clockIn(employeeId) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDate(new Date());
     const existing = await this.getEmployeeAttendance(employeeId, today);
 
     if (existing) {
@@ -64,7 +73,7 @@ class AttendanceRepository extends BaseRepository {
     return this.create({
       employeeId,
       date: today,
-      clockIn: new Date().toISOString(),
+      clockIn: new Date().toTimeString().slice(0, 5), // HH:mm format
       status: 'present'
     });
   }
@@ -73,7 +82,7 @@ class AttendanceRepository extends BaseRepository {
    * Clock out
    */
   async clockOut(employeeId) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDate(new Date());
     const attendance = await this.getEmployeeAttendance(employeeId, today);
 
     if (!attendance) {
@@ -84,13 +93,10 @@ class AttendanceRepository extends BaseRepository {
       throw new Error('Already clocked out today');
     }
 
-    const clockOut = new Date();
-    const clockIn = new Date(attendance.clockIn);
-    const hoursWorked = (clockOut - clockIn) / (1000 * 60 * 60);
+    const nowTime = new Date().toTimeString().slice(0, 5); // HH:mm format
 
     return this.update(attendance._id, {
-      clockOut: clockOut.toISOString(),
-      hoursWorked: Math.round(hoursWorked * 100) / 100
+      clockOut: nowTime
     });
   }
 

@@ -231,8 +231,7 @@ const POS = () => {
 
     if (existingIndex >= 0) {
       // Increase quantity
-      const newCart = [...cart];
-      const newQuantity = newCart[existingIndex].quantity + 1;
+      const newQuantity = cart[existingIndex].quantity + 1;
 
       // Check stock for products
       if (product.type === 'product' && newQuantity > product.stock) {
@@ -240,8 +239,12 @@ const POS = () => {
         return;
       }
 
-      newCart[existingIndex].quantity = newQuantity;
-      newCart[existingIndex].subtotal = product.price * newQuantity;
+      // Update cart with immutable pattern
+      const newCart = cart.map((item, index) =>
+        index === existingIndex
+          ? { ...item, quantity: newQuantity, subtotal: product.price * newQuantity }
+          : item
+      );
       setCart(newCart);
       showToast(`${product.name} quantity increased`, 'info');
     } else {
@@ -280,9 +283,12 @@ const POS = () => {
       return;
     }
 
-    const newCart = [...cart];
-    newCart[index].quantity = newQuantity;
-    newCart[index].subtotal = item.price * newQuantity;
+    // Update cart with immutable pattern
+    const newCart = cart.map((cartItem, i) =>
+      i === index
+        ? { ...cartItem, quantity: newQuantity, subtotal: item.price * newQuantity }
+        : cartItem
+    );
     setCart(newCart);
   };
 
@@ -489,8 +495,9 @@ const POS = () => {
           return;
         }
 
-        // Generate transaction ID
-        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        // Generate transaction ID (local date)
+        const now = new Date();
+        const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
         const sequence = Math.floor(Math.random() * 9999) + 1;
         const transactionId = `txn_adv_${today}_${sequence.toString().padStart(4, '0')}`;
 
@@ -555,10 +562,11 @@ const POS = () => {
 
       } else {
         // Regular checkout (immediate transaction)
-        // Generate receipt number
-        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        // Generate receipt number (local date)
+        const nowDate = new Date();
+        const todayStr = `${nowDate.getFullYear()}${String(nowDate.getMonth() + 1).padStart(2, '0')}${String(nowDate.getDate()).padStart(2, '0')}`;
         const sequence = Math.floor(Math.random() * 9999) + 1;
-        const receiptNumber = `RCP-${today}-${sequence.toString().padStart(4, '0')}`;
+        const receiptNumber = `RCP-${todayStr}-${sequence.toString().padStart(4, '0')}`;
 
         // Calculate commission (handle missing commission data)
         const commissionAmount = cart.reduce((sum, item) => {

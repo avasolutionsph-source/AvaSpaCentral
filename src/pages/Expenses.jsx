@@ -239,10 +239,8 @@ const Expenses = ({ embedded = false, onDataChange }) => {
       );
     }
 
-    // Sort by date descending
-    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    return filtered;
+    // Sort by date descending (create new array to avoid mutation)
+    return [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm]);
 
   // Calculate stats

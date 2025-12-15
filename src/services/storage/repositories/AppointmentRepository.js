@@ -3,6 +3,12 @@
  */
 import BaseRepository from '../BaseRepository';
 
+// Helper to get local date string (YYYY-MM-DD)
+const toLocalDate = (date) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 class AppointmentRepository extends BaseRepository {
   constructor() {
     super('appointments');
@@ -12,9 +18,9 @@ class AppointmentRepository extends BaseRepository {
    * Get appointments by date
    */
   async getByDate(date) {
-    const targetDate = new Date(date).toISOString().split('T')[0];
+    const targetDate = toLocalDate(date);
     return this.find(a => {
-      const appointmentDate = new Date(a.scheduledDateTime).toISOString().split('T')[0];
+      const appointmentDate = toLocalDate(a.scheduledDateTime);
       return appointmentDate === targetDate;
     });
   }
@@ -23,9 +29,11 @@ class AppointmentRepository extends BaseRepository {
    * Get appointments by date range
    */
   async getByDateRange(startDate, endDate) {
+    const start = toLocalDate(startDate);
+    const end = toLocalDate(endDate);
     return this.find(a => {
-      const appointmentDate = new Date(a.scheduledDateTime);
-      return appointmentDate >= new Date(startDate) && appointmentDate <= new Date(endDate);
+      const appointmentDate = toLocalDate(a.scheduledDateTime);
+      return appointmentDate >= start && appointmentDate <= end;
     });
   }
 
@@ -68,7 +76,7 @@ class AppointmentRepository extends BaseRepository {
    * Get today's appointments
    */
   async getToday() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDate(new Date());
     return this.getByDate(today);
   }
 

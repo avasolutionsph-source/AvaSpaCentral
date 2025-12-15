@@ -29,7 +29,12 @@ const Inventory = ({ embedded = false, onDataChange }) => {
 
   // Purchase Order Form
   const [poSupplier, setPoSupplier] = useState('');
-  const [poDate, setPoDate] = useState(new Date().toISOString().split('T')[0]);
+  // Use local date for PO date
+  const getLocalDateString = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+  const [poDate, setPoDate] = useState(getLocalDateString());
   const [poItems, setPoItems] = useState([{ productId: '', quantity: '', cost: '' }]);
 
   // Stock Movement History
@@ -235,7 +240,7 @@ const Inventory = ({ embedded = false, onDataChange }) => {
   // Purchase Order Handlers
   const openPurchaseOrderModal = () => {
     setPoSupplier('');
-    setPoDate(new Date().toISOString().split('T')[0]);
+    setPoDate(getLocalDateString());
     setPoItems([{ productId: '', quantity: '', cost: '' }]);
     setShowPurchaseOrderModal(true);
   };

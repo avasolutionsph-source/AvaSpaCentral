@@ -63,6 +63,9 @@ const POS = () => {
   const [nextEmployee, setNextEmployee] = useState(null);
   const [showRotationQueue, setShowRotationQueue] = useState(true);
 
+  // Room selection state
+  const [selectedRoom, setSelectedRoom] = useState(null);
+
   // Clear cart confirmation state
   const [clearCartConfirm, setClearCartConfirm] = useState(false);
 
@@ -626,7 +629,9 @@ const POS = () => {
                 }
               : { name: 'Walk-in' },
           bookingSource: bookingSource,
-          status: 'completed'
+          status: 'completed',
+          roomId: selectedRoom || null,
+          roomName: selectedRoom ? rooms.find(r => r._id === selectedRoom)?.name : null
         };
 
         // Save transaction
@@ -673,6 +678,7 @@ const POS = () => {
   const resetCheckoutForm = () => {
     setSelectedEmployee(null);
     setSelectedCustomer(null);
+    setSelectedRoom(null);
     setCustomerType('walk-in');
     setIsAdvanceBooking(false);
     setAdvanceBookingData(null);
@@ -1048,6 +1054,30 @@ const POS = () => {
                   <p className="employee-commission">
                     Commission: {employees.find(e => e._id === selectedEmployee)?.commission.value}
                     {employees.find(e => e._id === selectedEmployee)?.commission.type === 'percentage' ? '%' : ' PHP'}
+                  </p>
+                )}
+              </div>
+
+              {/* Room Selection */}
+              <div className="checkout-section">
+                <h4>🚪 Select Room</h4>
+                <select
+                  className="form-control"
+                  value={selectedRoom || ''}
+                  onChange={(e) => setSelectedRoom(e.target.value || null)}
+                >
+                  <option value="">No specific room</option>
+                  {rooms
+                    .filter(room => room.status === 'available')
+                    .map(room => (
+                      <option key={room._id} value={room._id}>
+                        {room.name} - {room.type}
+                      </option>
+                    ))}
+                </select>
+                {selectedRoom && (
+                  <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--gray-600)' }}>
+                    📍 {rooms.find(r => r._id === selectedRoom)?.name}
                   </p>
                 )}
               </div>

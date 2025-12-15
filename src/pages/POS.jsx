@@ -83,13 +83,16 @@ const POS = () => {
 
         if (!isMounted) return;
 
-        setProducts(productsData);
+        // Filter out products marked as hidden from POS
+        const visibleProducts = productsData.filter(p => !p.hideFromPOS);
+
+        setProducts(visibleProducts);
         setEmployees(employeesData);
         setCustomers(customersData);
         setRooms(roomsData);
 
-        // Extract unique categories
-        const uniqueCategories = [...new Set(productsData.map(p => p.category))];
+        // Extract unique categories from visible products only
+        const uniqueCategories = [...new Set(visibleProducts.map(p => p.category))];
         setCategories(uniqueCategories);
 
         setLoading(false);

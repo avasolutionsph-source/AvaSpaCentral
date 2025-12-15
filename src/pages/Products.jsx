@@ -35,7 +35,8 @@ const Products = ({ embedded = false, onDataChange }) => {
     stock: '',
     lowStockAlert: '',
     description: '',
-    itemsUsed: []
+    itemsUsed: [],
+    hideFromPOS: false
   };
 
   // Custom validation for products (more complex than schema-based)
@@ -109,7 +110,8 @@ const Products = ({ embedded = false, onDataChange }) => {
       stock: product.stock?.toString() || '',
       lowStockAlert: product.lowStockAlert?.toString() || '',
       description: product.description || '',
-      itemsUsed: product.itemsUsed || []
+      itemsUsed: product.itemsUsed || [],
+      hideFromPOS: product.hideFromPOS || false
     }),
     transformForSubmit: (data) => ({
       name: data.name.trim(),
@@ -121,7 +123,8 @@ const Products = ({ embedded = false, onDataChange }) => {
       stock: data.type === 'product' ? parseInt(data.stock) : undefined,
       lowStockAlert: data.type === 'product' && data.lowStockAlert ? parseInt(data.lowStockAlert) : undefined,
       description: data.description.trim(),
-      itemsUsed: data.type === 'service' ? data.itemsUsed : []
+      itemsUsed: data.type === 'service' ? data.itemsUsed : [],
+      hideFromPOS: data.hideFromPOS || false
     }),
     validateForm: validateProduct,
     onSuccess: () => {
@@ -560,6 +563,19 @@ const Products = ({ embedded = false, onDataChange }) => {
             className="form-control"
             rows="3"
           ></textarea>
+        </div>
+
+        <div className="form-group">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              name="hideFromPOS"
+              checked={formData.hideFromPOS}
+              onChange={handleInputChange}
+            />
+            <span>Do not show in POS</span>
+          </label>
+          <p className="form-hint">When checked, this item won't appear in the Point of Sale screen</p>
         </div>
       </CrudModal>
 

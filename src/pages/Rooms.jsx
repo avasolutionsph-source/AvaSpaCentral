@@ -22,6 +22,9 @@ const Rooms = ({ embedded = false, onDataChange }) => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [upcomingBookings, setUpcomingBookings] = useState([]);
 
+  // Timer state for countdown on occupied rooms
+  const [currentTime, setCurrentTime] = useState(new Date());
+
   // Room types and amenities options
   const roomTypes = ['Treatment Room', 'VIP Suite', 'Couples Room', 'Massage Room', 'Facial Room'];
   const availableAmenities = ['Air Conditioning', 'Hot Stone', 'Jacuzzi', 'Music System', 'Aromatherapy', 'Private Shower', 'Locker', 'Massage Table'];
@@ -112,6 +115,31 @@ const Rooms = ({ embedded = false, onDataChange }) => {
   useEffect(() => {
     loadUpcomingBookings();
   }, [user]);
+
+  // Update time every second for countdown timers
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Helper function to calculate remaining time for occupied rooms
+  const getRemainingTime = (room) => {
+    if (room.status !== 'occupied' || !room.startTime || !room.serviceDuration) {
+      return null;
+    }
+
+    const startTime = new Date(room.startTime);
+    const endTime = new Date(startTime.getTime() + room.serviceDuration * 60000);
+    const remaining = Math.max(0, endTime - currentTime);
+
+    return {
+      minutes: Math.floor(remaining / 60000),
+      seconds: Math.floor((remaining % 60000) / 1000),
+      totalSeconds: Math.floor(remaining / 1000),
+      isExpired: remaining <= 0,
+      isCritical: remaining <= 5 * 60000 && remaining > 0 // 5 minutes or less
+    };
+  };
 
   // Filter rooms based on status and role
   const filteredRooms = useMemo(() => {
@@ -260,6 +288,18 @@ const Rooms = ({ embedded = false, onDataChange }) => {
                   ))}
                   {room.amenities.length > 3 && (
                     <span className="amenity-tag">+{room.amenities.length - 3}</span>
+                  )}
+                </div>
+              )}
+              {/* Countdown timer for occupied rooms */}
+              {room.status === 'occupied' && getRemainingTime(room) && (
+                <div className={`room-timer ${getRemainingTime(room).isCritical ? 'critical' : ''}`}>
+                  {getRemainingTime(room).isExpired ? (
+                    <span>Time's up!</span>
+                  ) : (
+                    <span>
+                      {getRemainingTime(room).minutes}:{String(getRemainingTime(room).seconds).padStart(2, '0')} remaining
+                    </span>
                   )}
                 </div>
               )}

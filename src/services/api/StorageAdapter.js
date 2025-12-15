@@ -354,9 +354,23 @@ export const roomsAdapter = {
     return { success: true };
   },
 
-  async updateRoomStatus(id, status) {
+  async updateRoomStatus(id, status, timingData = {}) {
     await delay();
-    const room = await storageService.rooms.update(id, { status });
+    const updateData = { status };
+
+    // Store timing data when room becomes occupied
+    if (status === 'occupied' && timingData.startTime) {
+      updateData.startTime = timingData.startTime;
+      updateData.serviceDuration = timingData.serviceDuration;
+      updateData.transactionId = timingData.transactionId;
+    } else if (status === 'available') {
+      // Clear timing data when room becomes available
+      updateData.startTime = null;
+      updateData.serviceDuration = null;
+      updateData.transactionId = null;
+    }
+
+    const room = await storageService.rooms.update(id, updateData);
     if (!room) throw new Error('Room not found');
     return { success: true, room: clone(room) };
   }

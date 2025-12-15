@@ -661,7 +661,16 @@ const POS = () => {
         // Mark room as occupied if one was selected
         if (selectedRoom) {
           try {
-            await mockApi.rooms.updateRoomStatus(selectedRoom, 'occupied');
+            // Calculate total service duration from cart (services only)
+            const totalDuration = cart.reduce((total, item) => {
+              return total + ((item.type === 'service' && item.duration) ? item.duration * item.quantity : 0);
+            }, 0) || 60; // Default 60 min if no duration
+
+            await mockApi.rooms.updateRoomStatus(selectedRoom, 'occupied', {
+              startTime: new Date().toISOString(),
+              serviceDuration: totalDuration,
+              transactionId: receiptNumber
+            });
           } catch (error) {
             console.error('Failed to update room status:', error);
             // Continue anyway - transaction already saved

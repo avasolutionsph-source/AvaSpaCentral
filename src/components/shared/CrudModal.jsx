@@ -42,6 +42,7 @@ const CrudModal = memo(function CrudModal({
 }) {
   const modalRef = useRef(null);
   const previousActiveElement = useRef(null);
+  const hasAutoFocused = useRef(false);
 
   // Get title based on mode
   const getTitle = () => {
@@ -97,20 +98,28 @@ const CrudModal = memo(function CrudModal({
     }
   }, [onClose, isSubmitting]);
 
-  // Focus management
+  // Focus management - only auto-focus once when modal opens
   useEffect(() => {
     if (isOpen) {
       previousActiveElement.current = document.activeElement;
       document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
 
-      // Focus first input or close button
-      setTimeout(() => {
-        const firstInput = modalRef.current?.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled])');
-        if (firstInput) {
-          firstInput.focus();
-        }
-      }, 100);
+      // Only auto-focus on initial open, not on re-renders
+      if (!hasAutoFocused.current) {
+        hasAutoFocused.current = true;
+        setTimeout(() => {
+          // Focus first text input, not select (to avoid keyboard type-ahead issues)
+          const firstTextInput = modalRef.current?.querySelector('input[type="text"]:not([disabled]), input[type="email"]:not([disabled]), input:not([type]):not([disabled]), textarea:not([disabled])');
+          const firstInput = firstTextInput || modalRef.current?.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled])');
+          if (firstInput) {
+            firstInput.focus();
+          }
+        }, 100);
+      }
+    } else {
+      // Reset when modal closes
+      hasAutoFocused.current = false;
     }
 
     return () => {

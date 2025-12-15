@@ -497,7 +497,11 @@ export const payrollConfigApi = {
 
 // Service rotation tracks employee queue based on clock-in time
 // First to clock in = first to serve customer
-const getTodayDateString = () => new Date().toISOString().split('T')[0];
+// Use local date format to match StorageAdapter.clockIn() format
+const getTodayDateString = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
 
 const initServiceRotation = async () => {
   const today = getTodayDateString();
@@ -542,15 +546,26 @@ export const serviceRotationApi = {
     const attendanceRecords = await db.attendance.where('date').equals(today).toArray();
     const todayAttendance = attendanceRecords.filter(a => a.clockIn && !a.clockOut);
 
+    // Get all employees to join with attendance (attendance records only store employeeId)
+    const employees = await db.employees.toArray();
+    const employeeMap = {};
+    employees.forEach(e => { employeeMap[e._id] = e; });
+
+    // Join employee data to attendance records
+    const attendanceWithEmployees = todayAttendance.map(att => ({
+      ...att,
+      employee: employeeMap[att.employeeId] || null
+    }));
+
     // Sort by clock-in time (earliest first)
-    todayAttendance.sort((a, b) => {
+    attendanceWithEmployees.sort((a, b) => {
       const timeA = a.clockIn.replace(':', '');
       const timeB = b.clockIn.replace(':', '');
       return parseInt(timeA) - parseInt(timeB);
     });
 
     // Build queue with employee details and service count
-    const queue = todayAttendance.map((att, index) => ({
+    const queue = attendanceWithEmployees.map((att, index) => ({
       employeeId: att.employee?._id || att.employeeId,
       employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
       position: att.employee?.position || '',

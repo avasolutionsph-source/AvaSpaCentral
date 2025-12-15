@@ -13,6 +13,24 @@ import {
   EmptyState
 } from '../components/shared';
 
+// Initial form data - defined outside component to prevent recreation on each render
+// This fixes the bug where typing/selecting would auto-select "Service" radio
+const initialFormData = {
+  name: '',
+  category: '',
+  type: 'service',
+  price: '',
+  cost: '',
+  duration: '',
+  stock: '',
+  lowStockAlert: '',
+  description: '',
+  itemsUsed: [],
+  hideFromPOS: false
+};
+
+const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
+
 const Products = ({ embedded = false, onDataChange }) => {
   const { showToast, canEdit } = useApp();
 
@@ -21,23 +39,6 @@ const Products = ({ embedded = false, onDataChange }) => {
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
-
-  const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
-
-  // Initial form data
-  const initialFormData = {
-    name: '',
-    category: '',
-    type: 'service',
-    price: '',
-    cost: '',
-    duration: '',
-    stock: '',
-    lowStockAlert: '',
-    description: '',
-    itemsUsed: [],
-    hideFromPOS: false
-  };
 
   // Custom validation for products (more complex than schema-based)
   const validateProduct = (data) => {

@@ -198,24 +198,6 @@ export const authApi = {
       const user = clone(mockDatabase.testUser);
       delete user.password;
 
-      // Auto-create employee record if it doesn't exist
-      if (user.employeeId) {
-        const existingEmployee = await db.employees.get(user.employeeId);
-        if (!existingEmployee) {
-          await db.employees.put({
-            _id: user.employeeId,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            role: user.role,
-            status: 'active',
-            businessId: user.businessId,
-            _createdAt: new Date().toISOString(),
-            _updatedAt: new Date().toISOString()
-          });
-        }
-      }
-
       // Store in localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -236,24 +218,6 @@ export const authApi = {
       const token = 'mock_jwt_token_' + Date.now();
       const user = clone(matchedDemoUser);
       delete user.password;
-
-      // Auto-create employee record if it doesn't exist
-      if (user.employeeId) {
-        const existingEmployee = await db.employees.get(user.employeeId);
-        if (!existingEmployee) {
-          await db.employees.put({
-            _id: user.employeeId,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            role: user.role,
-            status: 'active',
-            businessId: user.businessId,
-            _createdAt: new Date().toISOString(),
-            _updatedAt: new Date().toISOString()
-          });
-        }
-      }
 
       // Store in localStorage
       localStorage.setItem('token', token);

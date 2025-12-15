@@ -724,3 +724,174 @@
     max-height: 70vh;
   }
 }
+
+/* ============================================================================
+   SERVICE ROTATION QUEUE (Checkout Modal)
+   ============================================================================ */
+.rotation-queue-panel {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.rotation-queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.rotation-queue-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--gray-800);
+}
+
+.rotation-queue-count {
+  background: var(--primary);
+  color: var(--white);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.rotation-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.rotation-queue-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--white);
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.rotation-queue-item:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.rotation-queue-item.selected {
+  border-color: var(--primary);
+  background: rgba(34, 84, 61, 0.08);
+}
+
+.rotation-queue-item.next-in-line {
+  border-color: var(--success);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.rotation-queue-item.next-in-line:hover {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.rotation-queue-position {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-100);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  flex-shrink: 0;
+}
+
+.rotation-queue-item.next-in-line .rotation-queue-position {
+  background: var(--success);
+  color: var(--white);
+}
+
+.rotation-queue-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rotation-queue-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--gray-900);
+  margin-bottom: 2px;
+}
+
+.rotation-queue-details {
+  display: flex;
+  gap: var(--spacing-md);
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+.rotation-clock-in,
+.rotation-services {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rotation-skip-btn {
+  background: var(--gray-100);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all var(--transition-fast);
+}
+
+.rotation-skip-btn:hover {
+  background: var(--warning-light);
+  border-color: var(--warning);
+}
+
+.rotation-next-indicator {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+  color: var(--white);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.rotation-next-indicator strong {
+  font-weight: 500;
+  opacity: 0.9;
+  margin-right: var(--spacing-xs);
+}
+
+.rotation-no-queue {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.rotation-no-queue span {
+  font-size: 1.2rem;
+}
+
+.rotation-no-queue p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gray-700);
+}

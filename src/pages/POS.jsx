@@ -657,6 +657,16 @@ const POS = () => {
         if (selectedEmployee) {
           await mockApi.serviceRotation.recordService(selectedEmployee);
         }
+
+        // Mark room as occupied if one was selected
+        if (selectedRoom) {
+          try {
+            await mockApi.rooms.updateRoomStatus(selectedRoom, 'occupied');
+          } catch (error) {
+            console.error('Failed to update room status:', error);
+            // Continue anyway - transaction already saved
+          }
+        }
       }
 
       // Reset everything

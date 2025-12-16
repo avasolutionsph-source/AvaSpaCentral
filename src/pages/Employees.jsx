@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { useCrudOperations } from '../hooks';
@@ -33,7 +33,7 @@ const INITIAL_FORM_DATA = {
   skills: []
 };
 
-const Employees = ({ embedded = false, onDataChange }) => {
+const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const { showToast, canEdit, isManager } = useApp();
 
   // Filters
@@ -167,6 +167,13 @@ const Employees = ({ embedded = false, onDataChange }) => {
     validateForm: validateEmployee
   });
 
+  // Expose openCreate to parent via ref
+  React.useEffect(() => {
+    if (onOpenCreateRef) {
+      onOpenCreateRef.current = openCreate;
+    }
+  }, [onOpenCreateRef, openCreate]);
+
   // Custom handler for nested commission fields and position-role-department auto-linking
   const handleFieldChange = useCallback((e) => {
     const { name, value } = e.target;
@@ -298,39 +305,31 @@ const Employees = ({ embedded = false, onDataChange }) => {
         />
       )}
 
-      {/* Embedded header with just the action button */}
-      {embedded && canEdit() && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
-          <button className="btn btn-primary" onClick={openCreate}>+ Add Employee</button>
-        </div>
-      )}
 
-      <div className="filters-section">
-        <FilterBar
-          searchValue={searchTerm}
-          onSearchChange={setSearchTerm}
-          searchPlaceholder="Search employees..."
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          resultCount={filteredEmployees.length}
-          resultLabel="employees"
-        >
-          <div className="view-toggle">
-            <button
-              className={`btn btn-sm ${viewMode === 'cards' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setViewMode('cards')}
-            >
-              Cards
-            </button>
-            <button
-              className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setViewMode('table')}
-            >
-              Table
-            </button>
-          </div>
-        </FilterBar>
-      </div>
+      <FilterBar
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Search employees..."
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        resultCount={filteredEmployees.length}
+        resultLabel="employees"
+      >
+        <div className="view-toggle">
+          <button
+            className={`btn btn-sm ${viewMode === 'cards' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setViewMode('cards')}
+          >
+            Cards
+          </button>
+          <button
+            className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setViewMode('table')}
+          >
+            Table
+          </button>
+        </div>
+      </FilterBar>
 
       {filteredEmployees.length === 0 ? (
         <EmptyState

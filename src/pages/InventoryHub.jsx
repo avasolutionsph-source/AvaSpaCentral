@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import Products from './Products';
 import Inventory from './Inventory';
@@ -8,9 +9,13 @@ import PurchaseOrders from './PurchaseOrders';
 import '../assets/css/hub-pages.css';
 
 const InventoryHub = () => {
+  const { canEdit } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'products';
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Refs to access child component functions
+  const productsOpenCreateRef = useRef(null);
 
   // Quick stats for badges
   const [stats, setStats] = useState({
@@ -92,28 +97,38 @@ const InventoryHub = () => {
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="hub-quick-stats">
-            {stats.outOfStock > 0 && (
-              <div className="hub-stat danger">
-                <span className="hub-stat-icon">🚫</span>
-                <span className="hub-stat-value">{stats.outOfStock}</span>
-                <span className="hub-stat-label">out of stock</span>
-              </div>
-            )}
-            {stats.lowStock > 0 && (
-              <div className="hub-stat warning">
-                <span className="hub-stat-icon">⚠️</span>
-                <span className="hub-stat-value">{stats.lowStock}</span>
-                <span className="hub-stat-label">low stock</span>
-              </div>
-            )}
-            {stats.pendingOrders > 0 && (
-              <div className="hub-stat">
-                <span className="hub-stat-icon">⏳</span>
-                <span className="hub-stat-value">{stats.pendingOrders}</span>
-                <span className="hub-stat-label">pending POs</span>
-              </div>
+          {/* Quick Stats and Action Button */}
+          <div className="hub-header-actions">
+            <div className="hub-quick-stats">
+              {stats.outOfStock > 0 && (
+                <div className="hub-stat danger">
+                  <span className="hub-stat-icon">🚫</span>
+                  <span className="hub-stat-value">{stats.outOfStock}</span>
+                  <span className="hub-stat-label">out of stock</span>
+                </div>
+              )}
+              {stats.lowStock > 0 && (
+                <div className="hub-stat warning">
+                  <span className="hub-stat-icon">⚠️</span>
+                  <span className="hub-stat-value">{stats.lowStock}</span>
+                  <span className="hub-stat-label">low stock</span>
+                </div>
+              )}
+              {stats.pendingOrders > 0 && (
+                <div className="hub-stat">
+                  <span className="hub-stat-icon">⏳</span>
+                  <span className="hub-stat-value">{stats.pendingOrders}</span>
+                  <span className="hub-stat-label">pending POs</span>
+                </div>
+              )}
+            </div>
+            {activeTab === 'products' && canEdit() && (
+              <button
+                className="btn btn-primary"
+                onClick={() => productsOpenCreateRef.current?.()}
+              >
+                + Add Product/Service
+              </button>
             )}
           </div>
         </div>
@@ -140,7 +155,7 @@ const InventoryHub = () => {
 
       {/* Tab Content */}
       <div className="hub-content">
-        {activeTab === 'products' && <Products embedded onDataChange={loadStats} />}
+        {activeTab === 'products' && <Products embedded onDataChange={loadStats} onOpenCreateRef={productsOpenCreateRef} />}
         {activeTab === 'stock' && <Inventory embedded onDataChange={loadStats} />}
         {activeTab === 'suppliers' && <Suppliers embedded />}
         {activeTab === 'orders' && <PurchaseOrders embedded onDataChange={loadStats} />}

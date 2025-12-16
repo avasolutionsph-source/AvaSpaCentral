@@ -969,21 +969,10 @@ const POS = () => {
 
               {/* Employee Selection with Rotation Queue */}
               <div className="checkout-section">
-                <div className="employee-section-header">
-                  <h4>👤 Select Employee *</h4>
-                  {rotationQueue.length > 0 && (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => setShowRotationQueue(!showRotationQueue)}
-                    >
-                      {showRotationQueue ? '📋 Hide Queue' : '📋 Show Queue'}
-                    </button>
-                  )}
-                </div>
+                <h4>👤 Select Employee *</h4>
 
                 {/* Service Rotation Queue */}
-                {showRotationQueue && rotationQueue.length > 0 && (
+                {rotationQueue.length > 0 && (
                   <div className="rotation-queue-panel">
                     <div className="rotation-queue-header">
                       <span className="rotation-queue-title">🔄 Service Rotation Queue</span>
@@ -1559,12 +1548,6 @@ const POS = () => {
                   </select>
                 </div>
               )}
-
-              {/* Final Total */}
-              <div className="checkout-section final-total">
-                <h3>💰 Total to Pay</h3>
-                <h2>₱{getTotal().toLocaleString()}</h2>
-              </div>
 
               {/* Cart Summary - Moved to bottom */}
               <div className="checkout-section">

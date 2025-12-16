@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
 import mockApi from '../mockApi';
 
-const PayrollRequests = ({ embedded = false, onDataChange }) => {
+const PayrollRequests = ({ embedded = false, onDataChange, onOpenSubmitRef }) => {
   const { showToast, user } = useApp();
   const [payrollHistory, setPayrollHistory] = useState([]);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
@@ -28,6 +28,13 @@ const PayrollRequests = ({ embedded = false, onDataChange }) => {
     fetchPayrollHistory();
     fetchPayrollRequests();
   }, [filterYear]);
+
+  // Expose toggle function to parent via ref
+  React.useEffect(() => {
+    if (onOpenSubmitRef) {
+      onOpenSubmitRef.current = () => setShowRequestForm(prev => !prev);
+    }
+  }, [onOpenSubmitRef]);
 
   const fetchPayrollRequests = async () => {
     try {
@@ -188,13 +195,6 @@ Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
           </button>
         </div>
       )}
-      {embedded && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
-          <button className="btn btn-primary" onClick={() => setShowRequestForm(!showRequestForm)}>
-            {showRequestForm ? '❌ Cancel Request' : '✉️ Submit Request'}
-          </button>
-        </div>
-      )}
 
       {/* Summary Cards */}
       <div className="employee-payroll-summary">
@@ -350,7 +350,7 @@ Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
           </div>
         ) : payrollHistory.length === 0 ? (
           <div className="empty-payroll-requests">
-            <div className="empty-payroll-icon">📭</div>
+            <div className="empty-payroll-icon">📋</div>
             <h3>No Payroll Records</h3>
             <p>You don't have any payroll records for {filterYear}.</p>
           </div>

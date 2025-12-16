@@ -264,16 +264,16 @@ const GiftCertificates = () => {
 
       {/* Search and Filters */}
       <div className="filters-section">
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Search by code, recipient, or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
         <div className="filters-row">
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Search by code, recipient, or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+          </div>
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
             <option value="all">All Status</option>
             <option value="active">Active</option>

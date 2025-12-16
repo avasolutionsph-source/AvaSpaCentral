@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
@@ -9,10 +9,17 @@ import EmployeeAccounts from './EmployeeAccounts';
 import '../assets/css/hub-pages.css';
 
 const HRHub = () => {
-  const { isOwner } = useApp();
+  const { isOwner, canEdit } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'employees';
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Refs to access child component functions
+  const employeesOpenCreateRef = useRef(null);
+  const accountsOpenCreateRef = useRef(null);
+  const payrollCalculateRef = useRef(null);
+  const payrollRemittancesRef = useRef(null);
+  const payrollPayslipsRef = useRef(null);
 
   // Quick stats for badges
   const [stats, setStats] = useState({
@@ -90,19 +97,62 @@ const HRHub = () => {
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="hub-quick-stats">
-            <div className="hub-stat success">
-              <span className="hub-stat-icon">✓</span>
-              <span className="hub-stat-value">{stats.activeEmployees}</span>
-              <span className="hub-stat-label">active staff</span>
-            </div>
-            {stats.pendingRequests > 0 && (
-              <div className="hub-stat warning">
-                <span className="hub-stat-icon">⏳</span>
-                <span className="hub-stat-value">{stats.pendingRequests}</span>
-                <span className="hub-stat-label">pending requests</span>
+          {/* Quick Stats and Action Buttons */}
+          <div className="hub-header-actions">
+            <div className="hub-quick-stats">
+              <div className="hub-stat success">
+                <span className="hub-stat-icon">✓</span>
+                <span className="hub-stat-value">{stats.activeEmployees}</span>
+                <span className="hub-stat-label">active staff</span>
               </div>
+              {stats.pendingRequests > 0 && (
+                <div className="hub-stat warning">
+                  <span className="hub-stat-icon">⏳</span>
+                  <span className="hub-stat-value">{stats.pendingRequests}</span>
+                  <span className="hub-stat-label">pending requests</span>
+                </div>
+              )}
+            </div>
+            {/* Employees Tab Button */}
+            {activeTab === 'employees' && canEdit() && (
+              <button
+                className="btn btn-primary"
+                onClick={() => employeesOpenCreateRef.current?.()}
+              >
+                + Add Employee
+              </button>
+            )}
+            {/* Payroll Tab Buttons */}
+            {activeTab === 'payroll' && (
+              <>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => payrollRemittancesRef.current?.()}
+                >
+                  Remittances
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => payrollPayslipsRef.current?.()}
+                >
+                  Payslips
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => payrollCalculateRef.current?.()}
+                >
+                  Calculate
+                </button>
+              </>
+            )}
+            {/* Accounts Tab Button */}
+            {activeTab === 'accounts' && isOwner() && (
+              <button
+                className="btn btn-primary"
+                onClick={() => accountsOpenCreateRef.current?.()}
+              >
+                + Create Account
+              </button>
             )}
           </div>
         </div>
@@ -129,9 +179,9 @@ const HRHub = () => {
 
       {/* Tab Content */}
       <div className="hub-content">
-        {activeTab === 'employees' && <Employees embedded onDataChange={loadStats} />}
-        {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} />}
-        {activeTab === 'accounts' && isOwner() && <EmployeeAccounts embedded onDataChange={loadStats} />}
+        {activeTab === 'employees' && <Employees embedded onDataChange={loadStats} onOpenCreateRef={employeesOpenCreateRef} />}
+        {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} onCalculateRef={payrollCalculateRef} onRemittancesRef={payrollRemittancesRef} onPayslipsRef={payrollPayslipsRef} />}
+        {activeTab === 'accounts' && isOwner() && <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />}
       </div>
     </div>
   );

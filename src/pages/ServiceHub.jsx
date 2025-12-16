@@ -1,14 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import Rooms from './Rooms';
 import ServiceHistory from './ServiceHistory';
 import '../assets/css/hub-pages.css';
 
 const ServiceHub = () => {
+  const { canEdit } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'rooms';
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Refs to access child component functions
+  const roomsOpenCreateRef = useRef(null);
 
   // Quick stats for badges
   const [stats, setStats] = useState({
@@ -80,26 +85,36 @@ const ServiceHub = () => {
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="hub-quick-stats">
-            <div className="hub-stat success">
-              <span className="hub-stat-icon">✓</span>
-              <span className="hub-stat-value">{stats.availableRooms}</span>
-              <span className="hub-stat-label">available</span>
+          {/* Quick Stats and Action Button */}
+          <div className="hub-header-actions">
+            <div className="hub-quick-stats">
+              <div className="hub-stat success">
+                <span className="hub-stat-icon">✓</span>
+                <span className="hub-stat-value">{stats.availableRooms}</span>
+                <span className="hub-stat-label">available</span>
+              </div>
+              {stats.occupiedRooms > 0 && (
+                <div className="hub-stat info">
+                  <span className="hub-stat-icon">👤</span>
+                  <span className="hub-stat-value">{stats.occupiedRooms}</span>
+                  <span className="hub-stat-label">occupied</span>
+                </div>
+              )}
+              {stats.todayServices > 0 && (
+                <div className="hub-stat">
+                  <span className="hub-stat-icon">📝</span>
+                  <span className="hub-stat-value">{stats.todayServices}</span>
+                  <span className="hub-stat-label">today</span>
+                </div>
+              )}
             </div>
-            {stats.occupiedRooms > 0 && (
-              <div className="hub-stat info">
-                <span className="hub-stat-icon">👤</span>
-                <span className="hub-stat-value">{stats.occupiedRooms}</span>
-                <span className="hub-stat-label">occupied</span>
-              </div>
-            )}
-            {stats.todayServices > 0 && (
-              <div className="hub-stat">
-                <span className="hub-stat-icon">📝</span>
-                <span className="hub-stat-value">{stats.todayServices}</span>
-                <span className="hub-stat-label">today</span>
-              </div>
+            {activeTab === 'rooms' && canEdit() && (
+              <button
+                className="btn btn-primary"
+                onClick={() => roomsOpenCreateRef.current?.()}
+              >
+                + Add Room
+              </button>
             )}
           </div>
         </div>
@@ -126,7 +141,7 @@ const ServiceHub = () => {
 
       {/* Tab Content */}
       <div className="hub-content">
-        {activeTab === 'rooms' && <Rooms embedded onDataChange={loadStats} />}
+        {activeTab === 'rooms' && <Rooms embedded onDataChange={loadStats} onOpenCreateRef={roomsOpenCreateRef} />}
         {activeTab === 'history' && <ServiceHistory embedded onDataChange={loadStats} />}
       </div>
     </div>

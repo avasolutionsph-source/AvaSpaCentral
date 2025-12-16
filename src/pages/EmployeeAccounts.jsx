@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { usersApi } from '../mockApi/offlineApi';
@@ -14,7 +14,7 @@ import {
   EmptyState
 } from '../components/shared';
 
-const EmployeeAccounts = ({ embedded = false, onDataChange }) => {
+const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const { user, showToast, isOwner } = useApp();
 
   // Filter state
@@ -170,6 +170,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange }) => {
     }
   });
 
+  // Expose openCreate to parent via ref
+  React.useEffect(() => {
+    if (onOpenCreateRef) {
+      onOpenCreateRef.current = openCreate;
+    }
+  }, [onOpenCreateRef, openCreate]);
+
   // Handle employee selection - auto-fill name and email
   const handleEmployeeSelect = (e) => {
     const empId = e.target.value;
@@ -293,12 +300,6 @@ const EmployeeAccounts = ({ embedded = false, onDataChange }) => {
         />
       )}
 
-      {/* Embedded Add Button */}
-      {embedded && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
-          <button className="btn btn-primary" onClick={openCreate}>+ Create Account</button>
-        </div>
-      )}
 
       {/* Filters */}
       <FilterBar

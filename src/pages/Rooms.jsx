@@ -15,7 +15,7 @@ import {
 } from '../components/shared';
 import { roomValidation, validateWithToast } from '../validation/schemas';
 
-const Rooms = ({ embedded = false, onDataChange }) => {
+const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const { user, showToast, isTherapist, canEdit } = useApp();
 
   // Filter state (kept separate as it's page-specific)
@@ -103,6 +103,13 @@ const Rooms = ({ embedded = false, onDataChange }) => {
       loadUpcomingBookings();
     }
   });
+
+  // Expose openCreate to parent via ref callback
+  React.useEffect(() => {
+    if (onOpenCreateRef) {
+      onOpenCreateRef.current = openCreate;
+    }
+  }, [onOpenCreateRef, openCreate]);
 
   // Load upcoming bookings (separate from CRUD operations)
   const loadUpcomingBookings = async () => {
@@ -439,12 +446,6 @@ const Rooms = ({ embedded = false, onDataChange }) => {
         />
       )}
 
-      {/* Embedded Add Button */}
-      {embedded && canEdit() && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
-          <button className="btn btn-primary" onClick={openCreate}>+ Add Room</button>
-        </div>
-      )}
 
       {/* Filters */}
       <FilterBar

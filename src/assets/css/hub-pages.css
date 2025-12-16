@@ -141,11 +141,17 @@
   display: none;
 }
 
+/* Header Actions (stats + button) */
+.hub-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
 /* Quick Stats Bar (optional - shown above tabs) */
 .hub-quick-stats {
   display: flex;
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
   flex-wrap: wrap;
 }
 

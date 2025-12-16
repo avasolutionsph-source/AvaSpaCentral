@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, subDays, isWithinInterval } from 'date-fns';
 
-const Payroll = ({ embedded = false, onDataChange }) => {
+const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef }) => {
   const { showToast } = useApp();
 
   const [loading, setLoading] = useState(false);
@@ -26,6 +26,25 @@ const Payroll = ({ embedded = false, onDataChange }) => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Expose functions to parent via refs
+  React.useEffect(() => {
+    if (onCalculateRef) {
+      onCalculateRef.current = handleCalculatePayroll;
+    }
+  }, [onCalculateRef]);
+
+  React.useEffect(() => {
+    if (onRemittancesRef) {
+      onRemittancesRef.current = () => setShowGovRemittance(prev => !prev);
+    }
+  }, [onRemittancesRef]);
+
+  React.useEffect(() => {
+    if (onPayslipsRef) {
+      onPayslipsRef.current = handleGeneratePayslips;
+    }
+  }, [onPayslipsRef]);
 
   const loadData = async () => {
     try {
@@ -463,20 +482,6 @@ const Payroll = ({ embedded = false, onDataChange }) => {
         </div>
       )}
 
-      {/* Embedded header with just action buttons */}
-      {embedded && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-          <button className="btn btn-secondary" onClick={() => setShowGovRemittance(!showGovRemittance)}>
-            📊 Remittances
-          </button>
-          <button className="btn btn-secondary" onClick={handleGeneratePayslips} disabled={payrollData.length === 0}>
-            📄 Payslips
-          </button>
-          <button className="btn btn-primary" onClick={handleCalculatePayroll}>
-            💰 Calculate
-          </button>
-        </div>
-      )}
 
       {/* Period Selector */}
       <div className="period-selector-section">

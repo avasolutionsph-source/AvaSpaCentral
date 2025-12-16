@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
@@ -29,6 +29,9 @@ const MyPortal = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [clockAction, setClockAction] = useState(null); // 'in' or 'out'
   const [loadingAttendance, setLoadingAttendance] = useState(true);
+
+  // Ref for Submit Request button
+  const payrollSubmitRef = useRef(null);
 
   useEffect(() => {
     loadStats();
@@ -492,28 +495,38 @@ const MyPortal = () => {
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="hub-quick-stats">
-            {todayAttendance?.clockIn && !todayAttendance?.clockOut && (
-              <div className="hub-stat success">
-                <span className="hub-stat-icon">🟢</span>
-                <span className="hub-stat-value">In</span>
-                <span className="hub-stat-label">clocked in</span>
-              </div>
-            )}
-            {stats.upcomingAppointments > 0 && (
-              <div className="hub-stat info">
-                <span className="hub-stat-icon">📋</span>
-                <span className="hub-stat-value">{stats.upcomingAppointments}</span>
-                <span className="hub-stat-label">upcoming</span>
-              </div>
-            )}
-            {stats.pendingRequests > 0 && (
-              <div className="hub-stat warning">
-                <span className="hub-stat-icon">⏳</span>
-                <span className="hub-stat-value">{stats.pendingRequests}</span>
-                <span className="hub-stat-label">pending</span>
-              </div>
+          {/* Quick Stats and Action Button */}
+          <div className="hub-header-actions">
+            <div className="hub-quick-stats">
+              {todayAttendance?.clockIn && !todayAttendance?.clockOut && (
+                <div className="hub-stat success">
+                  <span className="hub-stat-icon">🟢</span>
+                  <span className="hub-stat-value">In</span>
+                  <span className="hub-stat-label">clocked in</span>
+                </div>
+              )}
+              {stats.upcomingAppointments > 0 && (
+                <div className="hub-stat info">
+                  <span className="hub-stat-icon">📋</span>
+                  <span className="hub-stat-value">{stats.upcomingAppointments}</span>
+                  <span className="hub-stat-label">upcoming</span>
+                </div>
+              )}
+              {stats.pendingRequests > 0 && (
+                <div className="hub-stat warning">
+                  <span className="hub-stat-icon">⏳</span>
+                  <span className="hub-stat-value">{stats.pendingRequests}</span>
+                  <span className="hub-stat-label">pending</span>
+                </div>
+              )}
+            </div>
+            {activeTab === 'payroll' && (
+              <button
+                className="btn btn-primary"
+                onClick={() => payrollSubmitRef.current?.()}
+              >
+                Submit Request
+              </button>
             )}
           </div>
         </div>
@@ -543,7 +556,7 @@ const MyPortal = () => {
         {activeTab === 'attendance' && renderAttendanceTab()}
         {activeTab === 'history' && <MyAttendanceHistory embedded />}
         {activeTab === 'schedule' && <MySchedule embedded onDataChange={loadStats} />}
-        {activeTab === 'payroll' && <PayrollRequests embedded onDataChange={loadStats} />}
+        {activeTab === 'payroll' && <PayrollRequests embedded onDataChange={loadStats} onOpenSubmitRef={payrollSubmitRef} />}
       </div>
 
       {/* Camera Capture Modal */}

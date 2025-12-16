@@ -398,7 +398,7 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
       </div>
 
       {/* Filters */}
-      <div className="po-filters">
+      <div className="filters-section">
         <div className="filters-row">
           <div className="search-box">
             <input
@@ -406,13 +406,13 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
               placeholder="Search by order # or supplier..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="form-control"
+              className="search-input"
             />
           </div>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="form-control"
+            className="filter-select"
           >
             <option value="">All Status</option>
             {statusOptions.map(status => (
@@ -422,7 +422,7 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
           <select
             value={filterSupplier}
             onChange={(e) => setFilterSupplier(e.target.value)}
-            className="form-control"
+            className="filter-select"
           >
             <option value="">All Suppliers</option>
             {suppliers.map(supplier => (
@@ -433,22 +433,22 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
             type="date"
             value={dateRange.start}
             onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-            className="form-control"
+            className="filter-select"
             placeholder="From Date"
           />
           <input
             type="date"
             value={dateRange.end}
             onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-            className="form-control"
+            className="filter-select"
             placeholder="To Date"
           />
-          <button className="btn btn-secondary" onClick={clearFilters}>
+          <button className="btn btn-sm btn-secondary" onClick={clearFilters}>
             Clear
           </button>
-        </div>
-        <div className="filter-info">
-          Showing {filteredOrders.length} of {purchaseOrders.length} orders
+          <div className="results-count">
+            {filteredOrders.length} of {purchaseOrders.length} orders
+          </div>
         </div>
       </div>
 

@@ -31,7 +31,7 @@ const initialFormData = {
 
 const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
 
-const Products = ({ embedded = false, onDataChange }) => {
+const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const { showToast, canEdit } = useApp();
 
   // Filter state
@@ -132,6 +132,13 @@ const Products = ({ embedded = false, onDataChange }) => {
       if (onDataChange) onDataChange();
     }
   });
+
+  // Expose openCreate to parent via ref callback
+  React.useEffect(() => {
+    if (onOpenCreateRef) {
+      onOpenCreateRef.current = openCreate;
+    }
+  }, [onOpenCreateRef, openCreate]);
 
   // Get retail products for items used dropdown
   const retailProducts = useMemo(() =>
@@ -250,12 +257,6 @@ const Products = ({ embedded = false, onDataChange }) => {
         />
       )}
 
-      {/* Embedded header */}
-      {embedded && canEdit() && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-md)' }}>
-          <button className="btn btn-primary" onClick={openCreate}>+ Add Product/Service</button>
-        </div>
-      )}
 
       {/* Filters */}
       <FilterBar

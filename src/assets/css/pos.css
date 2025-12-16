@@ -314,94 +314,155 @@
   border-top: 1px solid var(--gray-200);
 }
 
-/* Checkout Modal */
+/* ============================================================================
+   CHECKOUT MODAL - MINIMALIST REDESIGN
+   ============================================================================ */
 .checkout-modal {
-  max-width: 700px;
+  max-width: 520px;
   max-height: 90vh;
 }
 
-.checkout-section {
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-lg);
-  border-bottom: 1px solid var(--gray-200);
+.checkout-modal .modal-body {
+  padding: 24px;
 }
 
-.checkout-section:last-child {
+.checkout-section {
+  margin-bottom: 28px;
+  padding-bottom: 0;
   border-bottom: none;
 }
 
-.checkout-section h4 {
-  font-size: 0.95rem;
-  margin-bottom: var(--spacing-md);
-  color: var(--gray-700);
+.checkout-section:last-child {
+  margin-bottom: 0;
 }
 
+.checkout-section h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  color: #888;
+}
+
+/* Checkout Cart Summary */
 .checkout-cart-summary {
-  background: var(--gray-50);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
+  background: #F8F8F8;
+  padding: 14px;
+  border-radius: 10px;
 }
 
 .checkout-item {
   display: flex;
   justify-content: space-between;
-  margin-bottom: var(--spacing-sm);
-  font-size: 0.9rem;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  color: #555;
 }
 
 .checkout-total {
   display: flex;
   justify-content: space-between;
-  margin-top: var(--spacing-md);
-  padding-top: var(--spacing-md);
-  border-top: 1px solid var(--gray-300);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #E0E0E0;
   font-weight: 600;
+  color: #333;
 }
 
 .employee-commission {
-  margin-top: var(--spacing-sm);
-  font-size: 0.85rem;
+  margin-top: 8px;
+  font-size: 0.8rem;
   color: var(--success);
 }
 
+/* Checkout Form Inputs - Minimal Style */
+.checkout-modal input,
+.checkout-modal select,
+.checkout-modal textarea {
+  background: #F5F5F5;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+}
+
+.checkout-modal input:focus,
+.checkout-modal select:focus,
+.checkout-modal textarea:focus {
+  background: #FFFFFF;
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34, 84, 61, 0.1);
+}
+
+.checkout-modal input::placeholder {
+  color: #999;
+}
+
+/* Customer Type - Pill Toggle */
 .customer-type-selector {
-  display: flex;
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-md);
+  display: inline-flex;
+  background: #F0F0F0;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 16px;
 }
 
 .customer-type-selector label {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.15s ease;
 }
 
+.customer-type-selector label:has(input:checked) {
+  background: #FFFFFF;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.customer-type-selector input[type="radio"] {
+  display: none;
+}
+
+/* Payment Methods - Pill Selector */
 .payment-methods {
-  display: flex;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
+  display: inline-flex;
+  background: #F0F0F0;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 16px;
 }
 
 .payment-btn {
-  flex: 1;
-  padding: var(--spacing-md);
-  border: 2px solid var(--gray-300);
-  background: var(--white);
-  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  transition: all var(--transition-fast);
+  font-size: 0.875rem;
+  color: #666;
+  transition: all 0.15s ease;
 }
 
 .payment-btn:hover {
-  border-color: var(--primary);
+  color: #333;
 }
 
 .payment-btn.active {
   background: var(--primary);
-  color: var(--white);
-  border-color: var(--primary);
+  color: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .payment-details {
@@ -415,14 +476,16 @@
   font-size: 0.9rem;
 }
 
+/* Change Display */
 .change-display {
   display: flex;
   justify-content: space-between;
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--gray-50);
-  border-radius: var(--radius-md);
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #F5F5F5;
+  border-radius: 8px;
   font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .change-display .negative {
@@ -433,40 +496,75 @@
   color: var(--success);
 }
 
+/* Discount Buttons - Small Chips */
 .discount-buttons {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.discount-applied {
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: rgba(16, 185, 129, 0.1);
-  border-radius: var(--radius-md);
-  color: var(--success-dark);
-  font-size: 0.9rem;
+.discount-buttons .btn {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  border: 1px solid #E0E0E0;
+  border-radius: 20px;
+  background: #FFFFFF;
+  color: #666;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
+.discount-buttons .btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.discount-buttons .btn.active,
+.discount-buttons .btn-primary {
+  background: var(--primary);
+  color: #FFFFFF;
+  border-color: var(--primary);
+}
+
+.discount-buttons .btn-outline-secondary {
+  background: transparent;
+  border-color: #CCC;
+}
+
+.discount-applied {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: 8px;
+  color: #059669;
+  font-size: 0.85rem;
+}
+
+/* Final Total - Clean & Simple */
 .final-total {
   text-align: center;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  color: var(--white);
-  padding: var(--spacing-xl);
-  border-radius: var(--radius-lg);
-  margin: var(--spacing-lg) 0;
+  background: #FFFFFF;
+  border: 2px solid var(--primary);
+  padding: 20px;
+  border-radius: 12px;
+  margin: 20px 0;
 }
 
 .final-total h3 {
-  margin: 0 0 var(--spacing-sm) 0;
-  font-size: 0.95rem;
-  opacity: 0.9;
+  margin: 0 0 4px 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .final-total h2 {
   margin: 0;
-  font-size: 2.5rem;
-  color: var(--white);
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--primary);
 }
 
 /* POS Responsive */
@@ -496,80 +594,90 @@
 }
 
 /* ============================================================================
-   ADVANCE BOOKING SECTION
+   ADVANCE BOOKING SECTION - Minimalist
    ============================================================================ */
 .advance-booking-section {
-  margin: var(--spacing-lg) 0;
-  padding: var(--spacing-md);
-  background: var(--gray-50);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--gray-200);
+  margin: 16px 0;
+  padding: 14px;
+  background: #F8F8F8;
+  border-radius: 10px;
+  border: 1px solid transparent;
 }
 
 .advance-booking-section.active {
-  background: var(--blue-50);
-  border-color: var(--blue-200);
+  background: #F0F7FF;
+  border-color: #C4DFFF;
 }
 
 .advance-booking-section .checkbox-label {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 8px;
   cursor: pointer;
   font-weight: 500;
-  font-size: 1rem;
-  color: var(--gray-800);
+  font-size: 0.9rem;
+  color: #555;
 }
 
 .advance-booking-section .checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
 }
 
 .advance-booking-form {
-  margin-top: var(--spacing-lg);
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--gray-300);
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #E0E0E0;
 }
 
 .advance-booking-form .form-section {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: 20px;
 }
 
 .advance-booking-form .form-section h4 {
-  font-size: 1rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  margin-bottom: var(--spacing-md);
-  color: var(--gray-800);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  color: #888;
 }
 
 .advance-booking-form .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-md);
+  gap: 12px;
 }
 
 .advance-booking-form .form-group {
-  margin-bottom: var(--spacing-md);
+  margin-bottom: 12px;
 }
 
 .advance-booking-form .form-group label {
   display: block;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 500;
-  margin-bottom: var(--spacing-xs);
-  color: var(--gray-700);
+  margin-bottom: 6px;
+  color: #666;
 }
 
 .advance-booking-form .form-group input,
 .advance-booking-form .form-group select,
 .advance-booking-form .form-group textarea {
   width: 100%;
-  padding: var(--spacing-sm);
-  border: 1px solid var(--gray-300);
-  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   font-size: 0.875rem;
+  background: #FFFFFF;
+}
+
+.advance-booking-form .form-group input:focus,
+.advance-booking-form .form-group select:focus,
+.advance-booking-form .form-group textarea:focus {
+  border-color: var(--primary);
+  outline: none;
 }
 
 .advance-booking-form .form-group input.error,
@@ -580,31 +688,37 @@
 
 .advance-booking-form .error-message {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--error);
-  margin-top: var(--spacing-xs);
+  margin-top: 4px;
 }
 
 .payment-timing-options {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: 8px;
 }
 
 .radio-option {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  border: 2px solid var(--gray-300);
-  border-radius: var(--radius-md);
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease;
+  background: #FFFFFF;
 }
 
 .radio-option:hover {
   border-color: var(--primary);
-  background: var(--primary-light);
+  background: rgba(34, 84, 61, 0.03);
+}
+
+.radio-option:has(input:checked) {
+  border-color: var(--primary);
+  background: rgba(34, 84, 61, 0.05);
 }
 
 .radio-option input[type="radio"] {
@@ -726,77 +840,76 @@
 }
 
 /* ============================================================================
-   SERVICE ROTATION QUEUE (Checkout Modal)
+   SERVICE ROTATION QUEUE (Checkout Modal) - Minimalist
    ============================================================================ */
 .rotation-queue-panel {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
+  background: #FFFFFF;
+  border: 1px solid #E8E8E8;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
 }
 
 .rotation-queue-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-md);
-  padding-bottom: var(--spacing-sm);
-  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 12px;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .rotation-queue-title {
   font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--gray-800);
+  font-size: 0.8rem;
+  color: #666;
 }
 
 .rotation-queue-count {
   background: var(--primary);
-  color: var(--white);
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  color: #FFFFFF;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
   font-weight: 500;
 }
 
 .rotation-queue-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  max-height: 200px;
+  gap: 8px;
+  max-height: 180px;
   overflow-y: auto;
 }
 
 .rotation-queue-item {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--white);
-  border: 2px solid var(--gray-200);
-  border-radius: var(--radius-md);
+  gap: 12px;
+  padding: 10px 12px;
+  background: #F8F8F8;
+  border: 1px solid transparent;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease;
 }
 
 .rotation-queue-item:hover {
-  border-color: var(--primary);
-  background: var(--primary-light);
+  background: #F0F0F0;
 }
 
 .rotation-queue-item.selected {
   border-color: var(--primary);
-  background: rgba(34, 84, 61, 0.08);
+  background: rgba(34, 84, 61, 0.05);
 }
 
 .rotation-queue-item.next-in-line {
   border-color: var(--success);
-  background: rgba(16, 185, 129, 0.08);
+  background: rgba(16, 185, 129, 0.05);
 }
 
 .rotation-queue-item.next-in-line:hover {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(16, 185, 129, 0.1);
 }
 
 .rotation-queue-position {
@@ -860,19 +973,18 @@
 }
 
 .rotation-next-indicator {
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-  color: var(--white);
-  border-radius: var(--radius-md);
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--primary);
+  color: #FFFFFF;
+  border-radius: 8px;
   font-size: 0.85rem;
   text-align: center;
 }
 
 .rotation-next-indicator strong {
   font-weight: 500;
-  opacity: 0.9;
-  margin-right: var(--spacing-xs);
+  margin-right: 4px;
 }
 
 .rotation-no-queue {

@@ -23,7 +23,8 @@
       "Bash(timeout:*)",
       "Bash(grep:*)",
       "Bash(git restore:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

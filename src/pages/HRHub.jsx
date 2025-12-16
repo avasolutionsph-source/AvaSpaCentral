@@ -64,7 +64,7 @@ const HRHub = () => {
     {
       id: 'payroll',
       label: 'Payroll',
-      icon: '💰',
+      icon: '₱',
       badge: stats.pendingRequests > 0 ? stats.pendingRequests : null,
       badgeType: 'warning'
     },

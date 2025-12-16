@@ -339,7 +339,7 @@ const Expenses = ({ embedded = false, onDataChange }) => {
       {/* Summary Cards */}
       <div className="expenses-summary-grid">
         <div className="expense-summary-card total">
-          <div className="expense-summary-icon">💰</div>
+          <div className="expense-summary-icon">₱</div>
           <div className="expense-summary-value">₱{stats.total.toLocaleString()}</div>
           <div className="expense-summary-label">Total Expenses</div>
         </div>
@@ -428,7 +428,7 @@ const Expenses = ({ embedded = false, onDataChange }) => {
       {/* Expenses Table */}
       {filteredExpenses.length === 0 ? (
         <EmptyState
-          icon="💸"
+          icon=""
           title="No expenses found"
           description={expenses.length === 0 ? 'Start tracking your expenses' : 'Try adjusting your filters'}
           action={expenses.length === 0 ? { label: 'Add Your First Expense', onClick: openCreate } : null}

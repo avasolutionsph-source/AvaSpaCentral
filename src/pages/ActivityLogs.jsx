@@ -45,6 +45,22 @@ const ActivityLogs = () => {
     }
   };
 
+  // Helper to safely get user display name from log (handles both old and new formats)
+  const getUserDisplayName = (log) => {
+    if (log.user && log.user.firstName) {
+      return `${log.user.firstName} ${log.user.lastName || ''}`.trim();
+    }
+    return log.userName || 'Unknown';
+  };
+
+  // Helper to safely get user role from log
+  const getUserRole = (log) => {
+    if (log.user && log.user.role) {
+      return log.user.role;
+    }
+    return 'Unknown';
+  };
+
   const applyFilters = () => {
     let filtered = [...logs];
 
@@ -84,7 +100,7 @@ const ActivityLogs = () => {
     // User filter
     if (filterUser !== 'all') {
       filtered = filtered.filter(log =>
-        `${log.user.firstName} ${log.user.lastName}`.toLowerCase().includes(filterUser.toLowerCase())
+        getUserDisplayName(log).toLowerCase().includes(filterUser.toLowerCase())
       );
     }
 
@@ -104,7 +120,7 @@ const ActivityLogs = () => {
       filtered = filtered.filter(log =>
         log.action.toLowerCase().includes(query) ||
         log.description.toLowerCase().includes(query) ||
-        `${log.user.firstName} ${log.user.lastName}`.toLowerCase().includes(query)
+        getUserDisplayName(log).toLowerCase().includes(query)
       );
     }
 
@@ -146,7 +162,7 @@ const ActivityLogs = () => {
       filteredLogs.forEach((log, index) => {
         exportData += `${index + 1}. ${log.action}\n`;
         exportData += `   Time: ${format(parseISO(log.timestamp), 'MMM dd, yyyy HH:mm:ss')}\n`;
-        exportData += `   User: ${log.user.firstName} ${log.user.lastName} (${log.user.role})\n`;
+        exportData += `   User: ${getUserDisplayName(log)} (${getUserRole(log)})\n`;
         exportData += `   Description: ${log.description}\n`;
         exportData += `   Severity: ${log.severity.toUpperCase()}\n`;
         exportData += `   IP: ${log.ipAddress}\n`;
@@ -158,7 +174,7 @@ const ActivityLogs = () => {
     } else if (exportFormat === 'csv') {
       exportData = 'ID,Action,Description,User,Role,Timestamp,Severity,IP Address\n';
       filteredLogs.forEach(log => {
-        exportData += `${log.id},"${log.action}","${log.description}","${log.user.firstName} ${log.user.lastName}","${log.user.role}","${format(parseISO(log.timestamp), 'yyyy-MM-dd HH:mm:ss')}","${log.severity}","${log.ipAddress}"\n`;
+        exportData += `${log.id},"${log.action}","${log.description}","${getUserDisplayName(log)}","${getUserRole(log)}","${format(parseISO(log.timestamp), 'yyyy-MM-dd HH:mm:ss')}","${log.severity}","${log.ipAddress}"\n`;
       });
     } else if (exportFormat === 'json') {
       exportData = JSON.stringify(filteredLogs, null, 2);
@@ -184,7 +200,7 @@ const ActivityLogs = () => {
       const today = startOfDay(new Date());
       return logDate.getTime() === today.getTime();
     }).length,
-    uniqueUsers: new Set(logs.map(log => `${log.user.firstName} ${log.user.lastName}`)).size,
+    uniqueUsers: new Set(logs.map(log => getUserDisplayName(log))).size,
     critical: logs.filter(log => log.severity === 'critical').length
   };
 
@@ -204,7 +220,8 @@ const ActivityLogs = () => {
       transaction: '💳',
       system: '⚙️',
       error: '❌',
-      security: '🛡️'
+      security: '🛡️',
+      service: '💆'
     };
     return icons[type] || '📝';
   };
@@ -301,6 +318,7 @@ const ActivityLogs = () => {
             <label>Type</label>
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
               <option value="all">All Types</option>
+              <option value="service">Service History</option>
               <option value="login">Login</option>
               <option value="logout">Logout</option>
               <option value="create">Create</option>
@@ -390,7 +408,7 @@ const ActivityLogs = () => {
                     <div className="log-meta">
                       <div className="log-meta-item">
                         <span className="log-meta-icon">👤</span>
-                        <span>{log.user.firstName} {log.user.lastName} ({log.user.role})</span>
+                        <span>{getUserDisplayName(log)} ({getUserRole(log)})</span>
                       </div>
                       <div className="log-meta-item">
                         <span className="log-meta-icon">🌐</span>
@@ -411,7 +429,71 @@ const ActivityLogs = () => {
                         </div>
                         {expandedLogs.has(log.id) && (
                           <div className="log-details-content">
-                            {JSON.stringify(log.details, null, 2)}
+                            {log.type === 'service' ? (
+                              <div className="service-log-details">
+                                <div className="service-detail-row">
+                                  <span className="service-detail-label">Room:</span>
+                                  <span>{log.details.roomName || 'N/A'}</span>
+                                </div>
+                                <div className="service-detail-row">
+                                  <span className="service-detail-label">Therapist:</span>
+                                  <span>{log.details.therapistName || 'N/A'}</span>
+                                </div>
+                                <div className="service-detail-row">
+                                  <span className="service-detail-label">Customer:</span>
+                                  <span>{log.details.customerName || 'N/A'}</span>
+                                </div>
+                                {log.details.customerPhone && (
+                                  <div className="service-detail-row">
+                                    <span className="service-detail-label">Phone:</span>
+                                    <span>{log.details.customerPhone}</span>
+                                  </div>
+                                )}
+                                <div className="service-detail-row">
+                                  <span className="service-detail-label">Service(s):</span>
+                                  <span>{log.details.serviceNames?.join(', ') || 'N/A'}</span>
+                                </div>
+                                <div className="service-detail-row">
+                                  <span className="service-detail-label">Planned Duration:</span>
+                                  <span>{log.details.plannedDuration || 0} min</span>
+                                </div>
+                                {log.details.actualDuration !== undefined && (
+                                  <div className="service-detail-row">
+                                    <span className="service-detail-label">Actual Duration:</span>
+                                    <span>{log.details.actualDuration} min</span>
+                                  </div>
+                                )}
+                                <div className="service-detail-row">
+                                  <span className="service-detail-label">Status:</span>
+                                  <span className={`service-status-badge ${log.details.status}`}>
+                                    {log.details.status === 'started' && '▶️ Started'}
+                                    {log.details.status === 'completed' && '✅ Completed'}
+                                    {log.details.status === 'ended_early' && '⏹️ Ended Early'}
+                                    {log.details.status === 'cancelled' && '❌ Cancelled'}
+                                  </span>
+                                </div>
+                                {log.details.reason && (
+                                  <div className="service-detail-row reason">
+                                    <span className="service-detail-label">Reason:</span>
+                                    <span>{log.details.reason}</span>
+                                  </div>
+                                )}
+                                {log.details.startTime && (
+                                  <div className="service-detail-row">
+                                    <span className="service-detail-label">Start Time:</span>
+                                    <span>{format(parseISO(log.details.startTime), 'HH:mm:ss')}</span>
+                                  </div>
+                                )}
+                                {log.details.endTime && (
+                                  <div className="service-detail-row">
+                                    <span className="service-detail-label">End Time:</span>
+                                    <span>{format(parseISO(log.details.endTime), 'HH:mm:ss')}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <pre>{JSON.stringify(log.details, null, 2)}</pre>
+                            )}
                           </div>
                         )}
                       </>

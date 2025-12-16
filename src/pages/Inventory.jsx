@@ -195,6 +195,27 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       : Math.max(0, selectedProduct.stock - quantity);
 
     try {
+      // For stock removal, log consumption data for AI tracking
+      let servicesTracked = 0;
+      if (adjustmentType === 'subtract') {
+        // Get the number of services performed since last adjustment
+        servicesTracked = selectedProduct.servicesSinceLastAdjustment || 0;
+
+        if (servicesTracked > 0) {
+          // Log consumption for AI learning
+          await mockApi.productConsumption.logConsumption({
+            productId: selectedProduct._id,
+            productName: selectedProduct.name,
+            quantityUsed: quantity,
+            servicesDone: servicesTracked,
+            note: adjustmentReason
+          });
+
+          // Reset the service counter
+          await mockApi.products.resetServiceCount(selectedProduct._id);
+        }
+      }
+
       // Persist to API
       await mockApi.products.updateProduct(selectedProduct._id, { stock: newStock });
 
@@ -208,6 +229,7 @@ const Inventory = ({ embedded = false, onDataChange }) => {
         oldStock: selectedProduct.stock,
         newStock: newStock,
         reason: adjustmentReason,
+        servicesTracked: servicesTracked, // Track services for this adjustment
         user: 'Current User',
         date: new Date().toISOString()
       };
@@ -226,11 +248,17 @@ const Inventory = ({ embedded = false, onDataChange }) => {
 
       // Update inventory
       const updatedInventory = inventory.map(p =>
-        p._id === selectedProduct._id ? { ...p, stock: newStock } : p
+        p._id === selectedProduct._id ? { ...p, stock: newStock, servicesSinceLastAdjustment: adjustmentType === 'subtract' ? 0 : p.servicesSinceLastAdjustment } : p
       );
       setInventory(updatedInventory);
 
-      showToast(`Stock ${adjustmentType === 'add' ? 'increased' : 'decreased'} successfully!`, 'success');
+      // Show success message with AI learning info
+      if (adjustmentType === 'subtract' && servicesTracked > 0) {
+        const rate = (servicesTracked / quantity).toFixed(1);
+        showToast(`Stock decreased! AI learned: ${quantity} unit(s) covered ${servicesTracked} services (~${rate} services/unit)`, 'success');
+      } else {
+        showToast(`Stock ${adjustmentType === 'add' ? 'increased' : 'decreased'} successfully!`, 'success');
+      }
       setShowAdjustmentModal(false);
     } catch (error) {
       showToast('Failed to update stock. Please try again.', 'error');
@@ -392,7 +420,7 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       {/* Summary Cards */}
       <div className="inventory-summary-grid">
         <div className="inventory-summary-card total-value">
-          <div className="inventory-summary-icon">💰</div>
+          <div className="inventory-summary-icon">₱</div>
           <div className="inventory-summary-value">₱{summary.totalValue.toLocaleString()}</div>
           <div className="inventory-summary-label">Total Inventory Value</div>
         </div>
@@ -413,23 +441,6 @@ const Inventory = ({ embedded = false, onDataChange }) => {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      {canEdit() && (
-        <div className="inventory-quick-actions">
-          <button className="quick-action-btn" onClick={() => navigate('/purchase-orders')}>
-            <span className="quick-action-icon">📋</span>
-            <span>Manage Purchase Orders</span>
-          </button>
-          <button className="quick-action-btn" onClick={() => navigate('/suppliers')}>
-            <span className="quick-action-icon">🏢</span>
-            <span>Manage Suppliers</span>
-          </button>
-          <button className="quick-action-btn" onClick={handleExportInventory}>
-            <span className="quick-action-icon">📊</span>
-            <span>Export Report</span>
-          </button>
-        </div>
-      )}
 
       {/* Reorder Suggestions */}
       {reorderSuggestions.length > 0 && canEdit() && (
@@ -699,6 +710,31 @@ const Inventory = ({ embedded = false, onDataChange }) => {
                         ? selectedProduct.stock + parseInt(adjustmentQuantity || 0)
                         : Math.max(0, selectedProduct.stock - parseInt(adjustmentQuantity || 0))}
                     </strong>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Tracking Info for stock removal */}
+              {adjustmentType === 'subtract' && selectedProduct.servicesSinceLastAdjustment > 0 && (
+                <div className="ai-tracking-info" style={{ marginTop: '16px', padding: '12px', background: '#E8F5E9', borderRadius: '8px', border: '1px solid #4CAF50' }}>
+                  <div style={{ fontWeight: '600', color: '#2E7D32', marginBottom: '8px' }}>
+                    🤖 AI Consumption Tracking
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: '#1B5E20' }}>
+                    <strong>{selectedProduct.servicesSinceLastAdjustment}</strong> services performed since last adjustment.
+                    {adjustmentQuantity && parseInt(adjustmentQuantity) > 0 && (
+                      <span style={{ display: 'block', marginTop: '4px' }}>
+                        Learning rate: ~{(selectedProduct.servicesSinceLastAdjustment / parseInt(adjustmentQuantity)).toFixed(1)} services per unit
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {adjustmentType === 'subtract' && (!selectedProduct.servicesSinceLastAdjustment || selectedProduct.servicesSinceLastAdjustment === 0) && (
+                <div className="ai-tracking-info" style={{ marginTop: '16px', padding: '12px', background: '#FFF3E0', borderRadius: '8px', border: '1px solid #FF9800' }}>
+                  <div style={{ fontSize: '0.85rem', color: '#E65100' }}>
+                    ℹ️ No services tracked yet for this product. Link this product to services and perform transactions to enable AI consumption tracking.
                   </div>
                 </div>
               )}

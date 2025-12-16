@@ -49,7 +49,11 @@ export const productsApi = {
   createProduct: productsAdapter.createProduct,
   updateProduct: productsAdapter.updateProduct,
   deleteProduct: productsAdapter.deleteProduct,
-  toggleStatus: productsAdapter.toggleStatus
+  toggleStatus: productsAdapter.toggleStatus,
+  // Service consumption tracking
+  incrementServiceCount: productsAdapter.incrementServiceCount,
+  getServiceCount: productsAdapter.getServiceCount,
+  resetServiceCount: productsAdapter.resetServiceCount
 };
 
 export const employeesApi = {

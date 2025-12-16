@@ -188,9 +188,7 @@ const Products = ({ embedded = false, onDataChange }) => {
 
     const newItem = {
       productId: product._id,
-      productName: product.name,
-      quantity: 0.05,
-      unit: 'bottle'
+      productName: product.name
     };
 
     setFieldValue('itemsUsed', [...formData.itemsUsed, newItem]);
@@ -198,14 +196,6 @@ const Products = ({ embedded = false, onDataChange }) => {
 
   const handleRemoveItemUsed = (productId) => {
     setFieldValue('itemsUsed', formData.itemsUsed.filter(item => item.productId !== productId));
-  };
-
-  const handleUpdateItemQuantity = (productId, quantity) => {
-    setFieldValue('itemsUsed', formData.itemsUsed.map(item =>
-      item.productId === productId
-        ? { ...item, quantity: parseFloat(quantity) || 0 }
-        : item
-    ));
   };
 
   // Filter configuration
@@ -495,7 +485,7 @@ const Products = ({ embedded = false, onDataChange }) => {
 
             <div className="form-group">
               <label>Items Used in Service</label>
-              <p className="form-hint">Select products consumed when performing this service (for AI tracking)</p>
+              <p className="form-hint">Link products used in this service. Usage rate is automatically learned when you adjust inventory.</p>
 
               <div className="items-used-add">
                 <select
@@ -521,17 +511,6 @@ const Products = ({ embedded = false, onDataChange }) => {
                   {formData.itemsUsed.map(item => (
                     <div key={item.productId} className="items-used-item">
                       <span className="item-name">🧴 {item.productName}</span>
-                      <div className="item-quantity">
-                        <input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => handleUpdateItemQuantity(item.productId, e.target.value)}
-                          min="0.01"
-                          step="0.01"
-                          className="form-control quantity-input"
-                        />
-                        <span className="item-unit">per service</span>
-                      </div>
                       <button
                         type="button"
                         className="btn-remove-item"

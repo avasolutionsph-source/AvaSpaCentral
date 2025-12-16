@@ -742,9 +742,9 @@ const Dashboard = () => {
           <span className="quick-btn-icon">📦</span>
           <span className="quick-btn-text">Inventory</span>
         </button>
-        <button className="quick-action-btn gradient" onClick={() => navigate('/ai-insights')}>
+        <button className="quick-action-btn gradient" onClick={() => navigate('/ava-sensei')}>
           <span className="quick-btn-icon">🤖</span>
-          <span className="quick-btn-text">AI Insights</span>
+          <span className="quick-btn-text">Ava Sensei</span>
         </button>
         <button className="quick-action-btn secondary" onClick={() => navigate('/reports')}>
           <span className="quick-btn-icon">📊</span>
@@ -761,7 +761,7 @@ const Dashboard = () => {
         {/* Financial Metrics */}
         <div className="kpi-card">
           <div className="kpi-header">
-            <h3>💰 Financial Metrics</h3>
+            <h3>₱ Financial Metrics</h3>
             <button
               className="icon-btn"
               onClick={() => setShowGoalModal(true)}
@@ -1092,43 +1092,6 @@ const Dashboard = () => {
                 </div>
               ))
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="quick-actions">
-        <h3>⚡ Quick Actions</h3>
-        <div className="quick-actions-grid">
-          <div className="quick-action-card" onClick={() => navigate('/pos')}>
-            <div className="action-icon">💳</div>
-            <h4>Open POS</h4>
-            <p>Process sales & transactions</p>
-          </div>
-          <div className="quick-action-card" onClick={() => navigate('/appointments')}>
-            <div className="action-icon">📅</div>
-            <h4>Manage Appointments</h4>
-            <p>View & schedule appointments</p>
-          </div>
-          <div className="quick-action-card" onClick={() => navigate('/attendance')}>
-            <div className="action-icon">⏰</div>
-            <h4>Check Attendance</h4>
-            <p>Clock in/out & view records</p>
-          </div>
-          <div className="quick-action-card" onClick={() => navigate('/products')}>
-            <div className="action-icon">📦</div>
-            <h4>Check Inventory</h4>
-            <p>Manage products & stock</p>
-          </div>
-          <div className="quick-action-card" onClick={refreshDashboard}>
-            <div className="action-icon">↻</div>
-            <h4>Sync Data</h4>
-            <p>Refresh all data</p>
-          </div>
-          <div className="quick-action-card" onClick={exportDailySales}>
-            <div className="action-icon">📊</div>
-            <h4>Export Daily Sales</h4>
-            <p>Download CSV report</p>
           </div>
         </div>
       </div>

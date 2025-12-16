@@ -80,6 +80,39 @@ export const productsAdapter = {
 
     const updated = await storageService.products.update(id, { active: !product.active });
     return { success: true, active: updated.active };
+  },
+
+  // Increment service count for a product (called when service using this product is performed)
+  async incrementServiceCount(productId, count = 1) {
+    await delay();
+    const product = await storageService.products.getById(productId);
+    if (!product) throw new Error('Product not found');
+
+    const currentCount = product.servicesSinceLastAdjustment || 0;
+    await storageService.products.update(productId, {
+      servicesSinceLastAdjustment: currentCount + count
+    });
+    return { success: true, newCount: currentCount + count };
+  },
+
+  // Get service count since last stock adjustment
+  async getServiceCount(productId) {
+    await delay();
+    const product = await storageService.products.getById(productId);
+    if (!product) throw new Error('Product not found');
+    return { success: true, count: product.servicesSinceLastAdjustment || 0 };
+  },
+
+  // Reset service count (called after stock adjustment)
+  async resetServiceCount(productId) {
+    await delay();
+    const product = await storageService.products.getById(productId);
+    if (!product) throw new Error('Product not found');
+
+    await storageService.products.update(productId, {
+      servicesSinceLastAdjustment: 0
+    });
+    return { success: true };
   }
 };
 
@@ -358,20 +391,49 @@ export const roomsAdapter = {
     await delay();
     const updateData = { status };
 
-    // Store timing and employee data when room becomes occupied
-    if (status === 'occupied' && timingData.startTime) {
-      updateData.startTime = timingData.startTime;
-      updateData.serviceDuration = timingData.serviceDuration;
-      updateData.transactionId = timingData.transactionId;
+    // Store data when room becomes pending (waiting for therapist to start)
+    if (status === 'pending') {
       updateData.assignedEmployeeId = timingData.employeeId || null;
       updateData.assignedEmployeeName = timingData.employeeName || null;
+      updateData.customerName = timingData.customerName || null;
+      updateData.customerPhone = timingData.customerPhone || null;
+      updateData.customerEmail = timingData.customerEmail || null;
+      updateData.serviceNames = timingData.serviceNames || [];
+      updateData.serviceDuration = timingData.serviceDuration || null;
+      updateData.transactionId = timingData.transactionId || null;
+      // Don't set startTime yet - therapist will set it when they start
+      updateData.startTime = null;
+    }
+    // Store timing and employee data when room becomes occupied (therapist starts service)
+    else if (status === 'occupied') {
+      // If startTime is provided, set it (therapist starting service)
+      if (timingData.startTime) {
+        updateData.startTime = timingData.startTime;
+      }
+      // Keep existing data if not provided (for transition from pending to occupied)
+      if (timingData.serviceDuration !== undefined) {
+        updateData.serviceDuration = timingData.serviceDuration;
+      }
+      if (timingData.transactionId !== undefined) {
+        updateData.transactionId = timingData.transactionId;
+      }
+      if (timingData.employeeId !== undefined) {
+        updateData.assignedEmployeeId = timingData.employeeId;
+      }
+      if (timingData.employeeName !== undefined) {
+        updateData.assignedEmployeeName = timingData.employeeName;
+      }
     } else if (status === 'available') {
-      // Clear timing and employee data when room becomes available
+      // Clear all data when room becomes available
       updateData.startTime = null;
       updateData.serviceDuration = null;
       updateData.transactionId = null;
       updateData.assignedEmployeeId = null;
       updateData.assignedEmployeeName = null;
+      updateData.customerName = null;
+      updateData.customerPhone = null;
+      updateData.customerEmail = null;
+      updateData.serviceNames = null;
     }
 
     const room = await storageService.rooms.update(id, updateData);
@@ -490,15 +552,31 @@ export const transactionsAdapter = {
       createdAt: new Date().toISOString()
     });
 
-    // Update product stock for sold items
+    // Update product stock for sold items and track service counts
     if (transaction.items) {
       for (const item of transaction.items) {
         if (item.type === 'product') {
+          // Deduct stock for retail product sales
           const product = await storageService.products.getById(item.id);
           if (product && product.stock !== undefined) {
             await storageService.products.update(item.id, {
               stock: product.stock - item.quantity
             });
+          }
+        } else if (item.type === 'service' && item.itemsUsed && item.itemsUsed.length > 0) {
+          // Increment service count for each linked product (for consumption tracking)
+          for (const linkedProduct of item.itemsUsed) {
+            try {
+              const product = await storageService.products.getById(linkedProduct.productId);
+              if (product) {
+                const currentCount = product.servicesSinceLastAdjustment || 0;
+                await storageService.products.update(linkedProduct.productId, {
+                  servicesSinceLastAdjustment: currentCount + item.quantity
+                });
+              }
+            } catch (err) {
+              console.error('Failed to increment service count for product:', linkedProduct.productId, err);
+            }
           }
         }
       }

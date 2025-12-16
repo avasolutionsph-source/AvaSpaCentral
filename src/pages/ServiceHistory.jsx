@@ -245,7 +245,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
       {/* Summary Cards */}
       <div className="service-summary-grid">
         <div className="service-summary-card revenue">
-          <div className="service-summary-icon">💰</div>
+          <div className="service-summary-icon">₱</div>
           <div className="service-summary-value">
             ₱{summary.revenue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </div>

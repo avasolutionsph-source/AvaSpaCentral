@@ -25,6 +25,22 @@ const Rooms = ({ embedded = false, onDataChange }) => {
   // Timer state for countdown on occupied rooms
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Stop service modal state
+  const [stopServiceModal, setStopServiceModal] = useState({ isOpen: false, room: null });
+  const [stopReason, setStopReason] = useState('');
+  const [isStoppingService, setIsStoppingService] = useState(false);
+
+  // Predefined stop reasons
+  const stopReasons = [
+    'Client request',
+    'Emergency',
+    'Client no-show',
+    'Technical issue',
+    'Health concern',
+    'Schedule conflict',
+    'Other'
+  ];
+
   // Room types and amenities options
   const roomTypes = ['Treatment Room', 'VIP Suite', 'Couples Room', 'Massage Room', 'Facial Room'];
   const availableAmenities = ['Air Conditioning', 'Hot Stone', 'Jacuzzi', 'Music System', 'Aromatherapy', 'Private Shower', 'Locker', 'Massage Table'];
@@ -145,10 +161,13 @@ const Rooms = ({ embedded = false, onDataChange }) => {
   const filteredRooms = useMemo(() => {
     let filtered = rooms;
 
-    // Filter by therapist if user is therapist
+    // For therapists: show rooms assigned to them OR available rooms
+    // This allows therapists to see their assigned rooms plus available ones
     if (isTherapist() && user?.employeeId) {
       filtered = filtered.filter(r =>
-        r.assignedTherapist === user.employeeId || r.assignedTherapist === null
+        r.assignedEmployeeId === user.employeeId ||
+        r.status === 'available' ||
+        r.status === 'maintenance'
       );
     }
 
@@ -180,6 +199,105 @@ const Rooms = ({ embedded = false, onDataChange }) => {
     }
   };
 
+  // Handle therapist starting service (pending -> occupied)
+  const handleStartServiceFromRoom = async (room) => {
+    try {
+      const startTime = new Date().toISOString();
+
+      // Update room to occupied and set startTime to NOW
+      await mockApi.rooms.updateRoomStatus(room._id, 'occupied', {
+        startTime: startTime
+      });
+
+      // Log service start event
+      await mockApi.activityLogs.createLog({
+        type: 'service',
+        action: 'Service Started',
+        description: `${room.serviceNames?.join(', ') || 'Service'} started in ${room.name}`,
+        user: {
+          firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
+          lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
+          role: user?.role || 'therapist'
+        },
+        ipAddress: 'localhost',
+        details: {
+          roomId: room._id,
+          roomName: room.name,
+          therapistId: room.assignedEmployeeId,
+          therapistName: room.assignedEmployeeName,
+          customerName: room.customerName,
+          customerPhone: room.customerPhone,
+          serviceNames: room.serviceNames,
+          plannedDuration: room.serviceDuration,
+          startTime: startTime,
+          status: 'started',
+          transactionId: room.transactionId
+        },
+        severity: 'info'
+      });
+
+      showToast('Service started! Timer is now running.', 'success');
+      loadRooms();
+    } catch (error) {
+      showToast('Failed to start service', 'error');
+    }
+  };
+
+  // Auto-complete rooms when timer expires
+  useEffect(() => {
+    const checkExpiredRooms = async () => {
+      for (const room of rooms) {
+        if (room.status === 'occupied' && room.startTime && room.serviceDuration) {
+          const remaining = getRemainingTime(room);
+          if (remaining && remaining.isExpired) {
+            try {
+              const endTime = new Date().toISOString();
+
+              // Log service completion event
+              await mockApi.activityLogs.createLog({
+                type: 'service',
+                action: 'Service Completed',
+                description: `${room.serviceNames?.join(', ') || 'Service'} completed in ${room.name}`,
+                user: {
+                  firstName: 'System',
+                  lastName: '',
+                  role: 'System'
+                },
+                ipAddress: 'localhost',
+                details: {
+                  roomId: room._id,
+                  roomName: room.name,
+                  therapistId: room.assignedEmployeeId,
+                  therapistName: room.assignedEmployeeName,
+                  customerName: room.customerName,
+                  customerPhone: room.customerPhone,
+                  serviceNames: room.serviceNames,
+                  plannedDuration: room.serviceDuration,
+                  actualDuration: room.serviceDuration,
+                  startTime: room.startTime,
+                  endTime: endTime,
+                  status: 'completed',
+                  transactionId: room.transactionId
+                },
+                severity: 'info'
+              });
+
+              await mockApi.rooms.updateRoomStatus(room._id, 'available');
+              showToast(`${room.name} service completed - room now available`, 'info');
+              loadRooms();
+            } catch (error) {
+              console.error('Failed to auto-complete room:', error);
+            }
+          }
+        }
+      }
+    };
+
+    // Check every 5 seconds for expired timers
+    const interval = setInterval(checkExpiredRooms, 5000);
+    return () => clearInterval(interval);
+  }, [rooms, currentTime]);
+
   // Handle starting a service from booking
   const handleStartService = async (booking) => {
     try {
@@ -195,6 +313,85 @@ const Rooms = ({ embedded = false, onDataChange }) => {
       loadUpcomingBookings();
     } catch (error) {
       showToast(error.message || 'Failed to start service', 'error');
+    }
+  };
+
+  // Open stop service modal
+  const openStopServiceModal = (room) => {
+    setStopServiceModal({ isOpen: true, room });
+    setStopReason('');
+  };
+
+  // Close stop service modal
+  const closeStopServiceModal = () => {
+    setStopServiceModal({ isOpen: false, room: null });
+    setStopReason('');
+  };
+
+  // Handle stopping service with reason
+  const handleStopService = async () => {
+    if (!stopReason) {
+      showToast('Please select a reason', 'error');
+      return;
+    }
+
+    const room = stopServiceModal.room;
+    if (!room) return;
+
+    setIsStoppingService(true);
+    try {
+      // Calculate actual duration
+      const now = new Date();
+      let actualDuration = 0;
+      let status = 'cancelled';
+
+      if (room.status === 'occupied' && room.startTime) {
+        const startTime = new Date(room.startTime);
+        actualDuration = Math.floor((now - startTime) / 60000); // minutes
+        status = 'ended_early';
+      }
+
+      // Log the service event
+      await mockApi.activityLogs.createLog({
+        type: 'service',
+        action: status === 'ended_early' ? 'Service Ended Early' : 'Service Cancelled',
+        description: `${room.serviceNames?.join(', ') || 'Service'} ${status === 'ended_early' ? 'ended early' : 'cancelled'}: ${stopReason}`,
+        user: {
+          firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
+          lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
+          role: user?.role || 'therapist'
+        },
+        ipAddress: 'localhost',
+        details: {
+          roomId: room._id,
+          roomName: room.name,
+          therapistId: room.assignedEmployeeId,
+          therapistName: room.assignedEmployeeName,
+          customerName: room.customerName,
+          customerPhone: room.customerPhone,
+          serviceNames: room.serviceNames,
+          plannedDuration: room.serviceDuration,
+          actualDuration: actualDuration,
+          startTime: room.startTime,
+          endTime: now.toISOString(),
+          status: status,
+          reason: stopReason,
+          transactionId: room.transactionId
+        },
+        severity: 'warning'
+      });
+
+      // Update room to available
+      await mockApi.rooms.updateRoomStatus(room._id, 'available');
+
+      showToast(`Service stopped: ${stopReason}`, 'info');
+      closeStopServiceModal();
+      loadRooms();
+    } catch (error) {
+      console.error('Failed to stop service:', error);
+      showToast('Failed to stop service', 'error');
+    } finally {
+      setIsStoppingService(false);
     }
   };
 
@@ -218,6 +415,7 @@ const Rooms = ({ embedded = false, onDataChange }) => {
       options: [
         { value: 'all', label: 'All Status' },
         { value: 'available', label: 'Available' },
+        { value: 'pending', label: 'Pending' },
         { value: 'occupied', label: 'Occupied' },
         { value: 'maintenance', label: 'Maintenance' }
       ]
@@ -267,74 +465,148 @@ const Rooms = ({ embedded = false, onDataChange }) => {
         />
       ) : (
         <div className="rooms-grid">
-          {filteredRooms.map(room => (
-            <div key={room._id} className={`room-card ${room.status}`}>
-              <div className="room-header">
-                <div className="room-icon">{getRoomIcon(room.type)}</div>
-                <span className={`room-status-badge ${room.status}`}>{room.status}</span>
-              </div>
-              <h3 className="room-name">{room.name}</h3>
-              <p className="room-type">{room.type}</p>
-              {/* Show assigned employee when room is occupied */}
-              {room.status === 'occupied' && room.assignedEmployeeName && (
-                <div className="room-assigned-employee">
-                  <span className="employee-icon">👤</span>
-                  <span className="employee-name">{room.assignedEmployeeName}</span>
+          {filteredRooms.map(room => {
+            // Check if this room is assigned to the current therapist
+            const isMyRoom = isTherapist() && user?.employeeId && room.assignedEmployeeId === user.employeeId;
+
+            return (
+              <div key={room._id} className={`room-card ${room.status}`}>
+                <div className="room-header">
+                  <div className="room-icon">{getRoomIcon(room.type)}</div>
+                  <span className={`room-status-badge ${room.status}`}>
+                    {room.status === 'pending' ? 'PENDING' : room.status}
+                  </span>
                 </div>
-              )}
-              <div className="room-details">
-                <div className="room-detail-row">
-                  <span className="room-detail-label">Capacity</span>
-                  <span className="room-detail-value">{room.capacity} {room.capacity === 1 ? 'person' : 'people'}</span>
+                <h3 className="room-name">{room.name}</h3>
+                <p className="room-type">{room.type}</p>
+
+                {/* Show assigned employee when room is pending or occupied */}
+                {(room.status === 'pending' || room.status === 'occupied') && room.assignedEmployeeName && (
+                  <div className="room-assigned-employee">
+                    <span className="employee-icon">👤</span>
+                    <span className="employee-name">{room.assignedEmployeeName}</span>
+                  </div>
+                )}
+
+                {/* Show customer info for pending/occupied rooms */}
+                {(room.status === 'pending' || room.status === 'occupied') && room.customerName && (
+                  <div className="room-customer-info">
+                    <div className="customer-info-header">Customer Info</div>
+                    <div className="customer-info-row">
+                      <span>👤</span>
+                      <span>{room.customerName}</span>
+                    </div>
+                    {room.customerPhone && (
+                      <div className="customer-info-row">
+                        <span>📞</span>
+                        <span>{room.customerPhone}</span>
+                      </div>
+                    )}
+                    {room.serviceNames && room.serviceNames.length > 0 && (
+                      <div className="customer-info-row">
+                        <span>💆</span>
+                        <span>{room.serviceNames.join(', ')}</span>
+                      </div>
+                    )}
+                    {room.serviceDuration && (
+                      <div className="customer-info-row">
+                        <span>⏱️</span>
+                        <span>{room.serviceDuration} min</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="room-details">
+                  <div className="room-detail-row">
+                    <span className="room-detail-label">Capacity</span>
+                    <span className="room-detail-value">{room.capacity} {room.capacity === 1 ? 'person' : 'people'}</span>
+                  </div>
                 </div>
-              </div>
-              {room.amenities && room.amenities.length > 0 && (
-                <div className="room-amenities">
-                  {room.amenities.slice(0, 3).map(amenity => (
-                    <span key={amenity} className="amenity-tag">{amenity}</span>
-                  ))}
-                  {room.amenities.length > 3 && (
-                    <span className="amenity-tag">+{room.amenities.length - 3}</span>
-                  )}
-                </div>
-              )}
-              {/* Countdown timer for occupied rooms */}
-              {room.status === 'occupied' && getRemainingTime(room) && (
-                <div className={`room-timer ${getRemainingTime(room).isCritical ? 'critical' : ''}`}>
-                  {getRemainingTime(room).isExpired ? (
-                    <span>Time's up!</span>
-                  ) : (
-                    <span>
-                      {getRemainingTime(room).minutes}:{String(getRemainingTime(room).seconds).padStart(2, '0')} remaining
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className="status-change-group">
-                {room.status !== 'available' && (
-                  <button className="btn btn-success" onClick={() => handleStatusChange(room, 'available')}>
-                    Available
+
+                {room.amenities && room.amenities.length > 0 && (
+                  <div className="room-amenities">
+                    {room.amenities.slice(0, 3).map(amenity => (
+                      <span key={amenity} className="amenity-tag">{amenity}</span>
+                    ))}
+                    {room.amenities.length > 3 && (
+                      <span className="amenity-tag">+{room.amenities.length - 3}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Start Service button for pending rooms (therapist view) */}
+                {room.status === 'pending' && (isMyRoom || !isTherapist()) && (
+                  <div className="service-action-buttons">
+                    <button
+                      className="btn btn-primary start-service-btn"
+                      onClick={() => handleStartServiceFromRoom(room)}
+                    >
+                      ▶️ Start Service
+                    </button>
+                    <button
+                      className="btn btn-error stop-service-btn"
+                      onClick={() => openStopServiceModal(room)}
+                    >
+                      ⏹️ Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Stop Service button for occupied rooms */}
+                {room.status === 'occupied' && (isMyRoom || !isTherapist()) && (
+                  <button
+                    className="btn btn-error stop-service-btn"
+                    onClick={() => openStopServiceModal(room)}
+                    style={{ marginTop: 'var(--spacing-sm)' }}
+                  >
+                    ⏹️ Stop Service
                   </button>
                 )}
-                {room.status !== 'occupied' && (
-                  <button className="btn btn-error" onClick={() => handleStatusChange(room, 'occupied')}>
-                    Occupied
-                  </button>
+
+                {/* Countdown timer for occupied rooms */}
+                {room.status === 'occupied' && getRemainingTime(room) && (
+                  <div className={`room-timer ${getRemainingTime(room).isCritical ? 'critical' : ''}`}>
+                    {getRemainingTime(room).isExpired ? (
+                      <span>Time's up!</span>
+                    ) : (
+                      <span>
+                        {getRemainingTime(room).minutes}:{String(getRemainingTime(room).seconds).padStart(2, '0')} remaining
+                      </span>
+                    )}
+                  </div>
                 )}
-                {room.status !== 'maintenance' && (
-                  <button className="btn btn-warning" onClick={() => handleStatusChange(room, 'maintenance')}>
-                    Maintenance
-                  </button>
+
+                {/* Status change buttons - only for admin/manager/receptionist */}
+                {!isTherapist() && (
+                  <div className="status-change-group">
+                    {room.status !== 'available' && (
+                      <button className="btn btn-success" onClick={() => handleStatusChange(room, 'available')}>
+                        Available
+                      </button>
+                    )}
+                    {room.status !== 'occupied' && room.status !== 'pending' && (
+                      <button className="btn btn-error" onClick={() => handleStatusChange(room, 'occupied')}>
+                        Occupied
+                      </button>
+                    )}
+                    {room.status !== 'maintenance' && (
+                      <button className="btn btn-warning" onClick={() => handleStatusChange(room, 'maintenance')}>
+                        Maintenance
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {canEdit() && (
+                  <div className="room-actions">
+                    <button className="btn btn-secondary" onClick={() => openEdit(room)}>Edit</button>
+                    <button className="btn btn-error" onClick={() => handleDelete(room)}>Delete</button>
+                  </div>
                 )}
               </div>
-              {canEdit() && (
-                <div className="room-actions">
-                  <button className="btn btn-secondary" onClick={() => openEdit(room)}>Edit</button>
-                  <button className="btn btn-error" onClick={() => handleDelete(room)}>Delete</button>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -471,6 +743,55 @@ const Rooms = ({ embedded = false, onDataChange }) => {
         confirmVariant="danger"
         isLoading={isDeleting}
       />
+
+      {/* Stop Service Modal */}
+      {stopServiceModal.isOpen && (
+        <div className="modal-overlay" onClick={closeStopServiceModal}>
+          <div className="modal stop-service-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{stopServiceModal.room?.status === 'pending' ? 'Cancel Service' : 'Stop Service'}</h3>
+              <button className="modal-close" onClick={closeStopServiceModal}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="stop-service-info">
+                <p><strong>Room:</strong> {stopServiceModal.room?.name}</p>
+                <p><strong>Therapist:</strong> {stopServiceModal.room?.assignedEmployeeName || 'N/A'}</p>
+                <p><strong>Customer:</strong> {stopServiceModal.room?.customerName || 'N/A'}</p>
+                <p><strong>Service:</strong> {stopServiceModal.room?.serviceNames?.join(', ') || 'N/A'}</p>
+                {stopServiceModal.room?.status === 'occupied' && stopServiceModal.room?.startTime && (
+                  <p><strong>Running for:</strong> {Math.floor((new Date() - new Date(stopServiceModal.room.startTime)) / 60000)} min</p>
+                )}
+              </div>
+              <div className="form-group">
+                <label>Reason for {stopServiceModal.room?.status === 'pending' ? 'cancellation' : 'stopping'} *</label>
+                <select
+                  value={stopReason}
+                  onChange={(e) => setStopReason(e.target.value)}
+                  className="form-control"
+                  required
+                >
+                  <option value="">Select a reason...</option>
+                  {stopReasons.map(reason => (
+                    <option key={reason} value={reason}>{reason}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={closeStopServiceModal}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleStopService}
+                disabled={!stopReason || isStoppingService}
+              >
+                {isStoppingService ? 'Stopping...' : (stopServiceModal.room?.status === 'pending' ? 'Cancel Service' : 'Stop Service')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

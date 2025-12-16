@@ -30,6 +30,11 @@
   border-color: var(--error);
 }
 
+.room-card.pending {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.03);
+}
+
 .room-card.maintenance {
   border-color: var(--gray-600);
 }
@@ -84,6 +89,18 @@
   background: var(--gray-100);
   color: var(--gray-600);
   border: 1px solid var(--gray-600);
+}
+
+.room-status-badge.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid #f59e0b;
+  animation: pulse-pending 2s ease-in-out infinite;
+}
+
+@keyframes pulse-pending {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* Room Info */
@@ -532,4 +549,130 @@
 @keyframes pulse-timer {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+
+/* ============================================================================
+   CUSTOMER INFO SECTION - Displayed on pending/occupied rooms
+   ============================================================================ */
+.room-customer-info {
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+}
+
+.room-customer-info .customer-info-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  margin-bottom: var(--spacing-sm);
+  letter-spacing: 0.03em;
+}
+
+.room-customer-info .customer-info-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--gray-700);
+  padding: 3px 0;
+}
+
+.room-customer-info .customer-info-row span:first-child {
+  font-size: 0.9rem;
+}
+
+/* ============================================================================
+   START SERVICE BUTTON - For therapists to start pending services
+   ============================================================================ */
+.start-service-btn {
+  width: 100%;
+  margin-top: var(--spacing-md);
+  padding: 12px 16px !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, var(--primary), #2d7f50) !important;
+  border: none !important;
+  color: var(--white) !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(27, 94, 55, 0.2);
+}
+
+.start-service-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(27, 94, 55, 0.3);
+}
+
+.start-service-btn:active {
+  transform: translateY(0);
+}
+
+/* ============================================================================
+   SERVICE ACTION BUTTONS - Start/Stop buttons container
+   ============================================================================ */
+.service-action-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.service-action-buttons .start-service-btn {
+  flex: 2;
+  margin-top: 0;
+}
+
+.service-action-buttons .stop-service-btn {
+  flex: 1;
+}
+
+/* ============================================================================
+   STOP SERVICE BUTTON
+   ============================================================================ */
+.stop-service-btn {
+  width: 100%;
+  padding: 10px 16px !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  background: var(--white) !important;
+  border: 2px solid var(--error) !important;
+  color: var(--error) !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stop-service-btn:hover {
+  background: var(--error) !important;
+  color: var(--white) !important;
+}
+
+/* ============================================================================
+   STOP SERVICE MODAL
+   ============================================================================ */
+.stop-service-modal {
+  max-width: 450px;
+}
+
+.stop-service-info {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.stop-service-info p {
+  margin: 6px 0;
+  font-size: 0.9rem;
+  color: var(--gray-700);
+}
+
+.stop-service-info p strong {
+  color: var(--gray-900);
+  min-width: 80px;
+  display: inline-block;
 }

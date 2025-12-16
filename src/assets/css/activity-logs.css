@@ -905,3 +905,72 @@
     overflow-y: auto;
   }
 }
+
+/* ============================================================================
+   SERVICE LOG DETAILS - Formatted display for service-type logs
+   ============================================================================ */
+.log-icon.service {
+  background: rgba(27, 94, 55, 0.1);
+}
+
+.service-log-details {
+  display: grid;
+  gap: 8px;
+  padding: var(--spacing-md);
+  background: var(--gray-50);
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
+}
+
+.service-detail-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: 0.85rem;
+}
+
+.service-detail-row.reason {
+  padding-top: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  border-top: 1px solid var(--gray-200);
+}
+
+.service-detail-label {
+  min-width: 120px;
+  font-weight: 600;
+  color: var(--gray-600);
+}
+
+.service-detail-row span:last-child {
+  color: var(--gray-900);
+}
+
+.service-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.service-status-badge.started {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.service-status-badge.completed {
+  background: rgba(27, 94, 55, 0.1);
+  color: var(--primary);
+}
+
+.service-status-badge.ended_early {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.service-status-badge.cancelled {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+}

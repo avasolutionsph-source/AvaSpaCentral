@@ -194,10 +194,10 @@ const POS = () => {
     loadScheduledEmployees();
   }, [isAdvanceBooking, advanceBookingData?.bookingDateTime]);
 
-  // Get employees currently doing services (assigned to occupied rooms)
+  // Get employees currently doing services (assigned to pending or occupied rooms)
   const busyEmployeeIds = useMemo(() => {
     return rooms
-      .filter(room => room.status === 'occupied' && room.assignedEmployeeId)
+      .filter(room => (room.status === 'occupied' || room.status === 'pending') && room.assignedEmployeeId)
       .map(room => room.assignedEmployeeId);
   }, [rooms]);
 
@@ -605,7 +605,8 @@ const POS = () => {
             type: item.type,
             price: item.price,
             quantity: item.quantity,
-            subtotal: item.subtotal
+            subtotal: item.subtotal,
+            itemsUsed: item.itemsUsed || [] // Include linked products for service tracking
           })),
           subtotal: getCartSubtotal(),
           discount: getDiscount(),
@@ -670,7 +671,7 @@ const POS = () => {
           await mockApi.serviceRotation.recordService(selectedEmployee);
         }
 
-        // Mark room as occupied if one was selected
+        // Mark room as pending (waiting for therapist to start service)
         if (selectedRoom) {
           try {
             // Calculate total service duration from cart (services only)
@@ -682,12 +683,36 @@ const POS = () => {
             const selectedEmp = employees.find(e => e._id === selectedEmployee);
             const employeeName = selectedEmp ? `${selectedEmp.firstName} ${selectedEmp.lastName}` : null;
 
-            await mockApi.rooms.updateRoomStatus(selectedRoom, 'occupied', {
-              startTime: new Date().toISOString(),
+            // Get service names for display
+            const serviceNames = cart
+              .filter(item => item.type === 'service')
+              .map(item => item.name);
+
+            // Get customer info
+            let customerName = null;
+            let customerPhone = null;
+            let customerEmail = null;
+
+            if (customerType === 'existing' && selectedCustomer) {
+              customerName = selectedCustomer.name;
+              customerPhone = selectedCustomer.phone;
+              customerEmail = selectedCustomer.email || null;
+            } else if (customerType === 'walk-in' && walkInCustomerData.name) {
+              customerName = walkInCustomerData.name;
+              customerPhone = walkInCustomerData.phone || null;
+              customerEmail = walkInCustomerData.email || null;
+            }
+
+            // Set room to pending - therapist will start the timer
+            await mockApi.rooms.updateRoomStatus(selectedRoom, 'pending', {
               serviceDuration: totalDuration,
               transactionId: receiptNumber,
               employeeId: selectedEmployee,
-              employeeName: employeeName
+              employeeName: employeeName,
+              serviceNames: serviceNames,
+              customerName: customerName,
+              customerPhone: customerPhone,
+              customerEmail: customerEmail
             });
           } catch (error) {
             console.error('Failed to update room status:', error);

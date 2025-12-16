@@ -254,7 +254,7 @@ const GiftCertificates = () => {
           </div>
         </div>
         <div className="gc-stat-card value-stat">
-          <div className="gc-stat-icon">💰</div>
+          <div className="gc-stat-icon">₱</div>
           <div className="gc-stat-content">
             <div className="gc-stat-value">₱{stats.totalValue.toLocaleString()}</div>
             <div className="gc-stat-label">Total Active Value</div>
@@ -287,7 +287,6 @@ const GiftCertificates = () => {
       {/* Gift Certificates Grid */}
       {filteredGCs.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">🎁</div>
           <h3>No gift certificates found</h3>
           <p>{searchTerm || filterStatus !== 'all' ? 'Try adjusting your filters or search term' : 'Create your first gift certificate to get started'}</p>
           <button className="btn btn-primary" onClick={openCreateModal}>+ Create Gift Certificate</button>

@@ -204,3 +204,31 @@ export const formatDuration = (minutes) => {
   if (mins === 0) return `${hours} hr`;
   return `${hours} hr ${mins} min`;
 };
+
+/**
+ * Convert 24-hour time string to 12-hour AM/PM format
+ * @param {string} time24 - Time in 24-hour format (e.g., "14:30" or "09:00")
+ * @returns {string} Time in 12-hour format (e.g., "2:30 PM" or "9:00 AM")
+ */
+export const formatTime12Hour = (time24) => {
+  if (!time24) return '';
+
+  const [hours, minutes] = time24.split(':').map(Number);
+  if (isNaN(hours) || isNaN(minutes)) return time24;
+
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+
+  return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
+};
+
+/**
+ * Format a time range in 12-hour format
+ * @param {string} startTime - Start time in 24-hour format
+ * @param {string} endTime - End time in 24-hour format
+ * @returns {string} Formatted range (e.g., "9:00 AM - 5:00 PM")
+ */
+export const formatTimeRange = (startTime, endTime) => {
+  if (!startTime || !endTime) return '';
+  return `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
+};

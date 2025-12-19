@@ -24,7 +24,8 @@ const AdvanceBookingCheckout = ({
     roomId: '',
     isHomeService: false,
     specialRequests: '',
-    clientNotes: '' // New field for preferences/allergies
+    clientNotes: '',
+    clientAddress: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -66,7 +67,8 @@ const AdvanceBookingCheckout = ({
         roomId: '',
         isHomeService: false,
         specialRequests: '',
-        clientNotes: ''
+        clientNotes: '',
+        clientAddress: ''
       });
       setErrors({});
     }
@@ -134,13 +136,7 @@ const AdvanceBookingCheckout = ({
       }
     }
 
-    if (bookingData.isHomeService && !walkInCustomerData.address.trim()) {
-      newErrors.clientAddress = 'Address is required for home service';
-    }
-
-    if (!bookingData.isHomeService && !bookingData.roomId) {
-      newErrors.location = 'Please select a room';
-    }
+    // Room validation is handled in POS.jsx
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -420,46 +416,6 @@ const AdvanceBookingCheckout = ({
             )}
           </div>
 
-          {/* Service Location */}
-          <div className="form-group">
-            <label>Service Location *</label>
-            <select
-              value={bookingData.isHomeService ? 'home' : bookingData.roomId}
-              onChange={(e) => handleChange('location', e.target.value)}
-              className={errors.location ? 'error' : ''}
-            >
-              <option value="">Select location...</option>
-              <optgroup label="Rooms">
-                {rooms && rooms.map(room => (
-                  <option key={room._id} value={room._id}>
-                    {room.name} - {room.type}
-                  </option>
-                ))}
-              </optgroup>
-              <option value="home">🏠 Home Service</option>
-            </select>
-            {errors.location && (
-              <span className="error-message">{errors.location}</span>
-            )}
-          </div>
-
-          {/* Address for Home Service */}
-          {bookingData.isHomeService && (
-            <div className="form-group">
-              <label>Client Address *</label>
-              <textarea
-                value={bookingData.clientAddress}
-                onChange={(e) => handleChange('clientAddress', e.target.value)}
-                className={errors.clientAddress ? 'error' : ''}
-                placeholder="Enter complete address"
-                rows="2"
-              />
-              {errors.clientAddress && (
-                <span className="error-message">{errors.clientAddress}</span>
-              )}
-            </div>
-          )}
-
           {/* Special Requests */}
           <div className="form-group">
             <label>Special Requests (Optional)</label>
@@ -485,7 +441,7 @@ const AdvanceBookingCheckout = ({
                 onChange={(e) => handleChange('paymentTiming', e.target.value)}
               />
               <div className="radio-content">
-                <span className="radio-title">💰 Pay Now (Advance Payment)</span>
+                <span className="radio-title">Pay Now (Advance Payment)</span>
                 <span className="radio-desc">Collect payment immediately</span>
               </div>
             </label>
@@ -498,7 +454,7 @@ const AdvanceBookingCheckout = ({
                 onChange={(e) => handleChange('paymentTiming', e.target.value)}
               />
               <div className="radio-content">
-                <span className="radio-title">📅 Pay After Service</span>
+                <span className="radio-title">Pay After Service</span>
                 <span className="radio-desc">Collect payment after service completion</span>
               </div>
             </label>

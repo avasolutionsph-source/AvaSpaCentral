@@ -21,7 +21,7 @@ import React, { memo } from 'react';
  * - className: additional CSS classes
  */
 const EmptyState = memo(function EmptyState({
-  icon = '📋',
+  icon,
   title,
   description,
   action,
@@ -36,9 +36,11 @@ const EmptyState = memo(function EmptyState({
 
   return (
     <div className={containerClasses}>
-      <div className="empty-state-icon" aria-hidden="true">
-        {icon}
-      </div>
+      {icon && (
+        <div className="empty-state-icon" aria-hidden="true">
+          {icon}
+        </div>
+      )}
       <h3 className="empty-state-title">{title}</h3>
       {description && (
         <p className="empty-state-description">{description}</p>

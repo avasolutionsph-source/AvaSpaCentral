@@ -515,7 +515,7 @@ const AIChatbot = () => {
     <div className="chatbot-page">
       <div className="page-header">
         <div>
-          <h1>✨ Ava</h1>
+          <h1>Ava</h1>
           <p>Your AI business assistant - Get instant insights and manage your spa with ease</p>
         </div>
         <div className="header-actions">

@@ -33,28 +33,24 @@ const Reports = ({ embedded = false }) => {
     {
       id: 'financial',
       title: 'Financial Reports',
-      icon: '💰',
       description: 'Revenue, expenses, profit & loss statements',
       count: 4
     },
     {
       id: 'operations',
       title: 'Operations Reports',
-      icon: '📊',
       description: 'Services, appointments, and room utilization',
       count: 5
     },
     {
       id: 'employee',
       title: 'Employee Reports',
-      icon: '👥',
       description: 'Performance, attendance, and payroll reports',
       count: 6
     },
     {
       id: 'customer',
       title: 'Customer Reports',
-      icon: '👤',
       description: 'Customer insights, retention, and loyalty',
       count: 3
     }
@@ -62,30 +58,30 @@ const Reports = ({ embedded = false }) => {
 
   const reports = {
     financial: [
-      { id: 'pl', name: 'Profit & Loss Statement', icon: '📈' },
-      { id: 'revenue', name: 'Revenue Analysis', icon: '💵' },
-      { id: 'expenses', name: 'Expense Breakdown', icon: '💸' },
-      { id: 'cashflow', name: 'Cash Flow Report', icon: '💰' }
+      { id: 'pl', name: 'Profit & Loss Statement' },
+      { id: 'revenue', name: 'Revenue Analysis' },
+      { id: 'expenses', name: 'Expense Breakdown' },
+      { id: 'cashflow', name: 'Cash Flow Report' }
     ],
     operations: [
-      { id: 'services', name: 'Service Performance', icon: '🛍️' },
-      { id: 'appointments', name: 'Appointment Analytics', icon: '📅' },
-      { id: 'rooms', name: 'Room Utilization', icon: '🚪' },
-      { id: 'inventory', name: 'Inventory Turnover', icon: '📦' },
-      { id: 'daily', name: 'Daily Operations Summary', icon: '📋' }
+      { id: 'services', name: 'Service Performance' },
+      { id: 'appointments', name: 'Appointment Analytics' },
+      { id: 'rooms', name: 'Room Utilization' },
+      { id: 'inventory', name: 'Inventory Turnover' },
+      { id: 'daily', name: 'Daily Operations Summary' }
     ],
     employee: [
-      { id: 'performance', name: 'Employee Performance', icon: '⭐' },
-      { id: 'attendance', name: 'Attendance Report', icon: '⏰' },
-      { id: 'payroll', name: 'Payroll Summary', icon: '💰' },
-      { id: 'commission', name: 'Commission Report', icon: '💵' },
-      { id: 'schedule', name: 'Schedule Analysis', icon: '📆' },
-      { id: 'productivity', name: 'Productivity Metrics', icon: '📊' }
+      { id: 'performance', name: 'Employee Performance' },
+      { id: 'attendance', name: 'Attendance Report' },
+      { id: 'payroll', name: 'Payroll Summary' },
+      { id: 'commission', name: 'Commission Report' },
+      { id: 'schedule', name: 'Schedule Analysis' },
+      { id: 'productivity', name: 'Productivity Metrics' }
     ],
     customer: [
-      { id: 'insights', name: 'Customer Insights', icon: '🔍' },
-      { id: 'retention', name: 'Retention Analysis', icon: '🔄' },
-      { id: 'loyalty', name: 'Loyalty Program Report', icon: '🎁' }
+      { id: 'insights', name: 'Customer Insights' },
+      { id: 'retention', name: 'Retention Analysis' },
+      { id: 'loyalty', name: 'Loyalty Program Report' }
     ]
   };
 
@@ -2537,7 +2533,6 @@ const Reports = ({ embedded = false }) => {
               className={`report-category-card ${category.id}`}
               onClick={() => setSelectedCategory(category.id)}
             >
-              <div className="category-icon">{category.icon}</div>
               <h3 className="category-title">{category.title}</h3>
               <p className="category-description">{category.description}</p>
               <span className="category-count">{category.count} reports</span>
@@ -2588,7 +2583,7 @@ const Reports = ({ embedded = false }) => {
               <option value="">Select a report...</option>
               {reports[selectedCategory]?.map(report => (
                 <option key={report.id} value={report.id}>
-                  {report.icon} {report.name}
+                  {report.name}
                 </option>
               ))}
             </select>

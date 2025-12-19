@@ -28,7 +28,8 @@ import {
   payrollRequestsAdapter,
   cashDrawerAdapter,
   shiftSchedulesAdapter,
-  usersAdapter
+  usersAdapter,
+  homeServicesAdapter
 } from '../services/api';
 
 // Import APIs that we haven't migrated yet from the original mockApi
@@ -196,12 +197,22 @@ export const usersApi = {
   delete: usersAdapter.deleteUser
 };
 
+// Home Services API (now using Dexie)
+export const homeServicesApi = {
+  getHomeServices: homeServicesAdapter.getHomeServices,
+  getActiveHomeServices: homeServicesAdapter.getActiveHomeServices,
+  createHomeService: homeServicesAdapter.createHomeService,
+  updateHomeServiceStatus: homeServicesAdapter.updateHomeServiceStatus,
+  deleteHomeService: homeServicesAdapter.deleteHomeService
+};
+
 // Shift Schedules API (now using Dexie)
 export const shiftSchedulesApi = {
   getShiftConfig: shiftSchedulesAdapter.getShiftConfig,
   updateShiftConfig: shiftSchedulesAdapter.updateShiftConfig,
   getTemplates: shiftSchedulesAdapter.getTemplates,
   getAllSchedules: shiftSchedulesAdapter.getAllSchedules,
+  getScheduleForDate: shiftSchedulesAdapter.getScheduleForDate,
   getScheduleByEmployee: shiftSchedulesAdapter.getScheduleByEmployee,
   getMySchedule: shiftSchedulesAdapter.getMySchedule,
   createSchedule: shiftSchedulesAdapter.createSchedule,
@@ -251,5 +262,6 @@ export default {
   analytics: analyticsApi,
   suppliers: suppliersApi,
   purchaseOrders: purchaseOrdersApi,
-  users: usersApi
+  users: usersApi,
+  homeServices: homeServicesApi
 };

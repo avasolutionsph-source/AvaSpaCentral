@@ -214,28 +214,24 @@ const Suppliers = ({ embedded = false }) => {
       {/* Summary Cards */}
       <div className="suppliers-summary">
         <div className="summary-card">
-          <div className="summary-icon">🏢</div>
           <div className="summary-content">
             <span className="summary-value">{suppliers.length}</span>
             <span className="summary-label">Total Suppliers</span>
           </div>
         </div>
         <div className="summary-card">
-          <div className="summary-icon">✅</div>
           <div className="summary-content">
             <span className="summary-value">{suppliers.filter(s => s.status === 'active').length}</span>
             <span className="summary-label">Active</span>
           </div>
         </div>
         <div className="summary-card">
-          <div className="summary-icon">📦</div>
           <div className="summary-content">
             <span className="summary-value">{categories.length}</span>
             <span className="summary-label">Categories</span>
           </div>
         </div>
         <div className="summary-card">
-          <div className="summary-icon">⭐</div>
           <div className="summary-content">
             <span className="summary-value">
               {suppliers.length > 0 ? (suppliers.reduce((sum, s) => sum + (s.rating || 0), 0) / suppliers.length).toFixed(1) : '0'}
@@ -262,7 +258,6 @@ const Suppliers = ({ embedded = false }) => {
       <div className="suppliers-table-container">
         {filteredSuppliers.length === 0 ? (
           <EmptyState
-            icon="🏢"
             title="No suppliers found"
             description="Try adjusting your filters or add a new supplier"
             action={{ label: '+ Add Supplier', onClick: openCreate }}

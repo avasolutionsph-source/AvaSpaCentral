@@ -233,28 +233,24 @@ const GiftCertificates = () => {
       {/* Statistics Cards */}
       <div className="gc-stats-grid">
         <div className="gc-stat-card active-stat">
-          <div className="gc-stat-icon">✓</div>
           <div className="gc-stat-content">
             <div className="gc-stat-value">{stats.active}</div>
             <div className="gc-stat-label">Active</div>
           </div>
         </div>
         <div className="gc-stat-card redeemed-stat">
-          <div className="gc-stat-icon">🎯</div>
           <div className="gc-stat-content">
             <div className="gc-stat-value">{stats.redeemed}</div>
             <div className="gc-stat-label">Redeemed</div>
           </div>
         </div>
         <div className="gc-stat-card expired-stat">
-          <div className="gc-stat-icon">⏰</div>
           <div className="gc-stat-content">
             <div className="gc-stat-value">{stats.expired}</div>
             <div className="gc-stat-label">Expired</div>
           </div>
         </div>
         <div className="gc-stat-card value-stat">
-          <div className="gc-stat-icon">₱</div>
           <div className="gc-stat-content">
             <div className="gc-stat-value">₱{stats.totalValue.toLocaleString()}</div>
             <div className="gc-stat-label">Total Active Value</div>

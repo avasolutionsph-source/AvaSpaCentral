@@ -420,22 +420,22 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       {/* Summary Cards */}
       <div className="inventory-summary-grid">
         <div className="inventory-summary-card total-value">
-          <div className="inventory-summary-icon">₱</div>
+          <div className="inventory-summary-icon"></div>
           <div className="inventory-summary-value">₱{summary.totalValue.toLocaleString()}</div>
           <div className="inventory-summary-label">Total Inventory Value</div>
         </div>
         <div className="inventory-summary-card total-items">
-          <div className="inventory-summary-icon">📦</div>
+          <div className="inventory-summary-icon"></div>
           <div className="inventory-summary-value">{summary.totalItems}</div>
           <div className="inventory-summary-label">Total Items</div>
         </div>
         <div className="inventory-summary-card low-stock">
-          <div className="inventory-summary-icon">⚠️</div>
+          <div className="inventory-summary-icon"></div>
           <div className="inventory-summary-value">{summary.lowStock}</div>
           <div className="inventory-summary-label">Low Stock Alerts</div>
         </div>
         <div className="inventory-summary-card out-stock">
-          <div className="inventory-summary-icon">🚫</div>
+          <div className="inventory-summary-icon"></div>
           <div className="inventory-summary-value">{summary.outOfStock}</div>
           <div className="inventory-summary-label">Out of Stock</div>
         </div>
@@ -602,7 +602,7 @@ const Inventory = ({ embedded = false, onDataChange }) => {
                       <span className="product-category">{product.category}</span>
                     </div>
                   </td>
-                  <td className="right">{product.stock}</td>
+                  <td className="right">{product.stock} {product.unit || 'pcs'}</td>
                   <td className="right">{product.lowStockAlert}</td>
                   <td className="right">₱{product.cost?.toLocaleString() || 0}</td>
                   <td className="right">

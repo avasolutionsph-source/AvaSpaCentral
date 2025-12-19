@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
+import { homeServicesApi, transactionsApi } from '../mockApi/offlineApi';
 import { format, parseISO } from 'date-fns';
 
 // Import new shared components and hooks
@@ -26,9 +27,12 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Stop service modal state
-  const [stopServiceModal, setStopServiceModal] = useState({ isOpen: false, room: null });
+  const [stopServiceModal, setStopServiceModal] = useState({ isOpen: false, room: null, isHomeService: false });
   const [stopReason, setStopReason] = useState('');
   const [isStoppingService, setIsStoppingService] = useState(false);
+
+  // Home services state
+  const [homeServices, setHomeServices] = useState([]);
 
   // Predefined stop reasons
   const stopReasons = [
@@ -40,6 +44,73 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     'Schedule conflict',
     'Other'
   ];
+
+  // Helper function to create transaction for pay-after advance booking services
+  const createPayAfterTransaction = async (booking) => {
+    if (!booking || booking.paymentTiming !== 'pay-after') {
+      return null;
+    }
+
+    const receiptNumber = `RCP-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    // Parse service names from booking
+    const serviceNames = booking.serviceName ? booking.serviceName.split(' + ') : [];
+    const servicePrice = booking.servicePrice || 0;
+
+    // Build transaction matching POS structure
+    const transaction = {
+      businessId: 'biz_001',
+      receiptNumber,
+      date: now,
+      items: serviceNames.map((name, index) => ({
+        id: `service_${booking._id}_${index}`,
+        name: name.trim(),
+        type: 'service',
+        price: index === 0 ? servicePrice : 0, // Put full price on first item
+        quantity: 1,
+        subtotal: index === 0 ? servicePrice : 0,
+        itemsUsed: []
+      })),
+      subtotal: servicePrice,
+      discount: 0,
+      discountType: null,
+      tax: 0,
+      totalAmount: servicePrice,
+      paymentMethod: 'Cash', // Assume cash for pay-after
+      amountReceived: servicePrice,
+      change: 0,
+      cardTransactionId: null,
+      gcashReference: null,
+      employee: {
+        id: booking.employeeId,
+        name: booking.employeeName,
+        position: 'Therapist',
+        commission: 0
+      },
+      customer: {
+        name: booking.clientName || booking.customerName,
+        phone: booking.clientPhone || booking.customerPhone,
+        email: booking.clientEmail || booking.customerEmail || null
+      },
+      bookingSource: 'advance-booking',
+      status: 'completed',
+      roomId: booking.roomId || null,
+      roomName: booking.roomName || null,
+      isHomeService: booking.isHomeService || false,
+      homeServiceAddress: booking.clientAddress || booking.address || null,
+      advanceBookingId: booking._id || booking.id
+    };
+
+    try {
+      await transactionsApi.createTransaction(transaction);
+      console.log('[Rooms] Created transaction for pay-after booking:', receiptNumber);
+      return transaction;
+    } catch (error) {
+      console.error('[Rooms] Failed to create pay-after transaction:', error);
+      return null;
+    }
+  };
 
   // Room types and amenities options
   const roomTypes = ['Treatment Room', 'VIP Suite', 'Couples Room', 'Massage Room', 'Facial Room'];
@@ -134,9 +205,58 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     }
   };
 
-  // Load bookings on mount and when user changes
+  // Load active home services (both direct home services and advance booking home services)
+  const loadHomeServices = async () => {
+    try {
+      // Load direct home services (from regular checkout)
+      let services = await homeServicesApi.getActiveHomeServices();
+
+      // Also load home service advance bookings (scheduled/confirmed/in-progress with isHomeService flag)
+      let bookings = await mockApi.advanceBooking.listAdvanceBookings();
+      const homeServiceBookings = bookings
+        .filter(b =>
+          b.isHomeService &&
+          ['scheduled', 'confirmed', 'in-progress'].includes(b.status)
+        )
+        .map(b => ({
+          // Transform booking to match home service card format
+          _id: b._id || b.id,
+          status: b.status === 'in-progress' ? 'occupied' : 'pending', // Map booking status to home service status
+          employeeId: b.employeeId,
+          employeeName: b.employeeName,
+          customerName: b.clientName,
+          customerPhone: b.clientPhone,
+          customerEmail: b.clientEmail || null,
+          address: b.clientAddress,
+          serviceNames: b.serviceName ? b.serviceName.split(' + ') : [],
+          serviceDuration: b.estimatedDuration || 60,
+          transactionId: b.transactionId,
+          startTime: b.actualStartTime || null, // Use actualStartTime for in-progress bookings
+          createdAt: b.createdAt || new Date().toISOString(),
+          scheduledDateTime: b.bookingDateTime, // Keep for display
+          isAdvanceBooking: true, // Flag to identify advance booking home services
+          paymentTiming: b.paymentTiming,
+          paymentStatus: b.paymentStatus
+        }));
+
+      // Merge both sources
+      services = [...services, ...homeServiceBookings];
+
+      // Role-based filtering (if therapist, only show their home services)
+      if (isTherapist() && user?.employeeId) {
+        services = services.filter(s => s.employeeId === user.employeeId);
+      }
+
+      setHomeServices(services);
+    } catch (error) {
+      console.error('Failed to load home services:', error);
+    }
+  };
+
+  // Load bookings and home services on mount and when user changes
   useEffect(() => {
     loadUpcomingBookings();
+    loadHomeServices();
   }, [user]);
 
   // Update time every second for countdown timers
@@ -164,23 +284,43 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     };
   };
 
+  // Helper function to calculate remaining time for home services
+  const getHomeServiceRemainingTime = (service) => {
+    if (service.status !== 'occupied' || !service.startTime || !service.serviceDuration) {
+      return null;
+    }
+
+    const startTime = new Date(service.startTime);
+    const endTime = new Date(startTime.getTime() + service.serviceDuration * 60000);
+    const remaining = Math.max(0, endTime - currentTime);
+
+    return {
+      minutes: Math.floor(remaining / 60000),
+      seconds: Math.floor((remaining % 60000) / 1000),
+      totalSeconds: Math.floor(remaining / 1000),
+      isExpired: remaining <= 0,
+      isCritical: remaining <= 5 * 60000 && remaining > 0 // 5 minutes or less
+    };
+  };
+
   // Filter rooms based on status and role
+  // By default, only show rooms with active services (pending/occupied)
   const filteredRooms = useMemo(() => {
     let filtered = rooms;
 
-    // For therapists: show rooms assigned to them OR available rooms
-    // This allows therapists to see their assigned rooms plus available ones
-    if (isTherapist() && user?.employeeId) {
-      filtered = filtered.filter(r =>
-        r.assignedEmployeeId === user.employeeId ||
-        r.status === 'available' ||
-        r.status === 'maintenance'
-      );
+    // First filter: Only show rooms with active services by default (pending/occupied)
+    // Unless explicitly filtering for available or maintenance
+    if (filterStatus === 'all') {
+      // Default view: only pending and occupied rooms
+      filtered = filtered.filter(r => r.status === 'pending' || r.status === 'occupied');
+    } else {
+      // Apply specific status filter
+      filtered = filtered.filter(r => r.status === filterStatus);
     }
 
-    // Apply status filter
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(r => r.status === filterStatus);
+    // For therapists: only show rooms assigned to them
+    if (isTherapist() && user?.employeeId) {
+      filtered = filtered.filter(r => r.assignedEmployeeId === user.employeeId);
     }
 
     return filtered;
@@ -250,6 +390,58 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     }
   };
 
+  // Handle starting home service (pending -> occupied)
+  const handleStartHomeService = async (service) => {
+    try {
+      const startTime = new Date().toISOString();
+
+      // Handle advance booking home services differently
+      if (service.isAdvanceBooking) {
+        // Use advance booking API to start service
+        await mockApi.advanceBooking.startServiceFromBooking(service._id);
+      } else {
+        // Regular home service
+        await homeServicesApi.updateHomeServiceStatus(service._id, 'occupied', {
+          startTime: startTime
+        });
+      }
+
+      // Log home service start event
+      await mockApi.activityLogs.createLog({
+        type: 'service',
+        action: 'Home Service Started',
+        description: `Home service started for ${service.customerName} at ${service.address}`,
+        user: {
+          firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
+          lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
+          role: user?.role || 'therapist'
+        },
+        ipAddress: 'localhost',
+        details: {
+          homeServiceId: service._id,
+          therapistId: service.employeeId,
+          therapistName: service.employeeName,
+          customerName: service.customerName,
+          customerPhone: service.customerPhone,
+          address: service.address,
+          serviceNames: service.serviceNames,
+          plannedDuration: service.serviceDuration,
+          startTime: startTime,
+          status: 'started',
+          transactionId: service.transactionId,
+          isAdvanceBooking: service.isAdvanceBooking || false
+        },
+        severity: 'info'
+      });
+
+      showToast('Home service started! Timer is now running.', 'success');
+      loadHomeServices();
+    } catch (error) {
+      console.error('Failed to start home service:', error);
+      showToast('Failed to start home service', 'error');
+    }
+  };
+
   // Auto-complete rooms when timer expires
   useEffect(() => {
     const checkExpiredRooms = async () => {
@@ -289,6 +481,20 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                 severity: 'info'
               });
 
+              // Handle pay-after advance booking room services
+              if (room.advanceBookingId && room.paymentTiming === 'pay-after') {
+                try {
+                  const booking = await mockApi.advanceBooking.getAdvanceBooking(room.advanceBookingId);
+                  await createPayAfterTransaction(booking);
+                  await mockApi.advanceBooking.completeServiceFromBooking(room.advanceBookingId, {
+                    paymentMethod: 'Cash'
+                  });
+                  showToast(`${room.name} service completed and payment recorded`, 'success');
+                } catch (bookingError) {
+                  console.error('Failed to complete advance booking:', bookingError);
+                }
+              }
+
               await mockApi.rooms.updateRoomStatus(room._id, 'available');
               showToast(`${room.name} service completed - room now available`, 'info');
               loadRooms();
@@ -304,6 +510,84 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     const interval = setInterval(checkExpiredRooms, 5000);
     return () => clearInterval(interval);
   }, [rooms, currentTime]);
+
+  // Auto-complete home services when timer expires
+  useEffect(() => {
+    const checkExpiredHomeServices = async () => {
+      for (const service of homeServices) {
+        if (service.status === 'occupied' && service.startTime && service.serviceDuration) {
+          const remaining = getHomeServiceRemainingTime(service);
+          if (remaining && remaining.isExpired) {
+            try {
+              const endTime = new Date().toISOString();
+
+              // Log home service completion event
+              await mockApi.activityLogs.createLog({
+                type: 'service',
+                action: 'Home Service Completed',
+                description: `Home service completed for ${service.customerName} at ${service.address}`,
+                user: {
+                  firstName: 'System',
+                  lastName: '',
+                  role: 'System'
+                },
+                ipAddress: 'localhost',
+                details: {
+                  homeServiceId: service._id,
+                  therapistId: service.employeeId,
+                  therapistName: service.employeeName,
+                  customerName: service.customerName,
+                  customerPhone: service.customerPhone,
+                  address: service.address,
+                  serviceNames: service.serviceNames,
+                  plannedDuration: service.serviceDuration,
+                  actualDuration: service.serviceDuration,
+                  startTime: service.startTime,
+                  endTime: endTime,
+                  status: 'completed',
+                  transactionId: service.transactionId
+                },
+                severity: 'info'
+              });
+
+              // Handle advance booking home services - create transaction for pay-after
+              if (service.isAdvanceBooking) {
+                // Get the full booking data
+                try {
+                  const booking = await mockApi.advanceBooking.getAdvanceBooking(service._id);
+
+                  // Create transaction for pay-after bookings
+                  if (booking.paymentTiming === 'pay-after') {
+                    await createPayAfterTransaction(booking);
+                    showToast(`Home service completed and payment recorded`, 'success');
+                  }
+
+                  // Complete the advance booking
+                  await mockApi.advanceBooking.completeServiceFromBooking(service._id, {
+                    paymentMethod: 'Cash'
+                  });
+                } catch (bookingError) {
+                  console.error('Failed to complete advance booking:', bookingError);
+                }
+              } else {
+                // Delete regular home service card on completion
+                await homeServicesApi.deleteHomeService(service._id);
+              }
+
+              showToast(`Home service for ${service.customerName} completed`, 'info');
+              loadHomeServices();
+            } catch (error) {
+              console.error('Failed to auto-complete home service:', error);
+            }
+          }
+        }
+      }
+    };
+
+    // Check every 5 seconds for expired timers
+    const interval = setInterval(checkExpiredHomeServices, 5000);
+    return () => clearInterval(interval);
+  }, [homeServices, currentTime]);
 
   // Handle starting a service from booking
   const handleStartService = async (booking) => {
@@ -324,14 +608,14 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   };
 
   // Open stop service modal
-  const openStopServiceModal = (room) => {
-    setStopServiceModal({ isOpen: true, room });
+  const openStopServiceModal = (room, isHomeService = false) => {
+    setStopServiceModal({ isOpen: true, room, isHomeService });
     setStopReason('');
   };
 
   // Close stop service modal
   const closeStopServiceModal = () => {
-    setStopServiceModal({ isOpen: false, room: null });
+    setStopServiceModal({ isOpen: false, room: null, isHomeService: false });
     setStopReason('');
   };
 
@@ -343,6 +627,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     }
 
     const room = stopServiceModal.room;
+    const isHomeService = stopServiceModal.isHomeService;
     if (!room) return;
 
     setIsStoppingService(true);
@@ -358,42 +643,130 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
         status = 'ended_early';
       }
 
-      // Log the service event
-      await mockApi.activityLogs.createLog({
-        type: 'service',
-        action: status === 'ended_early' ? 'Service Ended Early' : 'Service Cancelled',
-        description: `${room.serviceNames?.join(', ') || 'Service'} ${status === 'ended_early' ? 'ended early' : 'cancelled'}: ${stopReason}`,
-        user: {
-          firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
-          lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
-          role: user?.role || 'therapist'
-        },
-        ipAddress: 'localhost',
-        details: {
-          roomId: room._id,
-          roomName: room.name,
-          therapistId: room.assignedEmployeeId,
-          therapistName: room.assignedEmployeeName,
-          customerName: room.customerName,
-          customerPhone: room.customerPhone,
-          serviceNames: room.serviceNames,
-          plannedDuration: room.serviceDuration,
-          actualDuration: actualDuration,
-          startTime: room.startTime,
-          endTime: now.toISOString(),
-          status: status,
-          reason: stopReason,
-          transactionId: room.transactionId
-        },
-        severity: 'warning'
-      });
+      if (isHomeService) {
+        // Handle home service stop
+        await mockApi.activityLogs.createLog({
+          type: 'service',
+          action: status === 'ended_early' ? 'Home Service Ended Early' : 'Home Service Cancelled',
+          description: `Home service for ${room.customerName} ${status === 'ended_early' ? 'ended early' : 'cancelled'}: ${stopReason}`,
+          user: {
+            firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
+            lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
+            role: user?.role || 'therapist'
+          },
+          ipAddress: 'localhost',
+          details: {
+            homeServiceId: room._id,
+            therapistId: room.employeeId,
+            therapistName: room.employeeName,
+            customerName: room.customerName,
+            customerPhone: room.customerPhone,
+            address: room.address,
+            serviceNames: room.serviceNames,
+            plannedDuration: room.serviceDuration,
+            actualDuration: actualDuration,
+            startTime: room.startTime,
+            endTime: now.toISOString(),
+            status: status,
+            reason: stopReason,
+            transactionId: room.transactionId,
+            isAdvanceBooking: room.isAdvanceBooking || false
+          },
+          severity: 'warning'
+        });
 
-      // Update room to available
-      await mockApi.rooms.updateRoomStatus(room._id, 'available');
+        // Handle advance booking home services vs regular home services
+        if (room.isAdvanceBooking) {
+          // If service was in progress (ended early), create transaction for pay-after and complete
+          if (status === 'ended_early' && room.paymentTiming === 'pay-after') {
+            try {
+              const booking = await mockApi.advanceBooking.getAdvanceBooking(room._id);
+              await createPayAfterTransaction(booking);
+              await mockApi.advanceBooking.completeServiceFromBooking(room._id, {
+                paymentMethod: 'Cash'
+              });
+              showToast(`Home service completed and payment recorded`, 'success');
+            } catch (bookingError) {
+              console.error('Failed to complete pay-after booking:', bookingError);
+            }
+          } else {
+            // Cancel the advance booking (not started or pay-now)
+            await mockApi.advanceBooking.updateAdvanceBooking(room._id, {
+              status: 'cancelled',
+              cancelReason: stopReason,
+              cancelledAt: now.toISOString()
+            });
+            showToast(`Home service stopped: ${stopReason}`, 'info');
+          }
+        } else {
+          // Delete regular home service card
+          await homeServicesApi.deleteHomeService(room._id);
+          showToast(`Home service stopped: ${stopReason}`, 'info');
+        }
+        loadHomeServices();
+      } else {
+        // Handle room service stop
+        await mockApi.activityLogs.createLog({
+          type: 'service',
+          action: status === 'ended_early' ? 'Service Ended Early' : 'Service Cancelled',
+          description: `${room.serviceNames?.join(', ') || 'Service'} ${status === 'ended_early' ? 'ended early' : 'cancelled'}: ${stopReason}`,
+          user: {
+            firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
+            lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
+            role: user?.role || 'therapist'
+          },
+          ipAddress: 'localhost',
+          details: {
+            roomId: room._id,
+            roomName: room.name,
+            therapistId: room.assignedEmployeeId,
+            therapistName: room.assignedEmployeeName,
+            customerName: room.customerName,
+            customerPhone: room.customerPhone,
+            serviceNames: room.serviceNames,
+            plannedDuration: room.serviceDuration,
+            actualDuration: actualDuration,
+            startTime: room.startTime,
+            endTime: now.toISOString(),
+            status: status,
+            reason: stopReason,
+            transactionId: room.transactionId
+          },
+          severity: 'warning'
+        });
 
-      showToast(`Service stopped: ${stopReason}`, 'info');
+        // Handle pay-after advance booking room services
+        if (room.advanceBookingId && room.paymentTiming === 'pay-after' && status === 'ended_early') {
+          try {
+            const booking = await mockApi.advanceBooking.getAdvanceBooking(room.advanceBookingId);
+            await createPayAfterTransaction(booking);
+            await mockApi.advanceBooking.completeServiceFromBooking(room.advanceBookingId, {
+              paymentMethod: 'Cash'
+            });
+            showToast(`Service completed and payment recorded`, 'success');
+          } catch (bookingError) {
+            console.error('Failed to complete pay-after booking:', bookingError);
+          }
+        } else if (room.advanceBookingId && status === 'cancelled') {
+          // Cancel the advance booking if service was cancelled (not started)
+          try {
+            await mockApi.advanceBooking.updateAdvanceBooking(room.advanceBookingId, {
+              status: 'cancelled',
+              cancelReason: stopReason,
+              cancelledAt: now.toISOString()
+            });
+          } catch (bookingError) {
+            console.error('Failed to cancel advance booking:', bookingError);
+          }
+        }
+
+        // Update room to available
+        await mockApi.rooms.updateRoomStatus(room._id, 'available');
+        showToast(`Service stopped: ${stopReason}`, 'info');
+        loadRooms();
+      }
+
       closeStopServiceModal();
-      loadRooms();
     } catch (error) {
       console.error('Failed to stop service:', error);
       showToast('Failed to stop service', 'error');
@@ -420,8 +793,8 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       key: 'status',
       value: filterStatus,
       options: [
-        { value: 'all', label: 'All Status' },
-        { value: 'available', label: 'Available' },
+        { value: 'all', label: 'Active Services' },
+        { value: 'available', label: 'Available Rooms' },
         { value: 'pending', label: 'Pending' },
         { value: 'occupied', label: 'Occupied' },
         { value: 'maintenance', label: 'Maintenance' }
@@ -457,14 +830,14 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       />
 
       {/* Rooms Grid or Empty State */}
-      {filteredRooms.length === 0 ? (
+      {filteredRooms.length === 0 && homeServices.length === 0 ? (
         <EmptyState
           icon="🚪"
-          title="No rooms found"
-          description="Try adjusting your filters"
-          action={canEdit() ? { label: 'Add Your First Room', onClick: openCreate } : null}
+          title={filterStatus === 'all' ? 'No active services' : 'No rooms found'}
+          description={filterStatus === 'all' ? 'No rooms are currently occupied or pending. Services will appear here when assigned via POS.' : 'Try adjusting your filters'}
+          action={canEdit() ? { label: 'Add Room', onClick: openCreate } : null}
         />
-      ) : (
+      ) : filteredRooms.length === 0 ? null : (
         <div className="rooms-grid">
           {filteredRooms.map(room => {
             // Check if this room is assigned to the current therapist
@@ -608,6 +981,131 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Home Services Section */}
+      {homeServices.length > 0 && (
+        <div className="home-services-section">
+          <h3>Home Services</h3>
+          <div className="home-services-grid">
+            {homeServices.map(service => {
+              const isMyService = isTherapist() && user?.employeeId && service.employeeId === user.employeeId;
+              const timeRemaining = getHomeServiceRemainingTime(service);
+
+              return (
+                <div key={service._id} className={`home-service-card ${service.status} ${service.isAdvanceBooking ? 'advance-booking' : ''}`}>
+                  <div className="home-service-header">
+                    <div className="home-service-icon">🏠</div>
+                    <span className={`home-service-status-badge ${service.status}`}>
+                      {service.status === 'pending' ? 'PENDING' : 'IN PROGRESS'}
+                    </span>
+                    {service.isAdvanceBooking && (
+                      <span className="home-service-type-badge scheduled">SCHEDULED</span>
+                    )}
+                  </div>
+                  <h3 className="home-service-title">Home Service</h3>
+
+                  {/* Scheduled DateTime for advance bookings */}
+                  {service.isAdvanceBooking && service.scheduledDateTime && (
+                    <div className="home-service-scheduled">
+                      <span className="schedule-icon">📅</span>
+                      <span className="schedule-datetime">
+                        {format(parseISO(service.scheduledDateTime), 'MMM d, yyyy h:mm a')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Therapist Info */}
+                  <div className="home-service-therapist">
+                    <span className="therapist-icon">👤</span>
+                    <span className="therapist-name">{service.employeeName}</span>
+                  </div>
+
+                  {/* Customer & Service Info */}
+                  <div className="home-service-info">
+                    <div className="info-header">Service Details</div>
+                    <div className="info-row">
+                      <span>👤</span>
+                      <span>{service.customerName}</span>
+                    </div>
+                    {service.customerPhone && (
+                      <div className="info-row">
+                        <span>📞</span>
+                        <span>{service.customerPhone}</span>
+                      </div>
+                    )}
+                    <div className="info-row">
+                      <span>📍</span>
+                      <span>{service.address}</span>
+                    </div>
+                    {service.serviceNames && service.serviceNames.length > 0 && (
+                      <div className="info-row">
+                        <span>💆</span>
+                        <span>{service.serviceNames.join(', ')}</span>
+                      </div>
+                    )}
+                    {service.serviceDuration && (
+                      <div className="info-row">
+                        <span>⏱️</span>
+                        <span>{service.serviceDuration} min</span>
+                      </div>
+                    )}
+                    {service.isAdvanceBooking && service.paymentStatus && (
+                      <div className="info-row">
+                        <span>💰</span>
+                        <span className={`payment-status ${service.paymentStatus}`}>
+                          {service.paymentStatus === 'paid' ? 'Paid' : 'Pay After Service'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Start Service button for pending home services */}
+                  {service.status === 'pending' && (isMyService || !isTherapist()) && (
+                    <div className="service-action-buttons">
+                      <button
+                        className="btn btn-primary start-service-btn"
+                        onClick={() => handleStartHomeService(service)}
+                      >
+                        ▶️ Start Service
+                      </button>
+                      <button
+                        className="btn btn-error stop-service-btn"
+                        onClick={() => openStopServiceModal(service, true)}
+                      >
+                        ⏹️ Cancel
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Stop Service button for occupied home services */}
+                  {service.status === 'occupied' && (isMyService || !isTherapist()) && (
+                    <button
+                      className="btn btn-error stop-service-btn"
+                      onClick={() => openStopServiceModal(service, true)}
+                      style={{ marginTop: 'var(--spacing-sm)' }}
+                    >
+                      ⏹️ Stop Service
+                    </button>
+                  )}
+
+                  {/* Countdown timer for occupied home services */}
+                  {service.status === 'occupied' && timeRemaining && (
+                    <div className={`room-timer ${timeRemaining.isCritical ? 'critical' : ''}`}>
+                      {timeRemaining.isExpired ? (
+                        <span>Time's up!</span>
+                      ) : (
+                        <span>
+                          {timeRemaining.minutes}:{String(timeRemaining.seconds).padStart(2, '0')} remaining
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -755,10 +1253,22 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
             </div>
             <div className="modal-body">
               <div className="stop-service-info">
-                <p><strong>Room:</strong> {stopServiceModal.room?.name}</p>
-                <p><strong>Therapist:</strong> {stopServiceModal.room?.assignedEmployeeName || 'N/A'}</p>
-                <p><strong>Customer:</strong> {stopServiceModal.room?.customerName || 'N/A'}</p>
-                <p><strong>Service:</strong> {stopServiceModal.room?.serviceNames?.join(', ') || 'N/A'}</p>
+                {stopServiceModal.isHomeService ? (
+                  <>
+                    <p><strong>Type:</strong> Home Service</p>
+                    <p><strong>Therapist:</strong> {stopServiceModal.room?.employeeName || 'N/A'}</p>
+                    <p><strong>Customer:</strong> {stopServiceModal.room?.customerName || 'N/A'}</p>
+                    <p><strong>Address:</strong> {stopServiceModal.room?.address || 'N/A'}</p>
+                    <p><strong>Service:</strong> {stopServiceModal.room?.serviceNames?.join(', ') || 'N/A'}</p>
+                  </>
+                ) : (
+                  <>
+                    <p><strong>Room:</strong> {stopServiceModal.room?.name}</p>
+                    <p><strong>Therapist:</strong> {stopServiceModal.room?.assignedEmployeeName || 'N/A'}</p>
+                    <p><strong>Customer:</strong> {stopServiceModal.room?.customerName || 'N/A'}</p>
+                    <p><strong>Service:</strong> {stopServiceModal.room?.serviceNames?.join(', ') || 'N/A'}</p>
+                  </>
+                )}
                 {stopServiceModal.room?.status === 'occupied' && stopServiceModal.room?.startTime && (
                   <p><strong>Running for:</strong> {Math.floor((new Date() - new Date(stopServiceModal.room.startTime)) / 60000)} min</p>
                 )}

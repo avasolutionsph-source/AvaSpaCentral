@@ -761,7 +761,7 @@ const Dashboard = () => {
         {/* Financial Metrics */}
         <div className="kpi-card">
           <div className="kpi-header">
-            <h3>₱ Financial Metrics</h3>
+            <h3>Financial Metrics</h3>
             <button
               className="icon-btn"
               onClick={() => setShowGoalModal(true)}
@@ -815,7 +815,7 @@ const Dashboard = () => {
         {/* Operational Metrics */}
         <div className="kpi-card">
           <div className="kpi-header">
-            <h3>📊 Operational Metrics</h3>
+            <h3>Operational Metrics</h3>
           </div>
           <div className="kpi-items">
             <div className="kpi-item">
@@ -840,7 +840,7 @@ const Dashboard = () => {
         {/* Staff Metrics */}
         <div className="kpi-card">
           <div className="kpi-header">
-            <h3>👥 Staff Metrics</h3>
+            <h3>Staff Metrics</h3>
           </div>
           <div className="kpi-items">
             <div className="kpi-item">
@@ -884,7 +884,7 @@ const Dashboard = () => {
         {/* Inventory Metrics */}
         <div className="kpi-card">
           <div className="kpi-header">
-            <h3>📦 Inventory Metrics</h3>
+            <h3>Inventory Metrics</h3>
           </div>
           <div className="kpi-items">
             <div className="kpi-item clickable" onClick={() => navigate('/products')}>
@@ -909,7 +909,7 @@ const Dashboard = () => {
         {/* Advance Booking - Pending Revenue */}
         <div className="kpi-card">
           <div className="kpi-header">
-            <h3>💰 Pending Revenue</h3>
+            <h3>Pending Revenue</h3>
           </div>
           <div className="kpi-items">
             <div className="kpi-item clickable" onClick={() => navigate('/appointments')}>
@@ -926,7 +926,7 @@ const Dashboard = () => {
         {/* Advance Booking - Today's Bookings */}
         <div className="kpi-card">
           <div className="kpi-header">
-            <h3>📅 Today's Bookings</h3>
+            <h3>Today's Bookings</h3>
           </div>
           <div className="kpi-items">
             <div className="kpi-item clickable" onClick={() => navigate('/appointments')}>

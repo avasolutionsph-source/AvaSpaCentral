@@ -65,13 +65,11 @@ const HRHub = () => {
     {
       id: 'employees',
       label: 'Employees',
-      icon: '👥',
       badge: null
     },
     {
       id: 'payroll',
       label: 'Payroll',
-      icon: '₱',
       badge: stats.pendingRequests > 0 ? stats.pendingRequests : null,
       badgeType: 'warning'
     },
@@ -79,7 +77,6 @@ const HRHub = () => {
     ...(isOwner() ? [{
       id: 'accounts',
       label: 'Accounts',
-      icon: '🔐',
       badge: stats.totalAccounts > 0 ? stats.totalAccounts : null,
       badgeType: 'info'
     }] : [])
@@ -90,7 +87,6 @@ const HRHub = () => {
       <div className="hub-header">
         <div className="hub-title-row">
           <div className="hub-title">
-            <span className="hub-title-icon">👥</span>
             <div>
               <h1>HR Hub</h1>
               <p className="hub-subtitle">Manage employees and process payroll</p>
@@ -165,7 +161,6 @@ const HRHub = () => {
               className={`hub-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
-              <span className="hub-tab-icon">{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.badge && (
                 <span className={`hub-tab-badge ${tab.badgeType || ''}`}>

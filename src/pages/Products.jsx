@@ -23,6 +23,7 @@ const initialFormData = {
   cost: '',
   duration: '',
   stock: '',
+  unit: 'pcs',
   lowStockAlert: '',
   description: '',
   itemsUsed: [],
@@ -30,6 +31,20 @@ const initialFormData = {
 };
 
 const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
+
+// Unit options for products
+const unitOptions = [
+  { value: 'pcs', label: 'pcs' },
+  { value: 'pack', label: 'pack' },
+  { value: 'box', label: 'box' },
+  { value: 'dozen', label: 'dozen' },
+  { value: 'ml', label: 'ml' },
+  { value: 'L', label: 'L' },
+  { value: 'gallon', label: 'gallon' },
+  { value: 'g', label: 'g' },
+  { value: 'kg', label: 'kg' },
+  { value: 'lb', label: 'lb' }
+];
 
 const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const { showToast, canEdit } = useApp();
@@ -109,6 +124,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       cost: product.cost?.toString() || '',
       duration: product.duration?.toString() || '',
       stock: product.stock?.toString() || '',
+      unit: product.unit || 'pcs',
       lowStockAlert: product.lowStockAlert?.toString() || '',
       description: product.description || '',
       itemsUsed: product.itemsUsed || [],
@@ -122,6 +138,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       cost: data.type === 'product' ? parseFloat(data.cost) : undefined,
       duration: data.type === 'service' ? parseInt(data.duration) : undefined,
       stock: data.type === 'product' ? parseInt(data.stock) : undefined,
+      unit: data.type === 'product' ? data.unit : undefined,
       lowStockAlert: data.type === 'product' && data.lowStockAlert ? parseInt(data.lowStockAlert) : undefined,
       description: data.description.trim(),
       itemsUsed: data.type === 'service' ? data.itemsUsed : [],
@@ -304,7 +321,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                   {product.type === 'product' && (
                     <>
                       <span className={`info-tag ${product.stock <= product.lowStockAlert ? 'stock-warning' : ''}`}>
-                        📦 {product.stock} {product.stock <= product.lowStockAlert && '⚠️'}
+                        📦 {product.stock} {product.unit || 'pcs'} {product.stock <= product.lowStockAlert && '⚠️'}
                       </span>
                       <span className="info-tag">💰 ₱{product.cost?.toLocaleString() || 0}</span>
                     </>
@@ -441,16 +458,28 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
             <div className="form-row">
               <div className="form-group">
                 <label>Stock *</label>
-                <input
-                  type="number"
-                  name="stock"
-                  value={formData.stock}
-                  onChange={handleInputChange}
-                  placeholder="0"
-                  className="form-control"
-                  min="0"
-                  required
-                />
+                <div className="stock-with-unit">
+                  <input
+                    type="number"
+                    name="stock"
+                    value={formData.stock}
+                    onChange={handleInputChange}
+                    placeholder="0"
+                    className="form-control"
+                    min="0"
+                    required
+                  />
+                  <select
+                    name="unit"
+                    value={formData.unit}
+                    onChange={handleInputChange}
+                    className="form-control unit-select"
+                  >
+                    {unitOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="form-group">
                 <label>Low Stock Alert</label>

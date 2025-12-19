@@ -1746,7 +1746,8 @@ select {
 .page-header h1 {
   margin: 0;
   font-size: 1.5rem;
-  font-weight: var(--font-semibold);
+  font-weight: 700;
+  color: var(--gray-900);
 }
 
 .page-header p {
@@ -2458,6 +2459,115 @@ select {
   border-top: 1px solid var(--gray-200);
 }
 
+/* Transaction Detail Modal */
+.transaction-detail-modal {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
+}
+
+.transaction-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.transaction-detail-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.transaction-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.info-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-weight: 500;
+  color: var(--gray-900);
+}
+
+.items-section {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.items-section h3 {
+  margin: 0 0 var(--spacing-md) 0;
+  font-size: 1rem;
+}
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.items-table th,
+.items-table td {
+  padding: var(--spacing-sm);
+  text-align: left;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.items-table th {
+  font-weight: 600;
+  color: var(--gray-500);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.items-table .right {
+  text-align: right;
+}
+
+.payment-summary {
+  padding: var(--spacing-lg);
+  background: var(--gray-50);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-xs) 0;
+}
+
+.summary-line.total {
+  border-top: 2px solid var(--gray-300);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.summary-value {
+  font-weight: 500;
+}
+
 .alert {
   padding: var(--spacing-md);
   border-radius: var(--radius-md);
@@ -2792,6 +2902,23 @@ select {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin: var(--spacing-xs) 0 var(--spacing-sm) 0;
+}
+
+/* Stock with unit input layout */
+.stock-with-unit {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.stock-with-unit input[type="number"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.stock-with-unit .unit-select {
+  width: auto;
+  min-width: 80px;
+  flex-shrink: 0;
 }
 
 .items-used-add {

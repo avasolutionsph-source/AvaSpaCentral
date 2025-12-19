@@ -368,28 +368,24 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
       {/* Summary Cards */}
       <div className="po-summary">
         <div className="summary-card">
-          <div className="summary-icon">📋</div>
           <div className="summary-content">
             <span className="summary-value">{summary.totalOrders || 0}</span>
             <span className="summary-label">Total Orders</span>
           </div>
         </div>
         <div className="summary-card pending">
-          <div className="summary-icon">⏳</div>
           <div className="summary-content">
             <span className="summary-value">{summary.pendingOrders || 0}</span>
             <span className="summary-label">Pending Approval</span>
           </div>
         </div>
         <div className="summary-card">
-          <div className="summary-icon">✅</div>
           <div className="summary-content">
             <span className="summary-value">{summary.approvedOrders || 0}</span>
             <span className="summary-label">Approved</span>
           </div>
         </div>
         <div className="summary-card">
-          <div className="summary-icon">₱</div>
           <div className="summary-content">
             <span className="summary-value">₱{(summary.totalValue || 0).toLocaleString()}</span>
             <span className="summary-label">This Month</span>
@@ -456,7 +452,6 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
       <div className="po-table-container">
         {filteredOrders.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📦</div>
             <h3>No purchase orders found</h3>
             <p>Try adjusting your filters or create a new purchase order</p>
             <button className="btn btn-primary" onClick={openCreateModal}>

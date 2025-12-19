@@ -357,10 +357,6 @@
   gap: var(--spacing-sm);
 }
 
-.quick-actions-panel h3::before {
-  content: '⚡';
-  font-size: 1.5rem;
-}
 
 .quick-actions-grid {
   display: grid;

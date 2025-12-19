@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
+import { formatTime12Hour, formatTimeRange } from '../utils/dateUtils';
 import {
   format,
   startOfWeek,
@@ -219,9 +220,9 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
       exportText += `${format(day, 'EEEE, MMMM d')}:\n`;
       items.forEach(item => {
         if (item.type === 'shift') {
-          exportText += `  - Shift: ${item.startTime} - ${item.endTime}\n`;
+          exportText += `  - Shift: ${formatTimeRange(item.startTime, item.endTime)}\n`;
         } else if (item.type === 'appointment') {
-          exportText += `  - Appointment: ${item.title} (${item.customer}) ${item.startTime}-${item.endTime}\n`;
+          exportText += `  - Appointment: ${item.title} (${item.customer}) ${formatTimeRange(item.startTime, item.endTime)}\n`;
         } else if (item.type === 'day-off') {
           exportText += `  - Day Off\n`;
         }
@@ -366,22 +367,18 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
       {/* Summary Cards */}
       <div className="schedule-summary-grid">
         <div className="schedule-summary-card shifts">
-          <div className="schedule-summary-icon">📋</div>
           <div className="schedule-summary-value">{summary.shifts}</div>
           <div className="schedule-summary-label">Total Shifts</div>
         </div>
         <div className="schedule-summary-card hours">
-          <div className="schedule-summary-icon">⏰</div>
           <div className="schedule-summary-value">{summary.hours}h</div>
           <div className="schedule-summary-label">Scheduled Hours</div>
         </div>
         <div className="schedule-summary-card appointments">
-          <div className="schedule-summary-icon">📅</div>
           <div className="schedule-summary-value">{summary.appointments}</div>
           <div className="schedule-summary-label">Appointments</div>
         </div>
         <div className="schedule-summary-card days-off">
-          <div className="schedule-summary-icon">🏖️</div>
           <div className="schedule-summary-value">{summary.daysOff}</div>
           <div className="schedule-summary-label">Days Off</div>
         </div>
@@ -446,7 +443,7 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
                         >
                           <span className="shift-item-icon">{item.icon}</span>
                           {item.startTime && (
-                            <span className="shift-item-time">{item.startTime}</span>
+                            <span className="shift-item-time">{formatTime12Hour(item.startTime)}</span>
                           )}
                         </div>
                       ))}
@@ -494,7 +491,7 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
                               <div className="schedule-detail-item">
                                 <div className="schedule-detail-label">Time</div>
                                 <div className="schedule-detail-value">
-                                  {item.startTime} - {item.endTime}
+                                  {formatTimeRange(item.startTime, item.endTime)}
                                 </div>
                               </div>
                             )}

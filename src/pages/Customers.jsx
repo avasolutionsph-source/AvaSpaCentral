@@ -587,7 +587,6 @@ const Customers = () => {
                 transition: 'all 0.2s'
               }}
             >
-              <div style={{ fontSize: '1.5rem' }}>👑</div>
               <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().VIP}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>VIP (₱50K+)</div>
             </div>
@@ -605,7 +604,6 @@ const Customers = () => {
                 color: tierFilter === 'REGULAR' ? 'white' : 'inherit'
               }}
             >
-              <div style={{ fontSize: '1.5rem' }}>⭐</div>
               <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().REGULAR}</div>
               <div style={{ fontSize: '0.8rem', color: tierFilter === 'REGULAR' ? 'rgba(255,255,255,0.8)' : 'var(--gray-600)' }}>Regular (₱20K+)</div>
             </div>
@@ -622,7 +620,6 @@ const Customers = () => {
                 transition: 'all 0.2s'
               }}
             >
-              <div style={{ fontSize: '1.5rem' }}>🌱</div>
               <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().NEW}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>New (&lt;₱20K)</div>
             </div>

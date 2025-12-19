@@ -401,6 +401,9 @@ export const roomsAdapter = {
       updateData.serviceNames = timingData.serviceNames || [];
       updateData.serviceDuration = timingData.serviceDuration || null;
       updateData.transactionId = timingData.transactionId || null;
+      // Track advance booking info for pay-after transaction creation
+      updateData.advanceBookingId = timingData.advanceBookingId || null;
+      updateData.paymentTiming = timingData.paymentTiming || null;
       // Don't set startTime yet - therapist will set it when they start
       updateData.startTime = null;
     }
@@ -434,6 +437,8 @@ export const roomsAdapter = {
       updateData.customerPhone = null;
       updateData.customerEmail = null;
       updateData.serviceNames = null;
+      updateData.advanceBookingId = null;
+      updateData.paymentTiming = null;
     }
 
     const room = await storageService.rooms.update(id, updateData);
@@ -1309,14 +1314,33 @@ export const shiftSchedulesAdapter = {
   // Get shift configuration
   async getShiftConfig() {
     await delay();
+    // Try to get from database first
+    const savedConfig = await db.settings.get('shiftConfig');
+    if (savedConfig?.value) {
+      return clone(savedConfig.value);
+    }
+    // Fall back to default from mockDatabase
     return clone(mockDatabase.shiftConfig);
   },
 
   // Update shift configuration
   async updateShiftConfig(config) {
     await delay();
-    mockDatabase.shiftConfig = { ...mockDatabase.shiftConfig, ...config };
-    return clone(mockDatabase.shiftConfig);
+    // Get current config
+    const currentConfig = await this.getShiftConfig();
+    const updatedConfig = { ...currentConfig, ...config };
+
+    // Save to database for persistence
+    await db.settings.put({
+      key: 'shiftConfig',
+      value: updatedConfig,
+      _updatedAt: new Date().toISOString()
+    });
+
+    // Also update mockDatabase for consistency
+    mockDatabase.shiftConfig = updatedConfig;
+
+    return clone(updatedConfig);
   },
 
   // Get all schedule templates
@@ -1328,6 +1352,37 @@ export const shiftSchedulesAdapter = {
   async getAllSchedules() {
     await delay();
     return clone(await storageService.shiftSchedules.getAllSchedules());
+  },
+
+  // Get employees scheduled for a specific date (for advance booking)
+  async getScheduleForDate(dateString) {
+    await delay();
+    const allSchedules = await storageService.shiftSchedules.getAllSchedules();
+
+    // Parse the date to get the day of week
+    const date = new Date(dateString);
+    const dayOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
+
+    // Filter to employees who are scheduled (not off) on that day
+    const scheduledEmployees = allSchedules
+      .filter(schedule => {
+        if (!schedule.isActive) return false;
+        const daySchedule = schedule.weeklySchedule?.[dayOfWeek];
+        return daySchedule && daySchedule.shift !== 'off';
+      })
+      .map(schedule => {
+        const daySchedule = schedule.weeklySchedule[dayOfWeek];
+        return {
+          employeeId: schedule.employeeId,
+          employeeName: schedule.employeeName,
+          employeePosition: schedule.employeePosition,
+          shift: daySchedule.shift,
+          startTime: daySchedule.startTime,
+          endTime: daySchedule.endTime
+        };
+      });
+
+    return clone(scheduledEmployees);
   },
 
   async getScheduleByEmployee(employeeId) {
@@ -1471,6 +1526,83 @@ export const shiftSchedulesAdapter = {
 };
 
 // =============================================================================
+// HOME SERVICES API ADAPTER
+// =============================================================================
+
+export const homeServicesAdapter = {
+  async getHomeServices(filters = {}) {
+    await delay();
+    let services = await db.homeServices.toArray();
+
+    if (filters.status) {
+      services = services.filter(s => s.status === filters.status);
+    }
+    if (filters.employeeId) {
+      services = services.filter(s => s.employeeId === filters.employeeId);
+    }
+
+    return clone(services);
+  },
+
+  async getActiveHomeServices() {
+    await delay();
+    const services = await db.homeServices
+      .where('status')
+      .anyOf(['pending', 'occupied'])
+      .toArray();
+    return clone(services);
+  },
+
+  async createHomeService(data) {
+    await delay();
+    const id = `hs_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const homeService = {
+      _id: id,
+      status: 'pending', // pending -> occupied -> completed
+      employeeId: data.employeeId,
+      employeeName: data.employeeName,
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      customerEmail: data.customerEmail || null,
+      address: data.address,
+      serviceNames: data.serviceNames || [],
+      serviceDuration: data.serviceDuration || 60,
+      transactionId: data.transactionId,
+      startTime: null,
+      createdAt: new Date().toISOString()
+    };
+
+    await db.homeServices.add(homeService);
+    return clone(homeService);
+  },
+
+  async updateHomeServiceStatus(id, status, timingData = {}) {
+    await delay();
+    const existing = await db.homeServices.get(id);
+    if (!existing) throw new Error('Home service not found');
+
+    let updateData = { status };
+
+    if (status === 'occupied') {
+      updateData.startTime = timingData.startTime || new Date().toISOString();
+    } else if (status === 'completed') {
+      updateData.completedAt = new Date().toISOString();
+    }
+
+    const updated = { ...existing, ...updateData };
+    await db.homeServices.put(updated);
+    return clone(updated);
+  },
+
+  async deleteHomeService(id) {
+    await delay();
+    await db.homeServices.delete(id);
+    return { success: true };
+  }
+};
+
+// =============================================================================
 // EXPORT ALL ADAPTERS
 // =============================================================================
 
@@ -1490,5 +1622,6 @@ export default {
   payrollRequests: payrollRequestsAdapter,
   cashDrawer: cashDrawerAdapter,
   shiftSchedules: shiftSchedulesAdapter,
-  users: usersAdapter
+  users: usersAdapter,
+  homeServices: homeServicesAdapter
 };

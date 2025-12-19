@@ -619,7 +619,6 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       {/* Payroll Table */}
       {payrollData.length === 0 ? (
         <div className="empty-payroll">
-          <div className="empty-payroll-icon">💼</div>
           <p>No payroll calculated yet</p>
           <button className="btn btn-primary" onClick={handleCalculatePayroll}>Calculate Payroll</button>
         </div>

@@ -199,21 +199,18 @@ Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
       {/* Summary Cards */}
       <div className="employee-payroll-summary">
         <div className="employee-payroll-card current">
-          <div className="employee-payroll-icon">💵</div>
           <div className="employee-payroll-value">
             ₱{currentPeriod ? currentPeriod.netPay.toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '0.00'}
           </div>
           <div className="employee-payroll-label">Current Period Net</div>
         </div>
         <div className="employee-payroll-card ytd">
-          <div className="employee-payroll-icon">📊</div>
           <div className="employee-payroll-value">
             ₱{ytd.netPay.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </div>
           <div className="employee-payroll-label">YTD Net Pay</div>
         </div>
         <div className="employee-payroll-card pending">
-          <div className="employee-payroll-icon">⏳</div>
           <div className="employee-payroll-value">
             {payrollHistory.filter(p => p.status === 'pending').length}
           </div>
@@ -350,7 +347,6 @@ Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
           </div>
         ) : payrollHistory.length === 0 ? (
           <div className="empty-payroll-requests">
-            <div className="empty-payroll-icon">📋</div>
             <h3>No Payroll Records</h3>
             <p>You don't have any payroll records for {filterYear}.</p>
           </div>

@@ -61,14 +61,12 @@ const ServiceHub = () => {
     {
       id: 'rooms',
       label: 'Rooms',
-      icon: '🚪',
       badge: stats.occupiedRooms > 0 ? stats.occupiedRooms : null,
       badgeType: 'info'
     },
     {
       id: 'history',
       label: 'Service History',
-      icon: '📋',
       badge: null
     }
   ];
@@ -78,7 +76,6 @@ const ServiceHub = () => {
       <div className="hub-header">
         <div className="hub-title-row">
           <div className="hub-title">
-            <span className="hub-title-icon">🏠</span>
             <div>
               <h1>Service Hub</h1>
               <p className="hub-subtitle">Manage rooms and track service history</p>
@@ -127,7 +124,6 @@ const ServiceHub = () => {
               className={`hub-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
-              <span className="hub-tab-icon">{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.badge && (
                 <span className={`hub-tab-badge ${tab.badgeType || ''}`}>

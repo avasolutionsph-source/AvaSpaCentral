@@ -457,11 +457,11 @@ const AvaSenseiUltrathink = () => {
 
   const getInsightIcon = (type) => {
     switch (type) {
-      case 'warning': return '⚠️';
-      case 'success': return '✅';
-      case 'opportunity': return '💡';
-      case 'critical': return '🚨';
-      default: return '📊';
+      case 'warning': return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+      case 'success': return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+      case 'opportunity': return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>;
+      case 'critical': return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+      default: return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
     }
   };
 
@@ -740,49 +740,49 @@ const AvaSenseiUltrathink = () => {
           className={`ava-tab ${activeTab === 'executive' ? 'active' : ''}`}
           onClick={() => setActiveTab('executive')}
         >
-          <span className="tab-icon">📊</span> Executive Overview
+          Executive Overview
         </button>
         <button
           className={`ava-tab ${activeTab === 'ai-insights' ? 'active' : ''}`}
           onClick={() => setActiveTab('ai-insights')}
         >
-          <span className="tab-icon">🔮</span> AI Predictions
+          AI Predictions
         </button>
         <button
           className={`ava-tab ${activeTab === 'product-usage' ? 'active' : ''}`}
           onClick={() => setActiveTab('product-usage')}
         >
-          <span className="tab-icon">🧴</span> Product Usage
+          Product Usage
         </button>
         <button
           className={`ava-tab ${activeTab === 'inventory' ? 'active' : ''}`}
           onClick={() => setActiveTab('inventory')}
         >
-          <span className="tab-icon">📦</span> Inventory Forecast
+          Inventory Forecast
         </button>
         <button
           className={`ava-tab ${activeTab === 'revenue' ? 'active' : ''}`}
           onClick={() => setActiveTab('revenue')}
         >
-          <span className="tab-icon">💰</span> Revenue Forecast
+          Revenue Forecast
         </button>
         <button
           className={`ava-tab ${activeTab === 'customers' ? 'active' : ''}`}
           onClick={() => setActiveTab('customers')}
         >
-          <span className="tab-icon">👥</span> Customer Analysis
+          Customer Analysis
         </button>
         <button
           className={`ava-tab ${activeTab === 'performance' ? 'active' : ''}`}
           onClick={() => setActiveTab('performance')}
         >
-          <span className="tab-icon">⭐</span> Performance
+          Performance
         </button>
         <button
           className={`ava-tab ${activeTab === 'reports' ? 'active' : ''}`}
           onClick={() => setActiveTab('reports')}
         >
-          <span className="tab-icon">📋</span> Reports
+          Reports
         </button>
       </div>
 
@@ -790,32 +790,26 @@ const AvaSenseiUltrathink = () => {
       <div className="quick-nav">
           <div className="nav-cards">
             <div className={`nav-card ${activeTab === 'product-analytics' ? 'active' : ''}`} onClick={() => setActiveTab(activeTab === 'product-analytics' ? 'executive' : 'product-analytics')}>
-              <span className="nav-icon">📦</span>
               <span className="nav-title">Product Analytics</span>
               <span className="nav-desc">GPM by product, pricing</span>
             </div>
             <div className={`nav-card ${activeTab === 'inventory-analytics' ? 'active' : ''}`} onClick={() => setActiveTab(activeTab === 'inventory-analytics' ? 'executive' : 'inventory-analytics')}>
-              <span className="nav-icon">📊</span>
               <span className="nav-title">Inventory Analytics</span>
               <span className="nav-desc">Turnover, stockout forecasts</span>
             </div>
             <div className={`nav-card ${activeTab === 'customer-analytics' ? 'active' : ''}`} onClick={() => setActiveTab(activeTab === 'customer-analytics' ? 'executive' : 'customer-analytics')}>
-              <span className="nav-icon">👥</span>
               <span className="nav-title">Customer Analytics</span>
               <span className="nav-desc">CLV, retention, Pareto</span>
             </div>
             <div className={`nav-card ${activeTab === 'employee-analytics' ? 'active' : ''}`} onClick={() => setActiveTab(activeTab === 'employee-analytics' ? 'executive' : 'employee-analytics')}>
-              <span className="nav-icon">👔</span>
               <span className="nav-title">Employee Analytics</span>
               <span className="nav-desc">Productivity metrics</span>
             </div>
             <div className={`nav-card ${activeTab === 'opex-analytics' ? 'active' : ''}`} onClick={() => setActiveTab(activeTab === 'opex-analytics' ? 'executive' : 'opex-analytics')}>
-              <span className="nav-icon">💵</span>
               <span className="nav-title">OPEX & Tax</span>
               <span className="nav-desc">Operating expenses</span>
             </div>
             <div className={`nav-card ${activeTab === 'heatmap-analytics' ? 'active' : ''}`} onClick={() => setActiveTab(activeTab === 'heatmap-analytics' ? 'executive' : 'heatmap-analytics')}>
-              <span className="nav-icon">🔥</span>
               <span className="nav-title">Sales Heatmap</span>
               <span className="nav-desc">Peak hours, patterns</span>
             </div>
@@ -847,7 +841,6 @@ const AvaSenseiUltrathink = () => {
           <div className="kpi-grid">
             <div className="kpi-card">
               <div className="kpi-header">
-                <span className="kpi-icon">📊</span>
                 <span className="kpi-title">Break-Even Progress</span>
               </div>
               <div className="kpi-value">{formatPercent(breakEven?.monthly?.progressPercent)}</div>
@@ -862,7 +855,6 @@ const AvaSenseiUltrathink = () => {
 
             <div className="kpi-card">
               <div className="kpi-header">
-                <span className="kpi-icon">💰</span>
                 <span className="kpi-title">Gross Profit Margin</span>
               </div>
               <div className={`kpi-value ${parseFloat(profitability?.grossProfitMargin) >= 50 ? 'positive' : 'warning'}`}>
@@ -876,7 +868,6 @@ const AvaSenseiUltrathink = () => {
 
             <div className="kpi-card">
               <div className="kpi-header">
-                <span className="kpi-icon">📈</span>
                 <span className="kpi-title">Net Profit Margin</span>
               </div>
               <div className={`kpi-value ${parseFloat(profitability?.netProfitMargin) >= 15 ? 'positive' : parseFloat(profitability?.netProfitMargin) >= 0 ? 'warning' : 'negative'}`}>
@@ -890,7 +881,6 @@ const AvaSenseiUltrathink = () => {
 
             <div className="kpi-card">
               <div className="kpi-header">
-                <span className="kpi-icon">🏦</span>
                 <span className="kpi-title">Cash Runway</span>
               </div>
               <div className={`kpi-value ${burnRate?.runwayMonths >= 6 ? 'positive' : burnRate?.runwayMonths >= 3 ? 'warning' : 'negative'}`}>
@@ -904,7 +894,6 @@ const AvaSenseiUltrathink = () => {
 
             <div className="kpi-card">
               <div className="kpi-header">
-                <span className="kpi-icon">👥</span>
                 <span className="kpi-title">Customer Lifetime Value</span>
               </div>
               <div className="kpi-value">{formatCurrency(customerMetrics?.summary?.avgCLV)}</div>
@@ -916,7 +905,6 @@ const AvaSenseiUltrathink = () => {
 
             <div className="kpi-card">
               <div className="kpi-header">
-                <span className="kpi-icon">🎯</span>
                 <span className="kpi-title">Customer Base</span>
               </div>
               <div className="kpi-value">{customerMetrics?.summary?.totalCustomers || 0}</div>
@@ -1028,13 +1016,11 @@ const AvaSenseiUltrathink = () => {
         <div className="tab-content">
           <div className="ai-summary-grid">
             <div className="ai-summary-card">
-              <div className="ai-summary-icon">🔮</div>
               <div className="ai-summary-value">{inventoryPredictions.filter(p => p.alert === 'HIGH').length}</div>
               <div className="ai-summary-label">Critical Stock Items</div>
               <div className="ai-summary-trend critical">Requires immediate attention</div>
             </div>
             <div className="ai-summary-card">
-              <div className="ai-summary-icon">📈</div>
               <div className="ai-summary-value">
                 ₱{revenuePredictions.projected7Day?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </div>
@@ -1044,7 +1030,6 @@ const AvaSenseiUltrathink = () => {
               </div>
             </div>
             <div className="ai-summary-card">
-              <div className="ai-summary-icon">💎</div>
               <div className="ai-summary-value">
                 ₱{customerInsights?.avgLifetimeValue?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </div>
@@ -1052,7 +1037,6 @@ const AvaSenseiUltrathink = () => {
               <div className="ai-summary-trend info">{customerInsights?.totalCustomers} total customers</div>
             </div>
             <div className="ai-summary-card">
-              <div className="ai-summary-icon">🎯</div>
               <div className="ai-summary-value">{customerInsights?.retentionRate?.toFixed(0)}%</div>
               <div className="ai-summary-label">Customer Retention</div>
               <div className="ai-summary-trend success">{customerInsights?.activeCustomers} active customers</div>
@@ -1062,7 +1046,7 @@ const AvaSenseiUltrathink = () => {
           {/* Quick Charts */}
           <div className="overview-charts-grid">
             <div className="overview-chart-card">
-              <h3>📈 7-Day Revenue Forecast</h3>
+              <h3>7-Day Revenue Forecast</h3>
               <div className="chart-container-ai" style={{ height: '250px', marginTop: 'var(--spacing-md)' }}>
                 {revenuePredictions.forecast && revenuePredictions.forecast.length > 0 && (
                   <Line
@@ -1095,7 +1079,7 @@ const AvaSenseiUltrathink = () => {
             </div>
 
             <div className="overview-chart-card">
-              <h3>⭐ Top Services by Revenue</h3>
+              <h3>Top Services by Revenue</h3>
               <div className="chart-container-ai" style={{ height: '250px', marginTop: 'var(--spacing-md)' }}>
                 {servicePerformance.length > 0 && (
                   <Bar
@@ -1122,7 +1106,7 @@ const AvaSenseiUltrathink = () => {
             </div>
 
             <div className="overview-chart-card">
-              <h3>📦 Inventory Alert Status</h3>
+              <h3>Inventory Alert Status</h3>
               <div className="chart-container-ai" style={{ height: '250px', marginTop: 'var(--spacing-md)' }}>
                 {inventoryPredictions.length > 0 && (
                   <Doughnut
@@ -1152,11 +1136,16 @@ const AvaSenseiUltrathink = () => {
 
           {/* Immediate Actions */}
           <div className="ai-section">
-            <h3>🚨 Immediate Actions Needed</h3>
+            <h3>Immediate Actions Needed</h3>
             <div className="ai-alerts-list">
               {inventoryPredictions.filter(p => p.alert === 'HIGH').slice(0, 3).map((pred, idx) => (
                 <div key={idx} className="ai-alert-card critical">
-                  <div className="ai-alert-icon">⚠️</div>
+                  <div className="ai-alert-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  </div>
                   <div className="ai-alert-content">
                     <h4>{pred.productName}</h4>
                     <p>Critical stock level - only {pred.daysUntilOut} days remaining at current usage rate</p>
@@ -1185,10 +1174,9 @@ const AvaSenseiUltrathink = () => {
 
           {/* Recommendations */}
           <div className="ai-section">
-            <h3>💡 AI-Powered Recommendations</h3>
+            <h3>AI-Powered Recommendations</h3>
             <div className="recommendations-grid">
               <div className="recommendation-card">
-                <div className="recommendation-icon">🎯</div>
                 <h4>Optimize Service Pricing</h4>
                 <p>
                   {servicePerformance.length > 0 && servicePerformance[0].revenue > 20000
@@ -1197,7 +1185,6 @@ const AvaSenseiUltrathink = () => {
                 </p>
               </div>
               <div className="recommendation-card">
-                <div className="recommendation-icon">👥</div>
                 <h4>Customer Retention Strategy</h4>
                 <p>
                   {customerInsights?.retentionRate < 60
@@ -1206,7 +1193,6 @@ const AvaSenseiUltrathink = () => {
                 </p>
               </div>
               <div className="recommendation-card">
-                <div className="recommendation-icon">📦</div>
                 <h4>Inventory Optimization</h4>
                 <p>
                   {inventoryPredictions.filter(p => p.alert === 'HIGH').length > 3
@@ -1215,7 +1201,6 @@ const AvaSenseiUltrathink = () => {
                 </p>
               </div>
               <div className="recommendation-card">
-                <div className="recommendation-icon">💰</div>
                 <h4>Revenue Growth Opportunity</h4>
                 <p>
                   Projected 7-day revenue is ₱{revenuePredictions.projected7Day?.toLocaleString(undefined, { maximumFractionDigits: 0 })}.
@@ -1232,7 +1217,6 @@ const AvaSenseiUltrathink = () => {
         <div className="tab-content">
           <div className="product-usage-summary">
             <div className="usage-summary-card critical">
-              <div className="usage-summary-icon">⚠️</div>
               <div className="usage-summary-content">
                 <div className="usage-summary-value">{productUsageAnalysis.filter(p => p.alert === 'HIGH').length}</div>
                 <div className="usage-summary-label">Critical Items</div>
@@ -1240,7 +1224,6 @@ const AvaSenseiUltrathink = () => {
               </div>
             </div>
             <div className="usage-summary-card warning">
-              <div className="usage-summary-icon">⚡</div>
               <div className="usage-summary-content">
                 <div className="usage-summary-value">{productUsageAnalysis.filter(p => p.alert === 'MEDIUM').length}</div>
                 <div className="usage-summary-label">Running Low</div>
@@ -1248,7 +1231,6 @@ const AvaSenseiUltrathink = () => {
               </div>
             </div>
             <div className="usage-summary-card healthy">
-              <div className="usage-summary-icon">✓</div>
               <div className="usage-summary-content">
                 <div className="usage-summary-value">{productUsageAnalysis.filter(p => p.alert === 'LOW').length}</div>
                 <div className="usage-summary-label">Well Stocked</div>
@@ -1256,7 +1238,6 @@ const AvaSenseiUltrathink = () => {
               </div>
             </div>
             <div className="usage-summary-card info">
-              <div className="usage-summary-icon">📊</div>
               <div className="usage-summary-content">
                 <div className="usage-summary-value">{productUsageAnalysis.length}</div>
                 <div className="usage-summary-label">Products Tracked</div>
@@ -1266,7 +1247,7 @@ const AvaSenseiUltrathink = () => {
           </div>
 
           <div className="ai-section">
-            <h3>🧴 Product Consumption Tracking</h3>
+            <h3>Product Consumption Tracking</h3>
             <p className="ai-section-subtitle">Track how many services you can perform with your current stock</p>
 
             <div className="usage-analysis-grid">
@@ -1275,7 +1256,20 @@ const AvaSenseiUltrathink = () => {
                   <div className="usage-card-header">
                     <div className="usage-product-info">
                       <div className="usage-product-icon">
-                        {usage.alert === 'HIGH' ? '⚠️' : usage.alert === 'MEDIUM' ? '⚡' : '✓'}
+                        {usage.alert === 'HIGH' ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                          </svg>
+                        ) : usage.alert === 'MEDIUM' ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                          </svg>
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        )}
                       </div>
                       <div>
                         <h4 className="usage-product-name">{usage.productName}</h4>
@@ -1287,7 +1281,11 @@ const AvaSenseiUltrathink = () => {
 
                   {usage.hasAnomaly && (
                     <div className="usage-anomaly-warning">
-                      <span className="anomaly-icon">🚨</span>
+                      <span className="anomaly-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                      </span>
                       <div className="anomaly-content">
                         <strong>Suspicious Usage Detected!</strong>
                         <p>{usage.anomalyWarning}</p>
@@ -1297,15 +1295,19 @@ const AvaSenseiUltrathink = () => {
 
                   <div className={`usage-consumption-highlight ${usage.dataSource === 'real' ? 'real-data' : 'estimated-data'}`}>
                     <div className="consumption-main">
-                      <span className="consumption-icon">🧴</span>
+                      <span className="consumption-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M8 2h8l2 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6l4-4z"/><path d="M10 2v4h4V2"/>
+                        </svg>
+                      </span>
                       <div className="consumption-text">
                         <span className="consumption-formula">
                           Used <strong>1 {usage.unit}</strong> for <strong>{usage.servicesPerUnit} services</strong>
                         </span>
                         <span className="consumption-detail">
                           {usage.dataSource === 'real'
-                            ? `✓ Based on real data: ${usage.totalUnitsUsed} bottles used for ${usage.totalServices} services`
-                            : '⚠️ Estimated - No consumption data yet'}
+                            ? `Based on real data: ${usage.totalUnitsUsed} bottles used for ${usage.totalServices} services`
+                            : 'Estimated - No consumption data yet'}
                         </span>
                       </div>
                     </div>
@@ -1313,28 +1315,45 @@ const AvaSenseiUltrathink = () => {
 
                   <div className="usage-metrics-grid">
                     <div className="usage-metric-card">
-                      <div className="usage-metric-icon">📦</div>
+                      <div className="usage-metric-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                      </div>
                       <div className="usage-metric-content">
                         <div className="usage-metric-label">Current Stock</div>
                         <div className="usage-metric-value">{usage.currentStock} <span className="usage-metric-unit">{usage.unit}s</span></div>
                       </div>
                     </div>
                     <div className="usage-metric-card">
-                      <div className="usage-metric-icon">🎯</div>
+                      <div className="usage-metric-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+                        </svg>
+                      </div>
                       <div className="usage-metric-content">
                         <div className="usage-metric-label">Services Possible</div>
                         <div className="usage-metric-value">{usage.estimatedServicesLeft} <span className="usage-metric-unit">services</span></div>
                       </div>
                     </div>
                     <div className="usage-metric-card">
-                      <div className="usage-metric-icon">⏱️</div>
+                      <div className="usage-metric-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                      </div>
                       <div className="usage-metric-content">
                         <div className="usage-metric-label">Days Remaining</div>
                         <div className={`usage-metric-value ${usage.alert === 'HIGH' ? 'critical-text' : ''}`}>{usage.estimatedDaysLeft} <span className="usage-metric-unit">days</span></div>
                       </div>
                     </div>
                     <div className="usage-metric-card">
-                      <div className="usage-metric-icon">📈</div>
+                      <div className="usage-metric-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+                        </svg>
+                      </div>
                       <div className="usage-metric-content">
                         <div className="usage-metric-label">Rate</div>
                         <div className="usage-metric-value">{usage.servicesPerUnit} <span className="usage-metric-unit">srv/{usage.unit}</span></div>
@@ -1380,7 +1399,6 @@ const AvaSenseiUltrathink = () => {
           <div className="inventory-summary-grid">
             <div className="inventory-summary-card critical-gradient">
               <div className="inv-summary-header">
-                <div className="inv-summary-icon critical">⚠️</div>
                 <span className="inv-summary-badge critical">URGENT</span>
               </div>
               <div className="inv-summary-value">{inventoryPredictions.filter(p => p.alert === 'HIGH').length}</div>
@@ -1389,7 +1407,6 @@ const AvaSenseiUltrathink = () => {
             </div>
             <div className="inventory-summary-card warning-gradient">
               <div className="inv-summary-header">
-                <div className="inv-summary-icon warning">⏰</div>
                 <span className="inv-summary-badge warning">WATCH</span>
               </div>
               <div className="inv-summary-value">{inventoryPredictions.filter(p => p.alert === 'MEDIUM').length}</div>
@@ -1398,7 +1415,6 @@ const AvaSenseiUltrathink = () => {
             </div>
             <div className="inventory-summary-card success-gradient">
               <div className="inv-summary-header">
-                <div className="inv-summary-icon success">✓</div>
                 <span className="inv-summary-badge success">GOOD</span>
               </div>
               <div className="inv-summary-value">{inventoryPredictions.filter(p => p.alert === 'LOW').length}</div>
@@ -1407,7 +1423,6 @@ const AvaSenseiUltrathink = () => {
             </div>
             <div className="inventory-summary-card info-gradient">
               <div className="inv-summary-header">
-                <div className="inv-summary-icon info">📊</div>
                 <span className="inv-summary-badge info">TOTAL</span>
               </div>
               <div className="inv-summary-value">{inventoryPredictions.length}</div>
@@ -1426,7 +1441,20 @@ const AvaSenseiUltrathink = () => {
                   <div className="inv-pred-header">
                     <div className="inv-pred-title-section">
                       <div className={`inv-pred-icon ${pred.alert.toLowerCase()}`}>
-                        {pred.alert === 'HIGH' ? '⚠️' : pred.alert === 'MEDIUM' ? '⏰' : '✓'}
+                        {pred.alert === 'HIGH' ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                          </svg>
+                        ) : pred.alert === 'MEDIUM' ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        )}
                       </div>
                       <div>
                         <h4 className="inv-pred-product-name">{pred.productName}</h4>
@@ -1480,37 +1508,21 @@ const AvaSenseiUltrathink = () => {
         <div className="tab-content">
           <div className="revenue-summary-grid">
             <div className="revenue-summary-card total-gradient">
-              <div className="rev-summary-header">
-                <div className="rev-summary-icon total">💰</div>
-                <span className="rev-summary-badge total">7-DAY</span>
-              </div>
               <div className="rev-summary-value">₱{revenuePredictions.projected7Day?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
               <div className="rev-summary-label">Projected Revenue</div>
               <div className="rev-summary-detail">Next 7 days forecast</div>
             </div>
             <div className="revenue-summary-card avg-gradient">
-              <div className="rev-summary-header">
-                <div className="rev-summary-icon avg">📊</div>
-                <span className="rev-summary-badge avg">DAILY</span>
-              </div>
               <div className="rev-summary-value">₱{revenuePredictions.avgDaily?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
               <div className="rev-summary-label">Average Daily</div>
               <div className="rev-summary-detail">Historical average</div>
             </div>
             <div className="revenue-summary-card confidence-gradient">
-              <div className="rev-summary-header">
-                <div className="rev-summary-icon confidence">🎯</div>
-                <span className="rev-summary-badge confidence">ACCURACY</span>
-              </div>
               <div className="rev-summary-value">{Math.round(revenuePredictions.forecast.reduce((sum, f) => sum + f.confidence, 0) / revenuePredictions.forecast.length)}%</div>
               <div className="rev-summary-label">Avg Confidence</div>
               <div className="rev-summary-detail">Prediction accuracy</div>
             </div>
             <div className="revenue-summary-card growth-gradient">
-              <div className="rev-summary-header">
-                <div className="rev-summary-icon growth">📈</div>
-                <span className="rev-summary-badge growth">TREND</span>
-              </div>
               <div className="rev-summary-value">{((revenuePredictions.projected7Day / (revenuePredictions.avgDaily * 7) - 1) * 100).toFixed(1)}%</div>
               <div className="rev-summary-label">vs Average</div>
               <div className="rev-summary-detail">Growth projection</div>

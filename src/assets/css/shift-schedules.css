@@ -898,3 +898,129 @@
     min-width: 100px;
   }
 }
+
+/* Shift Configuration Modal */
+.shift-config-modal {
+  max-width: 500px;
+}
+
+.shift-config-modal .modal-body {
+  padding: var(--spacing-lg);
+}
+
+.shift-config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s;
+}
+
+.shift-config-row:hover {
+  border-color: var(--primary);
+}
+
+.shift-config-row:last-child {
+  margin-bottom: 0;
+}
+
+.shift-config-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 500;
+  color: var(--gray-900);
+  font-size: 0.9rem;
+}
+
+.config-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--white);
+}
+
+.shift-config-times {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shift-config-times .time-input {
+  width: 110px;
+  padding: 10px 14px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--gray-900);
+  background: var(--white);
+}
+
+.shift-config-times .time-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.shift-config-times .time-separator {
+  color: var(--gray-400);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Locked time inputs in Edit Schedule modal */
+.schedule-edit-row .time-input-locked {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  cursor: not-allowed;
+  border-color: var(--gray-200);
+}
+
+.schedule-edit-row .time-input-locked:focus {
+  border-color: var(--gray-200);
+}
+
+/* Quick Shift Buttons in Edit Modal */
+.quick-shift-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--gray-100);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.quick-shift-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--gray-600);
+  margin-right: 4px;
+}
+
+.btn-outline-sm {
+  padding: 6px 14px;
+  background: var(--white);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-outline-sm:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--white);
+}

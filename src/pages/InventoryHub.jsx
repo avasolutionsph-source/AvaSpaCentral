@@ -60,26 +60,22 @@ const InventoryHub = () => {
     {
       id: 'products',
       label: 'Products & Services',
-      icon: '📦',
       badge: stats.totalProducts > 0 ? null : null
     },
     {
       id: 'stock',
       label: 'Stock',
-      icon: '📊',
       badge: stats.lowStock + stats.outOfStock > 0 ? stats.lowStock + stats.outOfStock : null,
       badgeType: stats.outOfStock > 0 ? 'danger' : 'warning'
     },
     {
       id: 'suppliers',
       label: 'Suppliers',
-      icon: '🏢',
       badge: null
     },
     {
       id: 'orders',
       label: 'Purchase Orders',
-      icon: '📋',
       badge: stats.pendingOrders > 0 ? stats.pendingOrders : null,
       badgeType: 'warning'
     }
@@ -90,7 +86,6 @@ const InventoryHub = () => {
       <div className="hub-header">
         <div className="hub-title-row">
           <div className="hub-title">
-            <span className="hub-title-icon">📦</span>
             <div>
               <h1>Inventory Hub</h1>
               <p className="hub-subtitle">Manage products, stock levels, suppliers & purchase orders</p>
@@ -141,7 +136,6 @@ const InventoryHub = () => {
               className={`hub-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
-              <span className="hub-tab-icon">{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.badge && (
                 <span className={`hub-tab-badge ${tab.badgeType || ''}`}>

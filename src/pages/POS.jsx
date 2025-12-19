@@ -5,6 +5,7 @@ import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
 import { getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog } from '../components/shared';
 import { logTransaction } from '../utils/activityLogger';
+import { formatTimeRange } from '../utils/dateUtils';
 import '../assets/css/pos.css';
 
 const POS = () => {
@@ -65,6 +66,8 @@ const POS = () => {
 
   // Room selection state
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [isHomeService, setIsHomeService] = useState(false);
+  const [homeServiceAddress, setHomeServiceAddress] = useState('');
 
   // Clear cart confirmation state
   const [clearCartConfirm, setClearCartConfirm] = useState(false);
@@ -432,6 +435,16 @@ const POS = () => {
   const validateCheckout = () => {
     const errors = [];
 
+    // Validate room/location selection
+    if (!selectedRoom && !isHomeService) {
+      errors.push('Please select a room or Home Service');
+    }
+
+    // Validate home service address
+    if (isHomeService && !homeServiceAddress.trim()) {
+      errors.push('Please enter the client address for home service');
+    }
+
     if (!selectedEmployee) {
       errors.push('Please select an employee');
     }
@@ -518,10 +531,10 @@ const POS = () => {
         const sequence = Math.floor(Math.random() * 9999) + 1;
         const transactionId = `txn_adv_${today}_${sequence.toString().padStart(4, '0')}`;
 
-        // Get room details if applicable
+        // Get room details if applicable (use consolidated room state)
         let roomName = null;
-        if (advanceBookingData.roomId) {
-          const room = rooms.find(r => r._id === advanceBookingData.roomId);
+        if (selectedRoom) {
+          const room = rooms.find(r => r._id === selectedRoom);
           roomName = room ? room.name : null;
         }
 
@@ -550,7 +563,7 @@ const POS = () => {
           clientAddress = customerData ? customerData.address : (walkInCustomerData.address || null);
         }
 
-        // Create advance booking
+        // Create advance booking (use consolidated room state)
         const bookingData = {
           bookingDateTime: advanceBookingData.bookingDateTime,
           employeeId: employee._id,
@@ -558,20 +571,20 @@ const POS = () => {
           serviceName: serviceName,
           estimatedDuration: estimatedDuration || 60,
           servicePrice: getTotal(),
-          roomId: advanceBookingData.roomId || null,
+          roomId: selectedRoom || null,
           roomName: roomName,
-          isHomeService: advanceBookingData.isHomeService,
+          isHomeService: isHomeService,
           clientName: clientName,
           clientPhone: clientPhone,
           clientEmail: clientEmail,
-          clientAddress: clientAddress,
+          clientAddress: isHomeService ? homeServiceAddress : clientAddress,
           paymentMethod: paymentMethod,
           paymentTiming: advanceBookingData.paymentTiming,
           paymentStatus: advanceBookingData.paymentTiming === 'pay-now' ? 'paid' : 'pending',
           transactionId: transactionId,
           status: 'scheduled',
           specialRequests: advanceBookingData.specialRequests || null,
-          clientNotes: advanceBookingData.clientNotes || null // Add client notes/preferences
+          clientNotes: advanceBookingData.clientNotes || null
         };
 
         await mockApi.advanceBooking.createAdvanceBooking(bookingData);
@@ -644,7 +657,9 @@ const POS = () => {
           bookingSource: bookingSource,
           status: 'completed',
           roomId: selectedRoom || null,
-          roomName: selectedRoom ? rooms.find(r => r._id === selectedRoom)?.name : null
+          roomName: selectedRoom ? rooms.find(r => r._id === selectedRoom)?.name : null,
+          isHomeService: isHomeService,
+          homeServiceAddress: isHomeService ? homeServiceAddress : null
         };
 
         // Save transaction
@@ -719,6 +734,56 @@ const POS = () => {
             // Continue anyway - transaction already saved
           }
         }
+
+        // Create Home Service card if Home Service was selected
+        if (isHomeService && homeServiceAddress) {
+          try {
+            // Calculate total service duration from cart (services only)
+            const totalDuration = cart.reduce((total, item) => {
+              return total + ((item.type === 'service' && item.duration) ? item.duration * item.quantity : 0);
+            }, 0) || 60; // Default 60 min if no duration
+
+            // Get employee name for display on home service card
+            const selectedEmp = employees.find(e => e._id === selectedEmployee);
+            const employeeName = selectedEmp ? `${selectedEmp.firstName} ${selectedEmp.lastName}` : null;
+
+            // Get service names for display
+            const serviceNames = cart
+              .filter(item => item.type === 'service')
+              .map(item => item.name);
+
+            // Get customer info
+            let customerName = null;
+            let customerPhone = null;
+            let customerEmail = null;
+
+            if (customerType === 'existing' && selectedCustomer) {
+              customerName = selectedCustomer.name;
+              customerPhone = selectedCustomer.phone;
+              customerEmail = selectedCustomer.email || null;
+            } else if (customerType === 'walk-in' && walkInCustomerData.name) {
+              customerName = walkInCustomerData.name;
+              customerPhone = walkInCustomerData.phone || null;
+              customerEmail = walkInCustomerData.email || null;
+            }
+
+            // Create home service record
+            await mockApi.homeServices.createHomeService({
+              employeeId: selectedEmployee,
+              employeeName: employeeName,
+              customerName: customerName,
+              customerPhone: customerPhone,
+              customerEmail: customerEmail,
+              address: homeServiceAddress,
+              serviceNames: serviceNames,
+              serviceDuration: totalDuration,
+              transactionId: receiptNumber
+            });
+          } catch (error) {
+            console.error('Failed to create home service:', error);
+            // Continue anyway - transaction already saved
+          }
+        }
       }
 
       // Reset everything
@@ -741,6 +806,8 @@ const POS = () => {
     setSelectedEmployee(null);
     setSelectedCustomer(null);
     setSelectedRoom(null);
+    setIsHomeService(false);
+    setHomeServiceAddress('');
     setCustomerType('walk-in');
     setIsAdvanceBooking(false);
     setAdvanceBookingData(null);
@@ -824,7 +891,7 @@ const POS = () => {
                   )}
                   {product.type === 'product' && (
                     <p className="product-stock">
-                      Stock: {product.stock}
+                      Stock: {product.stock} {product.unit || 'pcs'}
                       {product.stock <= product.lowStockAlert && (
                         <span className="low-stock-badge">Low</span>
                       )}
@@ -954,7 +1021,13 @@ const POS = () => {
                   }
                 }}
                 value={advanceBookingData}
-                onChange={setAdvanceBookingData}
+                onChange={(data) => {
+                  setAdvanceBookingData(data);
+                  // Auto-set payment method to Cash when Pay After Service is selected
+                  if (data?.paymentTiming === 'pay-after') {
+                    setPaymentMethod('Cash');
+                  }
+                }}
                 employees={employees}
                 rooms={rooms}
                 customers={customers}
@@ -967,9 +1040,57 @@ const POS = () => {
                 onWalkInDataChange={setWalkInCustomerData}
               />
 
+              {/* Room Selection - Consolidated */}
+              <div className="checkout-section">
+                <h4>Select Room / Location *</h4>
+                <select
+                  className="form-control"
+                  value={isHomeService ? 'home' : (selectedRoom || '')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'home') {
+                      setIsHomeService(true);
+                      setSelectedRoom(null);
+                    } else {
+                      setIsHomeService(false);
+                      setSelectedRoom(val || null);
+                    }
+                  }}
+                  required
+                >
+                  <option value="">Select room or location...</option>
+                  <option value="home">Home Service</option>
+                  {rooms
+                    .filter(room => room.status === 'available')
+                    .map(room => (
+                      <option key={room._id} value={room._id}>
+                        {room.name} - {room.type}
+                      </option>
+                    ))}
+                </select>
+                {selectedRoom && !isHomeService && (
+                  <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--gray-600)' }}>
+                    📍 {rooms.find(r => r._id === selectedRoom)?.name}
+                  </p>
+                )}
+                {isHomeService && (
+                  <div className="form-group" style={{ marginTop: 'var(--spacing-md)' }}>
+                    <label>Client Address *</label>
+                    <textarea
+                      className="form-control"
+                      value={homeServiceAddress}
+                      onChange={(e) => setHomeServiceAddress(e.target.value)}
+                      placeholder="Enter complete address for home service"
+                      rows="2"
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Employee Selection with Rotation Queue */}
               <div className="checkout-section">
-                <h4>👤 Select Employee *</h4>
+                <h4>Select Employee *</h4>
 
                 {/* Service Rotation Queue */}
                 {rotationQueue.length > 0 && (
@@ -1077,7 +1198,7 @@ const POS = () => {
                         >
                           {emp.firstName} {emp.lastName} - {emp.position}
                           {canSelect
-                            ? ` (Scheduled: ${scheduledEmployees.find(s => s.employeeId === emp._id)?.startTime} - ${scheduledEmployees.find(s => s.employeeId === emp._id)?.endTime})`
+                            ? ` (Scheduled: ${formatTimeRange(scheduledEmployees.find(s => s.employeeId === emp._id)?.startTime, scheduledEmployees.find(s => s.employeeId === emp._id)?.endTime)})`
                             : isScheduled
                               ? ' (Outside shift hours)'
                               : ' (Not scheduled)'}
@@ -1115,34 +1236,10 @@ const POS = () => {
                 )}
               </div>
 
-              {/* Room Selection */}
-              <div className="checkout-section">
-                <h4>🚪 Select Room</h4>
-                <select
-                  className="form-control"
-                  value={selectedRoom || ''}
-                  onChange={(e) => setSelectedRoom(e.target.value || null)}
-                >
-                  <option value="">No specific room</option>
-                  {rooms
-                    .filter(room => room.status === 'available')
-                    .map(room => (
-                      <option key={room._id} value={room._id}>
-                        {room.name} - {room.type}
-                      </option>
-                    ))}
-                </select>
-                {selectedRoom && (
-                  <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--gray-600)' }}>
-                    📍 {rooms.find(r => r._id === selectedRoom)?.name}
-                  </p>
-                )}
-              </div>
-
               {/* Customer Selection - Hidden when advance booking is enabled */}
               {!isAdvanceBooking && (
                 <div className="checkout-section">
-                  <h4>👥 Customer</h4>
+                  <h4>Customer</h4>
                   <div className="customer-type-selector">
                     <label>
                       <input
@@ -1358,27 +1455,44 @@ const POS = () => {
               {/* Payment Method - Always show except when advance booking without payment timing set */}
               {(!isAdvanceBooking || (isAdvanceBooking && advanceBookingData?.paymentTiming)) && (
                 <div className="checkout-section">
-                  <h4>💳 Payment Method *</h4>
-                  <div className="payment-methods">
-                    <button
-                      className={`payment-btn ${paymentMethod === 'Cash' ? 'active' : ''}`}
-                      onClick={() => setPaymentMethod('Cash')}
-                    >
-                      Cash
-                    </button>
-                    <button
-                      className={`payment-btn ${paymentMethod === 'Card' ? 'active' : ''}`}
-                      onClick={() => setPaymentMethod('Card')}
-                    >
-                      Card
-                    </button>
-                    <button
-                      className={`payment-btn ${paymentMethod === 'GCash' ? 'active' : ''}`}
-                      onClick={() => setPaymentMethod('GCash')}
-                    >
-                      GCash
-                    </button>
-                  </div>
+                  <h4>Payment Method *</h4>
+                  {/* Pay After Service only allows Cash */}
+                  {isAdvanceBooking && advanceBookingData?.paymentTiming === 'pay-after' ? (
+                    <>
+                      <div className="payment-methods">
+                        <button
+                          className="payment-btn active"
+                          onClick={() => setPaymentMethod('Cash')}
+                        >
+                          Cash
+                        </button>
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 'var(--spacing-sm)' }}>
+                        Only Cash payment is accepted for Pay After Service bookings
+                      </p>
+                    </>
+                  ) : (
+                    <div className="payment-methods">
+                      <button
+                        className={`payment-btn ${paymentMethod === 'Cash' ? 'active' : ''}`}
+                        onClick={() => setPaymentMethod('Cash')}
+                      >
+                        Cash
+                      </button>
+                      <button
+                        className={`payment-btn ${paymentMethod === 'Card' ? 'active' : ''}`}
+                        onClick={() => setPaymentMethod('Card')}
+                      >
+                        Card
+                      </button>
+                      <button
+                        className={`payment-btn ${paymentMethod === 'GCash' ? 'active' : ''}`}
+                        onClick={() => setPaymentMethod('GCash')}
+                      >
+                        GCash
+                      </button>
+                    </div>
+                  )}
 
                   {paymentMethod === 'Cash' && (
                     <div className="payment-details">
@@ -1418,67 +1532,31 @@ const POS = () => {
                     </div>
                   )}
 
-                  {paymentMethod === 'Card' && (
+                  {/* Card payment - not available for Pay After Service */}
+                  {paymentMethod === 'Card' && !(isAdvanceBooking && advanceBookingData?.paymentTiming === 'pay-after') && (
                     <div className="payment-details">
-                      {/* Show different fields based on payment timing */}
-                      {isAdvanceBooking && advanceBookingData?.paymentTiming === 'pay-after' ? (
-                        <>
-                          <label>Amount to Pay (After Service):</label>
-                          <input
-                            type="number"
-                            value={getTotal()}
-                            readOnly
-                            className="form-control"
-                            style={{ backgroundColor: 'var(--gray-100)', cursor: 'not-allowed' }}
-                          />
-                          <p style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 'var(--spacing-sm)' }}>
-                            ℹ️ Card payment will be collected after service completion
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <label>Card Transaction ID *</label>
-                          <input
-                            type="text"
-                            value={cardTransactionId}
-                            onChange={(e) => setCardTransactionId(e.target.value)}
-                            placeholder="Enter transaction ID"
-                            className="form-control"
-                          />
-                        </>
-                      )}
+                      <label>Card Transaction ID *</label>
+                      <input
+                        type="text"
+                        value={cardTransactionId}
+                        onChange={(e) => setCardTransactionId(e.target.value)}
+                        placeholder="Enter transaction ID"
+                        className="form-control"
+                      />
                     </div>
                   )}
 
-                  {paymentMethod === 'GCash' && (
+                  {/* GCash payment - not available for Pay After Service */}
+                  {paymentMethod === 'GCash' && !(isAdvanceBooking && advanceBookingData?.paymentTiming === 'pay-after') && (
                     <div className="payment-details">
-                      {/* Show different fields based on payment timing */}
-                      {isAdvanceBooking && advanceBookingData?.paymentTiming === 'pay-after' ? (
-                        <>
-                          <label>Amount to Pay (After Service):</label>
-                          <input
-                            type="number"
-                            value={getTotal()}
-                            readOnly
-                            className="form-control"
-                            style={{ backgroundColor: 'var(--gray-100)', cursor: 'not-allowed' }}
-                          />
-                          <p style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 'var(--spacing-sm)' }}>
-                            ℹ️ GCash payment will be collected after service completion
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <label>GCash Reference # *</label>
-                          <input
-                            type="text"
-                            value={gcashReference}
-                            onChange={(e) => setGcashReference(e.target.value)}
-                            placeholder="Enter reference number"
-                            className="form-control"
-                          />
-                        </>
-                      )}
+                      <label>GCash Reference # *</label>
+                      <input
+                        type="text"
+                        value={gcashReference}
+                        onChange={(e) => setGcashReference(e.target.value)}
+                        placeholder="Enter reference number"
+                        className="form-control"
+                      />
                     </div>
                   )}
                 </div>
@@ -1487,7 +1565,7 @@ const POS = () => {
               {/* Discounts - Always show except when advance booking without payment timing set */}
               {(!isAdvanceBooking || (isAdvanceBooking && advanceBookingData?.paymentTiming)) && (
                 <div className="checkout-section">
-                  <h4>🎟️ Discounts</h4>
+                  <h4>Discounts</h4>
                   <div className="discount-buttons">
                     <button
                       className="btn btn-sm"

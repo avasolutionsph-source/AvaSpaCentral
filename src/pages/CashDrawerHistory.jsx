@@ -129,24 +129,20 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
       {/* Summary Cards */}
       <div className="cash-drawer-summary-grid">
         <div className="cash-drawer-summary-card total">
-          <div className="cash-drawer-summary-icon">💵</div>
           <div className="cash-drawer-summary-value">
             ₱{summary.totalCash.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </div>
           <div className="cash-drawer-summary-label">Total Cash</div>
         </div>
         <div className="cash-drawer-summary-card sessions">
-          <div className="cash-drawer-summary-icon">📊</div>
           <div className="cash-drawer-summary-value">{summary.totalSessions}</div>
           <div className="cash-drawer-summary-label">Total Sessions</div>
         </div>
         <div className="cash-drawer-summary-card transactions">
-          <div className="cash-drawer-summary-icon">📝</div>
           <div className="cash-drawer-summary-value">{summary.totalTransactions}</div>
           <div className="cash-drawer-summary-label">Transactions</div>
         </div>
         <div className="cash-drawer-summary-card variance">
-          <div className="cash-drawer-summary-icon">⚖️</div>
           <div className="cash-drawer-summary-value">
             ₱{summary.totalVariance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </div>
@@ -204,7 +200,6 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
           </div>
         ) : sessions.length === 0 ? (
           <div className="empty-cash-drawer">
-            <div className="empty-cash-drawer-icon">💵</div>
             <h3>No Sessions Found</h3>
             <p>No cash drawer sessions match your filters.</p>
           </div>

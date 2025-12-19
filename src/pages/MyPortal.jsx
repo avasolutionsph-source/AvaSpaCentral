@@ -163,26 +163,22 @@ const MyPortal = () => {
     {
       id: 'attendance',
       label: 'Clock In/Out',
-      icon: '⏱️',
       badge: null
     },
     {
       id: 'history',
       label: 'My History',
-      icon: '📋',
       badge: null
     },
     {
       id: 'schedule',
       label: 'My Schedule',
-      icon: '📅',
       badge: stats.upcomingAppointments > 0 ? stats.upcomingAppointments : null,
       badgeType: 'info'
     },
     {
       id: 'payroll',
       label: 'My Payroll',
-      icon: '💵',
       badge: stats.pendingRequests > 0 ? stats.pendingRequests : null,
       badgeType: 'warning'
     }
@@ -488,7 +484,6 @@ const MyPortal = () => {
       <div className="hub-header">
         <div className="hub-title-row">
           <div className="hub-title">
-            <span className="hub-title-icon">👤</span>
             <div>
               <h1>My Portal</h1>
               <p className="hub-subtitle">Your personal schedule and payroll information</p>
@@ -539,7 +534,6 @@ const MyPortal = () => {
               className={`hub-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
-              <span className="hub-tab-icon">{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.badge && (
                 <span className={`hub-tab-badge ${tab.badgeType || ''}`}>

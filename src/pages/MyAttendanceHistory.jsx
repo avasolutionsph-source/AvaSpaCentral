@@ -152,28 +152,24 @@ const MyAttendanceHistory = ({ embedded = false }) => {
       {/* Summary Cards */}
       <div className="summary-cards">
         <div className="summary-card">
-          <div className="summary-icon">📅</div>
           <div className="summary-content">
             <span className="summary-value">{summary.totalDays}</span>
             <span className="summary-label">Days Recorded</span>
           </div>
         </div>
         <div className="summary-card success">
-          <div className="summary-icon">✓</div>
           <div className="summary-content">
             <span className="summary-value">{summary.present}</span>
             <span className="summary-label">Present</span>
           </div>
         </div>
         <div className="summary-card warning">
-          <div className="summary-icon">⏰</div>
           <div className="summary-content">
             <span className="summary-value">{summary.late}</span>
             <span className="summary-label">Late</span>
           </div>
         </div>
         <div className="summary-card info">
-          <div className="summary-icon">⏱️</div>
           <div className="summary-content">
             <span className="summary-value">{summary.totalHours}h</span>
             <span className="summary-label">Total Hours</span>
@@ -227,7 +223,6 @@ const MyAttendanceHistory = ({ embedded = false }) => {
         </div>
       ) : attendanceRecords.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">📋</div>
           <h3>No Records Found</h3>
           <p>No attendance records found for the selected period.</p>
         </div>
@@ -336,10 +331,6 @@ const MyAttendanceHistory = ({ embedded = false }) => {
 
         .summary-card.info {
           border-left: 3px solid var(--primary);
-        }
-
-        .summary-icon {
-          font-size: 1.5rem;
         }
 
         .summary-content {
@@ -499,11 +490,6 @@ const MyAttendanceHistory = ({ embedded = false }) => {
           background: var(--bg-primary);
           border-radius: var(--radius-lg);
           border: 1px solid var(--border-color);
-        }
-
-        .empty-state-icon {
-          font-size: 3rem;
-          margin-bottom: var(--spacing-md);
         }
 
         .empty-state h3 {

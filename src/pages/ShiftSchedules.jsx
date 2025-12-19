@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
+import { formatTime12Hour, formatTimeRange } from '../utils/dateUtils';
 import {
   format,
   startOfWeek,
@@ -43,6 +44,10 @@ const ShiftSchedules = () => {
 
   // Add employee modal
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+
+  // Shift config modal
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configForm, setConfigForm] = useState(null);
 
   // Week navigation
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -228,6 +233,41 @@ const ShiftSchedules = () => {
     }
   };
 
+  // Set all days to a specific shift type (Sunday stays off)
+  const setAllDaysToShift = (shiftType) => {
+    const newWeeklySchedule = {};
+    DAYS.forEach(day => {
+      if (day === 'sunday') {
+        newWeeklySchedule[day] = { shift: 'off', startTime: null, endTime: null };
+      } else {
+        const config = shiftType === 'day' ? shiftConfig?.dayShift :
+                       shiftType === 'night' ? shiftConfig?.nightShift :
+                       shiftConfig?.wholeDayShift;
+        newWeeklySchedule[day] = {
+          shift: shiftType,
+          startTime: config?.startTime || '09:00',
+          endTime: config?.endTime || '17:00'
+        };
+      }
+    });
+    setEditingSchedule(prev => ({
+      ...prev,
+      weeklySchedule: newWeeklySchedule
+    }));
+  };
+
+  // Save shift configuration
+  const handleSaveShiftConfig = async () => {
+    try {
+      await mockApi.shiftSchedules.updateShiftConfig(configForm);
+      setShiftConfig(prev => ({ ...prev, ...configForm }));
+      showToast('Shift configuration saved!', 'success');
+      setShowConfigModal(false);
+    } catch (error) {
+      showToast('Failed to save configuration', 'error');
+    }
+  };
+
   // Calculate summary stats
   const calculateStats = () => {
     let totalShifts = 0;
@@ -283,6 +323,19 @@ const ShiftSchedules = () => {
               + Add Employee
             </button>
           )}
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setConfigForm({
+                dayShift: { ...shiftConfig?.dayShift },
+                nightShift: { ...shiftConfig?.nightShift },
+                wholeDayShift: { ...shiftConfig?.wholeDayShift }
+              });
+              setShowConfigModal(true);
+            }}
+          >
+            Configure Shifts
+          </button>
           <button
             className="btn btn-secondary"
             onClick={() => setShowTimeOffModal(true)}
@@ -417,7 +470,7 @@ const ShiftSchedules = () => {
                           <span className="shift-abbr">{shiftInfo.abbr}</span>
                           {!isOff && daySchedule?.startTime && (
                             <span className="shift-time">
-                              {daySchedule.startTime}
+                              {formatTime12Hour(daySchedule.startTime)}
                             </span>
                           )}
                         </div>
@@ -456,15 +509,15 @@ const ShiftSchedules = () => {
         <div className="legend-items">
           <div className="legend-item">
             <span className="legend-badge" style={{ backgroundColor: shiftConfig?.dayShift.color }}>D</span>
-            Day ({shiftConfig?.dayShift.startTime} - {shiftConfig?.dayShift.endTime})
+            Day ({formatTimeRange(shiftConfig?.dayShift.startTime, shiftConfig?.dayShift.endTime)})
           </div>
           <div className="legend-item">
             <span className="legend-badge" style={{ backgroundColor: shiftConfig?.nightShift.color }}>N</span>
-            Night ({shiftConfig?.nightShift.startTime} - {shiftConfig?.nightShift.endTime})
+            Night ({formatTimeRange(shiftConfig?.nightShift.startTime, shiftConfig?.nightShift.endTime)})
           </div>
           <div className="legend-item">
             <span className="legend-badge" style={{ backgroundColor: shiftConfig?.wholeDayShift.color }}>F</span>
-            Whole Day ({shiftConfig?.wholeDayShift.startTime} - {shiftConfig?.wholeDayShift.endTime})
+            Whole Day ({formatTimeRange(shiftConfig?.wholeDayShift.startTime, shiftConfig?.wholeDayShift.endTime)})
           </div>
           <div className="legend-item">
             <span className="legend-badge" style={{ backgroundColor: shiftConfig?.off.color }}>OFF</span>
@@ -482,6 +535,32 @@ const ShiftSchedules = () => {
               <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
             </div>
             <div className="modal-body">
+              {/* Quick Action Buttons */}
+              <div className="quick-shift-buttons">
+                <span className="quick-shift-label">Quick Set:</span>
+                <button
+                  type="button"
+                  className="btn btn-outline-sm"
+                  onClick={() => setAllDaysToShift('day')}
+                >
+                  Day Shift Only
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-sm"
+                  onClick={() => setAllDaysToShift('night')}
+                >
+                  Night Shift Only
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-sm"
+                  onClick={() => setAllDaysToShift('wholeDay')}
+                >
+                  Whole Day Only
+                </button>
+              </div>
+
               <div className="schedule-edit-grid">
                 {DAYS.map((day, idx) => {
                   const daySchedule = editingSchedule.weeklySchedule[day];
@@ -503,15 +582,15 @@ const ShiftSchedules = () => {
                           <input
                             type="time"
                             value={daySchedule?.startTime || ''}
-                            onChange={(e) => handleDayChange(day, 'startTime', e.target.value)}
-                            className="form-control time-input"
+                            readOnly
+                            className="form-control time-input time-input-locked"
                           />
                           <span className="time-separator">to</span>
                           <input
                             type="time"
                             value={daySchedule?.endTime || ''}
-                            onChange={(e) => handleDayChange(day, 'endTime', e.target.value)}
-                            className="form-control time-input"
+                            readOnly
+                            className="form-control time-input time-input-locked"
                           />
                         </>
                       )}
@@ -730,6 +809,116 @@ const ShiftSchedules = () => {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAddEmployeeModal(false)}>
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shift Configuration Modal */}
+      {showConfigModal && configForm && (
+        <div className="modal-overlay" onClick={() => setShowConfigModal(false)}>
+          <div className="modal shift-config-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Configure Shift Times</h2>
+              <button className="modal-close" onClick={() => setShowConfigModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p className="modal-description">Set the default start and end times for each shift type:</p>
+
+              {/* Day Shift */}
+              <div className="shift-config-row">
+                <div className="shift-config-label">
+                  <span className="config-badge" style={{ backgroundColor: '#1B5E37' }}>D</span>
+                  <span>Day Shift</span>
+                </div>
+                <div className="shift-config-times">
+                  <input
+                    type="time"
+                    value={configForm.dayShift?.startTime || '09:00'}
+                    onChange={(e) => setConfigForm(prev => ({
+                      ...prev,
+                      dayShift: { ...prev.dayShift, startTime: e.target.value }
+                    }))}
+                    className="form-control time-input"
+                  />
+                  <span className="time-separator">to</span>
+                  <input
+                    type="time"
+                    value={configForm.dayShift?.endTime || '17:00'}
+                    onChange={(e) => setConfigForm(prev => ({
+                      ...prev,
+                      dayShift: { ...prev.dayShift, endTime: e.target.value }
+                    }))}
+                    className="form-control time-input"
+                  />
+                </div>
+              </div>
+
+              {/* Night Shift */}
+              <div className="shift-config-row">
+                <div className="shift-config-label">
+                  <span className="config-badge" style={{ backgroundColor: '#666666' }}>N</span>
+                  <span>Night Shift</span>
+                </div>
+                <div className="shift-config-times">
+                  <input
+                    type="time"
+                    value={configForm.nightShift?.startTime || '13:00'}
+                    onChange={(e) => setConfigForm(prev => ({
+                      ...prev,
+                      nightShift: { ...prev.nightShift, startTime: e.target.value }
+                    }))}
+                    className="form-control time-input"
+                  />
+                  <span className="time-separator">to</span>
+                  <input
+                    type="time"
+                    value={configForm.nightShift?.endTime || '21:00'}
+                    onChange={(e) => setConfigForm(prev => ({
+                      ...prev,
+                      nightShift: { ...prev.nightShift, endTime: e.target.value }
+                    }))}
+                    className="form-control time-input"
+                  />
+                </div>
+              </div>
+
+              {/* Whole Day */}
+              <div className="shift-config-row">
+                <div className="shift-config-label">
+                  <span className="config-badge" style={{ backgroundColor: '#1B5E37' }}>F</span>
+                  <span>Whole Day</span>
+                </div>
+                <div className="shift-config-times">
+                  <input
+                    type="time"
+                    value={configForm.wholeDayShift?.startTime || '09:00'}
+                    onChange={(e) => setConfigForm(prev => ({
+                      ...prev,
+                      wholeDayShift: { ...prev.wholeDayShift, startTime: e.target.value }
+                    }))}
+                    className="form-control time-input"
+                  />
+                  <span className="time-separator">to</span>
+                  <input
+                    type="time"
+                    value={configForm.wholeDayShift?.endTime || '21:00'}
+                    onChange={(e) => setConfigForm(prev => ({
+                      ...prev,
+                      wholeDayShift: { ...prev.wholeDayShift, endTime: e.target.value }
+                    }))}
+                    className="form-control time-input"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowConfigModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSaveShiftConfig}>
+                Save Configuration
               </button>
             </div>
           </div>

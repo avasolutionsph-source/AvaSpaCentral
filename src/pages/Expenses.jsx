@@ -339,22 +339,18 @@ const Expenses = ({ embedded = false, onDataChange }) => {
       {/* Summary Cards */}
       <div className="expenses-summary-grid">
         <div className="expense-summary-card total">
-          <div className="expense-summary-icon">₱</div>
           <div className="expense-summary-value">₱{stats.total.toLocaleString()}</div>
           <div className="expense-summary-label">Total Expenses</div>
         </div>
         <div className="expense-summary-card monthly">
-          <div className="expense-summary-icon">📅</div>
           <div className="expense-summary-value">₱{stats.monthly.toLocaleString()}</div>
           <div className="expense-summary-label">This Month</div>
         </div>
         <div className="expense-summary-card categories">
-          <div className="expense-summary-icon">📂</div>
           <div className="expense-summary-value">{stats.categories}</div>
           <div className="expense-summary-label">Categories</div>
         </div>
         <div className="expense-summary-card">
-          <div className="expense-summary-icon">📝</div>
           <div className="expense-summary-value">{stats.count}</div>
           <div className="expense-summary-label">Total Records</div>
         </div>

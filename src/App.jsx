@@ -41,6 +41,7 @@ const Calendar = lazy(() => import('./pages/Calendar'));
 const Settings = lazy(() => import('./pages/Settings'));
 const AIChatbot = lazy(() => import('./pages/AIChatbot'));
 const AvaSenseiUltrathink = lazy(() => import('./pages/AvaSenseiUltrathink'));
+const AIInsights = lazy(() => import('./pages/AIInsights'));
 
 // Analytics Pages
 const ProductAnalytics = lazy(() => import('./pages/ProductAnalytics'));
@@ -171,6 +172,7 @@ function AppRoutes() {
           <Route path="calendar" element={<ProtectedRoute page="calendar"><Suspense fallback={<PageLoader />}><Calendar /></Suspense></ProtectedRoute>} />
           <Route path="ava-sensei" element={<ProtectedRoute page="ava-sensei"><Suspense fallback={<PageLoader />}><AvaSenseiUltrathink /></Suspense></ProtectedRoute>} />
           <Route path="ai-chatbot" element={<ProtectedRoute page="ai-chatbot"><Suspense fallback={<PageLoader />}><AIChatbot /></Suspense></ProtectedRoute>} />
+          <Route path="ai-insights" element={<ProtectedRoute page="dashboard"><Suspense fallback={<PageLoader />}><AIInsights /></Suspense></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute page="settings"><Suspense fallback={<PageLoader />}><Settings /></Suspense></ProtectedRoute>} />
           {/* Analytics Routes */}
           <Route path="analytics/products" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><ProductAnalytics /></Suspense></ProtectedRoute>} />

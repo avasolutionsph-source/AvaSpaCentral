@@ -61,13 +61,11 @@ const FinanceHub = () => {
     {
       id: 'expenses',
       label: 'Expenses',
-      icon: '₱',
       badge: null
     },
     {
       id: 'cash-drawer',
       label: 'Cash Drawer',
-      icon: '💵',
       badge: stats.openDrawers > 0 ? stats.openDrawers : null,
       badgeType: 'warning'
     }
@@ -78,7 +76,6 @@ const FinanceHub = () => {
       <div className="hub-header">
         <div className="hub-title-row">
           <div className="hub-title">
-            <span className="hub-title-icon">₱</span>
             <div>
               <h1>Finance Hub</h1>
               <p className="hub-subtitle">Manage expenses and cash drawer operations</p>
@@ -117,7 +114,6 @@ const FinanceHub = () => {
               className={`hub-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
-              <span className="hub-tab-icon">{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.badge && (
                 <span className={`hub-tab-badge ${tab.badgeType || ''}`}>

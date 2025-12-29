@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
@@ -20,6 +20,61 @@ const Login = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState(false);
+
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  // Check if app is already installed
+  useEffect(() => {
+    // Check if running as PWA
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+      setIsInstalled(true);
+    }
+
+    // Listen for beforeinstallprompt event
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    // Listen for app installed event
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setIsInstallable(false);
+      setDeferredPrompt(null);
+      showToast('App installed successfully!', 'success');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, [showToast]);
+
+  // Handle install button click
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      showToast('App is already installed or installation is not supported', 'info');
+      return;
+    }
+
+    // Show the install prompt
+    deferredPrompt.prompt();
+
+    // Wait for user response
+    const { outcome } = await deferredPrompt.userChoice;
+
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    }
+  };
 
   // Demo role credentials
   const demoRoles = [
@@ -269,6 +324,43 @@ const Login = () => {
             </div>
             <p className="demo-note">Click any role above to auto-fill credentials</p>
           </div>
+
+          {/* PWA Install Button */}
+          {!isInstalled && (
+            <div className="pwa-install-section">
+              <div className="pwa-install-divider">
+                <span>Install App</span>
+              </div>
+              {isInstallable ? (
+                <button
+                  type="button"
+                  className="btn btn-install"
+                  onClick={handleInstallClick}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Install AVA Spa App
+                </button>
+              ) : (
+                <p className="pwa-install-hint">
+                  Open in Chrome or Edge browser to install as app
+                </p>
+              )}
+            </div>
+          )}
+
+          {isInstalled && (
+            <div className="pwa-installed-badge">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              App Installed
+            </div>
+          )}
         </div>
       </div>
 

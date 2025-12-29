@@ -587,6 +587,95 @@ a:hover {
   color: var(--text-primary);
 }
 
+/* PWA Install Section */
+.pwa-install-section {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+}
+
+.pwa-install-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.pwa-install-divider::before,
+.pwa-install-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.pwa-install-divider span {
+  font-size: 0.8125rem;
+  color: var(--text-subtle);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-install {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, var(--color-accent) 0%, #145A2C 100%);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(27, 94, 55, 0.25);
+}
+
+.btn-install:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(27, 94, 55, 0.35);
+}
+
+.btn-install:active {
+  transform: translateY(0);
+}
+
+.btn-install svg {
+  flex-shrink: 0;
+}
+
+.pwa-install-hint {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--text-subtle);
+  margin: 0;
+  padding: var(--spacing-sm);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-border);
+}
+
+.pwa-installed-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(27, 94, 55, 0.1);
+  color: var(--color-accent);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: var(--font-medium);
+}
+
+.pwa-installed-badge svg {
+  color: var(--color-success);
+}
+
 /* ============================================================================
    FORM ELEMENTS
    Clean, accessible inputs

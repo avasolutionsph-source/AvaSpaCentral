@@ -47,7 +47,7 @@ const InventoryHub = () => {
         pendingOrders: poSummary.pendingCount || 0
       });
     } catch (error) {
-      console.error('Failed to load stats:', error);
+      // Silent fail for stats
     }
   };
 

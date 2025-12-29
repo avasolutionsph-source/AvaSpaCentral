@@ -46,7 +46,6 @@ const CustomerAnalytics = () => {
       setCustomerData(data);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load customer analytics:', error);
       showToast('Failed to load customer analytics', 'error');
       setLoading(false);
     }

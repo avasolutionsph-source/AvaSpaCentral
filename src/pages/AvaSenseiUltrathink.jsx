@@ -88,7 +88,7 @@ const AvaSenseiUltrathink = () => {
         const realtime = await mockApi.analytics.getRealtimeProfit();
         setRealtimeProfit(realtime);
       } catch (error) {
-        console.error('Failed to update realtime profit:', error);
+        // Silent fail for realtime updates
       }
     }, 30000);
 
@@ -166,7 +166,6 @@ const AvaSenseiUltrathink = () => {
 
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load data:', error);
       showToast('Failed to load analytics data', 'error');
       setLoading(false);
     }
@@ -264,7 +263,6 @@ const AvaSenseiUltrathink = () => {
 
       setProductUsageAnalysis(usageData.slice(0, 12));
     } catch (error) {
-      console.error('Failed to analyze product usage:', error);
       setProductUsageAnalysis([]);
     }
   };

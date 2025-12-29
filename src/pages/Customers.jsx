@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, isToday, parseISO } from 'date-fns';
@@ -10,7 +10,6 @@ const Customers = () => {
 
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
-  const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState(''); // Filter by spend tier
   const [activeTab, setActiveTab] = useState('customers'); // 'customers', 'loyalty'
@@ -87,11 +86,7 @@ const Customers = () => {
     loadCustomers();
   }, []);
 
-  useEffect(() => {
-    filterCustomersList();
-  }, [customers, searchTerm, tierFilter]);
-
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
       const data = await mockApi.customers.getCustomers();
@@ -101,14 +96,16 @@ const Customers = () => {
       showToast('Failed to load customers', 'error');
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const filterCustomersList = () => {
+  // Memoized filtered customers list
+  const filteredCustomers = useMemo(() => {
     let filtered = [...customers];
     if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        c.name.toLowerCase().includes(searchLower) ||
+        (c.email && c.email.toLowerCase().includes(searchLower)) ||
         (c.phone && c.phone.includes(searchTerm))
       );
     }
@@ -116,17 +113,17 @@ const Customers = () => {
     if (tierFilter) {
       filtered = filtered.filter(c => c.tier === tierFilter);
     }
-    setFilteredCustomers(filtered);
-  };
+    return filtered;
+  }, [customers, searchTerm, tierFilter]);
 
-  // Get tier stats for display
-  const getTierStats = () => {
+  // Memoized tier stats for display
+  const tierStats = useMemo(() => {
     return {
       VIP: customers.filter(c => c.tier === 'VIP').length,
       REGULAR: customers.filter(c => c.tier === 'REGULAR').length,
       NEW: customers.filter(c => c.tier === 'NEW').length
     };
-  };
+  }, [customers]);
 
   // Get spend tier badge styling
   const getSpendTierBadge = (tier) => {
@@ -138,13 +135,13 @@ const Customers = () => {
     return styles[tier] || styles.NEW;
   };
 
-  const openCreateModal = () => {
+  const openCreateModal = useCallback(() => {
     setModalMode('create');
     setFormData({ name: '', email: '', phone: '', birthday: '', notes: '' });
     setShowModal(true);
-  };
+  }, []);
 
-  const openEditModal = (customer) => {
+  const openEditModal = useCallback((customer) => {
     setModalMode('edit');
     setSelectedCustomer(customer);
     setFormData({
@@ -155,17 +152,17 @@ const Customers = () => {
       notes: customer.notes || ''
     });
     setShowModal(true);
-  };
+  }, []);
 
-  const openHistoryModal = (customer) => {
+  const openHistoryModal = useCallback((customer) => {
     setHistoryCustomer(customer);
     setShowHistoryModal(true);
-  };
+  }, []);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  }, []);
 
   const validateForm = () => {
     if (!formData.name.trim()) { showToast('Customer name is required', 'error'); return false; }
@@ -202,11 +199,11 @@ const Customers = () => {
     }
   };
 
-  const handleDelete = (customer) => {
+  const handleDelete = useCallback((customer) => {
     setDeleteConfirm({ isOpen: true, customer });
-  };
+  }, []);
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     const customer = deleteConfirm.customer;
     if (!customer) return;
     try {
@@ -217,21 +214,21 @@ const Customers = () => {
     } catch (error) {
       showToast('Failed to delete', 'error');
     }
-  };
+  }, [deleteConfirm.customer, showToast, loadCustomers]);
 
   // Loyalty Program Functions
-  const openLoyaltyModal = (customer) => {
+  const openLoyaltyModal = useCallback((customer) => {
     setLoyaltyCustomer(customer);
     setPointsToAdd('');
     setPointsReason('');
     setShowLoyaltyModal(true);
-  };
+  }, []);
 
-  const openRedeemModal = (customer) => {
+  const openRedeemModal = useCallback((customer) => {
     setRedeemCustomer(customer);
     setSelectedReward(null);
     setShowRedeemModal(true);
-  };
+  }, []);
 
   const handleAddPoints = async () => {
     const points = parseInt(pointsToAdd);
@@ -354,7 +351,7 @@ const Customers = () => {
           history = migrationData;
           // Clear localStorage after migration
           localStorage.removeItem(historyKey);
-          console.log(`[Customers] Migrated loyalty_history for customer ${customerId} to Dexie`);
+          // Migrated loyalty_history to Dexie
         }
       }
 
@@ -362,7 +359,6 @@ const Customers = () => {
       setPointsHistoryCache(prev => ({ ...prev, [customerId]: history }));
       return history;
     } catch (error) {
-      console.error('[Customers] Failed to load points history:', error);
       return [];
     }
   }, [pointsHistoryCache]);
@@ -379,7 +375,8 @@ const Customers = () => {
     }
   }, [showLoyaltyModal, loyaltyCustomer, loadPointsHistory]);
 
-  const getLoyaltyStats = () => {
+  // Memoized loyalty stats
+  const loyaltyStats = useMemo(() => {
     const stats = {
       totalMembers: customers.length,
       totalPoints: customers.reduce((sum, c) => sum + (c.loyaltyPoints || 0), 0),
@@ -392,7 +389,14 @@ const Customers = () => {
     });
 
     return stats;
-  };
+  }, [customers]);
+
+  // Memoized top loyalty members
+  const topLoyaltyMembers = useMemo(() => {
+    return [...customers]
+      .sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0))
+      .slice(0, 6);
+  }, [customers]);
 
   const isBirthdayToday = (birthday) => {
     if (!birthday) return false;
@@ -441,17 +445,17 @@ const Customers = () => {
           <div className="loyalty-stats-grid">
             <div className="loyalty-stat-card primary">
               <div className="stat-label">Total Members</div>
-              <div className="stat-value">{getLoyaltyStats().totalMembers}</div>
+              <div className="stat-value">{loyaltyStats.totalMembers}</div>
             </div>
             <div className="loyalty-stat-card primary">
               <div className="stat-label">Total Points</div>
-              <div className="stat-value">{getLoyaltyStats().totalPoints.toLocaleString()}</div>
+              <div className="stat-value">{loyaltyStats.totalPoints.toLocaleString()}</div>
             </div>
             {loyaltyTiers.map(tier => (
               <div key={tier.name} className="loyalty-stat-card">
                 <div className="tier-icon">{tier.icon}</div>
                 <div className="tier-name">{tier.name}</div>
-                <div className="stat-value">{getLoyaltyStats().tierCounts[tier.name]}</div>
+                <div className="stat-value">{loyaltyStats.tierCounts[tier.name]}</div>
               </div>
             ))}
           </div>
@@ -499,10 +503,7 @@ const Customers = () => {
           <div>
             <h3 className="loyalty-section-header">Top Loyalty Members</h3>
             <div className="loyalty-members-grid">
-              {[...customers]
-                .sort((a, b) => (b.loyaltyPoints || 0) - (a.loyaltyPoints || 0))
-                .slice(0, 6)
-                .map(customer => {
+              {topLoyaltyMembers.map(customer => {
                   const tier = getCustomerTier(customer.loyaltyPoints || 0);
                   const nextTier = getNextTier(customer.loyaltyPoints || 0);
                   const pointsToNext = getPointsToNextTier(customer.loyaltyPoints || 0);
@@ -559,9 +560,9 @@ const Customers = () => {
                 className="filter-select"
               >
                 <option value="">All Tiers</option>
-                <option value="VIP">VIP ({getTierStats().VIP})</option>
-                <option value="REGULAR">Regular ({getTierStats().REGULAR})</option>
-                <option value="NEW">New ({getTierStats().NEW})</option>
+                <option value="VIP">VIP ({tierStats.VIP})</option>
+                <option value="REGULAR">Regular ({tierStats.REGULAR})</option>
+                <option value="NEW">New ({tierStats.NEW})</option>
               </select>
               <div className="results-count">{filteredCustomers.length} customers</div>
             </div>
@@ -587,7 +588,7 @@ const Customers = () => {
                 transition: 'all 0.2s'
               }}
             >
-              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().VIP}</div>
+              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{tierStats.VIP}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>VIP (₱50K+)</div>
             </div>
             <div
@@ -604,7 +605,7 @@ const Customers = () => {
                 color: tierFilter === 'REGULAR' ? 'white' : 'inherit'
               }}
             >
-              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().REGULAR}</div>
+              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{tierStats.REGULAR}</div>
               <div style={{ fontSize: '0.8rem', color: tierFilter === 'REGULAR' ? 'rgba(255,255,255,0.8)' : 'var(--gray-600)' }}>Regular (₱20K+)</div>
             </div>
             <div
@@ -620,7 +621,7 @@ const Customers = () => {
                 transition: 'all 0.2s'
               }}
             >
-              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{getTierStats().NEW}</div>
+              <div style={{ fontWeight: '700', fontSize: '1.25rem' }}>{tierStats.NEW}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>New (&lt;₱20K)</div>
             </div>
           </div>

@@ -51,7 +51,7 @@ const HRHub = () => {
         totalAccounts: users.length
       });
     } catch (error) {
-      console.error('Failed to load stats:', error);
+      // Silent fail for stats
     }
   };
 

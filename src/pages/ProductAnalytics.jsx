@@ -42,7 +42,6 @@ const ProductAnalytics = () => {
       setProductData(data);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load product analytics:', error);
       showToast('Failed to load product analytics', 'error');
       setLoading(false);
     }

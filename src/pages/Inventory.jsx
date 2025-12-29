@@ -81,14 +81,13 @@ const Inventory = ({ embedded = false, onDataChange }) => {
         // Use bulkPut to avoid duplicate key errors
         await db.stockHistory.bulkPut(parsed);
         localStorage.removeItem('stockHistory');
-        console.log('[Inventory] Migrated stockHistory from localStorage to Dexie');
+        // Migrated stockHistory to Dexie
       }
 
       // Load from Dexie (starts empty if no data - no demo seeding)
       const history = await db.stockHistory.orderBy('date').reverse().toArray();
       setStockHistory(history);
     } catch (error) {
-      console.error('[Inventory] Failed to load stock history:', error);
       setStockHistory([]);
     }
   };
@@ -98,7 +97,7 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       const suggestions = await mockApi.purchaseOrders.getReorderSuggestions();
       setReorderSuggestions(suggestions);
     } catch (error) {
-      console.error('Failed to load reorder suggestions:', error);
+      // Silent fail for reorder suggestions
     }
   };
 
@@ -107,7 +106,7 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       const suppliersData = await mockApi.suppliers.getSuppliers();
       setSuppliers(suppliersData.filter(s => s.status === 'active'));
     } catch (error) {
-      console.error('Failed to load suppliers:', error);
+      // Silent fail for suppliers
     }
   };
 

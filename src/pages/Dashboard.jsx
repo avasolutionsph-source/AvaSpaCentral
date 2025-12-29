@@ -121,7 +121,6 @@ const Dashboard = () => {
         setLoading(false);
       } catch (error) {
         if (!isMounted) return;
-        console.error('Failed to load dashboard:', error);
         showToast('Failed to load dashboard data', 'error');
         setLoading(false);
       }
@@ -198,7 +197,6 @@ const Dashboard = () => {
 
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load dashboard:', error);
       showToast('Failed to load dashboard data', 'error');
       setLoading(false);
     }

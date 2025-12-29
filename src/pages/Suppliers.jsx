@@ -91,7 +91,7 @@ const Suppliers = ({ embedded = false }) => {
         const categoriesData = await mockApi.suppliers.getCategories();
         setCategories(categoriesData);
       } catch (error) {
-        console.error('Failed to load categories:', error);
+        // Silent fail for categories
       }
     };
     loadCategories();

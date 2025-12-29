@@ -65,7 +65,7 @@ const MyPortal = () => {
         upcomingAppointments
       });
     } catch (error) {
-      console.error('Failed to load stats:', error);
+      // Silent fail for stats
     }
   };
 
@@ -87,7 +87,7 @@ const MyPortal = () => {
       const myRecord = attendance.length > 0 ? attendance[0] : null;
       setTodayAttendance(myRecord);
     } catch (error) {
-      console.error('Failed to load attendance:', error);
+      // Silent fail for attendance
     } finally {
       setLoadingAttendance(false);
     }
@@ -154,7 +154,6 @@ const MyPortal = () => {
       const mins = minutes % 60;
       return `${hours}h ${mins}m`;
     } catch (error) {
-      console.error('Error calculating hours:', error);
       return null;
     }
   };

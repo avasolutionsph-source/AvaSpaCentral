@@ -75,7 +75,7 @@ const Calendar = () => {
           loadDropdowns(isMounted)
         ]);
       } catch (error) {
-        console.error('Failed to load calendar data:', error);
+        // Silent fail for calendar data
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -104,7 +104,7 @@ const Calendar = () => {
       setServices(prods.filter(p => p.type === 'service' && p.active));
       setRooms(rms);
     } catch (error) {
-      console.error('Failed to load dropdown data:', error);
+      // Silent fail for dropdown data
     }
   };
 
@@ -141,7 +141,7 @@ const Calendar = () => {
       setAppointments(transformedAppointments);
     } catch (error) {
       if (!isMounted) return;
-      console.error('Failed to load appointments:', error);
+      // Silent fail for appointments
     }
   };
 
@@ -174,7 +174,7 @@ const Calendar = () => {
       setAttendanceData(transformedAttendance);
     } catch (error) {
       if (!isMounted) return;
-      console.error('Failed to load attendance:', error);
+      // Silent fail for attendance
     }
   };
 
@@ -238,7 +238,7 @@ const Calendar = () => {
       setShiftData(transformedShifts);
     } catch (error) {
       if (!isMounted) return;
-      console.error('Failed to load shifts:', error);
+      // Silent fail for shifts
     }
   };
 
@@ -471,7 +471,6 @@ const Calendar = () => {
       setShowAppointmentModal(false);
       loadAppointments();
     } catch (error) {
-      console.error('Failed to save appointment:', error);
       showToast('Failed to save appointment', 'error');
     }
   };

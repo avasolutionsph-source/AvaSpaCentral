@@ -75,7 +75,6 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
       }
       if (onDataChange) onDataChange();
     } catch (error) {
-      console.error('Failed to load schedule:', error);
       showToast('Failed to load schedule', 'error');
     } finally {
       setLoading(false);

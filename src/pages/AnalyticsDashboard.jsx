@@ -57,7 +57,7 @@ const AnalyticsDashboard = () => {
         const realtime = await mockApi.analytics.getRealtimeProfit();
         setRealtimeProfit(realtime);
       } catch (error) {
-        console.error('Failed to update realtime profit:', error);
+        // Silent fail for realtime updates
       }
     }, 30000);
 
@@ -91,7 +91,6 @@ const AnalyticsDashboard = () => {
       setUtilizationMetrics(utilization);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load analytics:', error);
       showToast('Failed to load analytics data', 'error');
       setLoading(false);
     }

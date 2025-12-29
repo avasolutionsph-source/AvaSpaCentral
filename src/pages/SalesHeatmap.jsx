@@ -26,7 +26,7 @@ const SalesHeatmap = () => {
         const realtime = await mockApi.analytics.getRealtimeProfit();
         setRealtimeProfit(realtime);
       } catch (error) {
-        console.error('Failed to update realtime profit:', error);
+        // Silent fail for realtime updates
       }
     }, 30000);
 
@@ -68,7 +68,6 @@ const SalesHeatmap = () => {
       setRealtimeProfit(realtime);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load heatmap data:', error);
       showToast('Failed to load heatmap data', 'error');
       setLoading(false);
     }

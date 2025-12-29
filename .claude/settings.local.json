@@ -24,7 +24,13 @@
       "Bash(grep:*)",
       "Bash(git restore:*)",
       "Bash(ls:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(wc:*)",
+      "Bash(npm outdated:*)",
+      "Bash(npm audit:*)",
+      "Bash(while read f)",
+      "Bash(done)",
+      "Bash(node scripts/generate-pwa-icons.js:*)"
     ],
     "deny": [],
     "ask": []

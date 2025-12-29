@@ -88,7 +88,6 @@ const MyAttendanceHistory = ({ embedded = false }) => {
       });
 
     } catch (error) {
-      console.error('Failed to load attendance history:', error);
       showToast('Failed to load attendance history', 'error');
     } finally {
       setLoading(false);

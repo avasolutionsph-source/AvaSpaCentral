@@ -56,7 +56,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       const emps = await mockApi.employees.getEmployees();
       setEmployees(emps.filter(e => e.status === 'active'));
     } catch (error) {
-      console.error('Failed to load employees:', error);
+      // Silent fail for employees load
     } finally {
       setLoadingEmployees(false);
     }

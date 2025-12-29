@@ -104,10 +104,9 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
 
     try {
       await transactionsApi.createTransaction(transaction);
-      console.log('[Rooms] Created transaction for pay-after booking:', receiptNumber);
+      // Transaction created for pay-after booking
       return transaction;
     } catch (error) {
-      console.error('[Rooms] Failed to create pay-after transaction:', error);
       return null;
     }
   };
@@ -201,7 +200,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
 
       setUpcomingBookings(bookings);
     } catch (error) {
-      console.error('Failed to load upcoming bookings:', error);
+      // Silent fail for upcoming bookings
     }
   };
 
@@ -249,7 +248,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
 
       setHomeServices(services);
     } catch (error) {
-      console.error('Failed to load home services:', error);
+      // Silent fail for home services
     }
   };
 
@@ -437,7 +436,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       showToast('Home service started! Timer is now running.', 'success');
       loadHomeServices();
     } catch (error) {
-      console.error('Failed to start home service:', error);
       showToast('Failed to start home service', 'error');
     }
   };
@@ -491,7 +489,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                   });
                   showToast(`${room.name} service completed and payment recorded`, 'success');
                 } catch (bookingError) {
-                  console.error('Failed to complete advance booking:', bookingError);
+                  // Silent fail for booking completion
                 }
               }
 
@@ -499,7 +497,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
               showToast(`${room.name} service completed - room now available`, 'info');
               loadRooms();
             } catch (error) {
-              console.error('Failed to auto-complete room:', error);
+              // Silent fail for auto-complete
             }
           }
         }
@@ -567,7 +565,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                     paymentMethod: 'Cash'
                   });
                 } catch (bookingError) {
-                  console.error('Failed to complete advance booking:', bookingError);
+                  // Silent fail for booking completion
                 }
               } else {
                 // Delete regular home service card on completion
@@ -577,7 +575,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
               showToast(`Home service for ${service.customerName} completed`, 'info');
               loadHomeServices();
             } catch (error) {
-              console.error('Failed to auto-complete home service:', error);
+              // Silent fail for auto-complete
             }
           }
         }
@@ -687,7 +685,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
               });
               showToast(`Home service completed and payment recorded`, 'success');
             } catch (bookingError) {
-              console.error('Failed to complete pay-after booking:', bookingError);
+              // Silent fail for pay-after completion
             }
           } else {
             // Cancel the advance booking (not started or pay-now)
@@ -745,7 +743,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
             });
             showToast(`Service completed and payment recorded`, 'success');
           } catch (bookingError) {
-            console.error('Failed to complete pay-after booking:', bookingError);
+            // Silent fail for pay-after completion
           }
         } else if (room.advanceBookingId && status === 'cancelled') {
           // Cancel the advance booking if service was cancelled (not started)
@@ -756,7 +754,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
               cancelledAt: now.toISOString()
             });
           } catch (bookingError) {
-            console.error('Failed to cancel advance booking:', bookingError);
+            // Silent fail for booking cancellation
           }
         }
 
@@ -768,7 +766,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
 
       closeStopServiceModal();
     } catch (error) {
-      console.error('Failed to stop service:', error);
       showToast('Failed to stop service', 'error');
     } finally {
       setIsStoppingService(false);

@@ -193,7 +193,6 @@ const Settings = () => {
 
       showToast('Settings saved successfully!', 'success');
     } catch (error) {
-      console.error('Failed to save settings:', error);
       showToast('Failed to save settings', 'error');
     }
   };
@@ -241,7 +240,7 @@ const Settings = () => {
             const value = key === 'theme' ? storedValue : JSON.parse(storedValue);
             await SettingsRepository.set(key, value);
             localStorage.removeItem(key);
-            console.log(`[Settings] Migrated ${key} from localStorage to Dexie`);
+            // Migrated to Dexie
           }
         }
 
@@ -260,7 +259,7 @@ const Settings = () => {
         if (savedSecuritySettings) setSecuritySettings(savedSecuritySettings);
         if (saved2FA !== undefined) setTwoFactorEnabled(saved2FA);
       } catch (error) {
-        console.error('Failed to load settings:', error);
+        // Silent fail for settings load
       }
     };
 
@@ -421,7 +420,7 @@ const Settings = () => {
       }));
       await loadSyncStatus();
     } catch (error) {
-      console.error('Failed to load sync config:', error);
+      // Silent fail for sync config
     }
   };
 
@@ -438,7 +437,7 @@ const Settings = () => {
         failedCount: status.failedCount
       }));
     } catch (error) {
-      console.error('Failed to load sync status:', error);
+      // Silent fail for sync status
     }
   };
 
@@ -565,7 +564,7 @@ const Settings = () => {
             backupData.data[tableName] = tableData;
           }
         } catch (e) {
-          console.warn(`[Backup] Could not export ${tableName}:`, e);
+          // Skip table on export error
         }
       }
 
@@ -583,7 +582,6 @@ const Settings = () => {
 
       showToast('Backup exported successfully!', 'success');
     } catch (error) {
-      console.error('[Backup] Export error:', error);
       showToast('Failed to export backup: ' + error.message, 'error');
     } finally {
       setBackupOperation(null);
@@ -653,7 +651,6 @@ const Settings = () => {
             imported += tableData.length;
           }
         } catch (e) {
-          console.warn(`[Backup] Could not import ${tableName}:`, e);
           errors++;
         }
       }
@@ -666,7 +663,6 @@ const Settings = () => {
       }, 1500);
 
     } catch (error) {
-      console.error('[Backup] Import error:', error);
       showToast('Failed to import backup: ' + error.message, 'error');
     } finally {
       setBackupOperation(null);
@@ -740,7 +736,6 @@ const Settings = () => {
       });
       showToast('Security settings saved successfully!', 'success');
     } catch (error) {
-      console.error('Failed to save security settings:', error);
       showToast('Failed to save security settings', 'error');
     }
   };

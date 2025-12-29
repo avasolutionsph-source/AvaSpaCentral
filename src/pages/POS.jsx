@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
@@ -14,7 +14,6 @@ const POS = () => {
   // State
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,7 +117,7 @@ const POS = () => {
         setRotationQueue(rotationData.queue);
         setNextEmployee(rotationData.nextEmployee);
       } catch (error) {
-        console.error('Failed to load rotation queue:', error);
+        // Silent fail for rotation queue
       }
     };
 
@@ -131,11 +130,7 @@ const POS = () => {
     };
   }, []);
 
-  useEffect(() => {
-    filterProducts();
-  }, [products, selectedCategory, searchTerm]);
-
-  const loadPOSData = async () => {
+  const loadPOSData = useCallback(async () => {
     try {
       setLoading(true);
       const [productsData, employeesData, customersData, roomsData] = await Promise.all([
@@ -159,10 +154,10 @@ const POS = () => {
       showToast('Failed to load POS data', 'error');
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   // Load service rotation queue
-  const loadRotationQueue = async () => {
+  const loadRotationQueue = useCallback(async () => {
     try {
       const rotationData = await mockApi.serviceRotation.getRotationQueue();
       setRotationQueue(rotationData.queue);
@@ -173,9 +168,9 @@ const POS = () => {
         setSelectedEmployee(rotationData.nextEmployee.employeeId);
       }
     } catch (error) {
-      console.error('Failed to load rotation queue:', error);
+      // Silent fail for rotation queue
     }
-  };
+  }, []);
 
   // Load scheduled employees when advance booking date changes
   useEffect(() => {
@@ -186,7 +181,6 @@ const POS = () => {
           const scheduleData = await mockApi.shiftSchedules.getScheduleForDate(bookingDate);
           setScheduledEmployees(scheduleData);
         } catch (error) {
-          console.error('Failed to load scheduled employees:', error);
           setScheduledEmployees([]);
         }
       } else {
@@ -210,13 +204,13 @@ const POS = () => {
   }, [rotationQueue, busyEmployeeIds]);
 
   // Select employee from rotation queue
-  const selectFromRotation = (employeeId) => {
+  const selectFromRotation = useCallback((employeeId) => {
     setSelectedEmployee(employeeId);
     showToast('Employee selected from rotation queue', 'info');
-  };
+  }, [showToast]);
 
   // Skip current employee in rotation
-  const skipInRotation = async (employeeId) => {
+  const skipInRotation = useCallback(async (employeeId) => {
     try {
       await mockApi.serviceRotation.skipEmployee(employeeId);
       await loadRotationQueue();
@@ -224,9 +218,10 @@ const POS = () => {
     } catch (error) {
       showToast('Failed to skip employee', 'error');
     }
-  };
+  }, [loadRotationQueue, showToast]);
 
-  const filterProducts = () => {
+  // Memoized filtered products
+  const filteredProducts = useMemo(() => {
     let filtered = products;
 
     // Filter by category
@@ -236,128 +231,136 @@ const POS = () => {
 
     // Filter by search term
     if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.category.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(searchLower) ||
+        p.category.toLowerCase().includes(searchLower)
       );
     }
 
-    setFilteredProducts(filtered);
-  };
+    return filtered;
+  }, [products, selectedCategory, searchTerm]);
 
-  const addToCart = (product) => {
-    // Check if product is already in cart
-    const existingIndex = cart.findIndex(item => item.id === product._id);
+  const addToCart = useCallback((product) => {
+    setCart(prevCart => {
+      // Check if product is already in cart
+      const existingIndex = prevCart.findIndex(item => item.id === product._id);
 
-    if (existingIndex >= 0) {
-      // Increase quantity
-      const newQuantity = cart[existingIndex].quantity + 1;
+      if (existingIndex >= 0) {
+        // Increase quantity
+        const newQuantity = prevCart[existingIndex].quantity + 1;
 
-      // Check stock for products
-      if (product.type === 'product' && newQuantity > product.stock) {
-        showToast(`Only ${product.stock} units available in stock`, 'error');
-        return;
+        // Check stock for products
+        if (product.type === 'product' && newQuantity > product.stock) {
+          showToast(`Only ${product.stock} units available in stock`, 'error');
+          return prevCart;
+        }
+
+        // Update cart with immutable pattern
+        showToast(`${product.name} quantity increased`, 'info');
+        return prevCart.map((item, index) =>
+          index === existingIndex
+            ? { ...item, quantity: newQuantity, subtotal: product.price * newQuantity }
+            : item
+        );
+      } else {
+        // Add new item
+        if (product.type === 'product' && product.stock <= 0) {
+          showToast('Item out of stock', 'error');
+          return prevCart;
+        }
+
+        showToast(`${product.name} added to cart`, 'success');
+        return [...prevCart, {
+          id: product._id,
+          name: product.name,
+          type: product.type,
+          price: product.price,
+          quantity: 1,
+          subtotal: product.price,
+          commission: product.commission || { type: 'fixed', value: 0 },
+          duration: product.duration || null
+        }];
       }
+    });
+  }, [showToast]);
 
-      // Update cart with immutable pattern
-      const newCart = cart.map((item, index) =>
-        index === existingIndex
-          ? { ...item, quantity: newQuantity, subtotal: product.price * newQuantity }
-          : item
-      );
-      setCart(newCart);
-      showToast(`${product.name} quantity increased`, 'info');
-    } else {
-      // Add new item
-      if (product.type === 'product' && product.stock <= 0) {
-        showToast('Item out of stock', 'error');
-        return;
-      }
+  const removeFromCart = useCallback((index) => {
+    setCart(prevCart => prevCart.filter((_, i) => i !== index));
+    showToast('Item removed from cart', 'info');
+  }, [showToast]);
 
-      setCart([...cart, {
-        id: product._id,
-        name: product.name,
-        type: product.type,
-        price: product.price,
-        quantity: 1,
-        subtotal: product.price,
-        commission: product.commission || { type: 'fixed', value: 0 },
-        duration: product.duration || null
-      }]);
-      showToast(`${product.name} added to cart`, 'success');
-    }
-  };
-
-  const updateCartQuantity = (index, newQuantity) => {
+  const updateCartQuantity = useCallback((index, newQuantity) => {
     if (newQuantity < 1) {
       removeFromCart(index);
       return;
     }
 
-    const item = cart[index];
-    const product = products.find(p => p._id === item.id);
+    setCart(prevCart => {
+      const item = prevCart[index];
+      const product = products.find(p => p._id === item.id);
 
-    // Check stock
-    if (product.type === 'product' && newQuantity > product.stock) {
-      showToast(`Only ${product.stock} units available`, 'error');
-      return;
-    }
+      // Check stock
+      if (product && product.type === 'product' && newQuantity > product.stock) {
+        showToast(`Only ${product.stock} units available`, 'error');
+        return prevCart;
+      }
 
-    // Update cart with immutable pattern
-    const newCart = cart.map((cartItem, i) =>
-      i === index
-        ? { ...cartItem, quantity: newQuantity, subtotal: item.price * newQuantity }
-        : cartItem
-    );
-    setCart(newCart);
-  };
+      // Update cart with immutable pattern
+      return prevCart.map((cartItem, i) =>
+        i === index
+          ? { ...cartItem, quantity: newQuantity, subtotal: item.price * newQuantity }
+          : cartItem
+      );
+    });
+  }, [products, removeFromCart, showToast]);
 
-  const removeFromCart = (index) => {
-    const newCart = cart.filter((_, i) => i !== index);
-    setCart(newCart);
-    showToast('Item removed from cart', 'info');
-  };
-
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     if (cart.length === 0) return;
     setClearCartConfirm(true);
-  };
+  }, [cart.length]);
 
-  const confirmClearCart = () => {
+  const confirmClearCart = useCallback(() => {
     setCart([]);
     setClearCartConfirm(false);
     showToast('Cart cleared', 'info');
-  };
+  }, [showToast]);
 
-  const getCartSubtotal = () => {
+  // Memoized cart calculations
+  const cartSubtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.subtotal, 0);
-  };
+  }, [cart]);
 
-  const getDiscount = () => {
-    const subtotal = getCartSubtotal();
+  const discount = useMemo(() => {
     if (!discountType) return 0;
 
     if (discountType === 'senior' || discountType === 'pwd') {
-      return subtotal * 0.2; // 20% discount
+      return cartSubtotal * 0.2; // 20% discount
     }
 
     if (discountType === 'gc' && appliedGC) {
       // Gift certificate discount - use min of GC balance or cart subtotal
-      return Math.min(appliedGC.balance, subtotal);
+      return Math.min(appliedGC.balance, cartSubtotal);
     }
 
     return discountValue;
-  };
+  }, [cartSubtotal, discountType, discountValue, appliedGC]);
 
-  const getTotal = () => {
-    return getCartSubtotal() - getDiscount();
-  };
+  const total = useMemo(() => {
+    return cartSubtotal - discount;
+  }, [cartSubtotal, discount]);
 
-  const getChange = () => {
+  const change = useMemo(() => {
     if (paymentMethod !== 'Cash') return 0;
     const received = parseFloat(amountReceived) || 0;
-    return Math.max(0, received - getTotal());
-  };
+    return Math.max(0, received - total);
+  }, [paymentMethod, amountReceived, total]);
+
+  // Legacy getter functions for compatibility (can be removed after refactoring usages)
+  const getCartSubtotal = () => cartSubtotal;
+  const getDiscount = () => discount;
+  const getTotal = () => total;
+  const getChange = () => change;
 
   const openCheckout = () => {
     if (cart.length === 0) {
@@ -511,7 +514,6 @@ const POS = () => {
           customerData = newCustomer;
           showToast('Customer saved to database', 'success');
         } catch (error) {
-          console.error('Failed to save customer:', error);
           // Continue with transaction even if customer save fails
         }
       }
@@ -674,7 +676,6 @@ const POS = () => {
             const gcDiscount = getDiscount();
             await mockApi.giftCertificates.redeemGiftCertificate(appliedGC._id, gcDiscount);
           } catch (error) {
-            console.error('Failed to redeem gift certificate:', error);
             // Continue anyway - transaction already saved
           }
         }
@@ -730,7 +731,6 @@ const POS = () => {
               customerEmail: customerEmail
             });
           } catch (error) {
-            console.error('Failed to update room status:', error);
             // Continue anyway - transaction already saved
           }
         }
@@ -780,7 +780,6 @@ const POS = () => {
               transactionId: receiptNumber
             });
           } catch (error) {
-            console.error('Failed to create home service:', error);
             // Continue anyway - transaction already saved
           }
         }

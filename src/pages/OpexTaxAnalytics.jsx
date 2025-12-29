@@ -51,7 +51,6 @@ const OpexTaxAnalytics = () => {
       setSalaryHealth(salaryData);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load OPEX analytics:', error);
       showToast('Failed to load OPEX analytics', 'error');
       setLoading(false);
     }

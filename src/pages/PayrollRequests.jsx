@@ -41,7 +41,7 @@ const PayrollRequests = ({ embedded = false, onDataChange, onOpenSubmitRef }) =>
       const requests = await mockApi.payrollRequests.getRequests(user?._id);
       setPayrollRequests(requests);
     } catch (error) {
-      console.error('Failed to load payroll requests:', error);
+      // Silent fail for payroll requests
     }
   };
 

@@ -143,7 +143,7 @@ const Appointments = () => {
         });
         setConflicts(result);
       } catch (error) {
-        console.error('Error checking availability:', error);
+        // Silent fail for availability check
       } finally {
         setCheckingAvailability(false);
       }
@@ -357,7 +357,7 @@ const Appointments = () => {
             lastNoShow: new Date().toISOString()
           });
         } catch (err) {
-          console.error('Failed to update customer no-show count:', err);
+          // Silent fail for no-show count update
         }
       }
 

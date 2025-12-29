@@ -52,7 +52,6 @@ const InventoryAnalytics = () => {
       setForecasts(forecastData);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load inventory analytics:', error);
       showToast('Failed to load inventory analytics', 'error');
       setLoading(false);
     }

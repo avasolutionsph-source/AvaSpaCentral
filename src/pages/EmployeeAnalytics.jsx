@@ -51,7 +51,6 @@ const EmployeeAnalytics = () => {
       setEmployeeData(data);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load employee analytics:', error);
       showToast('Failed to load employee analytics', 'error');
       setLoading(false);
     }

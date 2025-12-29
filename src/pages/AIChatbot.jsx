@@ -67,7 +67,7 @@ const AIChatbot = () => {
         dataLoaded: true
       });
     } catch (error) {
-      console.error('Failed to load business data:', error);
+      // Silent fail - data will remain empty
     }
   };
 

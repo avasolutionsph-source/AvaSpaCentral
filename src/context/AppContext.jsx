@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import mockApi from '../mockApi';
+import { authService, supabaseSyncManager, isSupabaseConfigured } from '../services/supabase';
 import { logLogin, logLogout } from '../utils/activityLogger';
 
 const AppContext = createContext();
@@ -44,49 +44,87 @@ export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [syncStatus, setSyncStatus] = useState({ isOnline: false, isSyncing: false });
 
   // Initialize app - check for existing session
   useEffect(() => {
     const initApp = async () => {
       try {
-        const sessionUser = localStorage.getItem('user');
-        if (sessionUser) {
-          let userData = JSON.parse(sessionUser);
+        // Initialize Supabase auth service
+        await authService.initialize();
 
-          // FIX: Refresh employeeId from source if missing (for existing sessions before fix)
-          if (!userData.employeeId) {
-            // First, check Dexie users table (for custom accounts created via Employee Accounts)
-            const db = (await import('../db')).default;
-            const dexieUser = await db.users.get(userData._id);
+        // Check for existing user from authService
+        if (authService.currentUser) {
+          setUser(authService.currentUser);
+        } else {
+          // Fallback: Check localStorage for offline session
+          const sessionUser = localStorage.getItem('user');
+          if (sessionUser) {
+            let userData = JSON.parse(sessionUser);
 
-            if (dexieUser?.employeeId) {
-              userData.employeeId = dexieUser.employeeId;
-              console.log('[AppContext] Refreshed employeeId from Dexie:', userData.employeeId);
-            } else {
-              // Fallback: Check mockData demo users
-              const { mockDatabase } = await import('../mockApi/mockData');
+            // Refresh employeeId from source if missing (for existing sessions)
+            if (!userData.employeeId) {
+              const db = (await import('../db')).default;
+              const dexieUser = await db.users.get(userData._id);
 
-              if (userData.email === mockDatabase.testUser.email && mockDatabase.testUser.employeeId) {
-                userData.employeeId = mockDatabase.testUser.employeeId;
+              if (dexieUser?.employeeId) {
+                userData.employeeId = dexieUser.employeeId;
+                console.log('[AppContext] Refreshed employeeId from Dexie:', userData.employeeId);
               } else {
-                const demoUser = mockDatabase.demoUsers.find(u => u.email === userData.email);
-                if (demoUser?.employeeId) {
-                  userData.employeeId = demoUser.employeeId;
+                // Fallback: Check mockData demo users
+                const { mockDatabase } = await import('../mockApi/mockData');
+
+                if (userData.email === mockDatabase.testUser.email && mockDatabase.testUser.employeeId) {
+                  userData.employeeId = mockDatabase.testUser.employeeId;
+                } else {
+                  const demoUser = mockDatabase.demoUsers.find(u => u.email === userData.email);
+                  if (demoUser?.employeeId) {
+                    userData.employeeId = demoUser.employeeId;
+                  }
+                }
+
+                if (userData.employeeId) {
+                  console.log('[AppContext] Refreshed employeeId from mockData:', userData.employeeId);
                 }
               }
 
+              // Update localStorage with refreshed data
               if (userData.employeeId) {
-                console.log('[AppContext] Refreshed employeeId from mockData:', userData.employeeId);
+                localStorage.setItem('user', JSON.stringify(userData));
               }
             }
 
-            // Update localStorage with refreshed data
-            if (userData.employeeId) {
-              localStorage.setItem('user', JSON.stringify(userData));
-            }
+            setUser(userData);
           }
+        }
 
-          setUser(userData);
+        // Subscribe to auth state changes
+        authService.subscribe((event, session, userProfile) => {
+          console.log('[AppContext] Auth state changed:', event);
+          if (event === 'SIGNED_IN' && userProfile) {
+            setUser(userProfile);
+            // Initialize sync manager when user signs in
+            if (isSupabaseConfigured()) {
+              supabaseSyncManager.initialize();
+            }
+          } else if (event === 'SIGNED_OUT') {
+            setUser(null);
+            supabaseSyncManager.cleanup();
+          }
+        });
+
+        // Initialize sync manager if user is already logged in and Supabase is configured
+        if (authService.currentUser && isSupabaseConfigured()) {
+          await supabaseSyncManager.initialize();
+
+          // Subscribe to sync status updates
+          supabaseSyncManager.subscribe((status) => {
+            setSyncStatus(prev => ({
+              ...prev,
+              isSyncing: status.type === 'sync_start',
+              lastSync: status.type === 'sync_complete' ? new Date().toISOString() : prev.lastSync,
+            }));
+          });
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);
@@ -96,6 +134,11 @@ export const AppProvider = ({ children }) => {
     };
 
     initApp();
+
+    // Cleanup on unmount
+    return () => {
+      supabaseSyncManager.cleanup();
+    };
   }, []);
 
   // Toast notification system
@@ -111,9 +154,18 @@ export const AppProvider = ({ children }) => {
 
   const login = async (email, password, rememberMe) => {
     try {
-      const response = await mockApi.auth.login(email, password);
+      // Use Supabase auth service
+      const response = await authService.signIn(email, password);
       setUser(response.user);
       showToast('Login successful!', 'success');
+
+      // Initialize sync manager after login
+      if (isSupabaseConfigured()) {
+        await supabaseSyncManager.initialize();
+        // Trigger initial sync
+        supabaseSyncManager.sync();
+      }
+
       // Log the login activity
       logLogin(response.user);
       return response;
@@ -123,12 +175,18 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     // Log the logout activity before clearing user
     if (user) {
       logLogout(user);
     }
-    mockApi.auth.logout();
+
+    // Use Supabase auth service
+    await authService.signOut();
+
+    // Cleanup sync manager
+    supabaseSyncManager.cleanup();
+
     setUser(null);
     showToast('Logged out successfully', 'info');
   };
@@ -187,6 +245,26 @@ export const AppProvider = ({ children }) => {
     return ['Owner', 'Manager'].includes(user?.role);
   };
 
+  // Trigger manual sync
+  const triggerSync = async () => {
+    if (!isSupabaseConfigured()) {
+      showToast('Cloud sync not configured', 'warning');
+      return;
+    }
+    const result = await supabaseSyncManager.sync();
+    if (result.success) {
+      showToast(`Synced: ${result.pushed} pushed, ${result.pulled} pulled`, 'success');
+    } else {
+      showToast(`Sync failed: ${result.error || result.message}`, 'error');
+    }
+    return result;
+  };
+
+  // Check if cloud sync is available
+  const isCloudSyncEnabled = () => {
+    return isSupabaseConfigured();
+  };
+
   const value = {
     user,
     setUser,
@@ -204,7 +282,11 @@ export const AppProvider = ({ children }) => {
     isTherapist,
     canEdit,
     canViewAll,
-    hasManagementAccess
+    hasManagementAccess,
+    // New sync-related exports
+    syncStatus,
+    triggerSync,
+    isCloudSyncEnabled,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

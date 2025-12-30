@@ -10,8 +10,8 @@
 
 import storageService from './storage';
 import { SyncManager, NetworkDetector } from './sync';
-import db from '../db';
 import { mockDatabase } from '../mockApi/mockData';
+import { PayrollRequestRepository, SettingsRepository, ServiceRotationRepository } from './storage/repositories';
 
 class InitializationService {
   constructor() {
@@ -203,9 +203,9 @@ class InitializationService {
         try {
           const requestsData = JSON.parse(payrollRequests);
           if (Array.isArray(requestsData) && requestsData.length > 0) {
-            const existingCount = await db.payrollRequests.count();
+            const existingCount = await PayrollRequestRepository.count();
             if (existingCount === 0) {
-              await db.payrollRequests.bulkAdd(requestsData);
+              await PayrollRequestRepository.createMany(requestsData);
               console.log(`[InitService] Migrated ${requestsData.length} payroll requests`);
             }
           }
@@ -244,10 +244,10 @@ class InitializationService {
         const value = localStorage.getItem(key);
         if (value) {
           try {
-            const existingValue = await db.settings.get(key);
+            const existingValue = await SettingsRepository.get(key);
             if (!existingValue) {
               const parsedValue = key === 'theme' ? value : JSON.parse(value);
-              await db.settings.put({ key, value: parsedValue, _updatedAt: new Date().toISOString() });
+              await SettingsRepository.set(key, parsedValue);
               console.log(`[InitService] Migrated setting: ${key}`);
             }
             localStorage.removeItem(key);
@@ -268,7 +268,7 @@ class InitializationService {
             const date = key.replace('serviceRotation_', '');
             const rotationData = JSON.parse(localStorage.getItem(key));
             if (rotationData) {
-              await db.serviceRotation.put({ date, ...rotationData });
+              await ServiceRotationRepository.setRotation(date, rotationData);
               console.log(`[InitService] Migrated service rotation for ${date}`);
             }
             localStorage.removeItem(key);

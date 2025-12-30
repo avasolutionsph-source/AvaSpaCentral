@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
-import { db } from '../db';
+import { StockHistoryRepository } from '../services/storage/repositories';
 
 const Inventory = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
@@ -78,14 +78,18 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       const storedHistory = localStorage.getItem('stockHistory');
       if (storedHistory) {
         const parsed = JSON.parse(storedHistory);
-        // Use bulkPut to avoid duplicate key errors
-        await db.stockHistory.bulkPut(parsed);
+        // Migrate using repository (triggers sync events)
+        for (const entry of parsed) {
+          await StockHistoryRepository.create({
+            ...entry,
+            _id: entry.id || entry._id
+          });
+        }
         localStorage.removeItem('stockHistory');
-        // Migrated stockHistory to Dexie
       }
 
-      // Load from Dexie (starts empty if no data - no demo seeding)
-      const history = await db.stockHistory.orderBy('date').reverse().toArray();
+      // Load from repository (event-driven sync enabled)
+      const history = await StockHistoryRepository.getRecent(500);
       setStockHistory(history);
     } catch (error) {
       setStockHistory([]);
@@ -233,8 +237,16 @@ const Inventory = ({ embedded = false, onDataChange }) => {
         date: new Date().toISOString()
       };
 
-      // Persist stock history to Dexie
-      await db.stockHistory.add(historyEntry);
+      // Persist stock history using repository (event-driven sync)
+      await StockHistoryRepository.addAdjustment(
+        selectedProduct._id,
+        selectedProduct.name,
+        adjustmentType === 'add' ? quantity : -quantity,
+        selectedProduct.stock,
+        newStock,
+        adjustmentReason,
+        'Current User'
+      );
       setStockHistory([historyEntry, ...stockHistory]);
 
       // Log activity
@@ -344,8 +356,19 @@ const Inventory = ({ embedded = false, onDataChange }) => {
         }
       }
 
-      // Persist stock history to Dexie
-      await db.stockHistory.bulkAdd(newHistoryEntries);
+      // Persist stock history using repository (event-driven sync)
+      for (const entry of newHistoryEntries) {
+        await StockHistoryRepository.addPurchase(
+          entry.productId,
+          entry.productName,
+          entry.quantity,
+          entry.oldStock,
+          entry.newStock,
+          entry.cost,
+          entry.reason,
+          'Current User'
+        );
+      }
       setStockHistory([...newHistoryEntries, ...stockHistory]);
 
       // Log activity

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { authService, isSupabaseConfigured } from '../services/supabase';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -76,42 +77,6 @@ const Login = () => {
     }
   };
 
-  // Demo role credentials
-  const demoRoles = [
-    {
-      role: 'Owner',
-      email: 'owner@example.com',
-      password: 'DemoSpa123!',
-      description: 'Full access to all features'
-    },
-    {
-      role: 'Manager',
-      email: 'manager@example.com',
-      password: 'Manager123!',
-      description: 'Manage operations and staff'
-    },
-    {
-      role: 'Therapist',
-      email: 'therapist@example.com',
-      password: 'Therapist123!',
-      description: 'View schedule and appointments'
-    },
-    {
-      role: 'Receptionist',
-      email: 'receptionist@example.com',
-      password: 'Reception123!',
-      description: 'Handle bookings and POS'
-    }
-  ];
-
-  const handleRoleSelect = (role) => {
-    setFormData({
-      email: role.email,
-      password: role.password,
-      rememberMe: false
-    });
-    setErrors({});
-  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -187,12 +152,23 @@ const Login = () => {
 
     setForgotLoading(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    setForgotLoading(false);
-    setForgotSuccess(true);
-    showToast('Password reset link sent to your email!', 'success');
+    try {
+      if (isSupabaseConfigured()) {
+        // Use Supabase password reset
+        await authService.resetPassword(forgotEmail);
+        setForgotSuccess(true);
+        showToast('Password reset link sent to your email!', 'success');
+      } else {
+        // Simulate API call for offline mode
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        setForgotSuccess(true);
+        showToast('Password reset is not available in offline mode', 'warning');
+      }
+    } catch (error) {
+      showToast(error.message || 'Failed to send reset email', 'error');
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const openForgotModal = () => {
@@ -304,25 +280,6 @@ const Login = () => {
                 Register here
               </Link>
             </p>
-          </div>
-
-          {/* Demo Role Selector */}
-          <div className="demo-credentials">
-            <p className="demo-title">Quick Demo Login - Select a Role:</p>
-            <div className="demo-roles">
-              {demoRoles.map((role) => (
-                <button
-                  key={role.role}
-                  type="button"
-                  className="demo-role-btn"
-                  onClick={() => handleRoleSelect(role)}
-                >
-                  <span className="role-name">{role.role}</span>
-                  <span className="role-desc">{role.description}</span>
-                </button>
-              ))}
-            </div>
-            <p className="demo-note">Click any role above to auto-fill credentials</p>
           </div>
 
           {/* PWA Install Button */}

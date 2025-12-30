@@ -5,9 +5,11 @@
  * stored in mockDatabase (fixedCosts, cashAccounts, business settings).
  *
  * Uses a key-value pattern similar to SettingsRepository.
+ * Emits sync events for cross-device compatibility.
  */
 
-import { db } from '../../../db';
+import { db, syncQueue } from '../../../db';
+import dataChangeEmitter from '../../sync/DataChangeEmitter';
 
 // Default values for business configuration
 const DEFAULT_FIXED_COSTS = {
@@ -54,6 +56,32 @@ const DEFAULT_BUSINESS_INFO = {
 class BusinessConfigRepository {
   constructor() {
     this.table = db.businessConfig;
+    this.tableName = 'businessConfig';
+    this.trackSync = true;
+  }
+
+  /**
+   * Add to sync queue for offline-first sync
+   */
+  async _addToSyncQueue(key, operation, data) {
+    if (!this.trackSync) return;
+
+    await syncQueue.add({
+      entityType: this.tableName,
+      entityId: key,
+      operation,
+      data,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      retryCount: 0
+    });
+
+    // Emit event for immediate sync (if online)
+    dataChangeEmitter.emit({
+      entityType: this.tableName,
+      operation,
+      entityId: key
+    });
   }
 
   /**
@@ -72,11 +100,15 @@ class BusinessConfigRepository {
    */
   async setFixedCosts(fixedCosts) {
     const now = new Date().toISOString();
-    await this.table.put({
+    const existing = await this.table.get('fixedCosts');
+    const record = {
       key: 'fixedCosts',
       value: { ...DEFAULT_FIXED_COSTS, ...fixedCosts },
+      _syncStatus: 'pending',
       _updatedAt: now
-    });
+    };
+    await this.table.put(record);
+    await this._addToSyncQueue('fixedCosts', existing ? 'update' : 'create', record);
   }
 
   /**
@@ -95,11 +127,15 @@ class BusinessConfigRepository {
    */
   async setCashAccounts(cashAccounts) {
     const now = new Date().toISOString();
-    await this.table.put({
+    const existing = await this.table.get('cashAccounts');
+    const record = {
       key: 'cashAccounts',
       value: { ...cashAccounts, lastUpdated: now },
+      _syncStatus: 'pending',
       _updatedAt: now
-    });
+    };
+    await this.table.put(record);
+    await this._addToSyncQueue('cashAccounts', existing ? 'update' : 'create', record);
   }
 
   /**
@@ -118,11 +154,15 @@ class BusinessConfigRepository {
    */
   async setBusinessSettings(settings) {
     const now = new Date().toISOString();
-    await this.table.put({
+    const existing = await this.table.get('businessSettings');
+    const record = {
       key: 'businessSettings',
       value: { ...DEFAULT_BUSINESS_SETTINGS, ...settings },
+      _syncStatus: 'pending',
       _updatedAt: now
-    });
+    };
+    await this.table.put(record);
+    await this._addToSyncQueue('businessSettings', existing ? 'update' : 'create', record);
   }
 
   /**
@@ -151,11 +191,15 @@ class BusinessConfigRepository {
    */
   async setBusinessInfo(info) {
     const now = new Date().toISOString();
-    await this.table.put({
+    const existing = await this.table.get('businessInfo');
+    const record = {
       key: 'businessInfo',
       value: { ...DEFAULT_BUSINESS_INFO, ...info },
+      _syncStatus: 'pending',
       _updatedAt: now
-    });
+    };
+    await this.table.put(record);
+    await this._addToSyncQueue('businessInfo', existing ? 'update' : 'create', record);
   }
 
   /**
@@ -187,11 +231,15 @@ class BusinessConfigRepository {
    */
   async set(key, value) {
     const now = new Date().toISOString();
-    await this.table.put({
+    const existing = await this.table.get(key);
+    const record = {
       key,
       value,
+      _syncStatus: 'pending',
       _updatedAt: now
-    });
+    };
+    await this.table.put(record);
+    await this._addToSyncQueue(key, existing ? 'update' : 'create', record);
   }
 
   /**

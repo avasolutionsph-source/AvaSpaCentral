@@ -5,13 +5,41 @@
  * Used for: businessInfo, businessHours, taxSettings, theme, securitySettings, etc.
  *
  * Unlike other repositories, this uses a key-value pattern rather than entity collections.
+ * Emits sync events for cross-device compatibility (offline-first).
  */
 
-import { db } from '../../../db';
+import { db, syncQueue } from '../../../db';
+import dataChangeEmitter from '../../sync/DataChangeEmitter';
 
 class SettingsRepository {
   constructor() {
     this.table = db.settings;
+    this.tableName = 'settings';
+    this.trackSync = true;
+  }
+
+  /**
+   * Add to sync queue for offline-first sync
+   */
+  async _addToSyncQueue(key, operation, data) {
+    if (!this.trackSync) return;
+
+    await syncQueue.add({
+      entityType: this.tableName,
+      entityId: key,
+      operation,
+      data,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      retryCount: 0
+    });
+
+    // Emit event for immediate sync (if online)
+    dataChangeEmitter.emit({
+      entityType: this.tableName,
+      operation,
+      entityId: key
+    });
   }
 
   /**
@@ -32,11 +60,18 @@ class SettingsRepository {
    */
   async set(key, value) {
     const now = new Date().toISOString();
-    await this.table.put({
+    const existing = await this.table.get(key);
+    const record = {
       key,
       value,
+      _syncStatus: 'pending',
       _updatedAt: now
-    });
+    };
+
+    await this.table.put(record);
+
+    // Add to sync queue and emit event
+    await this._addToSyncQueue(key, existing ? 'update' : 'create', record);
   }
 
   /**
@@ -62,9 +97,16 @@ class SettingsRepository {
     const records = Object.entries(settings).map(([key, value]) => ({
       key,
       value,
+      _syncStatus: 'pending',
       _updatedAt: now
     }));
+
     await this.table.bulkPut(records);
+
+    // Add each to sync queue
+    for (const record of records) {
+      await this._addToSyncQueue(record.key, 'update', record);
+    }
   }
 
   /**
@@ -74,6 +116,9 @@ class SettingsRepository {
    */
   async delete(key) {
     await this.table.delete(key);
+
+    // Add to sync queue
+    await this._addToSyncQueue(key, 'delete', { key });
   }
 
   /**

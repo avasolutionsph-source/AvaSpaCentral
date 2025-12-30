@@ -10,6 +10,7 @@
  */
 
 import { db, syncQueue } from '../../db';
+import dataChangeEmitter from '../sync/DataChangeEmitter';
 
 // Generate a unique ID (similar to MongoDB ObjectId format)
 export const generateId = () => {
@@ -110,9 +111,10 @@ class BaseRepository {
 
     await this.table.add(item);
 
-    // Track in sync queue
+    // Track in sync queue and emit event for immediate sync
     if (this.trackSync) {
       await this.addToSyncQueue(item._id, 'create', item);
+      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'create', entityId: item._id });
     }
 
     return item;
@@ -135,11 +137,13 @@ class BaseRepository {
 
     await this.table.bulkAdd(itemsWithIds);
 
-    // Track in sync queue
+    // Track in sync queue and emit event for immediate sync
     if (this.trackSync) {
       for (const item of itemsWithIds) {
         await this.addToSyncQueue(item._id, 'create', item);
       }
+      // Emit single event for batch create (debounced sync will handle it)
+      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'create', count: itemsWithIds.length });
     }
 
     return itemsWithIds;
@@ -168,9 +172,10 @@ class BaseRepository {
 
     await this.table.put(updatedItem);
 
-    // Track in sync queue
+    // Track in sync queue and emit event for immediate sync
     if (this.trackSync) {
       await this.addToSyncQueue(id, 'update', updatedItem);
+      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'update', entityId: id });
     }
 
     return updatedItem;
@@ -199,9 +204,10 @@ class BaseRepository {
       await this.table.delete(id);
     }
 
-    // Track in sync queue
+    // Track in sync queue and emit event for immediate sync
     if (this.trackSync) {
       await this.addToSyncQueue(id, 'delete', { _id: id });
+      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'delete', entityId: id });
     }
 
     return true;
@@ -232,6 +238,11 @@ class BaseRepository {
           await this.addToSyncQueue(id, 'update', { ...existing, ...data });
         }
       }
+    }
+
+    // Emit single event for batch update (debounced sync will handle it)
+    if (this.trackSync && count > 0) {
+      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'update', count });
     }
 
     return count;

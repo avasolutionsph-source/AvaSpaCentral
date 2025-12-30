@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, isToday, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
-import { db } from '../db';
+import { LoyaltyHistoryRepository } from '../services/storage/repositories';
 
 const Customers = () => {
   const { showToast } = useApp();
@@ -250,15 +250,13 @@ const Customers = () => {
         loyaltyPoints: newPoints
       });
 
-      // Save points history to Dexie
-      await db.loyaltyHistory.add({
-        customerId: loyaltyCustomer._id,
-        type: 'earn',
-        points: points,
-        reason: pointsReason,
-        date: new Date().toISOString(),
-        balance: newPoints
-      });
+      // Save points history using repository (event-driven sync)
+      await LoyaltyHistoryRepository.addEarned(
+        loyaltyCustomer._id,
+        points,
+        newPoints,
+        pointsReason
+      );
 
       // Clear cache to force reload
       setPointsHistoryCache(prev => {
@@ -295,15 +293,13 @@ const Customers = () => {
         loyaltyPoints: newPoints
       });
 
-      // Save points history to Dexie
-      await db.loyaltyHistory.add({
-        customerId: redeemCustomer._id,
-        type: 'redeem',
-        points: -selectedReward.points,
-        reason: `Redeemed: ${selectedReward.name}`,
-        date: new Date().toISOString(),
-        balance: newPoints
-      });
+      // Save points history using repository (event-driven sync)
+      await LoyaltyHistoryRepository.addRedeemed(
+        redeemCustomer._id,
+        selectedReward.points,
+        newPoints,
+        `Redeemed: ${selectedReward.name}`
+      );
 
       // Clear cache to force reload
       setPointsHistoryCache(prev => {
@@ -329,29 +325,28 @@ const Customers = () => {
         return pointsHistoryCache[customerId];
       }
 
-      // Load from Dexie
-      let history = await db.loyaltyHistory
-        .where('customerId')
-        .equals(customerId)
-        .reverse()
-        .sortBy('date');
+      // Load from repository (event-driven sync enabled)
+      let history = await LoyaltyHistoryRepository.getByCustomer(customerId);
 
-      // If no data in Dexie, check localStorage for migration
+      // If no data, check localStorage for migration
       if (history.length === 0) {
         const historyKey = `loyalty_history_${customerId}`;
         const storedHistory = localStorage.getItem(historyKey);
         if (storedHistory) {
           const parsed = JSON.parse(storedHistory);
-          // Migrate to Dexie
-          const migrationData = parsed.map(entry => ({
-            ...entry,
-            customerId
-          }));
-          await db.loyaltyHistory.bulkAdd(migrationData);
-          history = migrationData;
+          // Migrate using repository (triggers sync events)
+          for (const entry of parsed) {
+            await LoyaltyHistoryRepository.addPoints(
+              customerId,
+              entry.type,
+              entry.points,
+              entry.balance,
+              entry.reason
+            );
+          }
+          history = await LoyaltyHistoryRepository.getByCustomer(customerId);
           // Clear localStorage after migration
           localStorage.removeItem(historyKey);
-          // Migrated loyalty_history to Dexie
         }
       }
 

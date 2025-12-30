@@ -16,6 +16,7 @@ import mockDatabase from './mockData';
 import { db } from '../db';
 import storageService from '../services/storage';
 import BusinessConfigRepository from '../services/storage/repositories/BusinessConfigRepository';
+import { PayrollConfigRepository, PayrollConfigLogRepository, ServiceRotationRepository, ProductConsumptionRepository } from '../services/storage/repositories';
 
 // =============================================================================
 // DEXIE DATA HELPERS - Get data from IndexedDB for analytics
@@ -332,18 +333,18 @@ const defaultPayrollConfig = {
   specialHolidayOT: { enabled: true, rate: 1.69, label: 'Special Holiday + Overtime', description: 'OT on special holiday (169% of hourly rate)' }
 };
 
-// Initialize payroll config in Dexie
+// Initialize payroll config using repository (event-driven sync)
 const initPayrollConfig = async () => {
   // Check for localStorage migration first
   const storedLS = localStorage.getItem('payrollConfig');
   if (storedLS) {
     const config = JSON.parse(storedLS);
-    // Migrate each key-value to Dexie
+    // Migrate using repository (triggers sync events)
     for (const [key, value] of Object.entries(config)) {
-      await db.payrollConfig.put({ key, value });
+      await PayrollConfigRepository.set(key, value);
     }
     localStorage.removeItem('payrollConfig');
-    console.log('[PayrollConfigApi] Migrated payrollConfig from localStorage to Dexie');
+    console.log('[PayrollConfigApi] Migrated payrollConfig using repository');
     return config;
   }
 
@@ -352,26 +353,23 @@ const initPayrollConfig = async () => {
   if (storedLogs) {
     const logs = JSON.parse(storedLogs);
     if (logs.length > 0) {
-      await db.payrollConfigLogs.bulkPut(logs.map((log, index) => ({
-        ...log,
-        id: log._id || log.id || (Date.now() + index)
-      })));
-      console.log('[PayrollConfigApi] Migrated payrollConfigLogs from localStorage to Dexie');
+      for (const log of logs) {
+        await PayrollConfigLogRepository.create(log);
+      }
+      console.log('[PayrollConfigApi] Migrated payrollConfigLogs using repository');
     }
     localStorage.removeItem('payrollConfigLogs');
   }
 
-  // Load from Dexie
-  const records = await db.payrollConfig.toArray();
-  if (records.length > 0) {
-    const config = {};
-    records.forEach(r => { config[r.key] = r.value; });
+  // Load from repository
+  const config = await PayrollConfigRepository.getAll();
+  if (Object.keys(config).length > 0) {
     return config;
   }
 
-  // Initialize with defaults
+  // Initialize with defaults using repository
   for (const [key, value] of Object.entries(defaultPayrollConfig)) {
-    await db.payrollConfig.put({ key, value });
+    await PayrollConfigRepository.set(key, value);
   }
   return defaultPayrollConfig;
 };
@@ -383,7 +381,7 @@ export const payrollConfigApi = {
     return clone(await initPayrollConfig());
   },
 
-  // Update payroll configuration (Owner only)
+  // Update payroll configuration (Owner only) - uses repositories for event-driven sync
   async updatePayrollConfig(newConfig, userId, userName) {
     await delay(500);
 
@@ -412,32 +410,28 @@ export const payrollConfigApi = {
       }
     });
 
-    // Log the change if there were any modifications
+    // Log the change using repository (event-driven sync)
     if (changes.length > 0) {
-      const logEntry = {
-        _id: 'plog_' + Date.now(),
-        timestamp: new Date().toISOString(),
-        userId: userId,
-        userName: userName,
-        action: 'PAYROLL_CONFIG_UPDATE',
-        changes: changes,
-        summary: `Updated ${changes.length} payroll setting(s)`
-      };
-
-      await db.payrollConfigLogs.add(logEntry);
+      await PayrollConfigLogRepository.logChange(
+        'payrollConfig',
+        oldConfig,
+        newConfig,
+        userId,
+        userName,
+        `Updated ${changes.length} payroll setting(s)`
+      );
 
       // Keep only last 100 logs
-      const allLogs = await db.payrollConfigLogs.orderBy('timestamp').reverse().toArray();
+      const allLogs = await PayrollConfigLogRepository.getRecent(150);
       if (allLogs.length > 100) {
-        const toDelete = allLogs.slice(100).map(l => l.id);
-        await db.payrollConfigLogs.bulkDelete(toDelete);
+        await PayrollConfigLogRepository.clearOldLogs(90);
       }
     }
 
-    // Save updated config to Dexie
+    // Save updated config using repository (event-driven sync)
     const updatedConfig = { ...oldConfig, ...newConfig };
     for (const [key, value] of Object.entries(updatedConfig)) {
-      await db.payrollConfig.put({ key, value });
+      await PayrollConfigRepository.set(key, value);
     }
 
     return {
@@ -450,7 +444,7 @@ export const payrollConfigApi = {
   // Get payroll config change logs
   async getPayrollConfigLogs() {
     await delay();
-    const logs = await db.payrollConfigLogs.orderBy('timestamp').reverse().toArray();
+    const logs = await PayrollConfigLogRepository.getRecent(100);
     return clone(logs);
   },
 
@@ -460,23 +454,23 @@ export const payrollConfigApi = {
 
     const oldConfig = await initPayrollConfig();
 
-    // Log the reset
-    const logEntry = {
-      _id: 'plog_' + Date.now(),
-      timestamp: new Date().toISOString(),
-      userId: userId,
-      userName: userName,
-      action: 'PAYROLL_CONFIG_RESET',
-      changes: [{ type: 'reset', oldValue: oldConfig, newValue: defaultPayrollConfig }],
-      summary: 'Reset all payroll settings to default values'
-    };
+    // Log the reset using repository (event-driven sync)
+    await PayrollConfigLogRepository.logChange(
+      'payrollConfig',
+      oldConfig,
+      defaultPayrollConfig,
+      userId,
+      userName,
+      'Reset all payroll settings to default values'
+    );
 
-    await db.payrollConfigLogs.add(logEntry);
-
-    // Reset to defaults in Dexie
-    await db.payrollConfig.clear();
+    // Reset to defaults using repository (event-driven sync)
+    const allConfigs = await PayrollConfigRepository.getAll();
+    for (const key of Object.keys(allConfigs)) {
+      await PayrollConfigRepository.delete(key);
+    }
     for (const [key, value] of Object.entries(defaultPayrollConfig)) {
-      await db.payrollConfig.put({ key, value });
+      await PayrollConfigRepository.set(key, value);
     }
 
     return {
@@ -503,6 +497,7 @@ const getTodayDateString = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+// Initialize service rotation using repository (event-driven sync)
 const initServiceRotation = async () => {
   const today = getTodayDateString();
 
@@ -511,27 +506,26 @@ const initServiceRotation = async () => {
   const storedLS = localStorage.getItem(oldKey);
   if (storedLS) {
     const data = JSON.parse(storedLS);
-    await db.serviceRotation.put({ date: today, ...data });
+    await ServiceRotationRepository.setRotation(today, data);
     localStorage.removeItem(oldKey);
-    console.log('[ServiceRotationApi] Migrated serviceRotation from localStorage to Dexie');
+    console.log('[ServiceRotationApi] Migrated serviceRotation using repository');
     return data;
   }
 
-  // Load from Dexie
-  const record = await db.serviceRotation.get(today);
+  // Load from repository
+  const record = await ServiceRotationRepository.getByDate(today);
   if (record) {
     return record;
   }
 
-  // Initialize new rotation for today
+  // Initialize new rotation for today using repository
   const initial = {
-    date: today,
     queue: [],
     serviceCount: {},
     lastServed: null
   };
-  await db.serviceRotation.put(initial);
-  return initial;
+  await ServiceRotationRepository.setRotation(today, initial);
+  return { date: today, ...initial };
 };
 
 export const serviceRotationApi = {
@@ -593,7 +587,7 @@ export const serviceRotationApi = {
     };
   },
 
-  // Record a service (employee served a customer)
+  // Record a service (employee served a customer) - uses repository for event-driven sync
   async recordService(employeeId) {
     await delay();
 
@@ -604,7 +598,8 @@ export const serviceRotationApi = {
     rotation.serviceCount[employeeId] = (rotation.serviceCount[employeeId] || 0) + 1;
     rotation.lastServed = employeeId;
 
-    await db.serviceRotation.put({ date: today, ...rotation });
+    // Use repository for event-driven sync
+    await ServiceRotationRepository.setRotation(today, rotation);
 
     return {
       success: true,
@@ -644,7 +639,8 @@ export const serviceRotationApi = {
     const rotation = await initServiceRotation();
 
     rotation.lastServed = employeeId;
-    await db.serviceRotation.put({ date: today, ...rotation });
+    // Use repository for event-driven sync
+    await ServiceRotationRepository.setRotation(today, rotation);
 
     return { success: true };
   },
@@ -655,19 +651,19 @@ export const serviceRotationApi = {
 
     const today = getTodayDateString();
     const initial = {
-      date: today,
       queue: [],
       serviceCount: {},
       lastServed: null
     };
-    await db.serviceRotation.put(initial);
+    // Use repository for event-driven sync
+    await ServiceRotationRepository.setRotation(today, initial);
 
     return { success: true };
   }
 };
 
 // =============================================================================
-// PRODUCT CONSUMPTION API
+// PRODUCT CONSUMPTION API - Uses repository for event-driven sync
 // =============================================================================
 // Track actual product consumption for AI learning
 
@@ -676,47 +672,44 @@ export const productConsumptionApi = {
   async getConsumptionLogs(filters = {}) {
     await delay();
 
-    let logs = await db.productConsumption.toArray();
+    let logs;
 
-    // Filter by product
+    // Use repository methods for filtering
     if (filters.productId) {
-      logs = logs.filter(l => l.productId === filters.productId);
+      logs = await ProductConsumptionRepository.getByProduct(filters.productId);
+    } else if (filters.month) {
+      logs = await ProductConsumptionRepository.getByMonth(filters.month);
+    } else if (filters.startDate && filters.endDate) {
+      logs = await ProductConsumptionRepository.getByDateRange(filters.startDate, filters.endDate);
+    } else {
+      logs = await ProductConsumptionRepository.getAll();
     }
 
-    // Filter by date range
-    if (filters.startDate) {
-      logs = logs.filter(l => new Date(l.date) >= new Date(filters.startDate));
-    }
-    if (filters.endDate) {
-      logs = logs.filter(l => new Date(l.date) <= new Date(filters.endDate));
-    }
-
-    // Filter by month (YYYY-MM format)
-    if (filters.month) {
-      logs = logs.filter(l => l.month === filters.month);
+    // Apply additional filters if needed
+    if (filters.productId && (filters.startDate || filters.endDate)) {
+      if (filters.startDate) {
+        logs = logs.filter(l => new Date(l.date) >= new Date(filters.startDate));
+      }
+      if (filters.endDate) {
+        logs = logs.filter(l => new Date(l.date) <= new Date(filters.endDate));
+      }
     }
 
     return clone(logs);
   },
 
-  // Log a consumption event (when inventory is updated)
+  // Log a consumption event (when inventory is updated) - uses repository for event-driven sync
   async logConsumption(data) {
     await delay(200);
 
-    const log = {
-      _id: 'cons_' + Date.now(),
-      productId: data.productId,
-      productName: data.productName,
-      quantityUsed: data.quantityUsed,
-      unit: data.unit || 'units',
-      servicesDone: data.servicesDone || 0,
-      date: data.date || new Date().toISOString(),
-      month: (data.date || new Date().toISOString()).substring(0, 7),
-      note: data.note || '',
-      createdAt: new Date().toISOString()
-    };
-
-    await db.productConsumption.put(log);
+    // Use repository for event-driven sync
+    const log = await ProductConsumptionRepository.logConsumption(
+      data.productId,
+      data.productName,
+      data.quantityUsed,
+      data.servicesDone || 0,
+      data.note || ''
+    );
 
     return { success: true, log: clone(log) };
   },
@@ -725,8 +718,8 @@ export const productConsumptionApi = {
   async getConsumptionAnalysis(productId) {
     await delay();
 
-    const allLogs = await db.productConsumption.toArray();
-    const logs = allLogs.filter(l => l.productId === productId);
+    // Use repository for data access
+    const logs = await ProductConsumptionRepository.getByProduct(productId);
 
     if (logs.length === 0) {
       return {
@@ -798,7 +791,8 @@ export const productConsumptionApi = {
 
     const allProducts = await getData.products();
     const products = allProducts.filter(p => p.type === 'product');
-    const allConsumptionLogs = await db.productConsumption.toArray();
+    // Use repository for data access
+    const allConsumptionLogs = await ProductConsumptionRepository.getAll();
     const analyses = [];
 
     for (const product of products) {

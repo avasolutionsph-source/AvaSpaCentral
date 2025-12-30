@@ -5,7 +5,7 @@
  * Can be configured via environment variables or runtime settings.
  */
 
-import { db } from '../../db';
+import { SettingsRepository } from '../storage/repositories';
 
 // Default configuration
 const defaultConfig = {
@@ -29,12 +29,8 @@ export const getApiConfig = () => ({ ...runtimeConfig });
  */
 export const setApiBaseUrl = async (url) => {
   runtimeConfig.baseUrl = url;
-  // Persist to Dexie settings
-  await db.settings.put({
-    key: 'apiBaseUrl',
-    value: url,
-    _updatedAt: new Date().toISOString()
-  });
+  // Persist using SettingsRepository (triggers sync events)
+  await SettingsRepository.set('apiBaseUrl', url);
 };
 
 /**
@@ -43,11 +39,7 @@ export const setApiBaseUrl = async (url) => {
  */
 export const setApiTimeout = async (timeout) => {
   runtimeConfig.timeout = timeout;
-  await db.settings.put({
-    key: 'apiTimeout',
-    value: timeout,
-    _updatedAt: new Date().toISOString()
-  });
+  await SettingsRepository.set('apiTimeout', timeout);
 };
 
 /**
@@ -56,14 +48,14 @@ export const setApiTimeout = async (timeout) => {
  */
 export const loadApiConfig = async () => {
   try {
-    const baseUrl = await db.settings.get('apiBaseUrl');
-    const timeout = await db.settings.get('apiTimeout');
+    const baseUrl = await SettingsRepository.get('apiBaseUrl');
+    const timeout = await SettingsRepository.get('apiTimeout');
 
-    if (baseUrl?.value) {
-      runtimeConfig.baseUrl = baseUrl.value;
+    if (baseUrl) {
+      runtimeConfig.baseUrl = baseUrl;
     }
-    if (timeout?.value) {
-      runtimeConfig.timeout = timeout.value;
+    if (timeout) {
+      runtimeConfig.timeout = timeout;
     }
 
     console.log('[ApiConfig] Loaded:', runtimeConfig.baseUrl);
@@ -77,8 +69,8 @@ export const loadApiConfig = async () => {
  */
 export const resetApiConfig = async () => {
   runtimeConfig = { ...defaultConfig };
-  await db.settings.delete('apiBaseUrl');
-  await db.settings.delete('apiTimeout');
+  await SettingsRepository.delete('apiBaseUrl');
+  await SettingsRepository.delete('apiTimeout');
 };
 
 export default {

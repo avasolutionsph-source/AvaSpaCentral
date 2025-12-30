@@ -12,7 +12,7 @@
 
 import storageService from '../storage';
 import { mockDatabase } from '../../mockApi/mockData';
-import { db } from '../../db';
+import { TimeOffRequestRepository, HomeServiceRepository, SettingsRepository } from '../storage/repositories';
 
 // Simulate network delay (optional, for realistic feel during development)
 const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
@@ -1314,10 +1314,10 @@ export const shiftSchedulesAdapter = {
   // Get shift configuration
   async getShiftConfig() {
     await delay();
-    // Try to get from database first
-    const savedConfig = await db.settings.get('shiftConfig');
-    if (savedConfig?.value) {
-      return clone(savedConfig.value);
+    // Try to get from settings repository first (event-driven sync)
+    const savedConfig = await SettingsRepository.get('shiftConfig');
+    if (savedConfig) {
+      return clone(savedConfig);
     }
     // Fall back to default from mockDatabase
     return clone(mockDatabase.shiftConfig);
@@ -1330,12 +1330,8 @@ export const shiftSchedulesAdapter = {
     const currentConfig = await this.getShiftConfig();
     const updatedConfig = { ...currentConfig, ...config };
 
-    // Save to database for persistence
-    await db.settings.put({
-      key: 'shiftConfig',
-      value: updatedConfig,
-      _updatedAt: new Date().toISOString()
-    });
+    // Save using settings repository (event-driven sync)
+    await SettingsRepository.set('shiftConfig', updatedConfig);
 
     // Also update mockDatabase for consistency
     mockDatabase.shiftConfig = updatedConfig;
@@ -1459,18 +1455,24 @@ export const shiftSchedulesAdapter = {
   },
 
   // =========================================================================
-  // TIME-OFF REQUESTS
+  // TIME-OFF REQUESTS (using TimeOffRequestRepository for event-driven sync)
   // =========================================================================
 
   async getTimeOffRequests(filters = {}) {
     await delay();
-    let requests = await db.timeOffRequests.toArray();
+    let requests;
 
-    // Apply filters
+    // Use repository methods based on filters
     if (filters.employeeId) {
-      requests = requests.filter(r => r.employeeId === filters.employeeId);
+      requests = await TimeOffRequestRepository.getByEmployee(filters.employeeId);
+    } else if (filters.status) {
+      requests = await TimeOffRequestRepository.getByStatus(filters.status);
+    } else {
+      requests = await TimeOffRequestRepository.getAll();
     }
-    if (filters.status) {
+
+    // Apply additional filters if both provided
+    if (filters.employeeId && filters.status) {
       requests = requests.filter(r => r.status === filters.status);
     }
 
@@ -1492,53 +1494,54 @@ export const shiftSchedulesAdapter = {
 
   async createTimeOffRequest(data) {
     await delay();
-    const now = new Date().toISOString();
-    const request = {
-      _id: `tor_${Date.now()}`,
-      ...data,
-      status: 'pending',
-      _createdAt: now,
-      _updatedAt: now
-    };
-    await db.timeOffRequests.put(request);
+    const request = await TimeOffRequestRepository.createRequest(data);
     return clone(request);
   },
 
   async updateTimeOffRequest(requestId, updates) {
     await delay();
-    const existing = await db.timeOffRequests.get(requestId);
-    if (!existing) throw new Error('Time-off request not found');
+    let updated;
 
-    const updated = {
-      ...existing,
-      ...updates,
-      _updatedAt: new Date().toISOString()
-    };
-    await db.timeOffRequests.put(updated);
+    // Handle status-specific updates
+    if (updates.status === 'approved') {
+      updated = await TimeOffRequestRepository.approve(requestId, updates.approvedBy);
+    } else if (updates.status === 'rejected') {
+      updated = await TimeOffRequestRepository.reject(requestId, updates.rejectedBy, updates.rejectionReason);
+    } else {
+      updated = await TimeOffRequestRepository.update(requestId, updates);
+    }
+
     return clone(updated);
   },
 
   async deleteTimeOffRequest(requestId) {
     await delay();
-    await db.timeOffRequests.delete(requestId);
+    await TimeOffRequestRepository.cancel(requestId);
     return { success: true };
   }
 };
 
 // =============================================================================
-// HOME SERVICES API ADAPTER
+// HOME SERVICES API ADAPTER (using HomeServiceRepository for event-driven sync)
 // =============================================================================
 
 export const homeServicesAdapter = {
   async getHomeServices(filters = {}) {
     await delay();
-    let services = await db.homeServices.toArray();
+    let services;
 
-    if (filters.status) {
-      services = services.filter(s => s.status === filters.status);
-    }
+    // Use repository methods based on filters
     if (filters.employeeId) {
-      services = services.filter(s => s.employeeId === filters.employeeId);
+      services = await HomeServiceRepository.getByEmployee(filters.employeeId);
+    } else if (filters.status) {
+      services = await HomeServiceRepository.getByStatus(filters.status);
+    } else {
+      services = await HomeServiceRepository.getAll();
+    }
+
+    // Apply additional filters if both provided
+    if (filters.employeeId && filters.status) {
+      services = services.filter(s => s.status === filters.status);
     }
 
     return clone(services);
@@ -1546,58 +1549,36 @@ export const homeServicesAdapter = {
 
   async getActiveHomeServices() {
     await delay();
-    const services = await db.homeServices
-      .where('status')
-      .anyOf(['pending', 'occupied'])
-      .toArray();
+    const services = await HomeServiceRepository.getActive();
     return clone(services);
   },
 
   async createHomeService(data) {
     await delay();
-    const id = `hs_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    const homeService = {
-      _id: id,
-      status: 'pending', // pending -> occupied -> completed
-      employeeId: data.employeeId,
-      employeeName: data.employeeName,
-      customerName: data.customerName,
-      customerPhone: data.customerPhone,
-      customerEmail: data.customerEmail || null,
-      address: data.address,
-      serviceNames: data.serviceNames || [],
-      serviceDuration: data.serviceDuration || 60,
-      transactionId: data.transactionId,
-      startTime: null,
-      createdAt: new Date().toISOString()
-    };
-
-    await db.homeServices.add(homeService);
+    const homeService = await HomeServiceRepository.createService(data);
     return clone(homeService);
   },
 
   async updateHomeServiceStatus(id, status, timingData = {}) {
     await delay();
-    const existing = await db.homeServices.get(id);
-    if (!existing) throw new Error('Home service not found');
-
-    let updateData = { status };
+    let updated;
 
     if (status === 'occupied') {
-      updateData.startTime = timingData.startTime || new Date().toISOString();
+      updated = await HomeServiceRepository.startService(id);
     } else if (status === 'completed') {
-      updateData.completedAt = new Date().toISOString();
+      updated = await HomeServiceRepository.completeService(id);
+    } else if (status === 'cancelled') {
+      updated = await HomeServiceRepository.cancelService(id, timingData.reason);
+    } else {
+      updated = await HomeServiceRepository.update(id, { status });
     }
 
-    const updated = { ...existing, ...updateData };
-    await db.homeServices.put(updated);
     return clone(updated);
   },
 
   async deleteHomeService(id) {
     await delay();
-    await db.homeServices.delete(id);
+    await HomeServiceRepository.delete(id);
     return { success: true };
   }
 };

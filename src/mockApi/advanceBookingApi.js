@@ -1,41 +1,43 @@
 // Mock Advance Booking API
 // Frontend-only simulation with Dexie (IndexedDB) persistence
+// Now uses repositories for event-driven sync
 
-import { db } from '../db';
+import { AdvanceBookingRepository, ActiveServiceRepository } from '../services/storage/repositories';
 
 const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Helper to clone objects
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
-// Migration helper - migrate from localStorage to Dexie
+// Migration helper - migrate from localStorage to repositories
 const migrateFromLocalStorage = async () => {
   const STORAGE_KEY = 'advanceBookings';
   const SERVICES_KEY = 'activeServices';
 
-  // Migrate advanceBookings
+  // Migrate advanceBookings using repository (triggers sync events)
   const storedBookings = localStorage.getItem(STORAGE_KEY);
   if (storedBookings) {
     const bookings = JSON.parse(storedBookings);
-    const existingCount = await db.advanceBookings.count();
-    if (existingCount === 0 && bookings.length > 0) {
-      // Add _id field for Dexie compatibility
-      const migrationData = bookings.map(b => ({ ...b, _id: b.id }));
-      await db.advanceBookings.bulkPut(migrationData);
-      console.log('[AdvanceBookingApi] Migrated advanceBookings from localStorage to Dexie');
+    const existing = await AdvanceBookingRepository.getAll();
+    if (existing.length === 0 && bookings.length > 0) {
+      for (const booking of bookings) {
+        await AdvanceBookingRepository.create({ ...booking, _id: booking.id });
+      }
+      console.log('[AdvanceBookingApi] Migrated advanceBookings using repository');
     }
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  // Migrate activeServices
+  // Migrate activeServices using repository (triggers sync events)
   const storedServices = localStorage.getItem(SERVICES_KEY);
   if (storedServices) {
     const services = JSON.parse(storedServices);
-    const existingCount = await db.activeServices.count();
-    if (existingCount === 0 && services.length > 0) {
-      const migrationData = services.map(s => ({ ...s, _id: s.id }));
-      await db.activeServices.bulkPut(migrationData);
-      console.log('[AdvanceBookingApi] Migrated activeServices from localStorage to Dexie');
+    const existing = await ActiveServiceRepository.getAll();
+    if (existing.length === 0 && services.length > 0) {
+      for (const service of services) {
+        await ActiveServiceRepository.create({ ...service, _id: service.id });
+      }
+      console.log('[AdvanceBookingApi] Migrated activeServices using repository');
     }
     localStorage.removeItem(SERVICES_KEY);
   }
@@ -43,23 +45,21 @@ const migrateFromLocalStorage = async () => {
 
 // Initialize advance bookings (no auto-seeding - starts empty)
 const initAdvanceBookings = async () => {
-  // First check for migration from localStorage
   await migrateFromLocalStorage();
-  return await db.advanceBookings.toArray();
+  return await AdvanceBookingRepository.getAll();
 };
 
 const initActiveServices = async () => {
   await migrateFromLocalStorage();
-  return await db.activeServices.toArray();
+  return await ActiveServiceRepository.getAll();
 };
 
 // Helper to get next booking ID from existing data
 const getNextBookingId = async () => {
-  const bookings = await db.advanceBookings.toArray();
+  const bookings = await AdvanceBookingRepository.getAll();
   if (bookings.length === 0) {
     return 'booking_001';
   }
-  // Find the highest numeric ID
   let maxNum = 0;
   for (const booking of bookings) {
     const match = booking._id?.match(/booking_(\d+)/);
@@ -71,26 +71,20 @@ const getNextBookingId = async () => {
   return `booking_${String(maxNum + 1).padStart(3, '0')}`;
 };
 
-// API Methods
+// API Methods - Using repositories for event-driven sync
 export const advanceBookingApi = {
   async createAdvanceBooking(bookingInput) {
     await delay(600);
-    await initAdvanceBookings(); // Ensure initialized
+    await initAdvanceBookings();
     const id = await getNextBookingId();
-    const now = new Date().toISOString();
 
-    const newBooking = {
+    // Use repository for event-driven sync
+    const newBooking = await AdvanceBookingRepository.createBooking({
       _id: id,
       id,
-      ...bookingInput,
-      status: bookingInput.status || 'scheduled',
-      actualStartTime: null,
-      actualEndTime: null,
-      createdAt: now,
-      updatedAt: now
-    };
+      ...bookingInput
+    });
 
-    await db.advanceBookings.put(newBooking);
     return clone(newBooking);
   },
 
@@ -103,7 +97,7 @@ export const advanceBookingApi = {
   async getAdvanceBooking(id) {
     await delay(300);
     await initAdvanceBookings();
-    const booking = await db.advanceBookings.get(id);
+    const booking = await AdvanceBookingRepository.getById(id);
     if (!booking) throw new Error('Booking not found');
     return clone(booking);
   },
@@ -111,52 +105,30 @@ export const advanceBookingApi = {
   async updateAdvanceBooking(id, updates) {
     await delay(500);
     await initAdvanceBookings();
-    const booking = await db.advanceBookings.get(id);
-    if (!booking) throw new Error('Booking not found');
-
-    const updatedBooking = {
-      ...booking,
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-
-    await db.advanceBookings.put(updatedBooking);
+    // Use repository for event-driven sync
+    const updatedBooking = await AdvanceBookingRepository.update(id, updates);
+    if (!updatedBooking) throw new Error('Booking not found');
     return clone(updatedBooking);
   },
 
   async listAdvanceBookingsByDate(dateString) {
     await delay(400);
-    const bookings = await initAdvanceBookings();
-    const targetDate = new Date(dateString);
-    const filtered = bookings.filter(booking => {
-      const bookingDate = new Date(booking.bookingDateTime);
-      return (
-        bookingDate.getFullYear() === targetDate.getFullYear() &&
-        bookingDate.getMonth() === targetDate.getMonth() &&
-        bookingDate.getDate() === targetDate.getDate()
-      );
-    });
-    return clone(filtered);
+    // Use repository method for date filtering
+    const bookings = await AdvanceBookingRepository.getByDate(dateString);
+    return clone(bookings);
   },
 
   async startServiceFromBooking(bookingId) {
     await delay(600);
     await initAdvanceBookings();
-    const booking = await db.advanceBookings.get(bookingId);
+    const booking = await AdvanceBookingRepository.getById(bookingId);
     if (!booking) throw new Error('Booking not found');
 
-    const updatedBooking = {
-      ...booking,
-      status: 'in-progress',
-      actualStartTime: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    await db.advanceBookings.put(updatedBooking);
+    // Use repository for event-driven sync
+    const updatedBooking = await AdvanceBookingRepository.checkIn(bookingId);
 
-    const serviceId = `service_${Date.now()}`;
-    const activeService = {
-      _id: serviceId,
-      id: serviceId,
+    // Create active service using repository
+    const activeService = await ActiveServiceRepository.startFromBooking({
       roomId: booking.roomId,
       roomName: booking.roomName,
       isHomeService: booking.isHomeService,
@@ -168,11 +140,8 @@ export const advanceBookingApi = {
       employeeName: booking.employeeName,
       transactionId: booking.transactionId,
       estimatedDuration: booking.estimatedDuration,
-      startTime: new Date().toISOString(),
-      status: 'in-progress',
       advanceBookingId: booking.id
-    };
-    await db.activeServices.put(activeService);
+    });
 
     return { booking: clone(updatedBooking), activeService: clone(activeService) };
   },
@@ -180,27 +149,19 @@ export const advanceBookingApi = {
   async completeServiceFromBooking(bookingId, paymentData = {}) {
     await delay(700);
     await initAdvanceBookings();
-    const booking = await db.advanceBookings.get(bookingId);
+    const booking = await AdvanceBookingRepository.getById(bookingId);
     if (!booking) throw new Error('Booking not found');
 
     const now = new Date().toISOString();
-    const updatedBooking = {
-      ...booking,
-      status: 'completed',
-      actualEndTime: now,
-      paymentStatus: 'paid',
-      ...paymentData,
-      updatedAt: now
-    };
-    await db.advanceBookings.put(updatedBooking);
 
-    // Find and remove active service
-    const activeServices = await db.activeServices.toArray();
-    const activeService = activeServices.find(s => s.advanceBookingId === bookingId);
+    // Use repository for event-driven sync
+    const updatedBooking = await AdvanceBookingRepository.complete(bookingId, paymentData);
+
+    // Find and complete active service using repository
+    const activeServices = await ActiveServiceRepository.getByBooking(bookingId);
     let completedService = null;
-    if (activeService) {
-      completedService = { ...activeService, status: 'completed' };
-      await db.activeServices.delete(activeService._id);
+    if (activeServices.length > 0) {
+      completedService = await ActiveServiceRepository.completeService(activeServices[0]._id);
     }
 
     const transaction = {
@@ -223,18 +184,8 @@ export const advanceBookingApi = {
   async cancelAdvanceBooking(bookingId, reason = '') {
     await delay(500);
     await initAdvanceBookings();
-    const booking = await db.advanceBookings.get(bookingId);
-    if (!booking) throw new Error('Booking not found');
-
-    const updatedBooking = {
-      ...booking,
-      status: 'cancelled',
-      specialRequests: booking.specialRequests
-        ? `${booking.specialRequests}\nCancellation reason: ${reason}`
-        : `Cancellation reason: ${reason}`,
-      updatedAt: new Date().toISOString()
-    };
-    await db.advanceBookings.put(updatedBooking);
+    // Use repository for event-driven sync
+    const updatedBooking = await AdvanceBookingRepository.cancel(bookingId, reason);
     return clone(updatedBooking);
   },
 
@@ -246,41 +197,39 @@ export const advanceBookingApi = {
 
   async getActiveServicesByRoom(roomId) {
     await delay(300);
-    const services = await db.activeServices.where('roomId').equals(roomId).toArray();
+    // Use repository method
+    const services = await ActiveServiceRepository.getByRoom(roomId);
     return clone(services);
   },
 
   async getPendingRevenue() {
     await delay(300);
-    const bookings = await initAdvanceBookings();
-    const pending = bookings.filter(
-      b => b.paymentTiming === 'pay-after' && b.paymentStatus === 'pending' && b.status !== 'cancelled'
-    );
+    // Use repository method
+    const pending = await AdvanceBookingRepository.getPendingPayment();
     const total = pending.reduce((sum, b) => sum + b.servicePrice, 0);
     return { total, bookings: clone(pending) };
   },
 
   async getTodaysBookingsCount() {
     await delay(300);
-    const bookings = await initAdvanceBookings();
-    const today = new Date();
-    const todayBookings = bookings.filter(booking => {
-      if (booking.status === 'cancelled' || booking.status === 'completed') return false;
-      const bookingDate = new Date(booking.bookingDateTime);
-      return (
-        bookingDate.getFullYear() === today.getFullYear() &&
-        bookingDate.getMonth() === today.getMonth() &&
-        bookingDate.getDate() === today.getDate()
-      );
-    });
-    return todayBookings.length;
+    // Use repository method
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayBookings = await AdvanceBookingRepository.getByDate(todayStr);
+    const active = todayBookings.filter(b => b.status !== 'cancelled' && b.status !== 'completed');
+    return active.length;
   },
 
   async resetDemoData() {
     await delay(200);
-    await db.advanceBookings.clear();
-    await db.activeServices.clear();
-    await initAdvanceBookings();
+    // Clear using repositories (this won't trigger sync for clear operations)
+    const allBookings = await AdvanceBookingRepository.getAll();
+    for (const b of allBookings) {
+      await AdvanceBookingRepository.delete(b._id);
+    }
+    const allServices = await ActiveServiceRepository.getAll();
+    for (const s of allServices) {
+      await ActiveServiceRepository.delete(s._id);
+    }
     return { success: true };
   }
 };

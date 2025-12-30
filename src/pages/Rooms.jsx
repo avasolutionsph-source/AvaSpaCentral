@@ -168,9 +168,13 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       status: data.status
     }),
     validateForm: (data) => validateWithToast(roomValidation, data, showToast),
-    onSuccess: () => {
+    onSuccess: (mode) => {
       if (onDataChange) onDataChange();
       loadUpcomingBookings();
+      // After creating a room, switch to 'available' filter so user can see the new room
+      if (mode === 'create') {
+        setFilterStatus('available');
+      }
     }
   });
 

@@ -244,7 +244,7 @@ const useCrudOperations = ({
         setIsSubmitting(false);
         closeModal();
         loadData();
-        onSuccess?.();
+        onSuccess?.(modalMode);
       }
       return true;
     } catch (err) {

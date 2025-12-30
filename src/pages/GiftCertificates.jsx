@@ -21,6 +21,7 @@ const GiftCertificates = () => {
     recipientEmail: '',
     amount: '',
     expiryDate: '',
+    noExpiry: false,
     message: ''
   });
 
@@ -101,6 +102,7 @@ const GiftCertificates = () => {
       recipientEmail: '',
       amount: '',
       expiryDate: format(defaultExpiry, 'yyyy-MM-dd'),
+      noExpiry: false,
       message: ''
     });
     setShowCreateModal(true);
@@ -126,7 +128,7 @@ const GiftCertificates = () => {
     if (!formData.recipientEmail.trim()) { showToast('Recipient email is required', 'error'); return false; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail)) { showToast('Invalid email format', 'error'); return false; }
     if (!formData.amount || parseFloat(formData.amount) <= 0) { showToast('Valid amount is required', 'error'); return false; }
-    if (!formData.expiryDate) { showToast('Expiry date is required', 'error'); return false; }
+    if (!formData.noExpiry && !formData.expiryDate) { showToast('Expiry date is required', 'error'); return false; }
     return true;
   };
 
@@ -140,7 +142,7 @@ const GiftCertificates = () => {
         recipientEmail: formData.recipientEmail.trim(),
         amount: parseFloat(formData.amount),
         balance: parseFloat(formData.amount),
-        expiryDate: formData.expiryDate,
+        expiryDate: formData.noExpiry ? null : formData.expiryDate,
         message: formData.message.trim() || undefined
       };
 
@@ -418,9 +420,18 @@ const GiftCertificates = () => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Expiry Date *</label>
+                  <label>Expiry Date {!formData.noExpiry && '*'}</label>
                   <input type="date" name="expiryDate" value={formData.expiryDate} onChange={handleInputChange}
-                    className="form-control" required />
+                    className="form-control" disabled={formData.noExpiry} required={!formData.noExpiry} />
+                  <label className="checkbox-label" style={{ marginTop: '8px' }}>
+                    <input
+                      type="checkbox"
+                      name="noExpiry"
+                      checked={formData.noExpiry}
+                      onChange={handleInputChange}
+                    />
+                    <span>No expiry (never expires)</span>
+                  </label>
                 </div>
                 <div className="form-group">
                   <label>Personal Message</label>
@@ -481,7 +492,7 @@ const GiftCertificates = () => {
                       </div>
                       <div className="gc-detail-row">
                         <span>Expires:</span>
-                        <span>{format(parseISO(validationResult.giftCertificate.expiryDate), 'MMM dd, yyyy')}</span>
+                        <span>{validationResult.giftCertificate.expiryDate ? format(parseISO(validationResult.giftCertificate.expiryDate), 'MMM dd, yyyy') : 'No expiry'}</span>
                       </div>
                     </div>
                   )}

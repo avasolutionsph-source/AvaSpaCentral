@@ -13,7 +13,7 @@ const rolePermissions = {
               'payroll', 'rooms', 'service-history', 'gift-certificates', 'expenses', 'ai-chatbot', 'ava-sensei', 'analytics', 'settings',
               'my-schedule', 'shift-schedules', 'payroll-requests'],
   'Receptionist': ['pos', 'products', 'inventory', 'customers', 'appointments', 'attendance', 'payroll', 'rooms',
-                   'service-history', 'expenses', 'my-schedule', 'payroll-requests'],
+                   'service-history', 'expenses', 'my-schedule', 'payroll-requests', 'calendar'],
   'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests']
 };
 

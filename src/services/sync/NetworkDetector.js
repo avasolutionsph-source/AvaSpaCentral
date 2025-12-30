@@ -3,18 +3,18 @@
  *
  * Provides real-time network status detection with:
  * - Browser online/offline events
- * - Periodic connectivity checks against API health endpoint
+ * - Periodic connectivity checks against Supabase (if configured) or browser status
  * - Event callbacks for status changes
  */
 
-import { httpClient } from '../api';
+import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient';
 
 class NetworkDetector {
   constructor() {
     this._isOnline = navigator.onLine;
     this._listeners = [];
     this._checkInterval = null;
-    this._checkIntervalMs = 30000; // Check every 30 seconds
+    this._checkIntervalMs = 60000; // Check every 60 seconds (reduced frequency)
 
     // Bind event handlers
     this._handleOnline = this._handleOnline.bind(this);
@@ -29,10 +29,12 @@ class NetworkDetector {
     window.addEventListener('online', this._handleOnline);
     window.addEventListener('offline', this._handleOffline);
 
-    // Start periodic checks (optional, for more reliable detection)
-    this._checkInterval = setInterval(() => {
-      this._checkConnectivity();
-    }, this._checkIntervalMs);
+    // Only do periodic checks if Supabase is configured
+    if (isSupabaseConfigured()) {
+      this._checkInterval = setInterval(() => {
+        this._checkConnectivity();
+      }, this._checkIntervalMs);
+    }
 
     console.log('[NetworkDetector] Started monitoring');
   }
@@ -78,7 +80,7 @@ class NetworkDetector {
 
   /**
    * Manually check connectivity
-   * Pings the API health endpoint to verify actual connectivity
+   * Uses browser online status and optionally pings Supabase
    */
   async _checkConnectivity() {
     try {
@@ -91,20 +93,27 @@ class NetworkDetector {
         return;
       }
 
-      // Then check if API is actually reachable
-      const isApiReachable = await httpClient.healthCheck();
+      // If Supabase is configured, check if it's reachable
+      if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('businesses').select('id').limit(1);
+        const isReachable = !error || error.code !== 'NETWORK_ERROR';
 
-      if (isApiReachable !== this._isOnline) {
-        this._isOnline = isApiReachable;
-        this._notifyListeners();
-        console.log(`[NetworkDetector] API ${isApiReachable ? 'reachable' : 'unreachable'}`);
+        if (isReachable !== this._isOnline) {
+          this._isOnline = isReachable;
+          this._notifyListeners();
+        }
+      } else {
+        // No Supabase, just use browser online status
+        if (navigator.onLine !== this._isOnline) {
+          this._isOnline = navigator.onLine;
+          this._notifyListeners();
+        }
       }
     } catch (error) {
-      // If check fails, mark as offline
-      if (this._isOnline) {
-        this._isOnline = false;
+      // If check fails, use browser's online status
+      if (navigator.onLine !== this._isOnline) {
+        this._isOnline = navigator.onLine;
         this._notifyListeners();
-        console.log('[NetworkDetector] API check failed, marking offline');
       }
     }
   }

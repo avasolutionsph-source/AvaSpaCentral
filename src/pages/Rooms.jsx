@@ -20,7 +20,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const { user, showToast, isTherapist, canEdit } = useApp();
 
   // Filter state (kept separate as it's page-specific)
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('available');
   const [upcomingBookings, setUpcomingBookings] = useState([]);
 
   // Timer state for countdown on occupied rooms

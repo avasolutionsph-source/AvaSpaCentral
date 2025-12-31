@@ -18,6 +18,8 @@ if (typeof window !== 'undefined') {
     console.log('  - supabaseSyncManager.debug() - Full debug info');
     console.log('  - supabaseSyncManager.sync() - Trigger sync');
     console.log('  - supabaseSyncManager.forcePull() - Pull all from Supabase');
-    console.log('  - supabaseSyncManager.getStatus() - Get sync status');
+    console.log('  - supabaseSyncManager.getFailedItems() - View failed sync items');
+    console.log('  - supabaseSyncManager.retryFailed() - Retry failed items');
+    console.log('  - supabaseSyncManager.resetStuckItems() - Reset stuck processing items');
   });
 }

@@ -350,10 +350,15 @@ class SupabaseSyncManager {
     this._initialized = true;
     console.log('[SupabaseSyncManager] Initialized with event-driven sync');
 
-    // Pull fresh data from Supabase on initialize
-    if (newBusinessId && (!storedBusinessId || newBusinessId !== storedBusinessId)) {
-      console.log('[SupabaseSyncManager] New/different account - pulling fresh data from Supabase...');
+    // Only force pull if business actually changed (not just first time storing the ID)
+    // This prevents clearing local data that hasn't been synced yet
+    if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
+      console.log('[SupabaseSyncManager] Business account changed - pulling fresh data from Supabase...');
       await this.forcePull();
+    } else if (newBusinessId && !storedBusinessId) {
+      // First time login - just do a regular sync to push any local data first, then pull
+      console.log('[SupabaseSyncManager] First time login - syncing...');
+      await this.sync();
     }
   }
 
@@ -910,6 +915,7 @@ class SupabaseSyncManager {
     console.log('[SupabaseSyncManager] === DEBUG INFO ===');
     console.log('Device ID:', this._deviceId);
     console.log('Business ID:', businessId);
+    console.log('Stored Business ID:', localStorage.getItem('currentBusinessId'));
     console.log('Is configured:', isSupabaseConfigured());
     console.log('Is online:', NetworkDetector.isOnline);
     console.log('Is syncing:', this._isSyncing);
@@ -919,10 +925,23 @@ class SupabaseSyncManager {
     // Check sync queue
     const pending = await db.syncQueue.where('status').equals('pending').toArray();
     const failed = await db.syncQueue.where('status').equals('failed').toArray();
+    const processing = await db.syncQueue.where('status').equals('processing').toArray();
     console.log('Pending sync items:', pending.length);
+    console.log('Processing sync items:', processing.length);
     console.log('Failed sync items:', failed.length);
+
     if (pending.length > 0) {
       console.log('Pending items:', pending);
+    }
+    if (processing.length > 0) {
+      console.log('Processing items (stuck?):', processing);
+    }
+    if (failed.length > 0) {
+      console.log('Failed items with errors:');
+      failed.forEach(item => {
+        console.log(`  - ${item.entityType}/${item.operation}: ${item.error}`);
+        console.log('    Data:', item.data);
+      });
     }
 
     // Check Supabase products
@@ -954,12 +973,41 @@ class SupabaseSyncManager {
     return {
       deviceId: this._deviceId,
       businessId,
+      storedBusinessId: localStorage.getItem('currentBusinessId'),
       isConfigured: isSupabaseConfigured(),
       isOnline: NetworkDetector.isOnline,
       pendingCount: pending.length,
+      processingCount: processing.length,
       failedCount: failed.length,
+      failedItems: failed,
       subscriptions: this._subscriptions.length
     };
+  }
+
+  /**
+   * View failed sync items with their errors
+   */
+  async getFailedItems() {
+    const failed = await db.syncQueue.where('status').equals('failed').toArray();
+    console.log('[SupabaseSyncManager] Failed items:');
+    failed.forEach(item => {
+      console.log(`  ${item.entityType}/${item.operation} (retry: ${item.retryCount})`);
+      console.log(`    Error: ${item.error}`);
+      console.log(`    Data:`, item.data);
+    });
+    return failed;
+  }
+
+  /**
+   * Reset stuck processing items back to pending
+   */
+  async resetStuckItems() {
+    const processing = await db.syncQueue.where('status').equals('processing').toArray();
+    for (const item of processing) {
+      await db.syncQueue.update(item.id, { status: 'pending' });
+    }
+    console.log(`[SupabaseSyncManager] Reset ${processing.length} stuck items to pending`);
+    return processing.length;
   }
 }
 

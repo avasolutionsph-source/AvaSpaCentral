@@ -9,7 +9,8 @@
  */
 
 import storageService from './storage';
-import { SyncManager, NetworkDetector } from './sync';
+// Note: Old SyncManager disabled - now using SupabaseSyncManager in AppContext
+// import { SyncManager, NetworkDetector } from './sync';
 import { mockDatabase } from '../mockApi/mockData';
 import { PayrollRequestRepository, SettingsRepository, ServiceRotationRepository } from './storage/repositories';
 
@@ -61,9 +62,9 @@ class InitializationService {
       // 3. Migrate any legacy localStorage data
       await this._migrateLocalStorage();
 
-      // 4. Start network detector and sync manager
-      NetworkDetector.start();
-      SyncManager.initialize();
+      // 4. Note: Old SyncManager removed - SupabaseSyncManager is initialized in AppContext
+      // NetworkDetector.start();
+      // SyncManager.initialize();
 
       this._initialized = true;
       console.log('[InitService] Initialization complete');

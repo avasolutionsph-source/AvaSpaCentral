@@ -31,6 +31,17 @@ function isValidUUID(str) {
   return uuidRegex.test(str);
 }
 
+/**
+ * Generate a UUID v4 (for repairing old non-UUID IDs)
+ */
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // Entities that can be synced to Supabase
 const SYNCABLE_ENTITIES = [
   // Core entities (CRITICAL - must be synced)
@@ -1190,8 +1201,8 @@ class SupabaseSyncManager {
   }
 
   /**
-   * Auto-repair local records with invalid or missing businessId
-   * This fixes data created before the businessId fix was applied
+   * Auto-repair local records with invalid or missing businessId or _id
+   * This fixes data created before the UUID fix was applied
    * Called automatically during initialization
    */
   async _autoRepairBusinessIds() {
@@ -1201,7 +1212,7 @@ class SupabaseSyncManager {
       return { repaired: 0, removed: 0 };
     }
 
-    console.log('[SupabaseSyncManager] Auto-repairing records with invalid businessId...');
+    console.log('[SupabaseSyncManager] Auto-repairing records with invalid businessId or _id...');
     let repaired = 0;
     let removed = 0;
 
@@ -1213,38 +1224,80 @@ class SupabaseSyncManager {
       try {
         const records = await db[tableName].toArray();
         for (const record of records) {
-          // Check if businessId is missing or invalid (non-UUID like 'biz_001')
-          if (!record.businessId || !isValidUUID(record.businessId)) {
+          const needsBusinessIdRepair = !record.businessId || !isValidUUID(record.businessId);
+          const needsIdRepair = !record._id || !isValidUUID(record._id);
+
+          if (needsBusinessIdRepair || needsIdRepair) {
             const oldBusinessId = record.businessId;
+            const oldId = record._id;
+            const newId = needsIdRepair ? generateUUID() : record._id;
 
-            // Update the record with correct businessId
-            await db[tableName].update(record._id, {
-              businessId: correctBusinessId,
-              _syncStatus: 'pending',
-              _updatedAt: new Date().toISOString()
-            });
+            // If _id needs repair, we need to delete old record and create new one
+            if (needsIdRepair) {
+              // Delete old record
+              await db[tableName].delete(oldId);
 
-            // Remove any existing sync queue items for this record (they have wrong businessId)
-            const existingQueueItems = await db.syncQueue
-              .where('entityId').equals(record._id)
-              .toArray();
-            for (const item of existingQueueItems) {
-              await db.syncQueue.delete(item.id);
+              // Create new record with valid UUID
+              const newRecord = {
+                ...record,
+                _id: newId,
+                businessId: correctBusinessId,
+                _syncStatus: 'pending',
+                _updatedAt: new Date().toISOString()
+              };
+              await db[tableName].add(newRecord);
+
+              // Remove any old sync queue items
+              const existingQueueItems = await db.syncQueue
+                .where('entityId').equals(oldId)
+                .toArray();
+              for (const item of existingQueueItems) {
+                await db.syncQueue.delete(item.id);
+              }
+
+              // Add to sync queue with new UUID
+              await db.syncQueue.add({
+                entityType: tableName,
+                entityId: newId,
+                operation: 'create',
+                data: newRecord,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                retryCount: 0
+              });
+
+              console.log(`[SupabaseSyncManager] Repaired ${tableName} _id: ${oldId} → ${newId}`);
+            } else {
+              // Just fix businessId
+              await db[tableName].update(record._id, {
+                businessId: correctBusinessId,
+                _syncStatus: 'pending',
+                _updatedAt: new Date().toISOString()
+              });
+
+              // Remove any existing sync queue items
+              const existingQueueItems = await db.syncQueue
+                .where('entityId').equals(record._id)
+                .toArray();
+              for (const item of existingQueueItems) {
+                await db.syncQueue.delete(item.id);
+              }
+
+              // Add to sync queue
+              await db.syncQueue.add({
+                entityType: tableName,
+                entityId: record._id,
+                operation: 'create',
+                data: { ...record, businessId: correctBusinessId },
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                retryCount: 0
+              });
+
+              console.log(`[SupabaseSyncManager] Repaired ${tableName}/${record._id} businessId: ${oldBusinessId || 'null'} → ${correctBusinessId}`);
             }
 
-            // Add to sync queue to push to Supabase
-            await db.syncQueue.add({
-              entityType: tableName,
-              entityId: record._id,
-              operation: 'create', // Use create since it likely never made it to Supabase
-              data: { ...record, businessId: correctBusinessId },
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-              retryCount: 0
-            });
-
             repaired++;
-            console.log(`[SupabaseSyncManager] Repaired ${tableName}/${record._id}: ${oldBusinessId || 'null'} → ${correctBusinessId}`);
           }
         }
       } catch (err) {

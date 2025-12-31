@@ -12,12 +12,15 @@
 import { db, syncQueue } from '../../db';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
 
-// Generate a unique ID (similar to MongoDB ObjectId format)
+// Generate a UUID v4 (compatible with Supabase)
 export const generateId = () => {
-  const timestamp = Math.floor(Date.now() / 1000).toString(16);
-  const randomPart = Math.random().toString(16).substring(2, 10);
-  const randomPart2 = Math.random().toString(16).substring(2, 10);
-  return timestamp + randomPart + randomPart2;
+  // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  // where x is random hex and y is 8, 9, a, or b
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 };
 
 class BaseRepository {

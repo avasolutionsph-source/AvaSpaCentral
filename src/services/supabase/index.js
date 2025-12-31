@@ -14,6 +14,10 @@ if (typeof window !== 'undefined') {
   import('./SupabaseSyncManager').then(module => {
     window.supabaseSyncManager = module.default;
     console.log('[Supabase] Debug: window.supabaseSyncManager available');
-    console.log('[Supabase] Commands: supabaseSyncManager.sync(), supabaseSyncManager.forcePull(), supabaseSyncManager.getStatus()');
+    console.log('[Supabase] Commands:');
+    console.log('  - supabaseSyncManager.debug() - Full debug info');
+    console.log('  - supabaseSyncManager.sync() - Trigger sync');
+    console.log('  - supabaseSyncManager.forcePull() - Pull all from Supabase');
+    console.log('  - supabaseSyncManager.getStatus() - Get sync status');
   });
 }

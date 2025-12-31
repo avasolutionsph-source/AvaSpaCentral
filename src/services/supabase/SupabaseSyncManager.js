@@ -368,9 +368,12 @@ class SupabaseSyncManager {
 
       // Special case: businesses table uses 'id' not 'business_id'
       const filterColumn = entityType === 'business' ? 'id' : 'business_id';
+      const channelName = `${tableName}_changes_${this._deviceId}`;
+
+      console.log(`[SupabaseSyncManager] Setting up subscription for ${tableName} (filter: ${filterColumn}=eq.${businessId})`);
 
       const subscription = supabase
-        .channel(`${tableName}_changes_${this._deviceId}`)
+        .channel(channelName)
         .on(
           'postgres_changes',
           {
@@ -379,10 +382,17 @@ class SupabaseSyncManager {
             table: tableName,
             filter: `${filterColumn}=eq.${businessId}`,
           },
-          (payload) => this._handleRealtimeChange(entityType, payload)
+          (payload) => {
+            console.log(`[SupabaseSyncManager] Received realtime event from ${tableName}:`, payload.eventType);
+            this._handleRealtimeChange(entityType, payload);
+          }
         )
-        .subscribe((status) => {
-          console.log(`[SupabaseSyncManager] Subscription ${tableName}: ${status}`);
+        .subscribe((status, err) => {
+          if (err) {
+            console.error(`[SupabaseSyncManager] Subscription error for ${tableName}:`, err);
+          } else {
+            console.log(`[SupabaseSyncManager] Subscription ${tableName}: ${status}`);
+          }
         });
 
       this._subscriptions.push(subscription);
@@ -394,20 +404,30 @@ class SupabaseSyncManager {
    */
   async _handleRealtimeChange(entityType, payload) {
     const { eventType, new: newRecord, old: oldRecord } = payload;
-    const dexieTableName = this._toDexieTableName(entityType);
+    // entityType is already the Dexie table name (e.g., 'products')
+    const dexieTableName = entityType;
 
-    console.log(`[SupabaseSyncManager] Real-time ${eventType} on ${entityType}`);
+    console.log(`[SupabaseSyncManager] Real-time ${eventType} on ${entityType}:`, newRecord || oldRecord);
 
     try {
+      // Check if table exists
+      if (!db[dexieTableName]) {
+        console.warn(`[SupabaseSyncManager] Table ${dexieTableName} not found in Dexie`);
+        return;
+      }
+
       switch (eventType) {
         case 'INSERT':
         case 'UPDATE':
           const dexieRecord = this._toDexieFormat(newRecord);
+          console.log(`[SupabaseSyncManager] Saving to Dexie ${dexieTableName}:`, dexieRecord);
           await db[dexieTableName].put(dexieRecord);
+          console.log(`[SupabaseSyncManager] Saved successfully`);
           break;
 
         case 'DELETE':
           if (oldRecord?.id) {
+            console.log(`[SupabaseSyncManager] Deleting from Dexie ${dexieTableName}: ${oldRecord.id}`);
             await db[dexieTableName].delete(oldRecord.id);
           }
           break;
@@ -553,6 +573,9 @@ class SupabaseSyncManager {
     let failed = 0;
 
     console.log(`[SupabaseSyncManager] Pushing ${pendingItems.length} changes`);
+    if (pendingItems.length > 0) {
+      console.log('[SupabaseSyncManager] Pending items:', pendingItems.map(i => `${i.entityType}/${i.operation}`));
+    }
 
     for (const item of pendingItems) {
       try {
@@ -563,10 +586,12 @@ class SupabaseSyncManager {
 
         switch (item.operation) {
           case 'create':
+            console.log(`[SupabaseSyncManager] INSERT into ${tableName}:`, supabaseRecord);
             const { error: createError } = await supabase
               .from(tableName)
               .insert(supabaseRecord);
             if (createError) throw createError;
+            console.log(`[SupabaseSyncManager] INSERT successful for ${tableName}`);
             break;
 
           case 'update':
@@ -778,6 +803,66 @@ class SupabaseSyncManager {
   async clearQueue() {
     await db.syncQueue.clear();
     return { success: true };
+  }
+
+  /**
+   * Debug function - check Supabase connection and data
+   */
+  async debug() {
+    const businessId = authService.currentUser?.businessId;
+    console.log('[SupabaseSyncManager] === DEBUG INFO ===');
+    console.log('Device ID:', this._deviceId);
+    console.log('Business ID:', businessId);
+    console.log('Is configured:', isSupabaseConfigured());
+    console.log('Is online:', NetworkDetector.isOnline);
+    console.log('Is syncing:', this._isSyncing);
+    console.log('Last sync:', this._lastSync);
+    console.log('Active subscriptions:', this._subscriptions.length);
+
+    // Check sync queue
+    const pending = await db.syncQueue.where('status').equals('pending').toArray();
+    const failed = await db.syncQueue.where('status').equals('failed').toArray();
+    console.log('Pending sync items:', pending.length);
+    console.log('Failed sync items:', failed.length);
+    if (pending.length > 0) {
+      console.log('Pending items:', pending);
+    }
+
+    // Check Supabase products
+    if (businessId) {
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('business_id', businessId);
+
+      if (error) {
+        console.error('Error fetching products from Supabase:', error);
+      } else {
+        console.log('Products in Supabase:', products?.length || 0);
+        if (products?.length > 0) {
+          console.log('Supabase products:', products);
+        }
+      }
+    }
+
+    // Check local products
+    const localProducts = await db.products.toArray();
+    console.log('Products in local Dexie:', localProducts.length);
+    if (localProducts.length > 0) {
+      console.log('Local products:', localProducts);
+    }
+
+    console.log('[SupabaseSyncManager] === END DEBUG ===');
+
+    return {
+      deviceId: this._deviceId,
+      businessId,
+      isConfigured: isSupabaseConfigured(),
+      isOnline: NetworkDetector.isOnline,
+      pendingCount: pending.length,
+      failedCount: failed.length,
+      subscriptions: this._subscriptions.length
+    };
   }
 }
 

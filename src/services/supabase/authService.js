@@ -195,6 +195,17 @@ class AuthService {
       'therapist@example.com': { password: 'Therapist123!', role: 'Therapist', firstName: 'Demo', lastName: 'Therapist' },
     };
 
+    // Get businessId from local business table for demo/offline users
+    let businessId = null;
+    try {
+      const businesses = await db.business.toArray();
+      if (businesses.length > 0) {
+        businessId = businesses[0]._id;
+      }
+    } catch (err) {
+      console.warn('[AuthService] Could not get businessId from local DB:', err);
+    }
+
     if (!user && demoUsers[email]) {
       const demo = demoUsers[email];
       if (password !== demo.password) {
@@ -207,6 +218,7 @@ class AuthService {
         lastName: demo.lastName,
         role: demo.role,
         status: 'active',
+        businessId: businessId, // Include businessId for demo users
       };
     } else if (user) {
       // For local users, check password (note: not secure, just for demo)
@@ -224,6 +236,7 @@ class AuthService {
       lastName: user.lastName,
       role: user.role,
       employeeId: user.employeeId,
+      businessId: user.businessId || businessId, // Include businessId - critical for sync!
       status: user.status,
     };
 

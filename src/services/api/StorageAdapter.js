@@ -590,6 +590,7 @@ export const transactionsAdapter = {
     return await db.transaction('rw', [db.transactions, db.products, db.syncQueue], async () => {
       const transaction = await storageService.transactions.create({
         ...data,
+        businessId: getRequiredBusinessId(), // Required for sync to work
         createdAt: new Date().toISOString()
       });
 

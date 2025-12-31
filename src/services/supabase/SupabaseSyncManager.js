@@ -310,8 +310,8 @@ class SupabaseSyncManager {
       } else if (key === 'deleted_at') {
         converted._deletedAt = value;
       } else if (key === 'business_id') {
-        // Skip business_id as it's not stored locally
-        continue;
+        // Map business_id to businessId for local storage and sync consistency
+        converted.businessId = value;
       } else {
         // Convert field name to camelCase
         const camelKey = this._toCamelCase(key);
@@ -336,6 +336,11 @@ class SupabaseSyncManager {
 
     console.log('[SupabaseSyncManager] Initializing...');
     console.log('[SupabaseSyncManager] Current business:', newBusinessId, 'Stored business:', storedBusinessId);
+
+    // Warn if no businessId is available - this means sync won't work properly
+    if (!newBusinessId) {
+      console.warn('[SupabaseSyncManager] WARNING: No business ID found in current user session. Sync operations will be limited. User:', authService.currentUser);
+    }
 
     // Check if user switched to a different business account
     if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
@@ -475,7 +480,7 @@ class SupabaseSyncManager {
   _setupRealtimeSubscriptions() {
     const businessId = authService.currentUser?.businessId;
     if (!businessId) {
-      console.log('[SupabaseSyncManager] No business ID, skipping realtime setup');
+      console.warn('[SupabaseSyncManager] No business ID available - realtime subscriptions will NOT be created. This means cross-device sync will not work until you re-login.');
       return;
     }
 
@@ -877,8 +882,8 @@ class SupabaseSyncManager {
     const businessId = authService.currentUser?.businessId;
 
     if (!businessId) {
-      console.log('[SupabaseSyncManager] No business ID, skipping pull');
-      return { pulled: 0, failed: 0 };
+      console.warn('[SupabaseSyncManager] Cannot pull changes: No business ID available. Please log in again to sync data.');
+      return { pulled: 0, failed: 0, skipped: true, reason: 'no_business_id' };
     }
 
     console.log('[SupabaseSyncManager] Pulling changes from Supabase');
@@ -1009,9 +1014,15 @@ class SupabaseSyncManager {
 
         if (localData.length === 0) continue;
 
-        const supabaseRecords = localData.map(record =>
-          this._toSupabaseFormat(record, entityType)
-        );
+        // Filter out null records (e.g., missing businessId or invalid data)
+        const supabaseRecords = localData
+          .map(record => this._toSupabaseFormat(record, entityType))
+          .filter(record => record !== null);
+
+        if (supabaseRecords.length === 0) {
+          console.log(`[SupabaseSyncManager] No valid records to push for ${entityType}`);
+          continue;
+        }
 
         // Upsert in batches
         for (let i = 0; i < supabaseRecords.length; i += this.config.batchSize) {

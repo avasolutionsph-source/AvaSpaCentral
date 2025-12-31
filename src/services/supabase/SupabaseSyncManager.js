@@ -22,6 +22,15 @@ function debounce(fn, ms) {
   };
 }
 
+/**
+ * Validate if a string is a valid UUID
+ */
+function isValidUUID(str) {
+  if (!str || typeof str !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 // Entities that can be synced to Supabase
 const SYNCABLE_ENTITIES = [
   // Core entities (CRITICAL - must be synced)
@@ -134,6 +143,7 @@ const FIELD_NAME_MAP = {
   entityType: 'entity_type',
   entityId: 'entity_id',
   rotationData: 'rotation_data',
+  lastServed: 'last_served',
   deviceId: 'device_id',
   retryCount: 'retry_count',
   processedAt: 'processed_at',
@@ -211,9 +221,23 @@ class SupabaseSyncManager {
 
   /**
    * Convert Dexie record to Supabase format
+   * Returns null if record has invalid data (e.g., old mock data with non-UUID businessId)
    */
   _toSupabaseFormat(record, entityType) {
     const businessId = authService.currentUser?.businessId;
+
+    // Validate businessId is a proper UUID (skip old mock data like 'biz_001')
+    if (!isValidUUID(businessId)) {
+      console.warn(`[SupabaseSyncManager] Skipping record - invalid businessId: ${businessId}`);
+      return null;
+    }
+
+    // Also check if the record has an old mock businessId that doesn't match
+    if (record.businessId && !isValidUUID(record.businessId)) {
+      console.warn(`[SupabaseSyncManager] Skipping record - old mock data with businessId: ${record.businessId}`);
+      return null;
+    }
+
     const converted = { business_id: businessId };
 
     for (const [key, value] of Object.entries(record)) {
@@ -683,6 +707,13 @@ class SupabaseSyncManager {
         const tableName = this._toSupabaseTableName(item.entityType);
         const supabaseRecord = this._toSupabaseFormat(item.data, item.entityType);
 
+        // Skip records with invalid data (e.g., old mock data)
+        if (supabaseRecord === null) {
+          console.log(`[SupabaseSyncManager] Removing invalid sync item: ${item.entityType}/${item.entityId}`);
+          await db.syncQueue.delete(item.id);
+          continue;
+        }
+
         switch (item.operation) {
           case 'create':
             console.log(`[SupabaseSyncManager] INSERT into ${tableName}:`, supabaseRecord);
@@ -781,14 +812,32 @@ class SupabaseSyncManager {
           query = query.gt('updated_at', since);
         }
 
-        const { data, error } = await query;
+        let { data, error } = await query;
 
         if (error) {
           // Table might not exist yet, skip silently
           if (error.code === '42P01') {
             continue;
           }
-          throw error;
+          // Column 'updated_at' doesn't exist - retry without the timestamp filter
+          if (error.message?.includes('updated_at') || error.code === '42703') {
+            console.warn(`[SupabaseSyncManager] Table ${tableName} missing updated_at column, pulling all records`);
+            // Retry query without the updated_at filter
+            let retryQuery = supabase.from(tableName).select('*');
+            if (entityType === 'business') {
+              retryQuery = retryQuery.eq('id', businessId);
+            } else {
+              retryQuery = retryQuery.eq('business_id', businessId);
+            }
+            const retryResult = await retryQuery;
+            if (retryResult.error) {
+              throw retryResult.error;
+            }
+            data = retryResult.data;
+            error = null;
+          } else {
+            throw error;
+          }
         }
 
         if (data && data.length > 0) {
@@ -1008,6 +1057,49 @@ class SupabaseSyncManager {
     }
     console.log(`[SupabaseSyncManager] Reset ${processing.length} stuck items to pending`);
     return processing.length;
+  }
+
+  /**
+   * Clean up old mock data with invalid UUIDs from sync queue and local database
+   * This removes data created with mock businessIds like 'biz_001'
+   */
+  async cleanOldMockData() {
+    console.log('[SupabaseSyncManager] Cleaning old mock data...');
+    let cleaned = { syncQueue: 0, localRecords: 0 };
+
+    // Clean sync queue items with invalid businessId
+    const allQueueItems = await db.syncQueue.toArray();
+    for (const item of allQueueItems) {
+      const businessId = item.data?.businessId;
+      if (businessId && !isValidUUID(businessId)) {
+        await db.syncQueue.delete(item.id);
+        cleaned.syncQueue++;
+        console.log(`[SupabaseSyncManager] Removed sync queue item: ${item.entityType}/${item.entityId} (businessId: ${businessId})`);
+      }
+    }
+
+    // Clean local records with invalid businessId in key tables
+    const tablesToClean = ['products', 'employees', 'customers', 'suppliers', 'rooms',
+      'transactions', 'appointments', 'expenses', 'giftCertificates'];
+
+    for (const tableName of tablesToClean) {
+      if (!db[tableName]) continue;
+      try {
+        const records = await db[tableName].toArray();
+        for (const record of records) {
+          if (record.businessId && !isValidUUID(record.businessId)) {
+            await db[tableName].delete(record._id);
+            cleaned.localRecords++;
+            console.log(`[SupabaseSyncManager] Removed ${tableName} record: ${record._id} (businessId: ${record.businessId})`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[SupabaseSyncManager] Error cleaning ${tableName}:`, err);
+      }
+    }
+
+    console.log(`[SupabaseSyncManager] Cleaned ${cleaned.syncQueue} sync queue items and ${cleaned.localRecords} local records`);
+    return cleaned;
   }
 }
 

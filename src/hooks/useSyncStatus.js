@@ -1,17 +1,18 @@
 /**
  * useSyncStatus - React hook for sync status
  *
- * Provides sync queue status and controls in React components
+ * NOTE: Old SyncManager disabled - now using SupabaseSyncManager in AppContext
+ * This hook now returns empty status to prevent localhost:3001 errors
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { SyncManager, SyncQueue } from '../services/sync';
+import { useState, useCallback } from 'react';
 
 /**
  * Hook to get sync status and controls
+ * Disabled - use AppContext's syncStatus and triggerSync instead
  */
 export function useSyncStatus() {
-  const [status, setStatus] = useState({
+  const [status] = useState({
     isOnline: true,
     isSyncing: false,
     lastSync: null,
@@ -19,43 +20,19 @@ export function useSyncStatus() {
     failedCount: 0
   });
 
-  // Load initial status
-  const loadStatus = useCallback(async () => {
-    const syncStatus = await SyncManager.getStatus();
-    setStatus(syncStatus);
-  }, []);
-
-  useEffect(() => {
-    // Load initial status
-    loadStatus();
-
-    // Subscribe to sync events
-    const unsubscribe = SyncManager.subscribe((event) => {
-      if (event.type === 'sync_start') {
-        setStatus(prev => ({ ...prev, isSyncing: true }));
-      } else if (event.type === 'sync_complete' || event.type === 'sync_error') {
-        loadStatus(); // Reload full status
-      }
-    });
-
-    // Refresh status periodically
-    const interval = setInterval(loadStatus, 30000);
-
-    return () => {
-      unsubscribe();
-      clearInterval(interval);
-    };
-  }, [loadStatus]);
-
-  // Manual sync trigger
+  // No-op functions since old SyncManager is disabled
   const triggerSync = useCallback(async () => {
-    return await SyncManager.sync();
+    console.log('[useSyncStatus] Old SyncManager disabled - use AppContext.triggerSync instead');
+    return { success: true, message: 'Using Supabase sync' };
   }, []);
 
-  // Retry failed items
   const retryFailed = useCallback(async () => {
-    await SyncQueue.resetFailed();
-    return await SyncManager.sync();
+    console.log('[useSyncStatus] Old SyncManager disabled - use AppContext.triggerSync instead');
+    return { success: true, message: 'Using Supabase sync' };
+  }, []);
+
+  const loadStatus = useCallback(async () => {
+    // No-op
   }, []);
 
   return {

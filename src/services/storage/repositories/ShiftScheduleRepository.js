@@ -18,6 +18,20 @@ const getCurrentBusinessId = () => {
   return null;
 };
 
+// Get current user's ID from localStorage
+const getCurrentUserId = () => {
+  const userStr = localStorage.getItem('user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user._id || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+};
+
 class ShiftScheduleRepository extends BaseRepository {
   constructor() {
     super('shiftSchedules');
@@ -75,7 +89,7 @@ class ShiftScheduleRepository extends BaseRepository {
       weeklySchedule: scheduleData.weeklySchedule,
       isActive: true,
       notes: scheduleData.notes || '',
-      createdBy: scheduleData.createdBy || 'user_001'
+      createdBy: scheduleData.createdBy || getCurrentUserId()
     };
 
     return this.create(newSchedule);

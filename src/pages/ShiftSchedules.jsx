@@ -17,7 +17,7 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const ShiftSchedules = () => {
   const navigate = useNavigate();
-  const { showToast, hasManagementAccess } = useApp();
+  const { showToast, hasManagementAccess, user } = useApp();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -188,7 +188,7 @@ const ShiftSchedules = () => {
     try {
       await mockApi.shiftSchedules.updateTimeOffRequest(requestId, {
         status: action,
-        reviewedBy: 'user_001'
+        reviewedBy: user?._id
       });
       showToast(`Request ${action}!`, 'success');
       loadData();

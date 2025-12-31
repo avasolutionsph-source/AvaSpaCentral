@@ -184,6 +184,8 @@ class SupabaseSyncManager {
 
     // Unsubscribe function for data change listener
     this._dataChangeUnsubscribe = null;
+    // Unsubscribe function for network status listener
+    this._networkUnsubscribe = null;
   }
 
   _getDeviceId() {
@@ -351,8 +353,11 @@ class SupabaseSyncManager {
     if (!this._initialized) {
       NetworkDetector.start();
 
-      // Listen for network changes
-      NetworkDetector.subscribe((isOnline) => {
+      // Listen for network changes (store unsubscribe to prevent memory leak)
+      if (this._networkUnsubscribe) {
+        this._networkUnsubscribe();
+      }
+      this._networkUnsubscribe = NetworkDetector.subscribe((isOnline) => {
         if (isOnline && this.config.syncOnReconnect) {
           console.log('[SupabaseSyncManager] Online - triggering sync');
           this.sync();
@@ -517,7 +522,44 @@ class SupabaseSyncManager {
    * Handle real-time changes from other devices
    */
   async _handleRealtimeChange(entityType, payload) {
+    // Validate payload structure
+    if (!payload || typeof payload !== 'object') {
+      console.warn('[SupabaseSyncManager] Invalid realtime payload: not an object');
+      return;
+    }
+
     const { eventType, new: newRecord, old: oldRecord } = payload;
+
+    // Validate event type
+    if (!eventType || !['INSERT', 'UPDATE', 'DELETE'].includes(eventType)) {
+      console.warn(`[SupabaseSyncManager] Invalid realtime event type: ${eventType}`);
+      return;
+    }
+
+    // Validate record data based on event type
+    if ((eventType === 'INSERT' || eventType === 'UPDATE') && !newRecord) {
+      console.warn(`[SupabaseSyncManager] Missing new record for ${eventType} event`);
+      return;
+    }
+    if (eventType === 'DELETE' && !oldRecord?.id) {
+      console.warn(`[SupabaseSyncManager] Missing old record id for DELETE event`);
+      return;
+    }
+
+    // Validate record has required id field
+    if (newRecord && !newRecord.id) {
+      console.warn(`[SupabaseSyncManager] Record missing id field:`, newRecord);
+      return;
+    }
+
+    // Validate business_id matches current user (prevent cross-account data injection)
+    const currentBusinessId = authService.currentUser?.businessId;
+    const recordBusinessId = (newRecord || oldRecord)?.business_id;
+    if (entityType !== 'business' && recordBusinessId && recordBusinessId !== currentBusinessId) {
+      console.warn(`[SupabaseSyncManager] Business ID mismatch - ignoring record for different business`);
+      return;
+    }
+
     // entityType is already the Dexie table name (e.g., 'products')
     const dexieTableName = entityType;
 
@@ -540,10 +582,8 @@ class SupabaseSyncManager {
           break;
 
         case 'DELETE':
-          if (oldRecord?.id) {
-            console.log(`[SupabaseSyncManager] Deleting from Dexie ${dexieTableName}: ${oldRecord.id}`);
-            await db[dexieTableName].delete(oldRecord.id);
-          }
+          console.log(`[SupabaseSyncManager] Deleting from Dexie ${dexieTableName}: ${oldRecord.id}`);
+          await db[dexieTableName].delete(oldRecord.id);
           break;
       }
 
@@ -568,6 +608,12 @@ class SupabaseSyncManager {
     if (this._dataChangeUnsubscribe) {
       this._dataChangeUnsubscribe();
       this._dataChangeUnsubscribe = null;
+    }
+
+    // Unsubscribe from network status events
+    if (this._networkUnsubscribe) {
+      this._networkUnsubscribe();
+      this._networkUnsubscribe = null;
     }
 
     // Unsubscribe from all real-time channels

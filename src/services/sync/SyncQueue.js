@@ -20,13 +20,13 @@ class SyncQueue {
    * Add an operation to the sync queue
    */
   async add(entityType, entityId, operation, data) {
-    // Check if there's already a pending operation for this entity
+    // Check if there's already a pending or processing operation for this entity
+    // Use filter instead of compound index for reliable lookup
     const existing = await syncQueue
-      .where(['entityType', 'entityId'])
-      .equals([entityType, entityId])
+      .filter(item => item.entityType === entityType && item.entityId === entityId)
       .first();
 
-    if (existing && existing.status === 'pending') {
+    if (existing && (existing.status === 'pending' || existing.status === 'processing')) {
       // Update existing operation instead of creating duplicate
       // If it was a create followed by update, keep as create with new data
       // If it was update followed by delete, just keep delete

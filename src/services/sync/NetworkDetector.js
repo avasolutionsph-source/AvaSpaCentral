@@ -96,7 +96,15 @@ class NetworkDetector {
       // If Supabase is configured, check if it's reachable
       if (isSupabaseConfigured()) {
         const { error } = await supabase.from('businesses').select('id').limit(1);
-        const isReachable = !error || error.code !== 'NETWORK_ERROR';
+        // Consider network-related errors as offline, other errors (auth, permissions) as still online
+        const networkErrors = ['NETWORK_ERROR', 'PGRST301', 'FetchError'];
+        const isNetworkError = error && (
+          networkErrors.includes(error.code) ||
+          error.message?.includes('fetch') ||
+          error.message?.includes('network') ||
+          error.message?.includes('Failed to fetch')
+        );
+        const isReachable = !isNetworkError;
 
         if (isReachable !== this._isOnline) {
           this._isOnline = isReachable;

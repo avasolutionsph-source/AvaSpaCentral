@@ -216,36 +216,47 @@ class BaseRepository {
   /**
    * Bulk update multiple items
    * @param {Array} updates - Array of { id, data } objects
-   * @returns {Promise<number>} Number of updated items
+   * @returns {Promise<{success: number, failed: number, errors: Array}>} Result with counts and errors
    */
   async bulkUpdate(updates) {
     const now = new Date().toISOString();
-    let count = 0;
+    let success = 0;
+    let failed = 0;
+    const errors = [];
 
     for (const { id, data } of updates) {
-      const existing = await this.getById(id);
-      if (existing) {
-        await this.table.put({
-          ...existing,
-          ...data,
-          _id: id,
-          _syncStatus: 'pending',
-          _updatedAt: now
-        });
-        count++;
+      try {
+        const existing = await this.getById(id);
+        if (existing) {
+          await this.table.put({
+            ...existing,
+            ...data,
+            _id: id,
+            _syncStatus: 'pending',
+            _updatedAt: now
+          });
+          success++;
 
-        if (this.trackSync) {
-          await this.addToSyncQueue(id, 'update', { ...existing, ...data });
+          if (this.trackSync) {
+            await this.addToSyncQueue(id, 'update', { ...existing, ...data });
+          }
+        } else {
+          failed++;
+          errors.push({ id, error: 'Item not found' });
         }
+      } catch (error) {
+        failed++;
+        errors.push({ id, error: error.message });
+        console.error(`[BaseRepository] bulkUpdate error for ${id}:`, error);
       }
     }
 
     // Emit single event for batch update (debounced sync will handle it)
-    if (this.trackSync && count > 0) {
-      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'update', count });
+    if (this.trackSync && success > 0) {
+      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'update', count: success });
     }
 
-    return count;
+    return { success, failed, errors };
   }
 
   /**
@@ -298,15 +309,27 @@ class BaseRepository {
   /**
    * Bulk upsert multiple items
    * @param {Array} items - Array of items to upsert
-   * @returns {Promise<Array>} The created/updated items
+   * @returns {Promise<{results: Array, success: number, failed: number, errors: Array}>} Results with counts and errors
    */
   async bulkUpsert(items) {
     const results = [];
+    let success = 0;
+    let failed = 0;
+    const errors = [];
+
     for (const item of items) {
-      const result = await this.upsert(item);
-      results.push(result);
+      try {
+        const result = await this.upsert(item);
+        results.push(result);
+        success++;
+      } catch (error) {
+        failed++;
+        errors.push({ item, error: error.message });
+        console.error(`[BaseRepository] bulkUpsert error:`, error);
+      }
     }
-    return results;
+
+    return { results, success, failed, errors };
   }
 
   // ==================== SYNC HELPERS ====================

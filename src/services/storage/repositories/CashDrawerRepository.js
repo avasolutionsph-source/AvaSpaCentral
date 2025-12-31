@@ -2,6 +2,7 @@
  * CashDrawerRepository - Cash drawer sessions storage
  */
 import BaseRepository from '../BaseRepository';
+import { db } from '../../../db';
 
 class CashDrawerRepository extends BaseRepository {
   constructor() {
@@ -62,20 +63,23 @@ class CashDrawerRepository extends BaseRepository {
 
   /**
    * Add transaction to session
+   * Uses Dexie transaction for atomicity to prevent race conditions
    */
   async addTransaction(sessionId, transaction) {
-    const session = await this.getById(sessionId);
-    if (!session) throw new Error('Session not found');
+    return await db.transaction('rw', db.cashDrawerSessions, async () => {
+      const session = await this.getById(sessionId);
+      if (!session) throw new Error('Session not found');
 
-    const newTransaction = {
-      _id: 'cdt_' + Date.now(),
-      ...transaction,
-      time: new Date().toISOString()
-    };
+      const newTransaction = {
+        _id: 'cdt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        ...transaction,
+        time: new Date().toISOString()
+      };
 
-    const transactions = [...(session.transactions || []), newTransaction];
+      const transactions = [...(session.transactions || []), newTransaction];
 
-    return this.update(sessionId, { transactions });
+      return this.update(sessionId, { transactions });
+    });
   }
 
   /**

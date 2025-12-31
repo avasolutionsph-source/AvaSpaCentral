@@ -13,12 +13,35 @@
 import storageService from '../storage';
 import { mockDatabase } from '../../mockApi/mockData';
 import { TimeOffRequestRepository, HomeServiceRepository, SettingsRepository } from '../storage/repositories';
+import { authService } from '../supabase';
 
 // Simulate network delay (optional, for realistic feel during development)
 const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Clone helper
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
+
+// Get current user's businessId (from Supabase auth or localStorage)
+const getCurrentBusinessId = () => {
+  // First try authService (Supabase auth)
+  if (authService.currentUser?.businessId) {
+    return authService.currentUser.businessId;
+  }
+  // Fallback to localStorage user
+  const userStr = localStorage.getItem('user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      if (user.businessId) {
+        return user.businessId;
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+  }
+  // Last resort: return null (caller should handle)
+  return null;
+};
 
 // =============================================================================
 // PRODUCTS API ADAPTER
@@ -53,7 +76,7 @@ export const productsAdapter = {
   async createProduct(data) {
     await delay();
     const product = await storageService.products.create({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       active: data.active !== undefined ? data.active : true
     });
@@ -146,7 +169,7 @@ export const employeesAdapter = {
   async createEmployee(data) {
     await delay();
     const employee = await storageService.employees.create({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       status: data.status || 'active',
       hireDate: data.hireDate || new Date().toISOString().split('T')[0]
@@ -244,7 +267,7 @@ export const customersAdapter = {
   async createCustomer(data) {
     await delay();
     const customer = await storageService.customers.create({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       status: data.status || 'active',
       totalSpent: 0,
@@ -301,7 +324,7 @@ export const suppliersAdapter = {
   async createSupplier(data) {
     await delay();
     const supplier = await storageService.suppliers.create({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       status: data.status || 'active'
     });
@@ -367,7 +390,7 @@ export const roomsAdapter = {
   async createRoom(data) {
     await delay();
     const room = await storageService.rooms.create({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       status: data.status || 'available'
     });
@@ -486,7 +509,7 @@ export const expensesAdapter = {
   async createExpense(data) {
     await delay();
     const expense = await storageService.expenses.create({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       status: data.status || 'pending'
     });
@@ -719,7 +742,7 @@ export const appointmentsAdapter = {
   async createAppointment(data) {
     await delay();
     const appointment = await storageService.appointments.create({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       status: data.status || 'scheduled'
     });
@@ -780,7 +803,7 @@ export const giftCertificatesAdapter = {
   async createGiftCertificate(data) {
     await delay();
     const certificate = await storageService.giftCertificates.createWithCode({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       balance: data.amount,
       status: 'active'
@@ -838,7 +861,7 @@ export const purchaseOrdersAdapter = {
   async createPurchaseOrder(data) {
     await delay();
     const order = await storageService.purchaseOrders.createWithNumber({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data
     });
     return { success: true, purchaseOrder: clone(order) };
@@ -1250,7 +1273,7 @@ export const usersAdapter = {
     }
 
     const user = await storageService.users.create({
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       ...data,
       status: data.status || 'active',
       lastLogin: null

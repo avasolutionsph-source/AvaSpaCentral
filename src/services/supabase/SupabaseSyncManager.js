@@ -45,6 +45,7 @@ const SYNCABLE_ENTITIES = [
 
 // Map Dexie table names to Supabase table names (snake_case)
 const TABLE_NAME_MAP = {
+  business: 'businesses', // Special case: singular to plural
   giftCertificates: 'gift_certificates',
   purchaseOrders: 'purchase_orders',
   shiftSchedules: 'shift_schedules',
@@ -63,7 +64,6 @@ const TABLE_NAME_MAP = {
   advanceBookings: 'advance_bookings',
   activeServices: 'active_services',
   homeServices: 'home_services',
-  // Note: 'business' and 'users' are already in correct format (no mapping needed)
 };
 
 // Map camelCase field names to snake_case for Supabase
@@ -366,6 +366,9 @@ class SupabaseSyncManager {
     realtimeEntities.forEach(entityType => {
       const tableName = this._toSupabaseTableName(entityType);
 
+      // Special case: businesses table uses 'id' not 'business_id'
+      const filterColumn = entityType === 'business' ? 'id' : 'business_id';
+
       const subscription = supabase
         .channel(`${tableName}_changes_${this._deviceId}`)
         .on(
@@ -374,7 +377,7 @@ class SupabaseSyncManager {
             event: '*',
             schema: 'public',
             table: tableName,
-            filter: `business_id=eq.${businessId}`,
+            filter: `${filterColumn}=eq.${businessId}`,
           },
           (payload) => this._handleRealtimeChange(entityType, payload)
         )
@@ -638,8 +641,14 @@ class SupabaseSyncManager {
         // Build query
         let query = supabase
           .from(tableName)
-          .select('*')
-          .eq('business_id', businessId);
+          .select('*');
+
+        // Special case: businesses table uses 'id' not 'business_id'
+        if (entityType === 'business') {
+          query = query.eq('id', businessId);
+        } else {
+          query = query.eq('business_id', businessId);
+        }
 
         // Only get updates since last sync (incremental sync)
         if (since) {

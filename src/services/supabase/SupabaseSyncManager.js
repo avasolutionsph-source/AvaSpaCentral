@@ -617,7 +617,8 @@ class SupabaseSyncManager {
 
         // Update local record sync status
         if (item.operation !== 'delete') {
-          const dexieTableName = this._toDexieTableName(item.entityType);
+          // item.entityType is already a Dexie table name (e.g., 'products')
+          const dexieTableName = item.entityType;
           await db[dexieTableName].update(item.entityId, {
             _syncStatus: 'synced',
             _lastSyncedAt: new Date().toISOString(),
@@ -657,7 +658,8 @@ class SupabaseSyncManager {
     for (const entityType of SYNCABLE_ENTITIES) {
       try {
         const tableName = this._toSupabaseTableName(entityType);
-        const dexieTableName = this._toDexieTableName(entityType);
+        // entityType is already a Dexie table name (e.g., 'products', 'giftCertificates')
+        const dexieTableName = entityType;
 
         // Get last sync timestamp for this entity
         const metadata = await db.syncMetadata.get(entityType);
@@ -753,7 +755,8 @@ class SupabaseSyncManager {
 
     for (const entityType of SYNCABLE_ENTITIES) {
       try {
-        const dexieTableName = this._toDexieTableName(entityType);
+        // entityType is already a Dexie table name (e.g., 'products', 'giftCertificates')
+        const dexieTableName = entityType;
         const tableName = this._toSupabaseTableName(entityType);
 
         const localData = await db[dexieTableName].toArray();

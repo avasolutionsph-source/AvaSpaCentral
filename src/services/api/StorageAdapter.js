@@ -14,6 +14,7 @@ import storageService from '../storage';
 import { mockDatabase } from '../../mockApi/mockData';
 import { TimeOffRequestRepository, HomeServiceRepository, SettingsRepository } from '../storage/repositories';
 import { authService } from '../supabase';
+import { db } from '../../db';
 
 // Simulate network delay (optional, for realistic feel during development)
 const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
@@ -41,6 +42,16 @@ const getCurrentBusinessId = () => {
   }
   // Last resort: return null (caller should handle)
   return null;
+};
+
+// Get businessId with validation - throws if not available
+// Use this for create operations to prevent saving data without business context
+const getRequiredBusinessId = () => {
+  const businessId = getCurrentBusinessId();
+  if (!businessId) {
+    throw new Error('Cannot save: No business context. Please log in again.');
+  }
+  return businessId;
 };
 
 // =============================================================================
@@ -76,7 +87,7 @@ export const productsAdapter = {
   async createProduct(data) {
     await delay();
     const product = await storageService.products.create({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       active: data.active !== undefined ? data.active : true
     });
@@ -169,7 +180,7 @@ export const employeesAdapter = {
   async createEmployee(data) {
     await delay();
     const employee = await storageService.employees.create({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       status: data.status || 'active',
       hireDate: data.hireDate || new Date().toISOString().split('T')[0]
@@ -267,7 +278,7 @@ export const customersAdapter = {
   async createCustomer(data) {
     await delay();
     const customer = await storageService.customers.create({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       status: data.status || 'active',
       totalSpent: 0,
@@ -324,7 +335,7 @@ export const suppliersAdapter = {
   async createSupplier(data) {
     await delay();
     const supplier = await storageService.suppliers.create({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       status: data.status || 'active'
     });
@@ -390,7 +401,7 @@ export const roomsAdapter = {
   async createRoom(data) {
     await delay();
     const room = await storageService.rooms.create({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       status: data.status || 'available'
     });
@@ -509,7 +520,7 @@ export const expensesAdapter = {
   async createExpense(data) {
     await delay();
     const expense = await storageService.expenses.create({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       status: data.status || 'pending'
     });
@@ -575,42 +586,47 @@ export const transactionsAdapter = {
   async createTransaction(data) {
     await delay();
 
-    const transaction = await storageService.transactions.create({
-      ...data,
-      createdAt: new Date().toISOString()
-    });
+    // Wrap in Dexie transaction for atomicity - if stock update fails, transaction is rolled back
+    return await db.transaction('rw', [db.transactions, db.products, db.syncQueue], async () => {
+      const transaction = await storageService.transactions.create({
+        ...data,
+        createdAt: new Date().toISOString()
+      });
 
-    // Update product stock for sold items and track service counts
-    if (transaction.items) {
-      for (const item of transaction.items) {
-        if (item.type === 'product') {
-          // Deduct stock for retail product sales
-          const product = await storageService.products.getById(item.id);
-          if (product && product.stock !== undefined) {
-            await storageService.products.update(item.id, {
-              stock: product.stock - item.quantity
-            });
-          }
-        } else if (item.type === 'service' && item.itemsUsed && item.itemsUsed.length > 0) {
-          // Increment service count for each linked product (for consumption tracking)
-          for (const linkedProduct of item.itemsUsed) {
-            try {
-              const product = await storageService.products.getById(linkedProduct.productId);
-              if (product) {
-                const currentCount = product.servicesSinceLastAdjustment || 0;
-                await storageService.products.update(linkedProduct.productId, {
-                  servicesSinceLastAdjustment: currentCount + item.quantity
-                });
+      // Update product stock for sold items and track service counts
+      if (transaction.items) {
+        for (const item of transaction.items) {
+          if (item.type === 'product') {
+            // Deduct stock for retail product sales
+            const product = await storageService.products.getById(item.id);
+            if (product && product.stock !== undefined) {
+              await storageService.products.update(item.id, {
+                stock: product.stock - item.quantity
+              });
+            }
+          } else if (item.type === 'service' && item.itemsUsed && item.itemsUsed.length > 0) {
+            // Increment service count for each linked product (for consumption tracking)
+            for (const linkedProduct of item.itemsUsed) {
+              try {
+                const product = await storageService.products.getById(linkedProduct.productId);
+                if (product) {
+                  const currentCount = product.servicesSinceLastAdjustment || 0;
+                  await storageService.products.update(linkedProduct.productId, {
+                    servicesSinceLastAdjustment: currentCount + item.quantity
+                  });
+                }
+              } catch (err) {
+                console.error('Failed to increment service count for product:', linkedProduct.productId, err);
+                // Re-throw to trigger transaction rollback
+                throw err;
               }
-            } catch (err) {
-              console.error('Failed to increment service count for product:', linkedProduct.productId, err);
             }
           }
         }
       }
-    }
 
-    return { success: true, transaction: clone(transaction) };
+      return { success: true, transaction: clone(transaction) };
+    });
   },
 
   async getRevenueSummary(period) {
@@ -742,7 +758,7 @@ export const appointmentsAdapter = {
   async createAppointment(data) {
     await delay();
     const appointment = await storageService.appointments.create({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       status: data.status || 'scheduled'
     });
@@ -803,7 +819,7 @@ export const giftCertificatesAdapter = {
   async createGiftCertificate(data) {
     await delay();
     const certificate = await storageService.giftCertificates.createWithCode({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       balance: data.amount,
       status: 'active'
@@ -861,7 +877,7 @@ export const purchaseOrdersAdapter = {
   async createPurchaseOrder(data) {
     await delay();
     const order = await storageService.purchaseOrders.createWithNumber({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data
     });
     return { success: true, purchaseOrder: clone(order) };
@@ -1273,7 +1289,7 @@ export const usersAdapter = {
     }
 
     const user = await storageService.users.create({
-      businessId: getCurrentBusinessId(),
+      businessId: getRequiredBusinessId(),
       ...data,
       status: data.status || 'active',
       lastLogin: null
@@ -1517,7 +1533,15 @@ export const shiftSchedulesAdapter = {
 
   async createTimeOffRequest(data) {
     await delay();
-    const request = await TimeOffRequestRepository.createRequest(data);
+    // Repository expects individual params: (employeeId, startDate, endDate, type, reason, options)
+    const request = await TimeOffRequestRepository.createRequest(
+      data.employeeId,
+      data.startDate,
+      data.endDate,
+      data.type,
+      data.reason,
+      data  // Pass full data as options for any extra fields
+    );
     return clone(request);
   },
 
@@ -1527,7 +1551,8 @@ export const shiftSchedulesAdapter = {
 
     // Handle status-specific updates
     if (updates.status === 'approved') {
-      updated = await TimeOffRequestRepository.approve(requestId, updates.approvedBy);
+      // Repository expects: (requestId, approvedBy, notes)
+      updated = await TimeOffRequestRepository.approve(requestId, updates.approvedBy, updates.approverNotes);
     } else if (updates.status === 'rejected') {
       updated = await TimeOffRequestRepository.reject(requestId, updates.rejectedBy, updates.rejectionReason);
     } else {
@@ -1537,9 +1562,10 @@ export const shiftSchedulesAdapter = {
     return clone(updated);
   },
 
-  async deleteTimeOffRequest(requestId) {
+  async deleteTimeOffRequest(requestId, cancelledBy = null, reason = null) {
     await delay();
-    await TimeOffRequestRepository.cancel(requestId);
+    // Repository expects: (requestId, cancelledBy, reason)
+    await TimeOffRequestRepository.cancel(requestId, cancelledBy, reason);
     return { success: true };
   }
 };

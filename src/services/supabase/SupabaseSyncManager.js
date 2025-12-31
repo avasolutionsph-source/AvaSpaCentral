@@ -340,6 +340,13 @@ class SupabaseSyncManager {
       await this._autoRepairBusinessIds();
     }
 
+    // Reset any stuck processing items from previous crashes/interruptions
+    // This ensures sync items don't get permanently stuck if app closes during sync
+    const stuckCount = await this.resetStuckItems();
+    if (stuckCount > 0) {
+      console.log(`[SupabaseSyncManager] Recovered ${stuckCount} stuck sync items`);
+    }
+
     // Start network detector (only once)
     if (!this._initialized) {
       NetworkDetector.start();

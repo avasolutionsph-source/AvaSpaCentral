@@ -152,6 +152,8 @@ class SupabaseSyncManager {
     this._subscriptions = [];
     this._deviceId = this._getDeviceId();
     this._syncInterval = null;
+    this._currentBusinessId = null; // Track current business for data isolation
+    this._initialized = false;
 
     this.config = {
       autoSync: true,
@@ -290,27 +292,53 @@ class SupabaseSyncManager {
       return;
     }
 
+    const newBusinessId = authService.currentUser?.businessId;
+    const storedBusinessId = localStorage.getItem('currentBusinessId');
+
     console.log('[SupabaseSyncManager] Initializing...');
+    console.log('[SupabaseSyncManager] Current business:', newBusinessId, 'Stored business:', storedBusinessId);
 
-    // Start network detector
-    NetworkDetector.start();
+    // Check if user switched to a different business account
+    if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
+      console.log('[SupabaseSyncManager] Business account changed! Clearing local data...');
+      await this._clearLocalDataForAccountSwitch();
+    }
 
-    // Listen for network changes
-    NetworkDetector.subscribe((isOnline) => {
-      if (isOnline && this.config.syncOnReconnect) {
-        console.log('[SupabaseSyncManager] Online - triggering sync');
-        this.sync();
-      }
-    });
+    // Store current business ID for future comparison
+    if (newBusinessId) {
+      localStorage.setItem('currentBusinessId', newBusinessId);
+      this._currentBusinessId = newBusinessId;
+    }
+
+    // Start network detector (only once)
+    if (!this._initialized) {
+      NetworkDetector.start();
+
+      // Listen for network changes
+      NetworkDetector.subscribe((isOnline) => {
+        if (isOnline && this.config.syncOnReconnect) {
+          console.log('[SupabaseSyncManager] Online - triggering sync');
+          this.sync();
+        }
+      });
+    }
 
     // EVENT-DRIVEN SYNC: Listen for local data changes and sync immediately (debounced)
-    this._dataChangeUnsubscribe = dataChangeEmitter.subscribe((change) => {
-      console.log('[SupabaseSyncManager] Data changed:', change.entityType, change.operation);
-      this._debouncedSync();
-    });
+    if (!this._dataChangeUnsubscribe) {
+      this._dataChangeUnsubscribe = dataChangeEmitter.subscribe((change) => {
+        console.log('[SupabaseSyncManager] Data changed:', change.entityType, change.operation);
+        this._debouncedSync();
+      });
+    }
 
     // Setup real-time subscriptions if authenticated
     if (authService.currentUser) {
+      // Clear old subscriptions first
+      this._subscriptions.forEach(sub => {
+        supabase.removeChannel(sub);
+      });
+      this._subscriptions = [];
+
       this._setupRealtimeSubscriptions();
     }
 
@@ -319,7 +347,51 @@ class SupabaseSyncManager {
       this._startPeriodicSync();
     }
 
+    this._initialized = true;
     console.log('[SupabaseSyncManager] Initialized with event-driven sync');
+
+    // Pull fresh data from Supabase on initialize
+    if (newBusinessId && (!storedBusinessId || newBusinessId !== storedBusinessId)) {
+      console.log('[SupabaseSyncManager] New/different account - pulling fresh data from Supabase...');
+      await this.forcePull();
+    }
+  }
+
+  /**
+   * Clear local Dexie data when switching business accounts
+   * This ensures data isolation between different accounts
+   */
+  async _clearLocalDataForAccountSwitch() {
+    console.log('[SupabaseSyncManager] Clearing local data for account switch...');
+
+    // Tables to clear (all syncable entities except sync infrastructure)
+    const tablesToClear = [
+      'products', 'employees', 'customers', 'suppliers', 'rooms',
+      'transactions', 'appointments', 'expenses', 'giftCertificates',
+      'purchaseOrders', 'inventoryMovements', 'stockHistory', 'productConsumption',
+      'attendance', 'shiftSchedules', 'activityLogs', 'payrollRequests',
+      'payrollConfig', 'payrollConfigLogs', 'timeOffRequests',
+      'cashDrawerSessions', 'settings', 'businessConfig', 'serviceRotation',
+      'loyaltyHistory', 'advanceBookings', 'activeServices', 'homeServices',
+      'business', 'users'
+    ];
+
+    for (const tableName of tablesToClear) {
+      try {
+        if (db[tableName]) {
+          await db[tableName].clear();
+          console.log(`[SupabaseSyncManager] Cleared ${tableName}`);
+        }
+      } catch (error) {
+        console.warn(`[SupabaseSyncManager] Error clearing ${tableName}:`, error);
+      }
+    }
+
+    // Clear sync queue and metadata
+    await db.syncQueue.clear();
+    await db.syncMetadata.clear();
+
+    console.log('[SupabaseSyncManager] Local data cleared for account switch');
   }
 
   /**
@@ -470,6 +542,28 @@ class SupabaseSyncManager {
 
     // Stop network detector
     NetworkDetector.stop();
+
+    // Reset state
+    this._currentBusinessId = null;
+    this._initialized = false;
+  }
+
+  /**
+   * Full cleanup on logout - clears local data to prevent data leakage
+   */
+  async cleanupOnLogout() {
+    console.log('[SupabaseSyncManager] Cleaning up on logout...');
+
+    // First do regular cleanup
+    this.cleanup();
+
+    // Clear the stored business ID so next login will pull fresh data
+    localStorage.removeItem('currentBusinessId');
+
+    // Clear all local data to prevent data leakage between accounts
+    await this._clearLocalDataForAccountSwitch();
+
+    console.log('[SupabaseSyncManager] Logout cleanup complete');
   }
 
   /**

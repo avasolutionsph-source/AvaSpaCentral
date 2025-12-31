@@ -184,8 +184,8 @@ export const AppProvider = ({ children }) => {
     // Use Supabase auth service
     await authService.signOut();
 
-    // Cleanup sync manager
-    supabaseSyncManager.cleanup();
+    // Full cleanup on logout - clears local data for security
+    await supabaseSyncManager.cleanupOnLogout();
 
     setUser(null);
     showToast('Logged out successfully', 'info');

@@ -4,6 +4,20 @@
 import BaseRepository from '../BaseRepository';
 import db from '../../../db';
 
+// Get current user's businessId from localStorage
+const getCurrentBusinessId = () => {
+  const userStr = localStorage.getItem('user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user.businessId || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+};
+
 class ShiftScheduleRepository extends BaseRepository {
   constructor() {
     super('shiftSchedules');
@@ -53,7 +67,7 @@ class ShiftScheduleRepository extends BaseRepository {
     }
 
     const newSchedule = {
-      businessId: 'biz_001',
+      businessId: getCurrentBusinessId(),
       employeeId: scheduleData.employeeId,
       employeeName: employee ? `${employee.firstName} ${employee.lastName}` : scheduleData.employeeName || 'Unknown',
       employeePosition: employee?.position || scheduleData.employeePosition || '',

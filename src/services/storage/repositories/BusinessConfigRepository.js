@@ -11,6 +11,20 @@
 import { db, syncQueue } from '../../../db';
 import dataChangeEmitter from '../../sync/DataChangeEmitter';
 
+// Get current user's businessId from localStorage
+const getCurrentBusinessId = () => {
+  const userStr = localStorage.getItem('user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user.businessId || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+};
+
 // Default values for business configuration
 const DEFAULT_FIXED_COSTS = {
   rent: 0,
@@ -42,8 +56,9 @@ const DEFAULT_BUSINESS_SETTINGS = {
   }
 };
 
-const DEFAULT_BUSINESS_INFO = {
-  _id: 'biz_001',
+// Factory function for default business info (uses dynamic businessId)
+const getDefaultBusinessInfo = () => ({
+  _id: getCurrentBusinessId() || 'default_biz',
   businessName: 'My SPA Business',
   tagline: '',
   address: '',
@@ -51,7 +66,7 @@ const DEFAULT_BUSINESS_INFO = {
   country: 'Philippines',
   phone: '',
   email: ''
-};
+});
 
 class BusinessConfigRepository {
   constructor() {
@@ -181,7 +196,7 @@ class BusinessConfigRepository {
    */
   async getBusinessInfo() {
     const record = await this.table.get('businessInfo');
-    return record ? record.value : { ...DEFAULT_BUSINESS_INFO };
+    return record ? record.value : { ...getDefaultBusinessInfo() };
   }
 
   /**
@@ -194,7 +209,7 @@ class BusinessConfigRepository {
     const existing = await this.table.get('businessInfo');
     const record = {
       key: 'businessInfo',
-      value: { ...DEFAULT_BUSINESS_INFO, ...info },
+      value: { ...getDefaultBusinessInfo(), ...info },
       _syncStatus: 'pending',
       _updatedAt: now
     };
@@ -283,4 +298,4 @@ const businessConfigRepository = new BusinessConfigRepository();
 export default businessConfigRepository;
 
 // Named exports for convenience
-export { DEFAULT_FIXED_COSTS, DEFAULT_CASH_ACCOUNTS, DEFAULT_BUSINESS_SETTINGS, DEFAULT_BUSINESS_INFO };
+export { DEFAULT_FIXED_COSTS, DEFAULT_CASH_ACCOUNTS, DEFAULT_BUSINESS_SETTINGS, getDefaultBusinessInfo };

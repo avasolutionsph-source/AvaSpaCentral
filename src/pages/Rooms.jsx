@@ -60,7 +60,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
 
     // Build transaction matching POS structure
     const transaction = {
-      businessId: 'biz_001',
+      businessId: user?.businessId,
       receiptNumber,
       date: now,
       items: serviceNames.map((name, index) => ({

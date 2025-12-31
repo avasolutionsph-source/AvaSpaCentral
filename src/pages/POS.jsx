@@ -611,7 +611,7 @@ const POS = () => {
 
         // Build transaction
         const transaction = {
-          businessId: 'biz_001',
+          businessId: user?.businessId,
           receiptNumber,
           date: new Date().toISOString(),
           items: cart.map(item => ({

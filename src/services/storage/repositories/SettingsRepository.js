@@ -54,24 +54,28 @@ class SettingsRepository {
 
   /**
    * Set a setting value
+   * Uses Dexie transaction for atomicity to prevent race conditions
    * @param {string} key - The setting key
    * @param {*} value - The value to store
    * @returns {Promise<void>}
    */
   async set(key, value) {
-    const now = new Date().toISOString();
-    const existing = await this.table.get(key);
-    const record = {
-      key,
-      value,
-      _syncStatus: 'pending',
-      _updatedAt: now
-    };
+    return await db.transaction('rw', [this.table, syncQueue], async () => {
+      const now = new Date().toISOString();
+      const existing = await this.table.get(key);
+      const record = {
+        key,
+        value,
+        _syncStatus: 'pending',
+        _updatedAt: now,
+        _createdAt: existing?._createdAt || now
+      };
 
-    await this.table.put(record);
+      await this.table.put(record);
 
-    // Add to sync queue and emit event
-    await this._addToSyncQueue(key, existing ? 'update' : 'create', record);
+      // Add to sync queue and emit event
+      await this._addToSyncQueue(key, existing ? 'update' : 'create', record);
+    });
   }
 
   /**
@@ -89,24 +93,35 @@ class SettingsRepository {
 
   /**
    * Set multiple settings at once
+   * Uses Dexie transaction for atomicity
    * @param {Object} settings - Object with key-value pairs
    * @returns {Promise<void>}
    */
   async setMany(settings) {
-    const now = new Date().toISOString();
-    const records = Object.entries(settings).map(([key, value]) => ({
-      key,
-      value,
-      _syncStatus: 'pending',
-      _updatedAt: now
-    }));
+    return await db.transaction('rw', [this.table, syncQueue], async () => {
+      const now = new Date().toISOString();
 
-    await this.table.bulkPut(records);
+      // Get existing records to determine create vs update
+      const keys = Object.keys(settings);
+      const existingRecords = await this.table.where('key').anyOf(keys).toArray();
+      const existingKeys = new Set(existingRecords.map(r => r.key));
 
-    // Add each to sync queue
-    for (const record of records) {
-      await this._addToSyncQueue(record.key, 'update', record);
-    }
+      const records = Object.entries(settings).map(([key, value]) => ({
+        key,
+        value,
+        _syncStatus: 'pending',
+        _updatedAt: now,
+        _createdAt: existingRecords.find(r => r.key === key)?._createdAt || now
+      }));
+
+      await this.table.bulkPut(records);
+
+      // Add each to sync queue with correct operation
+      for (const record of records) {
+        const operation = existingKeys.has(record.key) ? 'update' : 'create';
+        await this._addToSyncQueue(record.key, operation, record);
+      }
+    });
   }
 
   /**

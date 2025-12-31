@@ -123,30 +123,66 @@ class BaseRepository {
   /**
    * Create multiple items in a batch
    * @param {Array} items - Array of item data
-   * @returns {Promise<Array>} The created items with _ids
+   * @param {Object} options - Options
+   * @param {number} options.batchSize - Max items per batch (default: 100)
+   * @returns {Promise<{results: Array, success: number, failed: number, errors: Array}>} Results with counts
    */
-  async createMany(items) {
+  async createMany(items, options = {}) {
+    const batchSize = options.batchSize || 100;
     const now = new Date().toISOString();
-    const itemsWithIds = items.map(data => ({
-      ...data,
-      _id: data._id || generateId(),
-      _syncStatus: 'pending',
-      _createdAt: now,
-      _updatedAt: now
-    }));
+    const allResults = [];
+    let success = 0;
+    let failed = 0;
+    const errors = [];
 
-    await this.table.bulkAdd(itemsWithIds);
+    // Process in batches to avoid memory issues with large datasets
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const itemsWithIds = batch.map(data => ({
+        ...data,
+        _id: data._id || generateId(),
+        _syncStatus: 'pending',
+        _createdAt: now,
+        _updatedAt: now
+      }));
 
-    // Track in sync queue and emit event for immediate sync
-    if (this.trackSync) {
-      for (const item of itemsWithIds) {
-        await this.addToSyncQueue(item._id, 'create', item);
+      try {
+        await this.table.bulkAdd(itemsWithIds);
+
+        // Track in sync queue
+        if (this.trackSync) {
+          for (const item of itemsWithIds) {
+            await this.addToSyncQueue(item._id, 'create', item);
+          }
+        }
+
+        allResults.push(...itemsWithIds);
+        success += itemsWithIds.length;
+      } catch (error) {
+        // If bulk fails, try individual inserts
+        for (const item of itemsWithIds) {
+          try {
+            await this.table.add(item);
+            if (this.trackSync) {
+              await this.addToSyncQueue(item._id, 'create', item);
+            }
+            allResults.push(item);
+            success++;
+          } catch (individualError) {
+            failed++;
+            errors.push({ item, error: individualError.message });
+            console.error(`[BaseRepository] createMany individual error:`, individualError);
+          }
+        }
       }
-      // Emit single event for batch create (debounced sync will handle it)
-      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'create', count: itemsWithIds.length });
     }
 
-    return itemsWithIds;
+    // Emit single event for batch create (debounced sync will handle it)
+    if (this.trackSync && success > 0) {
+      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'create', count: success });
+    }
+
+    return { results: allResults, success, failed, errors };
   }
 
   /**
@@ -206,11 +242,40 @@ class BaseRepository {
 
     // Track in sync queue and emit event for immediate sync
     if (this.trackSync) {
+      // Clean up any orphaned sync queue entries for this entity before adding delete
+      await this._cleanupOrphanedSyncEntries(id);
       await this.addToSyncQueue(id, 'delete', { _id: id });
       dataChangeEmitter.emit({ entityType: this.tableName, operation: 'delete', entityId: id });
     }
 
     return true;
+  }
+
+  /**
+   * Clean up orphaned sync queue entries for an entity
+   * Called before delete to remove create/update entries that are now irrelevant
+   * @param {string} entityId - The entity ID
+   */
+  async _cleanupOrphanedSyncEntries(entityId) {
+    try {
+      const orphanedEntries = await syncQueue
+        .filter(item =>
+          item.entityType === this.tableName &&
+          item.entityId === entityId &&
+          (item.operation === 'create' || item.operation === 'update')
+        )
+        .toArray();
+
+      for (const entry of orphanedEntries) {
+        await syncQueue.delete(entry.id);
+      }
+
+      if (orphanedEntries.length > 0) {
+        console.log(`[BaseRepository] Cleaned up ${orphanedEntries.length} orphaned sync entries for ${this.tableName}/${entityId}`);
+      }
+    } catch (error) {
+      console.warn(`[BaseRepository] Error cleaning orphaned sync entries:`, error);
+    }
   }
 
   /**

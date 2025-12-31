@@ -172,6 +172,8 @@ class SupabaseSyncManager {
       eventDrivenDebounce: 500, // 500ms debounce for rapid changes
       batchSize: 50,
       conflictResolution: 'server-wins', // or 'last-write-wins'
+      maxRetries: 5,
+      baseRetryDelay: 1000, // 1 second base delay for exponential backoff
     };
 
     // Debounced sync for event-driven updates
@@ -753,13 +755,23 @@ class SupabaseSyncManager {
     const pendingItems = await db.syncQueue.where('status').equals('pending').toArray();
     let pushed = 0;
     let failed = 0;
+    let skipped = 0;
 
-    console.log(`[SupabaseSyncManager] Pushing ${pendingItems.length} changes`);
-    if (pendingItems.length > 0) {
-      console.log('[SupabaseSyncManager] Pending items:', pendingItems.map(i => `${i.entityType}/${i.operation}`));
+    // Filter out items that should wait due to exponential backoff
+    const itemsToProcess = pendingItems.filter(item => {
+      if (this._shouldSkipDueToBackoff(item)) {
+        skipped++;
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`[SupabaseSyncManager] Pushing ${itemsToProcess.length} changes (${skipped} skipped due to backoff)`);
+    if (itemsToProcess.length > 0) {
+      console.log('[SupabaseSyncManager] Processing items:', itemsToProcess.map(i => `${i.entityType}/${i.operation}`));
     }
 
-    for (const item of pendingItems) {
+    for (const item of itemsToProcess) {
       try {
         await db.syncQueue.update(item.id, { status: 'processing' });
 
@@ -817,16 +829,32 @@ class SupabaseSyncManager {
         pushed++;
       } catch (error) {
         console.error(`[SupabaseSyncManager] Push error for ${item.entityType}/${item.entityId}:`, error);
+        const newRetryCount = (item.retryCount || 0) + 1;
+        const maxRetries = this.config.maxRetries;
+
+        // Calculate next retry time with exponential backoff (1s, 2s, 4s, 8s, 16s)
+        const backoffDelay = this.config.baseRetryDelay * Math.pow(2, newRetryCount - 1);
+        const nextRetryAt = new Date(Date.now() + backoffDelay).toISOString();
+
         await db.syncQueue.update(item.id, {
-          status: 'failed',
+          status: newRetryCount >= maxRetries ? 'failed' : 'pending',
           error: error.message,
-          retryCount: (item.retryCount || 0) + 1,
+          retryCount: newRetryCount,
+          nextRetryAt: newRetryCount < maxRetries ? nextRetryAt : null,
         });
         failed++;
       }
     }
 
     return { pushed, failed };
+  }
+
+  /**
+   * Calculate if an item should be skipped due to backoff
+   */
+  _shouldSkipDueToBackoff(item) {
+    if (!item.nextRetryAt) return false;
+    return new Date(item.nextRetryAt) > new Date();
   }
 
   /**

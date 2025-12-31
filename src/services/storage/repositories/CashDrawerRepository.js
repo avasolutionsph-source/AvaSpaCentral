@@ -44,20 +44,28 @@ class CashDrawerRepository extends BaseRepository {
 
   /**
    * Close a session
+   * Uses Dexie transaction for atomicity to prevent race conditions
    */
   async closeSession(sessionId, actualCash) {
-    const session = await this.getById(sessionId);
-    if (!session) throw new Error('Session not found');
+    return await db.transaction('rw', db.cashDrawerSessions, async () => {
+      const session = await this.getById(sessionId);
+      if (!session) throw new Error('Session not found');
 
-    const cashTransactions = (session.transactions || []).filter(t => t.method === 'Cash');
-    const expectedCash = (session.openingFloat || 0) + cashTransactions.reduce((sum, t) => sum + t.amount, 0);
+      // Check if already closed to prevent double-close
+      if (session.status === 'closed') {
+        throw new Error('Session is already closed');
+      }
 
-    return this.update(sessionId, {
-      closeTime: new Date().toISOString(),
-      status: 'closed',
-      expectedCash,
-      actualCash,
-      variance: actualCash - expectedCash
+      const cashTransactions = (session.transactions || []).filter(t => t.method === 'Cash');
+      const expectedCash = (session.openingFloat || 0) + cashTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+      return this.update(sessionId, {
+        closeTime: new Date().toISOString(),
+        status: 'closed',
+        expectedCash,
+        actualCash,
+        variance: actualCash - expectedCash
+      });
     });
   }
 

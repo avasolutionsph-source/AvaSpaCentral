@@ -159,11 +159,12 @@ export const AppProvider = ({ children }) => {
       setUser(response.user);
       showToast('Login successful!', 'success');
 
-      // Initialize sync manager after login
+      // Initialize sync manager after login (non-blocking)
+      // This runs in background so login doesn't freeze while syncing
       if (isSupabaseConfigured()) {
-        await supabaseSyncManager.initialize();
-        // Trigger initial sync
-        supabaseSyncManager.sync();
+        supabaseSyncManager.initialize().catch(err => {
+          console.warn('[AppContext] Sync manager initialization error:', err);
+        });
       }
 
       // Log the login activity

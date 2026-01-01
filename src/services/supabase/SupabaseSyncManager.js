@@ -419,21 +419,18 @@ class SupabaseSyncManager {
     console.log('[SupabaseSyncManager] Initialized with event-driven sync');
 
     // Determine sync strategy based on state
-    if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
+    // IMPORTANT: Check localDataEmpty FIRST because logout clears both data AND storedBusinessId
+    if (newBusinessId && localDataEmpty) {
+      // Local data is empty - need to restore from Supabase
+      // This happens after logout cleanup OR on a new device/browser
+      console.log('[SupabaseSyncManager] Local data empty - restoring data from Supabase...');
+      await this.forcePull();
+    } else if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
       // Business account changed - pull fresh data
       console.log('[SupabaseSyncManager] Business account changed - pulling fresh data from Supabase...');
       await this.forcePull();
-    } else if (newBusinessId && localDataEmpty) {
-      // Same account but local data is empty (e.g., after logout cleanup)
-      // Need to restore data from Supabase
-      console.log('[SupabaseSyncManager] Local data empty - restoring data from Supabase...');
-      await this.forcePull();
-    } else if (newBusinessId && !storedBusinessId) {
-      // First time login - sync to push any local data first, then pull
-      console.log('[SupabaseSyncManager] First time login - syncing...');
-      await this.sync();
     } else if (newBusinessId) {
-      // Normal case - regular sync
+      // Normal case - regular sync (push local changes, pull remote changes)
       console.log('[SupabaseSyncManager] Normal sync...');
       await this.sync();
     }

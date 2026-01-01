@@ -8,6 +8,17 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { db } from '../../db';
 
+/**
+ * Generate a UUID v4 for creating stable IDs
+ */
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 class AuthService {
   constructor() {
     this._currentUser = null;
@@ -206,13 +217,41 @@ class AuthService {
       console.warn('[AuthService] Could not get businessId from local DB:', err);
     }
 
+    // If no business exists, create a default one for demo/offline mode
+    // This ensures sync operations have a valid businessId
+    if (!businessId) {
+      businessId = generateUUID();
+      try {
+        await db.business.add({
+          _id: businessId,
+          name: 'Demo Spa & Wellness',
+          _createdAt: new Date().toISOString(),
+          _updatedAt: new Date().toISOString(),
+          _syncStatus: 'synced', // Mark as synced so it doesn't try to push to Supabase
+        });
+        console.log('[AuthService] Created default business for demo mode:', businessId);
+      } catch (err) {
+        // If business already exists (race condition), get it
+        if (err.name === 'ConstraintError') {
+          const businesses = await db.business.toArray();
+          if (businesses.length > 0) {
+            businessId = businesses[0]._id;
+          }
+        } else {
+          console.warn('[AuthService] Could not create default business:', err);
+        }
+      }
+    }
+
     if (!user && demoUsers[email]) {
       const demo = demoUsers[email];
       if (password !== demo.password) {
         throw new Error('Invalid password');
       }
+      // Use stable ID based on email to ensure same user gets same ID across logins
+      const stableUserId = `demo_${email.split('@')[0]}`; // e.g., 'demo_owner', 'demo_manager'
       user = {
-        _id: `demo_${Date.now()}`,
+        _id: stableUserId,
         email,
         firstName: demo.firstName,
         lastName: demo.lastName,

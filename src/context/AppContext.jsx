@@ -181,6 +181,18 @@ export const AppProvider = ({ children }) => {
       logLogout(user);
     }
 
+    // IMPORTANT: Sync pending data to Supabase BEFORE clearing local data
+    // This ensures no data is lost when user logs back in
+    if (isSupabaseConfigured()) {
+      try {
+        console.log('[AppContext] Syncing pending data before logout...');
+        await supabaseSyncManager.sync();
+      } catch (error) {
+        console.warn('[AppContext] Pre-logout sync failed:', error);
+        // Continue with logout even if sync fails
+      }
+    }
+
     // Use Supabase auth service
     await authService.signOut();
 

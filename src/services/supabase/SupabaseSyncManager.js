@@ -360,6 +360,14 @@ class SupabaseSyncManager {
       await this._autoRepairBusinessIds();
     }
 
+    // Check if local data was cleared (e.g., after logout)
+    // If so, clear sync metadata to force a full pull from Supabase
+    const localDataEmpty = await this._isLocalDataEmpty();
+    if (localDataEmpty && newBusinessId) {
+      console.log('[SupabaseSyncManager] Local data empty - clearing sync metadata for full pull');
+      await db.syncMetadata.clear();
+    }
+
     // Reset any stuck processing items from previous crashes/interruptions
     // This ensures sync items don't get permanently stuck if app closes during sync
     const stuckCount = await this.resetStuckItems();
@@ -410,15 +418,40 @@ class SupabaseSyncManager {
     this._initialized = true;
     console.log('[SupabaseSyncManager] Initialized with event-driven sync');
 
-    // Only force pull if business actually changed (not just first time storing the ID)
-    // This prevents clearing local data that hasn't been synced yet
+    // Determine sync strategy based on state
     if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
+      // Business account changed - pull fresh data
       console.log('[SupabaseSyncManager] Business account changed - pulling fresh data from Supabase...');
       await this.forcePull();
+    } else if (newBusinessId && localDataEmpty) {
+      // Same account but local data is empty (e.g., after logout cleanup)
+      // Need to restore data from Supabase
+      console.log('[SupabaseSyncManager] Local data empty - restoring data from Supabase...');
+      await this.forcePull();
     } else if (newBusinessId && !storedBusinessId) {
-      // First time login - just do a regular sync to push any local data first, then pull
+      // First time login - sync to push any local data first, then pull
       console.log('[SupabaseSyncManager] First time login - syncing...');
       await this.sync();
+    } else if (newBusinessId) {
+      // Normal case - regular sync
+      console.log('[SupabaseSyncManager] Normal sync...');
+      await this.sync();
+    }
+  }
+
+  /**
+   * Check if local data tables are empty (indicating logout cleanup occurred)
+   * Used to determine if we need to force pull from Supabase
+   */
+  async _isLocalDataEmpty() {
+    try {
+      const productCount = await db.products.count();
+      const customerCount = await db.customers.count();
+      const employeeCount = await db.employees.count();
+      return productCount === 0 && customerCount === 0 && employeeCount === 0;
+    } catch (error) {
+      console.warn('[SupabaseSyncManager] Error checking local data:', error);
+      return false;
     }
   }
 

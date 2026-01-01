@@ -32,6 +32,9 @@ ALTER TABLE loyalty_history ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFA
 ALTER TABLE loyalty_history ADD COLUMN IF NOT EXISTS sync_status VARCHAR(20) DEFAULT 'synced';
 ALTER TABLE loyalty_history ADD COLUMN IF NOT EXISTS deleted BOOLEAN DEFAULT FALSE;
 
+-- Add updated_at to payroll_config_logs
+ALTER TABLE payroll_config_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 -- ============================================
 -- VERIFY THE CHANGES
 -- ============================================

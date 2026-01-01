@@ -27,6 +27,10 @@ import './assets/css/analytics-dashboard.css'
 // Register ChartJS components globally (once)
 import './utils/chartConfig'
 
+// Initialize Sentry error monitoring (production only)
+import { initSentry } from './utils/sentry'
+initSentry()
+
 // Initialize offline-first storage
 import InitializationService from './services/InitializationService'
 

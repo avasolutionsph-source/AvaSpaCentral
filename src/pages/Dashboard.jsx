@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 // ChartJS is registered globally in main.jsx via utils/chartConfig
 import { Line, Pie, Bar, Doughnut } from 'react-chartjs-2';
+import { DashboardSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -667,12 +668,7 @@ const Dashboard = () => {
   }, [showToast]);
 
   if (loading) {
-    return (
-      <div className="page-loading">
-        <div className="spinner"></div>
-        <p>Loading dashboard...</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (

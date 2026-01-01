@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService, supabaseSyncManager, isSupabaseConfigured } from '../services/supabase';
 import { logLogin, logLogout } from '../utils/activityLogger';
+import { setUserContext, clearUserContext } from '../utils/sentry';
 
 const AppContext = createContext();
 
@@ -137,6 +138,7 @@ export const AppProvider = ({ children }) => {
       // Use Supabase auth service
       const response = await authService.signIn(email, password);
       setUser(response.user);
+      setUserContext(response.user); // Track user in Sentry
       showToast('Login successful!', 'success');
 
       // Initialize sync manager after login (non-blocking)
@@ -181,6 +183,7 @@ export const AppProvider = ({ children }) => {
     await supabaseSyncManager.cleanupOnLogout();
 
     setUser(null);
+    clearUserContext(); // Clear user from Sentry
     showToast('Logged out successfully', 'info');
   };
 

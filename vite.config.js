@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -96,5 +97,18 @@ export default defineConfig(({ mode }) => ({
   // Strip console.log and debugger in production builds
   esbuild: {
     drop: mode === 'production' ? ['console', 'debugger'] : []
+  },
+  // Bundle analysis - generates stats.html after build
+  build: {
+    rollupOptions: {
+      plugins: [
+        mode === 'production' && visualizer({
+          filename: 'dist/stats.html',
+          open: false,
+          gzipSize: true,
+          brotliSize: true
+        })
+      ].filter(Boolean)
+    }
   }
 }))

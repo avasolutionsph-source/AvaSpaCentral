@@ -4,6 +4,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 // Development tools - sync test utility (only in dev mode)
 if (import.meta.env.DEV) {
@@ -200,6 +201,7 @@ function App() {
     <ErrorBoundary>
       <AppProvider>
         <AppRoutes />
+        <PWAInstallPrompt />
       </AppProvider>
     </ErrorBoundary>
   );

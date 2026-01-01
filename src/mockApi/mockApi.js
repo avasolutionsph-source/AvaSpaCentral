@@ -192,45 +192,6 @@ export const authApi = {
       };
     }
 
-    // Fallback: Check demo credentials (always available)
-    // Check against testUser first (owner@example.com)
-    if (email === mockDatabase.testUser.email && password === mockDatabase.testUser.password) {
-      const token = 'mock_jwt_token_' + Date.now();
-      const user = clone(mockDatabase.testUser);
-      delete user.password;
-
-      // Store in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      return {
-        success: true,
-        token,
-        user
-      };
-    }
-
-    // Check against additional demo users (if any)
-    const matchedDemoUser = mockDatabase.demoUsers.find(
-      u => u.email === email && u.password === password
-    );
-
-    if (matchedDemoUser) {
-      const token = 'mock_jwt_token_' + Date.now();
-      const user = clone(matchedDemoUser);
-      delete user.password;
-
-      // Store in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      return {
-        success: true,
-        token,
-        user
-      };
-    }
-
     throw new Error('Invalid email or password');
   },
 
@@ -240,13 +201,11 @@ export const authApi = {
 
     const { email } = formData;
 
-    // Check if email already exists
-    if (email === mockDatabase.testUser.email) {
+    // Check if email already exists in Dexie
+    const existingUsers = await db.users.where('email').equals(email).toArray();
+    if (existingUsers.length > 0) {
       throw new Error('Email already registered');
     }
-
-    // In real app, would create user here
-    // For demo, just return success
 
     return {
       success: true,

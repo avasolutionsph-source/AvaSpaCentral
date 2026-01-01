@@ -62,7 +62,7 @@ export const AppProvider = ({ children }) => {
           if (sessionUser) {
             let userData = JSON.parse(sessionUser);
 
-            // Refresh employeeId from source if missing (for existing sessions)
+            // Refresh employeeId from Dexie if missing (for existing sessions)
             if (!userData.employeeId) {
               const db = (await import('../db')).default;
               const dexieUser = await db.users.get(userData._id);
@@ -70,26 +70,6 @@ export const AppProvider = ({ children }) => {
               if (dexieUser?.employeeId) {
                 userData.employeeId = dexieUser.employeeId;
                 console.log('[AppContext] Refreshed employeeId from Dexie:', userData.employeeId);
-              } else {
-                // Fallback: Check mockData demo users
-                const { mockDatabase } = await import('../mockApi/mockData');
-
-                if (userData.email === mockDatabase.testUser.email && mockDatabase.testUser.employeeId) {
-                  userData.employeeId = mockDatabase.testUser.employeeId;
-                } else {
-                  const demoUser = mockDatabase.demoUsers.find(u => u.email === userData.email);
-                  if (demoUser?.employeeId) {
-                    userData.employeeId = demoUser.employeeId;
-                  }
-                }
-
-                if (userData.employeeId) {
-                  console.log('[AppContext] Refreshed employeeId from mockData:', userData.employeeId);
-                }
-              }
-
-              // Update localStorage with refreshed data
-              if (userData.employeeId) {
                 localStorage.setItem('user', JSON.stringify(userData));
               }
             }

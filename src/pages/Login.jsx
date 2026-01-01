@@ -153,17 +153,14 @@ const Login = () => {
     setForgotLoading(true);
 
     try {
-      if (isSupabaseConfigured()) {
-        // Use Supabase password reset
-        await authService.resetPassword(forgotEmail);
-        setForgotSuccess(true);
-        showToast('Password reset link sent to your email!', 'success');
-      } else {
-        // Simulate API call for offline mode
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setForgotSuccess(true);
-        showToast('Password reset is not available in offline mode', 'warning');
+      if (!isSupabaseConfigured()) {
+        showToast('Password reset requires an internet connection', 'error');
+        return;
       }
+      // Use Supabase password reset
+      await authService.resetPassword(forgotEmail);
+      setForgotSuccess(true);
+      showToast('Password reset link sent to your email!', 'success');
     } catch (error) {
       showToast(error.message || 'Failed to send reset email', 'error');
     } finally {
@@ -187,7 +184,7 @@ const Login = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1 className="brand-logo">Ava Solutions Demo SPA</h1>
+          <h1 className="brand-logo">AVA Spa & Wellness</h1>
           <p className="brand-tagline">SPA Management System</p>
         </div>
 

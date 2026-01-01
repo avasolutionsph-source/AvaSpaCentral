@@ -1,18 +1,21 @@
-# Ava Solutions Demo SPA ERP
+# AVA Spa & Wellness ERP
 
-**Version:** 3.2.0
+**Version:** 3.3.0
 **Brand:** Ava Solutions AI Business Assistant
-**Demo Type:** Frontend-only Single Page Application (SPA)
 
 ## Overview
 
-Complete Spa/Wellness Business Management System built with React. Fully functional frontend implementation with mock data and APIs, showcasing 200+ features without requiring a backend server.
+Complete Spa/Wellness Business Management System built with React. Full-stack implementation with Supabase backend, featuring 200+ features with offline-first architecture.
 
 ## Quick Start
 
 ```bash
 # Install dependencies
 npm install
+
+# Configure environment
+cp .env.example .env.local
+# Edit .env.local with your Supabase credentials
 
 # Start development server
 npm run dev
@@ -21,14 +24,16 @@ npm run dev
 npm run build
 ```
 
-## Demo Login Credentials
+## Authentication
 
-| Role | Email | Password |
-|------|-------|----------|
-| Owner | owner@example.com | DemoSpa123! |
-| Manager | manager@example.com | Manager123! |
-| Therapist | therapist@example.com | Therapist123! |
-| Receptionist | receptionist@example.com | Reception123! |
+This application uses Supabase for authentication. Users must be created in your Supabase project.
+
+### Setting Up Users
+
+1. Go to your Supabase Dashboard
+2. Navigate to Authentication > Users
+3. Create users with email/password
+4. Create corresponding records in the `users` table with `auth_id` linked
 
 ## Tech Stack
 

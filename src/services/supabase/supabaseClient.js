@@ -11,7 +11,16 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
+// In production, Supabase is REQUIRED - throw error if not configured
+if (import.meta.env.PROD && (!supabaseUrl || !supabaseAnonKey)) {
+  throw new Error(
+    'Supabase configuration is required in production. ' +
+    'Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.'
+  );
+}
+
+// In development, warn but allow offline mode
+if (!import.meta.env.PROD && (!supabaseUrl || !supabaseAnonKey)) {
   console.warn(
     '[Supabase] Missing environment variables. ' +
     'Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env.local file. ' +

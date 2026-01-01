@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     VitePWA({
@@ -92,5 +92,9 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true
+  },
+  // Strip console.log and debugger in production builds
+  esbuild: {
+    drop: mode === 'production' ? ['console', 'debugger'] : []
   }
-})
+}))

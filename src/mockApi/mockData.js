@@ -1,59 +1,8 @@
-// Mock Database for SPA Demo ERP
-// Version 3.0.0 - Clean slate (no demo data)
-// All data structures are empty - data comes from user input only
+// Mock Database for SPA ERP
+// Version 3.0.0 - Production ready (no demo credentials)
+// All data structures are empty - data comes from Supabase
 
 export const mockDatabase = {
-  // Test User for Authentication (Legacy - kept for backward compatibility)
-  // NOTE: In production, this should validate against real backend
-  testUser: {
-    email: 'owner@example.com',
-    password: 'DemoSpa123!',
-    _id: 'user_001',
-    businessId: 'biz_001',
-    role: 'Owner',
-    firstName: 'Admin',
-    lastName: 'User',
-    businessName: 'My SPA Business',
-    employeeId: 'emp_owner_001'
-  },
-
-  // Demo Users for All Roles - For Quick Demo Login buttons
-  demoUsers: [
-    {
-      _id: 'user_002',
-      email: 'manager@example.com',
-      password: 'Manager123!',
-      businessId: 'biz_001',
-      role: 'Manager',
-      firstName: 'Manager',
-      lastName: 'User',
-      businessName: 'My SPA Business',
-      employeeId: 'emp_manager_001'
-    },
-    {
-      _id: 'user_003',
-      email: 'therapist@example.com',
-      password: 'Therapist123!',
-      businessId: 'biz_001',
-      role: 'Therapist',
-      firstName: 'Therapist',
-      lastName: 'User',
-      businessName: 'My SPA Business',
-      employeeId: 'emp_therapist_001'
-    },
-    {
-      _id: 'user_004',
-      email: 'receptionist@example.com',
-      password: 'Reception123!',
-      businessId: 'biz_001',
-      role: 'Receptionist',
-      firstName: 'Receptionist',
-      lastName: 'User',
-      businessName: 'My SPA Business',
-      employeeId: 'emp_receptionist_001'
-    }
-  ],
-
   // Business Configuration - Default empty business
   business: {
     _id: 'biz_001',

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
+import { LazyImage } from '../components/OptimizedImage';
 import { SettingsRepository } from '../services/storage/repositories';
 import { SyncManager, NetworkDetector } from '../services/sync';
 import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
@@ -1074,7 +1075,7 @@ const Settings = () => {
             <div className="profile-avatar-section">
               <div className="profile-avatar-display">
                 {profileData.profilePhoto ? (
-                  <img src={profileData.profilePhoto} alt="Profile" />
+                  <LazyImage src={profileData.profilePhoto} alt="Profile" />
                 ) : (
                   getInitials()
                 )}

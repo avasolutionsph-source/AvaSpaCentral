@@ -7,6 +7,7 @@ import MySchedule from './MySchedule';
 import PayrollRequests from './PayrollRequests';
 import MyAttendanceHistory from './MyAttendanceHistory';
 import CameraCapture from '../components/CameraCapture';
+import { LazyImage } from '../components/OptimizedImage';
 import { logClockIn, logClockOut } from '../utils/activityLogger';
 import '../assets/css/hub-pages.css';
 
@@ -274,13 +275,13 @@ const MyPortal = () => {
             <div className="photos-grid">
               {todayAttendance?.clockInPhoto && (
                 <div className="photo-item">
-                  <img src={todayAttendance.clockInPhoto} alt="Clock In" />
+                  <LazyImage src={todayAttendance.clockInPhoto} alt="Clock In" />
                   <span className="photo-label">Clock In - {todayAttendance.clockIn}</span>
                 </div>
               )}
               {todayAttendance?.clockOutPhoto && (
                 <div className="photo-item">
-                  <img src={todayAttendance.clockOutPhoto} alt="Clock Out" />
+                  <LazyImage src={todayAttendance.clockOutPhoto} alt="Clock Out" />
                   <span className="photo-label">Clock Out - {todayAttendance.clockOut}</span>
                 </div>
               )}

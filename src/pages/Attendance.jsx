@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO, differenceInMinutes, isAfter, startOfDay } from 'date-fns';
 import CameraCapture from '../components/CameraCapture';
+import { LazyImage } from '../components/OptimizedImage';
 import { logClockIn, logClockOut } from '../utils/activityLogger';
 
 const Attendance = () => {
@@ -505,7 +506,7 @@ const Attendance = () => {
                   </h3>
                   {selectedRecord.clockInPhoto ? (
                     <div className="photo-container">
-                      <img
+                      <LazyImage
                         src={selectedRecord.clockInPhoto}
                         alt="Clock In Photo"
                         className="attendance-photo"
@@ -549,7 +550,7 @@ const Attendance = () => {
                   </h3>
                   {selectedRecord.clockOutPhoto ? (
                     <div className="photo-container">
-                      <img
+                      <LazyImage
                         src={selectedRecord.clockOutPhoto}
                         alt="Clock Out Photo"
                         className="attendance-photo"

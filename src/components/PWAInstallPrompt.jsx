@@ -87,7 +87,10 @@ const PWAInstallPrompt = () => {
     <div className="pwa-install-prompt" role="dialog" aria-labelledby="pwa-title">
       <div className="pwa-prompt-content">
         <div className="pwa-prompt-icon">
-          <img src="/pwa-192x192.png" alt="AVA Spa" width="48" height="48" />
+          <picture>
+            <source srcSet="/pwa-192x192.webp" type="image/webp" />
+            <img src="/pwa-192x192.png" alt="AVA Spa" width="48" height="48" loading="lazy" />
+          </picture>
         </div>
         <div className="pwa-prompt-text">
           <h3 id="pwa-title">Install AVA Spa</h3>

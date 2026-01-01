@@ -629,3 +629,45 @@
     max-width: none;
   }
 }
+
+/* ============================================
+   Optimized Image Component Styles
+   ============================================ */
+
+.optimized-image {
+  display: inline-block;
+  border-radius: inherit;
+}
+
+.optimized-image picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.optimized-image img {
+  display: block;
+  border-radius: inherit;
+}
+
+.optimized-image-skeleton {
+  border-radius: inherit;
+}
+
+.optimized-image-error {
+  border-radius: inherit;
+}
+
+/* Shimmer animation for image loading */
+@keyframes optimized-image-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.optimized-image-skeleton {
+  animation: optimized-image-shimmer 1.5s ease-in-out infinite;
+}

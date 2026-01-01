@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, subDays, startOfMonth, endOfMonth, parseISO, differenceInMinutes } from 'date-fns';
+import { LazyImage } from '../components/OptimizedImage';
 
 const MyAttendanceHistory = ({ embedded = false }) => {
   const { user, showToast } = useApp();
@@ -282,13 +283,13 @@ const MyAttendanceHistory = ({ embedded = false }) => {
               <div className="photos-grid">
                 {selectedRecord.clockInPhoto && (
                   <div className="photo-item">
-                    <img src={selectedRecord.clockInPhoto} alt="Clock In" />
+                    <LazyImage src={selectedRecord.clockInPhoto} alt="Clock In" />
                     <span className="photo-label">Clock In - {selectedRecord.clockIn}</span>
                   </div>
                 )}
                 {selectedRecord.clockOutPhoto && (
                   <div className="photo-item">
-                    <img src={selectedRecord.clockOutPhoto} alt="Clock Out" />
+                    <LazyImage src={selectedRecord.clockOutPhoto} alt="Clock Out" />
                     <span className="photo-label">Clock Out - {selectedRecord.clockOut}</span>
                   </div>
                 )}

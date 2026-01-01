@@ -163,6 +163,10 @@ const FIELD_NAME_MAP = {
   lastPushTimestamp: 'last_push_timestamp',
   lastPullTimestamp: 'last_pull_timestamp',
   itemCount: 'item_count',
+  // Product fields
+  hideFromPOS: 'hide_from_pos',
+  stockQuantity: 'stock_quantity',
+  reorderLevel: 'reorder_level',
 };
 
 class SupabaseSyncManager {

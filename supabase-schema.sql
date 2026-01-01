@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS products (
     reorder_level INTEGER DEFAULT 0,
     sku VARCHAR(100),
     active BOOLEAN DEFAULT TRUE,
+    hide_from_pos BOOLEAN DEFAULT FALSE,
     services_since_last_adjustment INTEGER DEFAULT 0,
     image_url TEXT,
     items_used JSONB DEFAULT '[]',
@@ -244,7 +245,9 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     reference_id UUID,
     notes TEXT,
     sync_status VARCHAR(20) DEFAULT 'synced',
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS stock_history (
@@ -257,7 +260,10 @@ CREATE TABLE IF NOT EXISTS stock_history (
     quantity_after INTEGER,
     reason TEXT,
     user_id UUID,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS product_consumption (
@@ -271,7 +277,9 @@ CREATE TABLE IF NOT EXISTS product_consumption (
     service_id UUID,
     employee_id UUID,
     sync_status VARCHAR(20) DEFAULT 'synced',
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================
@@ -416,7 +424,11 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     entity_id UUID,
     details JSONB,
     ip_address VARCHAR(50),
-    timestamp TIMESTAMPTZ DEFAULT NOW()
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    deleted BOOLEAN DEFAULT FALSE,
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -478,7 +490,10 @@ CREATE TABLE IF NOT EXISTS loyalty_history (
     balance_after INTEGER DEFAULT 0,
     reference_id UUID,
     notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS advance_bookings (

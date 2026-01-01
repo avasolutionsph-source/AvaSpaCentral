@@ -573,8 +573,8 @@ const MainLayout = () => {
         <div className="sidebar-header">
           <div className="brand">
             <picture>
-              <source srcSet="/Ava transparent.webp" type="image/webp" />
-              <img src="/Ava transparent.png" alt="Ava Solutions" className="brand-logo-img" loading="lazy" />
+              <source srcSet="/Ava%20transparent.webp" type="image/webp" />
+              <img src="/Ava%20transparent.png" alt="Ava Solutions" className="brand-logo-img" loading="lazy" />
             </picture>
           </div>
           <button

@@ -2,37 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, subDays, differenceInDays, addDays } from 'date-fns';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  RadialLinearScale,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-} from 'chart.js';
+// ChartJS is registered globally in main.jsx via utils/chartConfig
 import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
 import '../assets/css/ava-sensei-ultrathink.css';
 import Reports from './Reports';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  RadialLinearScale,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
 
 const AvaSenseiUltrathink = () => {
   const { showToast } = useApp();

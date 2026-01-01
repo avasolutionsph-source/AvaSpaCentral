@@ -2,32 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-} from 'chart.js';
+// ChartJS is registered globally in main.jsx via utils/chartConfig
 import { Line, Pie, Bar, Doughnut } from 'react-chartjs-2';
-
-// Register ChartJS components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
 
 const Dashboard = () => {
   const navigate = useNavigate();

@@ -24,6 +24,9 @@ import './assets/css/settings.css'
 import './assets/css/shift-schedules.css'
 import './assets/css/analytics-dashboard.css'
 
+// Register ChartJS components globally (once)
+import './utils/chartConfig'
+
 // Initialize offline-first storage
 import InitializationService from './services/InitializationService'
 

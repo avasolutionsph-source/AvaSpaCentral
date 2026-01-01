@@ -5,8 +5,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Development tools - sync test utility
-import './utils/syncTest';
+// Development tools - sync test utility (only in dev mode)
+if (import.meta.env.DEV) {
+  import('./utils/syncTest');
+}
 
 // Eagerly loaded pages (frequently accessed, small bundle)
 import Login from './pages/Login';

@@ -32,7 +32,7 @@ const OfflineIndicator = () => {
   }
 
   return (
-    <div className="offline-indicator-container">
+    <div className="offline-indicator-container" role="status" aria-live="polite">
       {/* Offline Banner */}
       {!isOnline && (
         <div className="offline-banner offline">
@@ -87,12 +87,12 @@ const OfflineIndicator = () => {
           </div>
           <div className="sync-actions">
             {!isSyncing && pendingCount > 0 && (
-              <button className="sync-btn" onClick={triggerSync}>
+              <button className="sync-btn" onClick={triggerSync} aria-label={`Sync ${pendingCount} pending changes now`}>
                 Sync Now
               </button>
             )}
             {!isSyncing && failedCount > 0 && (
-              <button className="sync-btn retry" onClick={retryFailed}>
+              <button className="sync-btn retry" onClick={retryFailed} aria-label={`Retry ${failedCount} failed sync operations`}>
                 Retry Failed
               </button>
             )}

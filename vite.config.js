@@ -40,10 +40,37 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: {
-        // Cache all assets
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // Cache all assets including lazy-loaded chunks
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
+        // SPA fallback - serve index.html for all navigation requests
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api/],
         // Runtime caching strategies
         runtimeCaching: [
+          {
+            // Cache JS chunks (for any dynamically imported chunks not in precache)
+            urlPattern: /\.js$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'js-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
+          },
+          {
+            // Cache CSS files
+            urlPattern: /\.css$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'css-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
+          },
           {
             // Cache API responses (mock API data stored in IndexedDB anyway)
             urlPattern: /^https:\/\/api\./i,

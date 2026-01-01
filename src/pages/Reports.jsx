@@ -3,8 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, subDays, addDays, startOfMonth, endOfMonth, differenceInDays, parseISO, isSameDay, startOfWeek, endOfWeek } from 'date-fns';
 import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+// jsPDF is loaded dynamically in handleExportPDF to reduce initial bundle size
 
 const Reports = ({ embedded = false }) => {
   const { showToast, user, isTherapist, canViewAll } = useApp();
@@ -467,11 +466,16 @@ const Reports = ({ embedded = false }) => {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!reportData) {
       showToast('Please generate a report first', 'error');
       return;
     }
+
+    // Dynamically load jsPDF only when user exports (saves ~300KB from initial load)
+    showToast('Preparing PDF...', 'info');
+    const { default: jsPDF } = await import('jspdf');
+    await import('jspdf-autotable');
 
     const doc = new jsPDF();
     const reportName = selectedReport ? reports[selectedCategory].find(r => r.id === selectedReport)?.name : 'Report';

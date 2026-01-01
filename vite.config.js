@@ -100,7 +100,26 @@ export default defineConfig(({ mode }) => ({
   },
   // Bundle analysis - generates stats.html after build
   build: {
+    // Increase chunk size warning limit (we're optimizing with manual chunks)
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
+      output: {
+        // Manual chunks to split vendor code and reduce main bundle size
+        manualChunks: {
+          // React core - loaded on every page
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // Chart.js - used in Dashboard and Analytics pages
+          'vendor-charts': ['chart.js', 'react-chartjs-2'],
+          // Date utilities - used across many pages
+          'vendor-date': ['date-fns'],
+          // PDF generation - only used in Reports page
+          'vendor-pdf': ['jspdf', 'jspdf-autotable'],
+          // Supabase - loaded on auth and data sync
+          'vendor-supabase': ['@supabase/supabase-js'],
+          // Offline storage - loaded early for data persistence
+          'vendor-dexie': ['dexie']
+        }
+      },
       plugins: [
         mode === 'production' && visualizer({
           filename: 'dist/stats.html',

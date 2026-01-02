@@ -13,7 +13,7 @@
 import storageService from '../storage';
 import { mockDatabase } from '../../mockApi/mockData';
 import { TimeOffRequestRepository, HomeServiceRepository, SettingsRepository } from '../storage/repositories';
-import { authService } from '../supabase';
+import { authService, supabase, isSupabaseConfigured, supabaseSyncManager } from '../supabase';
 import { db } from '../../db';
 
 // Simulate network delay (optional, for realistic feel during development)
@@ -1239,6 +1239,52 @@ export const usersAdapter = {
     await delay();
 
     let users = await storageService.users.getAll();
+
+    // If online and Supabase is configured, pull users from Supabase to ensure we have the latest
+    // This handles staff accounts created via authService.createStaffAccount() which go directly to Supabase
+    if (isSupabaseConfigured() && authService.currentUser?.businessId) {
+      try {
+        const businessId = authService.currentUser.businessId;
+        const { data: supabaseUsers, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('business_id', businessId);
+
+        if (!error && supabaseUsers && supabaseUsers.length > 0) {
+          // Merge Supabase users into local storage
+          const localUserIds = new Set(users.map(u => u._id));
+
+          for (const supabaseUser of supabaseUsers) {
+            const localUser = {
+              _id: supabaseUser.id,
+              authId: supabaseUser.auth_id,
+              email: supabaseUser.email,
+              username: supabaseUser.username,
+              firstName: supabaseUser.first_name,
+              lastName: supabaseUser.last_name,
+              role: supabaseUser.role,
+              businessId: supabaseUser.business_id,
+              employeeId: supabaseUser.employee_id,
+              status: supabaseUser.status,
+              lastLogin: supabaseUser.last_login,
+              _createdAt: supabaseUser.created_at,
+              _updatedAt: supabaseUser.updated_at,
+              _syncStatus: 'synced',
+              _lastSyncedAt: new Date().toISOString(),
+            };
+
+            // Add to local Dexie if not already present (or update if newer)
+            if (!localUserIds.has(localUser._id)) {
+              await db.users.put(localUser);
+              users.push(localUser);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('[usersAdapter] Failed to fetch users from Supabase:', error);
+        // Continue with local data if Supabase fetch fails
+      }
+    }
 
     if (filters.status) {
       users = users.filter(u => u.status === filters.status);

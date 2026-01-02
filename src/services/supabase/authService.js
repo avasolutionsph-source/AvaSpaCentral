@@ -211,34 +211,45 @@ class AuthService {
 
       // Check if input looks like an email (contains @)
       const isEmail = usernameOrEmail.includes('@');
+      console.log('[AuthService] Login attempt:', { usernameOrEmail, isEmail });
 
       if (!isEmail) {
         // It's a username - look up the email
+        console.log('[AuthService] Looking up username:', usernameOrEmail.toLowerCase());
         const { data: userProfile, error: lookupError } = await supabase
           .from('users')
           .select('email, status')
           .eq('username', usernameOrEmail.toLowerCase())
           .maybeSingle();
 
+        console.log('[AuthService] Username lookup result:', { userProfile, lookupError });
+
         if (lookupError || !userProfile) {
+          console.error('[AuthService] Username not found or lookup error');
           throw new Error('Invalid username or password');
         }
 
         // Check if user is active
         if (userProfile.status !== 'active') {
+          console.error('[AuthService] Account is inactive:', userProfile.status);
           throw new Error('Account is inactive. Please contact administrator.');
         }
 
         email = userProfile.email;
+        console.log('[AuthService] Found email for username:', email);
       }
 
       // Sign in with the email
+      console.log('[AuthService] Attempting Supabase auth with email:', email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      console.log('[AuthService] Supabase auth result:', { success: !!data?.user, error: error?.message });
+
       if (error) {
+        console.error('[AuthService] Supabase auth error:', error.message, error.status);
         throw new Error('Invalid username or password');
       }
 

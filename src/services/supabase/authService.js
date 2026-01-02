@@ -214,12 +214,12 @@ class AuthService {
       console.log('[AuthService] Login attempt:', { usernameOrEmail, isEmail });
 
       if (!isEmail) {
-        // It's a username - look up the email
+        // It's a username - look up the email (case-insensitive)
         console.log('[AuthService] Looking up username:', usernameOrEmail.toLowerCase());
         const { data: userProfile, error: lookupError } = await supabase
           .from('users')
           .select('email, status')
-          .eq('username', usernameOrEmail.toLowerCase())
+          .ilike('username', usernameOrEmail)
           .maybeSingle();
 
         console.log('[AuthService] Username lookup result:', { userProfile, lookupError });

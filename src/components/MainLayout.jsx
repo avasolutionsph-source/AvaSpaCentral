@@ -17,8 +17,12 @@ const MainLayout = () => {
   const notificationRef = React.useRef(null);
 
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('[MainLayout] Logout error:', error);
+    }
     navigate('/login');
   };
 

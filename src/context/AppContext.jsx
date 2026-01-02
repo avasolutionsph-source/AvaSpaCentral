@@ -196,15 +196,29 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    // Use Supabase auth service
-    await authService.signOut();
+    // Use Supabase auth service - wrap in try-catch to ensure logout completes
+    try {
+      await authService.signOut();
+    } catch (error) {
+      console.warn('[AppContext] Auth signOut failed:', error);
+    }
 
-    // Full cleanup on logout - clears local data for security
-    await supabaseSyncManager.cleanupOnLogout();
+    // Full cleanup on logout - wrap in try-catch to ensure logout completes
+    try {
+      await supabaseSyncManager.cleanupOnLogout();
+    } catch (error) {
+      console.warn('[AppContext] Cleanup failed:', error);
+    }
 
+    // Always clear user state regardless of above errors
     setUser(null);
     clearUserContext(); // Clear user from Sentry
     clearBusinessContext(); // Clear business context for multi-tenant isolation
+
+    // Also clear localStorage directly as backup
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+
     showToast('Logged out successfully', 'info');
   };
 

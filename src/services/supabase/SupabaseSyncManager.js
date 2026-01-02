@@ -86,6 +86,33 @@ const TABLE_NAME_MAP = {
   homeServices: 'home_services',
 };
 
+// Valid Supabase columns per table (prevents sending non-existent columns)
+// This must match your actual Supabase table schemas
+const SUPABASE_TABLE_COLUMNS = {
+  employees: [
+    'id', 'business_id', 'first_name', 'last_name', 'email', 'phone',
+    'department', 'position', 'status', 'hire_date', 'hourly_rate',
+    'commission_rate', 'photo_url', 'address', 'emergency_contact',
+    'notes', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+  ],
+  users: [
+    'id', 'auth_id', 'email', 'username', 'first_name', 'last_name',
+    'role', 'business_id', 'employee_id', 'status', 'last_login',
+    'created_at', 'updated_at'
+  ],
+  customers: [
+    'id', 'business_id', 'name', 'first_name', 'last_name', 'email', 'phone',
+    'address', 'notes', 'status', 'tier', 'total_spent', 'visit_count',
+    'last_visit', 'loyalty_points', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+  ],
+  products: [
+    'id', 'business_id', 'name', 'type', 'category', 'description', 'price',
+    'duration', 'active', 'stock_quantity', 'reorder_level', 'image_url',
+    'hide_from_pos', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+  ],
+  // Add more tables as needed - if a table isn't listed, all fields pass through
+};
+
 // Map camelCase field names to snake_case for Supabase
 const FIELD_NAME_MAP = {
   scheduledDateTime: 'scheduled_date_time',
@@ -307,6 +334,29 @@ class SupabaseSyncManager {
     }
     if (!converted.updated_at) {
       converted.updated_at = new Date().toISOString();
+    }
+
+    // Filter to only include valid Supabase columns for this table
+    const tableName = this._toSupabaseTableName(entityType);
+    const validColumns = SUPABASE_TABLE_COLUMNS[tableName];
+
+    if (validColumns) {
+      const filtered = {};
+      const skippedFields = [];
+
+      for (const [key, value] of Object.entries(converted)) {
+        if (validColumns.includes(key)) {
+          filtered[key] = value;
+        } else {
+          skippedFields.push(key);
+        }
+      }
+
+      if (skippedFields.length > 0) {
+        console.log(`[SupabaseSyncManager] Filtered out fields not in ${tableName} schema:`, skippedFields);
+      }
+
+      return filtered;
     }
 
     return converted;
@@ -898,7 +948,15 @@ class SupabaseSyncManager {
 
         pushed++;
       } catch (error) {
-        console.error(`[SupabaseSyncManager] Push error for ${item.entityType}/${item.entityId}:`, error);
+        // Log full error details for debugging
+        console.error(`[SupabaseSyncManager] Push error for ${item.entityType}/${item.entityId}:`, {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          fullError: error
+        });
+        console.error(`[SupabaseSyncManager] Failed record data:`, JSON.stringify(this._toSupabaseFormat(item.data, item.entityType), null, 2));
         const newRetryCount = (item.retryCount || 0) + 1;
         const maxRetries = this.config.maxRetries;
 

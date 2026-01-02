@@ -197,9 +197,9 @@ const Login = () => {
           )}
 
           <form onSubmit={handleSubmit} className="auth-form">
-            {/* Username Field */}
+            {/* Username/Email Field */}
             <div className="form-group">
-              <label htmlFor="username">Username</label>
+              <label htmlFor="username">Username or Email</label>
               <input
                 type="text"
                 id="username"
@@ -207,7 +207,7 @@ const Login = () => {
                 value={formData.username}
                 onChange={handleChange}
                 className={errors.username ? 'error' : ''}
-                placeholder="Enter your username"
+                placeholder="Enter username or email"
                 autoComplete="username"
               />
               {errors.username && (

@@ -180,34 +180,43 @@ class AuthService {
   }
 
   /**
-   * Sign in with username and password
-   * Looks up the email associated with the username, then authenticates
+   * Sign in with username or email and password
+   * Accepts either username or email, looks up the email if username provided
    */
-  async signInWithUsername(username, password) {
+  async signInWithUsername(usernameOrEmail, password) {
     if (!isSupabaseConfigured()) {
       throw new Error('Authentication service not configured. Please contact support.');
     }
 
     try {
-      // First, look up the user's email by username
-      const { data: userProfile, error: lookupError } = await supabase
-        .from('users')
-        .select('email, status')
-        .eq('username', username.toLowerCase())
-        .single();
+      let email = usernameOrEmail;
 
-      if (lookupError || !userProfile) {
-        throw new Error('Invalid username or password');
+      // Check if input looks like an email (contains @)
+      const isEmail = usernameOrEmail.includes('@');
+
+      if (!isEmail) {
+        // It's a username - look up the email
+        const { data: userProfile, error: lookupError } = await supabase
+          .from('users')
+          .select('email, status')
+          .eq('username', usernameOrEmail.toLowerCase())
+          .maybeSingle();
+
+        if (lookupError || !userProfile) {
+          throw new Error('Invalid username or password');
+        }
+
+        // Check if user is active
+        if (userProfile.status !== 'active') {
+          throw new Error('Account is inactive. Please contact administrator.');
+        }
+
+        email = userProfile.email;
       }
 
-      // Check if user is active
-      if (userProfile.status !== 'active') {
-        throw new Error('Account is inactive. Please contact administrator.');
-      }
-
-      // Now sign in with the email
+      // Sign in with the email
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: userProfile.email,
+        email,
         password,
       });
 
@@ -234,7 +243,7 @@ class AuthService {
         session: data.session,
       };
     } catch (error) {
-      console.error('[AuthService] Sign in with username error:', error);
+      console.error('[AuthService] Sign in error:', error);
       throw error;
     }
   }

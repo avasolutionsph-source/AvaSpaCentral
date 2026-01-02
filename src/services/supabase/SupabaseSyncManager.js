@@ -110,6 +110,12 @@ const SUPABASE_TABLE_COLUMNS = {
     'duration', 'active', 'stock_quantity', 'reorder_level', 'image_url',
     'hide_from_pos', 'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
+  service_rotation: [
+    'id', 'business_id', 'date', 'rotation_data', 'created_at', 'updated_at'
+  ],
+  payroll_config: [
+    'id', 'business_id', 'key', 'value', 'updated_at'
+  ],
   // Add more tables as needed - if a table isn't listed, all fields pass through
 };
 
@@ -336,8 +342,24 @@ class SupabaseSyncManager {
       converted.updated_at = new Date().toISOString();
     }
 
-    // Filter to only include valid Supabase columns for this table
+    // Special handling for service_rotation: wrap rotation fields into rotation_data JSONB
     const tableName = this._toSupabaseTableName(entityType);
+    if (tableName === 'service_rotation') {
+      const rotationFields = ['employeeOrder', 'employee_order', 'currentIndex', 'current_index',
+        'servicesCompleted', 'services_completed', 'lastAdvanced', 'last_advanced', 'lastServed', 'last_served'];
+      const rotationData = {};
+      for (const field of rotationFields) {
+        if (converted[field] !== undefined) {
+          rotationData[field] = converted[field];
+          delete converted[field];
+        }
+      }
+      if (Object.keys(rotationData).length > 0) {
+        converted.rotation_data = rotationData;
+      }
+    }
+
+    // Filter to only include valid Supabase columns for this table
     const validColumns = SUPABASE_TABLE_COLUMNS[tableName];
 
     if (validColumns) {

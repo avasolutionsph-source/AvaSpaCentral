@@ -93,22 +93,8 @@ const HRHub = () => {
             </div>
           </div>
 
-          {/* Quick Stats and Action Buttons */}
+          {/* Action Buttons */}
           <div className="hub-header-actions">
-            <div className="hub-quick-stats">
-              <div className="hub-stat success">
-                <span className="hub-stat-icon">✓</span>
-                <span className="hub-stat-value">{stats.activeEmployees}</span>
-                <span className="hub-stat-label">active staff</span>
-              </div>
-              {stats.pendingRequests > 0 && (
-                <div className="hub-stat warning">
-                  <span className="hub-stat-icon">⏳</span>
-                  <span className="hub-stat-value">{stats.pendingRequests}</span>
-                  <span className="hub-stat-label">pending requests</span>
-                </div>
-              )}
-            </div>
             {/* Employees Tab Button */}
             {activeTab === 'employees' && canEdit() && (
               <button

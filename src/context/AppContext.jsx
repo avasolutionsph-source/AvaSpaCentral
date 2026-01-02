@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService, supabaseSyncManager, isSupabaseConfigured } from '../services/supabase';
 import { logLogin, logLogout } from '../utils/activityLogger';
 import { setUserContext, clearUserContext } from '../utils/sentry';
+import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
 
 const AppContext = createContext();
 
@@ -57,6 +58,10 @@ export const AppProvider = ({ children }) => {
         // Check for existing user from authService
         if (authService.currentUser) {
           setUser(authService.currentUser);
+          // Set business context for multi-tenant data isolation
+          if (authService.currentUser.businessId) {
+            setBusinessContext(authService.currentUser.businessId);
+          }
         } else {
           // Fallback: Check localStorage for offline session
           const sessionUser = localStorage.getItem('user');
@@ -76,6 +81,10 @@ export const AppProvider = ({ children }) => {
             }
 
             setUser(userData);
+            // Set business context for multi-tenant data isolation
+            if (userData.businessId) {
+              setBusinessContext(userData.businessId);
+            }
           }
         }
 
@@ -84,12 +93,17 @@ export const AppProvider = ({ children }) => {
           console.log('[AppContext] Auth state changed:', event);
           if (event === 'SIGNED_IN' && userProfile) {
             setUser(userProfile);
+            // Set business context for multi-tenant data isolation
+            if (userProfile.businessId) {
+              setBusinessContext(userProfile.businessId);
+            }
             // Initialize sync manager when user signs in
             if (isSupabaseConfigured()) {
               supabaseSyncManager.initialize();
             }
           } else if (event === 'SIGNED_OUT') {
             setUser(null);
+            clearBusinessContext(); // Clear business context on sign out
             supabaseSyncManager.cleanup();
           }
         });
@@ -133,12 +147,18 @@ export const AppProvider = ({ children }) => {
     }, 4000);
   };
 
-  const login = async (email, password, rememberMe) => {
+  const login = async (username, password, rememberMe) => {
     try {
-      // Use Supabase auth service
-      const response = await authService.signIn(email, password);
+      // Use Supabase auth service with username-based login
+      const response = await authService.signInWithUsername(username, password);
       setUser(response.user);
       setUserContext(response.user); // Track user in Sentry
+
+      // Set business context for multi-tenant data isolation
+      if (response.user?.businessId) {
+        setBusinessContext(response.user.businessId);
+      }
+
       showToast('Login successful!', 'success');
 
       // Initialize sync manager after login (non-blocking)
@@ -184,6 +204,7 @@ export const AppProvider = ({ children }) => {
 
     setUser(null);
     clearUserContext(); // Clear user from Sentry
+    clearBusinessContext(); // Clear business context for multi-tenant isolation
     showToast('Logged out successfully', 'info');
   };
 

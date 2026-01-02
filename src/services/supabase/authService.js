@@ -76,6 +76,7 @@ class AuthService {
       this._currentUser = {
         _id: userProfile.id,
         email: userProfile.email,
+        username: userProfile.username,
         firstName: userProfile.first_name,
         lastName: userProfile.last_name,
         role: userProfile.role,
@@ -179,6 +180,177 @@ class AuthService {
   }
 
   /**
+   * Sign in with username and password
+   * Looks up the email associated with the username, then authenticates
+   */
+  async signInWithUsername(username, password) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Authentication service not configured. Please contact support.');
+    }
+
+    try {
+      // First, look up the user's email by username
+      const { data: userProfile, error: lookupError } = await supabase
+        .from('users')
+        .select('email, status')
+        .eq('username', username.toLowerCase())
+        .single();
+
+      if (lookupError || !userProfile) {
+        throw new Error('Invalid username or password');
+      }
+
+      // Check if user is active
+      if (userProfile.status !== 'active') {
+        throw new Error('Account is inactive. Please contact administrator.');
+      }
+
+      // Now sign in with the email
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: userProfile.email,
+        password,
+      });
+
+      if (error) {
+        throw new Error('Invalid username or password');
+      }
+
+      // Load full user profile
+      const fullProfile = await this._loadUserProfile(data.user.id);
+
+      if (!fullProfile) {
+        throw new Error('User profile not found. Please contact support.');
+      }
+
+      // Update last login
+      await supabase
+        .from('users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('auth_id', data.user.id);
+
+      return {
+        success: true,
+        user: fullProfile,
+        session: data.session,
+      };
+    } catch (error) {
+      console.error('[AuthService] Sign in with username error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a username is available
+   */
+  async isUsernameAvailable(username) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Username check requires Supabase connection');
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username.toLowerCase())
+      .single();
+
+    // If no data found, username is available
+    return !data && error?.code === 'PGRST116';
+  }
+
+  /**
+   * Create a staff account (for use by Owner in HR Hub)
+   * Creates both the Supabase Auth user and the user profile
+   */
+  async createStaffAccount({ username, password, email, firstName, lastName, role, employeeId, businessId }) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Account creation requires internet connection');
+    }
+
+    try {
+      // Validate username format
+      if (!username || !/^[a-zA-Z0-9_]+$/.test(username)) {
+        throw new Error('Username must contain only letters, numbers, and underscores');
+      }
+
+      if (username.length < 3 || username.length > 30) {
+        throw new Error('Username must be between 3 and 30 characters');
+      }
+
+      // Check username availability
+      const isAvailable = await this.isUsernameAvailable(username);
+      if (!isAvailable) {
+        throw new Error('Username is already taken');
+      }
+
+      // Create Supabase Auth user with the employee's email
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username.toLowerCase(),
+            first_name: firstName,
+            last_name: lastName,
+          },
+          // Skip email confirmation for staff accounts (Owner is creating them)
+          emailRedirectTo: undefined,
+        },
+      });
+
+      if (authError) {
+        throw new Error(authError.message);
+      }
+
+      if (!authData.user) {
+        throw new Error('Failed to create auth account');
+      }
+
+      // Create user profile in users table
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .insert({
+          auth_id: authData.user.id,
+          email: email.toLowerCase(),
+          username: username.toLowerCase(),
+          first_name: firstName,
+          last_name: lastName,
+          role: role || 'Therapist',
+          business_id: businessId,
+          employee_id: employeeId,
+          status: 'active',
+        })
+        .select()
+        .single();
+
+      if (profileError) {
+        // If profile creation fails, we should ideally delete the auth user
+        // but Supabase doesn't allow that without admin access
+        console.error('[AuthService] Failed to create profile:', profileError);
+        throw new Error('Failed to create user profile: ' + profileError.message);
+      }
+
+      return {
+        success: true,
+        user: {
+          _id: profileData.id,
+          email: profileData.email,
+          username: profileData.username,
+          firstName: profileData.first_name,
+          lastName: profileData.last_name,
+          role: profileData.role,
+          employeeId: profileData.employee_id,
+          businessId: profileData.business_id,
+          status: profileData.status,
+        },
+        message: 'Staff account created successfully',
+      };
+    } catch (error) {
+      console.error('[AuthService] Create staff account error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Sign up a new user
    */
   async signUp(email, password, metadata = {}) {
@@ -223,6 +395,7 @@ class AuthService {
       .insert({
         auth_id: authId,
         email: profileData.email,
+        username: profileData.username?.toLowerCase(),
         first_name: profileData.firstName,
         last_name: profileData.lastName,
         role: profileData.role || 'Receptionist',

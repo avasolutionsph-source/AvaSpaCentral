@@ -8,7 +8,7 @@ const Login = () => {
   const { login, showToast, getFirstPage } = useApp();
 
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
     rememberMe: false
   });
@@ -81,18 +81,18 @@ const Login = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Email validation
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    // Username validation
+    if (!formData.username) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
     }
 
     // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    } else if (formData.password.length < 4) {
+      newErrors.password = 'Password must be at least 4 characters';
     }
 
     setErrors(newErrors);
@@ -126,7 +126,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await login(formData.email, formData.password, formData.rememberMe);
+      await login(formData.username, formData.password, formData.rememberMe);
       // Redirect to user's first allowed page based on role
       navigate(getFirstPage());
     } catch (error) {
@@ -197,21 +197,21 @@ const Login = () => {
           )}
 
           <form onSubmit={handleSubmit} className="auth-form">
-            {/* Email Field */}
+            {/* Username Field */}
             <div className="form-group">
-              <label htmlFor="email">Email Address</label>
+              <label htmlFor="username">Username</label>
               <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
+                type="text"
+                id="username"
+                name="username"
+                value={formData.username}
                 onChange={handleChange}
-                className={errors.email ? 'error' : ''}
-                placeholder="Enter your email"
-                autoComplete="email"
+                className={errors.username ? 'error' : ''}
+                placeholder="Enter your username"
+                autoComplete="username"
               />
-              {errors.email && (
-                <span className="error-message">{errors.email}</span>
+              {errors.username && (
+                <span className="error-message">{errors.username}</span>
               )}
             </div>
 

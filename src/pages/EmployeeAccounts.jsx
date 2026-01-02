@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { usersApi } from '../mockApi/offlineApi';
+import { authService, isSupabaseConfigured } from '../services/supabase';
+import { db } from '../db';
 
 // Import shared components and hooks
 import { useCrudOperations } from '../hooks';
@@ -36,7 +38,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   // Initial form data for user accounts
   const initialFormData = {
     employeeId: '',
-    email: '',
+    username: '',
     password: '',
     confirmPassword: '',
     firstName: '',
@@ -44,6 +46,9 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     role: 'Therapist',
     status: 'active'
   };
+
+  // Track if we're creating via Supabase
+  const [isCreatingSupabase, setIsCreatingSupabase] = useState(false);
 
   // Load employees for dropdown
   useEffect(() => {
@@ -62,6 +67,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   };
 
+  // Generate username suggestion from employee name
+  const generateUsername = (firstName, lastName) => {
+    if (!firstName || !lastName) return '';
+    const base = `${firstName.toLowerCase()}_${lastName.toLowerCase()}`.replace(/[^a-z0-9_]/g, '');
+    return base.substring(0, 20);
+  };
+
   // Validation function
   const validateForm = (data) => {
     const errors = {};
@@ -69,9 +81,18 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     if (!data.employeeId) {
       errors.employeeId = 'Please select an employee';
     }
-    if (!data.email || !data.email.includes('@')) {
-      errors.email = 'Valid email is required';
+
+    // Username validation
+    if (!data.username?.trim()) {
+      errors.username = 'Username is required';
+    } else if (data.username.length < 3) {
+      errors.username = 'Username must be at least 3 characters';
+    } else if (data.username.length > 30) {
+      errors.username = 'Username must be 30 characters or less';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(data.username)) {
+      errors.username = 'Username can only contain letters, numbers, and underscores';
     }
+
     if (!data.firstName?.trim()) {
       errors.firstName = 'First name is required';
     }
@@ -137,7 +158,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     initialFormData,
     transformForEdit: (user) => ({
       employeeId: user.employeeId || '',
-      email: user.email || '',
+      username: user.username || '',
       password: '',
       confirmPassword: '',
       firstName: user.firstName || '',
@@ -148,11 +169,12 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     transformForSubmit: (data, mode) => {
       const submitData = {
         employeeId: data.employeeId,
-        email: data.email.trim().toLowerCase(),
+        username: data.username.trim().toLowerCase(),
         firstName: data.firstName.trim(),
         lastName: data.lastName.trim(),
         role: data.role,
-        status: data.status
+        status: data.status,
+        businessId: user?.businessId // Inherit businessId from current owner
       };
 
       // Only include password if it's set
@@ -177,7 +199,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   }, [onOpenCreateRef, openCreate]);
 
-  // Handle employee selection - auto-fill name and email
+  // Handle employee selection - auto-fill name and generate username suggestion
   const handleEmployeeSelect = (e) => {
     const empId = e.target.value;
     setFieldValue('employeeId', empId);
@@ -185,14 +207,84 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     if (empId) {
       const emp = employees.find(e => e._id === empId);
       if (emp) {
+        const suggestedUsername = generateUsername(emp.firstName, emp.lastName);
         setFormData(prev => ({
           ...prev,
           employeeId: empId,
           firstName: emp.firstName || '',
           lastName: emp.lastName || '',
-          email: emp.email || ''
+          username: suggestedUsername
         }));
       }
+    }
+  };
+
+  // Custom submit handler for Supabase integration
+  const handleCreateAccount = async () => {
+    // Validate form first
+    const validation = validateForm(formData);
+    if (!validation.isValid) {
+      return;
+    }
+
+    // Get the selected employee's email for Supabase auth
+    const selectedEmployee = employees.find(e => e._id === formData.employeeId);
+    if (!selectedEmployee) {
+      showToast('Please select an employee', 'error');
+      return;
+    }
+
+    // Check if employee has email (required for Supabase auth)
+    const employeeEmail = selectedEmployee.email;
+    if (!employeeEmail) {
+      showToast('Selected employee must have an email address for account creation', 'error');
+      return;
+    }
+
+    // Check Supabase availability
+    if (!isSupabaseConfigured()) {
+      showToast('Account creation requires internet connection', 'error');
+      return;
+    }
+
+    setIsCreatingSupabase(true);
+
+    try {
+      // Create account via Supabase auth service
+      const result = await authService.createStaffAccount({
+        username: formData.username.trim().toLowerCase(),
+        password: formData.password,
+        email: employeeEmail.toLowerCase(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        role: formData.role,
+        employeeId: formData.employeeId,
+        businessId: user?.businessId || 'default'
+      });
+
+      // Also save to local Dexie for offline access
+      await db.users.put({
+        _id: result.user._id,
+        email: employeeEmail.toLowerCase(),
+        username: formData.username.trim().toLowerCase(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        role: formData.role,
+        employeeId: formData.employeeId,
+        businessId: user?.businessId || 'default',
+        status: 'active',
+        password: formData.password // Store for offline login
+      });
+
+      showToast('Account created successfully!', 'success');
+      closeModal();
+      loadUsers();
+      if (onDataChange) onDataChange();
+    } catch (error) {
+      console.error('Failed to create account:', error);
+      showToast(error.message || 'Failed to create account', 'error');
+    } finally {
+      setIsCreatingSupabase(false);
     }
   };
 
@@ -211,7 +303,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       filtered = filtered.filter(u =>
         u.firstName?.toLowerCase().includes(term) ||
         u.lastName?.toLowerCase().includes(term) ||
-        u.email?.toLowerCase().includes(term)
+        u.username?.toLowerCase().includes(term)
       );
     }
 
@@ -303,7 +395,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
 
       {/* Filters */}
       <FilterBar
-        searchPlaceholder="Search by name or email..."
+        searchPlaceholder="Search by name or username..."
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         filters={filterConfig}
@@ -345,7 +437,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
                 <h3 className="account-name">
                   {account.firstName} {account.lastName}
                 </h3>
-                <p className="account-email">{account.email}</p>
+                <p className="account-username">@{account.username}</p>
                 {account.employee && (
                   <p className="account-position">
                     {account.employee.position}
@@ -392,8 +484,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         onClose={closeModal}
         mode={modalMode}
         title={{ create: 'Create Account', edit: 'Edit Account' }}
-        onSubmit={handleSubmit}
-        isSubmitting={isSubmitting}
+        onSubmit={modalMode === 'create' ? handleCreateAccount : handleSubmit}
+        isSubmitting={isSubmitting || isCreatingSupabase}
         className="account-modal"
       >
         <div className="form-group">
@@ -459,16 +551,21 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         </div>
 
         <div className="form-group">
-          <label>Email *</label>
+          <label>Username *</label>
           <input
-            type="email"
-            name="email"
-            value={formData.email}
+            type="text"
+            name="username"
+            value={formData.username}
             onChange={handleInputChange}
-            className={`form-control ${formErrors.email ? 'error' : ''}`}
-            placeholder="john.doe@example.com"
+            className={`form-control ${formErrors.username ? 'error' : ''}`}
+            placeholder="john_doe"
             required
+            autoComplete="off"
+            disabled={modalMode === 'edit'}
           />
+          <small className="form-hint">
+            Letters, numbers, and underscores only. This will be used to log in.
+          </small>
         </div>
 
         <div className="form-row">
@@ -675,10 +772,11 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
           color: var(--text-primary);
         }
 
-        .account-email {
+        .account-username {
           font-size: 0.9rem;
           color: var(--text-secondary);
           margin: 0 0 var(--spacing-xs) 0;
+          font-family: monospace;
         }
 
         .account-position {

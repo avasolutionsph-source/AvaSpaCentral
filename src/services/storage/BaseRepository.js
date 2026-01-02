@@ -7,10 +7,35 @@
  * - Soft delete support
  * - Timestamp tracking (createdAt, updatedAt)
  * - UUID generation for new entities
+ * - Multi-tenant data isolation via businessId
  */
 
 import { db, syncQueue } from '../../db';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
+
+// Business context for multi-tenant isolation
+let currentBusinessId = null;
+
+/**
+ * Set the current business context for multi-tenant isolation
+ * @param {string} businessId - The business ID to filter by
+ */
+export const setBusinessContext = (businessId) => {
+  currentBusinessId = businessId;
+};
+
+/**
+ * Get the current business context
+ * @returns {string|null} The current business ID
+ */
+export const getBusinessContext = () => currentBusinessId;
+
+/**
+ * Clear the business context (e.g., on logout)
+ */
+export const clearBusinessContext = () => {
+  currentBusinessId = null;
+};
 
 // Generate a UUID v4 (compatible with Supabase)
 export const generateId = () => {
@@ -29,12 +54,17 @@ class BaseRepository {
    * @param {Object} options - Repository options
    * @param {boolean} options.trackSync - Whether to track operations in sync queue (default: true)
    * @param {boolean} options.softDelete - Whether to use soft delete (default: false)
+   * @param {boolean} options.multiTenant - Whether to enforce businessId isolation (default: true)
    */
   constructor(tableName, options = {}) {
     this.tableName = tableName;
     this.table = db[tableName];
     this.trackSync = options.trackSync !== false;
     this.softDelete = options.softDelete || false;
+    // Enable multi-tenant isolation by default for most entities
+    // Exceptions: settings, payrollConfig, businessConfig, syncQueue, syncMetadata
+    const noTenantTables = ['settings', 'payrollConfig', 'businessConfig', 'syncQueue', 'syncMetadata'];
+    this.multiTenant = options.multiTenant !== false && !noTenantTables.includes(tableName);
 
     if (!this.table) {
       throw new Error(`Table "${tableName}" not found in database schema`);
@@ -45,6 +75,7 @@ class BaseRepository {
    * Get all items from the table
    * @param {Object} options - Query options
    * @param {boolean} options.includeDeleted - Include soft-deleted items
+   * @param {boolean} options.skipTenantFilter - Skip businessId filtering (for system operations)
    * @returns {Promise<Array>}
    */
   async getAll(options = {}) {
@@ -53,6 +84,11 @@ class BaseRepository {
     // Filter out soft-deleted items unless requested
     if (this.softDelete && !options.includeDeleted) {
       items = items.filter(item => !item._deleted);
+    }
+
+    // Apply multi-tenant businessId filter
+    if (this.multiTenant && currentBusinessId && !options.skipTenantFilter) {
+      items = items.filter(item => item.businessId === currentBusinessId);
     }
 
     return items;
@@ -112,6 +148,11 @@ class BaseRepository {
       _updatedAt: now
     };
 
+    // Automatically add businessId for multi-tenant entities
+    if (this.multiTenant && currentBusinessId && !item.businessId) {
+      item.businessId = currentBusinessId;
+    }
+
     await this.table.add(item);
 
     // Track in sync queue and emit event for immediate sync
@@ -141,13 +182,20 @@ class BaseRepository {
     // Process in batches to avoid memory issues with large datasets
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
-      const itemsWithIds = batch.map(data => ({
-        ...data,
-        _id: data._id || generateId(),
-        _syncStatus: 'pending',
-        _createdAt: now,
-        _updatedAt: now
-      }));
+      const itemsWithIds = batch.map(data => {
+        const item = {
+          ...data,
+          _id: data._id || generateId(),
+          _syncStatus: 'pending',
+          _createdAt: now,
+          _updatedAt: now
+        };
+        // Automatically add businessId for multi-tenant entities
+        if (this.multiTenant && currentBusinessId && !item.businessId) {
+          item.businessId = currentBusinessId;
+        }
+        return item;
+      });
 
       try {
         await this.table.bulkAdd(itemsWithIds);

@@ -154,16 +154,18 @@ const clone = (obj) => JSON.parse(JSON.stringify(obj));
 // =============================================================================
 
 export const authApi = {
-  // Login
-  async login(email, password) {
+  // Login with username (for offline mode fallback)
+  async login(username, password) {
     await delay(800); // Simulate auth check
 
     // First, check against users in Dexie database
     const users = await db.users.toArray();
 
-    // Try to find matching user in database
+    // Try to find matching user by username (primary) or email (fallback)
     const matchedUser = users.find(
-      u => u.email?.toLowerCase() === email?.toLowerCase() && u.password === password
+      u => (u.username?.toLowerCase() === username?.toLowerCase() ||
+            u.email?.toLowerCase() === username?.toLowerCase()) &&
+           u.password === password
     );
 
     if (matchedUser) {
@@ -192,7 +194,7 @@ export const authApi = {
       };
     }
 
-    throw new Error('Invalid email or password');
+    throw new Error('Invalid username or password');
   },
 
   // Register

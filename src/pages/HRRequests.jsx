@@ -199,6 +199,16 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
     { id: 'all', label: 'All' }
   ];
 
+  // Safe date formatting helper
+  const safeFormatDate = (dateStr, formatStr = 'MMM dd, yyyy') => {
+    if (!dateStr) return 'N/A';
+    try {
+      return format(parseISO(dateStr), formatStr);
+    } catch {
+      return dateStr;
+    }
+  };
+
   const renderRequestDetails = (request) => {
     switch (request.requestType) {
       case 'ot':
@@ -206,15 +216,15 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
           <>
             <div className="detail-row">
               <span className="detail-label">Date:</span>
-              <span className="detail-value">{format(parseISO(request.date), 'MMM dd, yyyy')}</span>
+              <span className="detail-value">{safeFormatDate(request.date)}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Time:</span>
-              <span className="detail-value">{request.startTime} - {request.endTime}</span>
+              <span className="detail-value">{request.startTime || 'N/A'} - {request.endTime || 'N/A'}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Reason:</span>
-              <span className="detail-value">{request.reason}</span>
+              <span className="detail-value">{request.reason || 'N/A'}</span>
             </div>
           </>
         );
@@ -224,17 +234,17 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
           <>
             <div className="detail-row">
               <span className="detail-label">Type:</span>
-              <span className="detail-value" style={{ textTransform: 'capitalize' }}>{request.type}</span>
+              <span className="detail-value" style={{ textTransform: 'capitalize' }}>{request.type || 'N/A'}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Period:</span>
               <span className="detail-value">
-                {format(parseISO(request.startDate), 'MMM dd')} - {format(parseISO(request.endDate), 'MMM dd, yyyy')}
+                {safeFormatDate(request.startDate, 'MMM dd')} - {safeFormatDate(request.endDate)}
               </span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Reason:</span>
-              <span className="detail-value">{request.reason}</span>
+              <span className="detail-value">{request.reason || 'N/A'}</span>
             </div>
           </>
         );
@@ -244,11 +254,11 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
           <>
             <div className="detail-row">
               <span className="detail-label">Amount:</span>
-              <span className="detail-value">PHP {request.amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+              <span className="detail-value">PHP {(request.amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Reason:</span>
-              <span className="detail-value">{request.reason}</span>
+              <span className="detail-value">{request.reason || 'N/A'}</span>
             </div>
           </>
         );
@@ -258,15 +268,15 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
           <>
             <div className="detail-row">
               <span className="detail-label">Title:</span>
-              <span className="detail-value">{request.title}</span>
+              <span className="detail-value">{request.title || 'N/A'}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Date:</span>
-              <span className="detail-value">{format(parseISO(request.incidentDate), 'MMM dd, yyyy')}</span>
+              <span className="detail-value">{safeFormatDate(request.incidentDate)}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Description:</span>
-              <span className="detail-value">{request.description}</span>
+              <span className="detail-value">{request.description || 'N/A'}</span>
             </div>
           </>
         );
@@ -402,9 +412,9 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
               </div>
 
               <div className="request-card-employee">
-                <div className="employee-name">{request.employeeName}</div>
+                <div className="employee-name">{request.employeeName || 'Unknown Employee'}</div>
                 <div className="request-date">
-                  Submitted {format(parseISO(request.createdAt), 'MMM dd, yyyy')}
+                  Submitted {request.createdAt ? format(parseISO(request.createdAt), 'MMM dd, yyyy') : 'Unknown date'}
                 </div>
               </div>
 
@@ -422,7 +432,7 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
                 <div className="approval-info">
                   <strong>{request.status === 'approved' ? 'Approved' : 'Processed'} by:</strong> {request.approvedBy}
                   {request.approvedAt && (
-                    <span> on {format(parseISO(request.approvedAt), 'MMM dd, yyyy')}</span>
+                    <span> on {safeFormatDate(request.approvedAt)}</span>
                   )}
                 </div>
               )}

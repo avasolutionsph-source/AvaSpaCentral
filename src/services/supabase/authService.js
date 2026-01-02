@@ -72,6 +72,24 @@ class AuthService {
         return null;
       }
 
+      // Auto-generate businessId for Owner users if missing
+      // This ensures multi-tenant data isolation works correctly
+      if (userProfile.role === 'Owner' && !userProfile.business_id) {
+        const newBusinessId = crypto.randomUUID();
+        console.log('[AuthService] Auto-generating businessId for Owner:', newBusinessId);
+
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ business_id: newBusinessId })
+          .eq('id', userProfile.id);
+
+        if (updateError) {
+          console.error('[AuthService] Failed to update businessId:', updateError);
+        } else {
+          userProfile.business_id = newBusinessId;
+        }
+      }
+
       // Transform to app format
       this._currentUser = {
         _id: userProfile.id,

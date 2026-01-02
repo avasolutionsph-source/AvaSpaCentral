@@ -341,7 +341,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
 
       console.log('[EmployeeAccounts] Account created:', result);
 
-      // Also save to local Dexie for offline access
+      // Also save to local Dexie for offline access (marked as synced since it came from Supabase)
       await db.users.put({
         _id: result.user._id,
         email: employeeEmail.toLowerCase(),
@@ -350,9 +350,12 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         lastName: formData.lastName.trim(),
         role: formData.role,
         employeeId: formData.employeeId,
-        businessId: user?.businessId || 'default',
+        businessId: user?.businessId,
         status: 'active',
-        password: formData.password // Store for offline login
+        _syncStatus: 'synced',
+        _lastSyncedAt: new Date().toISOString(),
+        _createdAt: new Date().toISOString(),
+        _updatedAt: new Date().toISOString()
       });
 
       showToast('Account created successfully!', 'success');

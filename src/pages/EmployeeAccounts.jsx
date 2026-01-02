@@ -50,6 +50,10 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   // Track if we're creating via Supabase
   const [isCreatingSupabase, setIsCreatingSupabase] = useState(false);
 
+  // Username validation state
+  const [usernameStatus, setUsernameStatus] = useState({ checking: false, available: null, message: '' });
+  const usernameCheckTimeout = useRef(null);
+
   // Load employees for dropdown
   useEffect(() => {
     loadEmployees();
@@ -74,6 +78,56 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     return base.substring(0, 20);
   };
 
+  // Check username availability (debounced)
+  const checkUsernameAvailability = async (username) => {
+    if (!username || username.length < 3) {
+      setUsernameStatus({ checking: false, available: null, message: '' });
+      return;
+    }
+
+    // Clear previous timeout
+    if (usernameCheckTimeout.current) {
+      clearTimeout(usernameCheckTimeout.current);
+    }
+
+    setUsernameStatus({ checking: true, available: null, message: 'Checking...' });
+
+    // Debounce the check
+    usernameCheckTimeout.current = setTimeout(async () => {
+      try {
+        // First check local Dexie for existing usernames
+        const localUsers = await db.users.where('username').equals(username.toLowerCase()).toArray();
+        if (localUsers.length > 0) {
+          setUsernameStatus({ checking: false, available: false, message: 'Username already taken' });
+          return;
+        }
+
+        // Then check Supabase if configured
+        if (isSupabaseConfigured()) {
+          const isAvailable = await authService.isUsernameAvailable(username);
+          if (isAvailable) {
+            setUsernameStatus({ checking: false, available: true, message: 'Username available' });
+          } else {
+            setUsernameStatus({ checking: false, available: false, message: 'Username already taken' });
+          }
+        } else {
+          // Offline mode - only local check was done
+          setUsernameStatus({ checking: false, available: true, message: 'Username available (offline)' });
+        }
+      } catch (error) {
+        console.error('Username check error:', error);
+        setUsernameStatus({ checking: false, available: null, message: 'Could not verify username' });
+      }
+    }, 500); // 500ms debounce
+  };
+
+  // Handle username input change
+  const handleUsernameChange = (e) => {
+    const value = e.target.value;
+    handleInputChange(e);
+    checkUsernameAvailability(value);
+  };
+
   // Validation function
   const validateForm = (data) => {
     const errors = {};
@@ -91,6 +145,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       errors.username = 'Username must be 30 characters or less';
     } else if (!/^[a-zA-Z0-9_]+$/.test(data.username)) {
       errors.username = 'Username can only contain letters, numbers, and underscores';
+    } else if (modalMode === 'create' && usernameStatus.available === false) {
+      errors.username = 'Username is already taken';
     }
 
     if (!data.firstName?.trim()) {
@@ -215,6 +271,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
           lastName: emp.lastName || '',
           username: suggestedUsername
         }));
+        // Check if suggested username is available
+        checkUsernameAvailability(suggestedUsername);
       }
     }
   };
@@ -224,6 +282,17 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     // Validate form first
     const validation = validateForm(formData);
     if (!validation.isValid) {
+      return;
+    }
+
+    // Check if username is still being checked or is taken
+    if (usernameStatus.checking) {
+      showToast('Please wait for username check to complete', 'warning');
+      return;
+    }
+
+    if (usernameStatus.available === false) {
+      showToast('Username is already taken. Please choose a different one.', 'error');
       return;
     }
 
@@ -250,8 +319,14 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     setIsCreatingSupabase(true);
 
     try {
-      // Create account via Supabase auth service
-      const result = await authService.createStaffAccount({
+      console.log('[EmployeeAccounts] Creating account for:', formData.username);
+
+      // Create account via Supabase auth service with timeout
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out. Please try again.')), 30000)
+      );
+
+      const createPromise = authService.createStaffAccount({
         username: formData.username.trim().toLowerCase(),
         password: formData.password,
         email: employeeEmail.toLowerCase(),
@@ -261,6 +336,10 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         employeeId: formData.employeeId,
         businessId: user?.businessId || 'default'
       });
+
+      const result = await Promise.race([createPromise, timeoutPromise]);
+
+      console.log('[EmployeeAccounts] Account created:', result);
 
       // Also save to local Dexie for offline access
       await db.users.put({
@@ -277,12 +356,25 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       });
 
       showToast('Account created successfully!', 'success');
+      setUsernameStatus({ checking: false, available: null, message: '' }); // Reset username status
       closeModal();
       loadUsers();
       if (onDataChange) onDataChange();
     } catch (error) {
-      console.error('Failed to create account:', error);
-      showToast(error.message || 'Failed to create account', 'error');
+      console.error('[EmployeeAccounts] Failed to create account:', error);
+
+      // Provide more specific error messages
+      let errorMessage = error.message || 'Failed to create account';
+
+      if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
+        errorMessage = 'An account with this email or username already exists';
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (errorMessage.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      }
+
+      showToast(errorMessage, 'error');
     } finally {
       setIsCreatingSupabase(false);
     }
@@ -552,19 +644,30 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
 
         <div className="form-group">
           <label>Username *</label>
-          <input
-            type="text"
-            name="username"
-            value={formData.username}
-            onChange={handleInputChange}
-            className={`form-control ${formErrors.username ? 'error' : ''}`}
-            placeholder="john_doe"
-            required
-            autoComplete="off"
-            disabled={modalMode === 'edit'}
-          />
-          <small className="form-hint">
-            Letters, numbers, and underscores only. This will be used to log in.
+          <div className="username-input-wrapper">
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleUsernameChange}
+              className={`form-control ${formErrors.username ? 'error' : ''} ${usernameStatus.available === true ? 'success' : ''} ${usernameStatus.available === false ? 'error' : ''}`}
+              placeholder="john_doe"
+              required
+              autoComplete="off"
+              disabled={modalMode === 'edit'}
+            />
+            {modalMode === 'create' && usernameStatus.checking && (
+              <span className="username-status checking">⏳</span>
+            )}
+            {modalMode === 'create' && usernameStatus.available === true && (
+              <span className="username-status available">✓</span>
+            )}
+            {modalMode === 'create' && usernameStatus.available === false && (
+              <span className="username-status taken">✗</span>
+            )}
+          </div>
+          <small className={`form-hint ${usernameStatus.available === false ? 'error' : ''} ${usernameStatus.available === true ? 'success' : ''}`}>
+            {usernameStatus.message || 'Letters, numbers, and underscores only. This will be used to log in.'}
           </small>
         </div>
 
@@ -829,6 +932,51 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
 
         .form-hint.warning {
           color: var(--warning);
+        }
+
+        .form-hint.error {
+          color: var(--error);
+        }
+
+        .form-hint.success {
+          color: var(--success);
+        }
+
+        .username-input-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .username-input-wrapper input {
+          padding-right: 35px;
+        }
+
+        .username-status {
+          position: absolute;
+          right: 10px;
+          font-size: 1rem;
+        }
+
+        .username-status.checking {
+          animation: pulse 1s infinite;
+        }
+
+        .username-status.available {
+          color: var(--success);
+        }
+
+        .username-status.taken {
+          color: var(--error);
+        }
+
+        .form-control.success {
+          border-color: var(--success);
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
 
         @media (max-width: 768px) {

@@ -247,14 +247,25 @@ class AuthService {
       throw new Error('Username check requires Supabase connection');
     }
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username.toLowerCase())
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username.toLowerCase())
+        .maybeSingle(); // Use maybeSingle instead of single to avoid error when not found
 
-    // If no data found, username is available
-    return !data && error?.code === 'PGRST116';
+      // If no data found, username is available
+      if (!data) {
+        return true;
+      }
+
+      // Username exists
+      return false;
+    } catch (error) {
+      console.error('[AuthService] Error checking username:', error);
+      // On error, assume username might be taken (safer)
+      return false;
+    }
   }
 
   /**

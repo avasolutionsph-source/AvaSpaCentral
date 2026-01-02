@@ -6,6 +6,11 @@ import { usersApi } from '../mockApi/offlineApi';
 import Employees from './Employees';
 import Payroll from './Payroll';
 import EmployeeAccounts from './EmployeeAccounts';
+import HRRequests from './HRRequests';
+import OTRequestRepository from '../services/storage/repositories/OTRequestRepository';
+import LeaveRequestRepository from '../services/storage/repositories/LeaveRequestRepository';
+import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
+import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
 import '../assets/css/hub-pages.css';
 
 const HRHub = () => {
@@ -26,7 +31,8 @@ const HRHub = () => {
     totalEmployees: 0,
     activeEmployees: 0,
     pendingRequests: 0,
-    totalAccounts: 0
+    totalAccounts: 0,
+    pendingHRRequests: 0
   });
 
   useEffect(() => {
@@ -44,11 +50,26 @@ const HRHub = () => {
       const activeEmployees = employees.filter(e => e.status === 'active').length;
       const pendingRequests = payrollRequests.filter(r => r.status === 'pending').length;
 
+      // Count pending HR requests
+      let pendingHRRequests = 0;
+      try {
+        const [otReqs, leaveReqs, cashReqs, incidentReqs] = await Promise.all([
+          OTRequestRepository.getPending(),
+          LeaveRequestRepository.getPending(),
+          CashAdvanceRequestRepository.getPending(),
+          IncidentReportRepository.getPending()
+        ]);
+        pendingHRRequests = otReqs.length + leaveReqs.length + cashReqs.length + incidentReqs.length;
+      } catch (e) {
+        // Silent fail for HR requests count
+      }
+
       setStats({
         totalEmployees: employees.length,
         activeEmployees,
         pendingRequests,
-        totalAccounts: users.length
+        totalAccounts: users.length,
+        pendingHRRequests
       });
     } catch (error) {
       // Silent fail for stats
@@ -66,6 +87,12 @@ const HRHub = () => {
       id: 'employees',
       label: 'Employees',
       badge: null
+    },
+    {
+      id: 'requests',
+      label: 'Requests',
+      badge: stats.pendingHRRequests > 0 ? stats.pendingHRRequests : null,
+      badgeType: 'warning'
     },
     {
       id: 'payroll',
@@ -161,6 +188,7 @@ const HRHub = () => {
       {/* Tab Content */}
       <div className="hub-content">
         {activeTab === 'employees' && <Employees embedded onDataChange={loadStats} onOpenCreateRef={employeesOpenCreateRef} />}
+        {activeTab === 'requests' && <HRRequests embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} onCalculateRef={payrollCalculateRef} onRemittancesRef={payrollRemittancesRef} onPayslipsRef={payrollPayslipsRef} />}
         {activeTab === 'accounts' && isOwner() && <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />}
       </div>

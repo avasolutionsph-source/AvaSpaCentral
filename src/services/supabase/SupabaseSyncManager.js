@@ -55,6 +55,8 @@ const SYNCABLE_ENTITIES = [
   // HR
   'attendance', 'shiftSchedules', 'activityLogs', 'payrollRequests',
   'payrollConfig', 'payrollConfigLogs', 'timeOffRequests',
+  // HR Requests
+  'otRequests', 'leaveRequests', 'cashAdvanceRequests', 'incidentReports',
   // Financial
   'cashDrawerSessions',
   // Settings & Config
@@ -84,6 +86,11 @@ const TABLE_NAME_MAP = {
   advanceBookings: 'advance_bookings',
   activeServices: 'active_services',
   homeServices: 'home_services',
+  // HR Requests
+  otRequests: 'ot_requests',
+  leaveRequests: 'leave_requests',
+  cashAdvanceRequests: 'cash_advance_requests',
+  incidentReports: 'incident_reports',
 };
 
 // Valid Supabase columns per table (prevents sending non-existent columns)
@@ -115,6 +122,28 @@ const SUPABASE_TABLE_COLUMNS = {
   ],
   payroll_config: [
     'id', 'business_id', 'key', 'value', 'updated_at'
+  ],
+  // HR Request tables
+  ot_requests: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'date', 'start_time', 'end_time',
+    'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason',
+    'created_at', 'updated_at'
+  ],
+  leave_requests: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'type', 'start_date', 'end_date',
+    'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason',
+    'created_at', 'updated_at'
+  ],
+  cash_advance_requests: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'amount', 'reason',
+    'status', 'approved_by', 'approved_at', 'rejection_reason',
+    'created_at', 'updated_at'
+  ],
+  incident_reports: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'title', 'description',
+    'incident_date', 'status', 'acknowledged_by', 'acknowledged_at', 'review_notes',
+    'resolved_by', 'resolved_at', 'resolution', 'closed_by', 'closed_at', 'closing_notes',
+    'created_at', 'updated_at'
   ],
   // Add more tables as needed - if a table isn't listed, all fields pass through
 };
@@ -220,6 +249,18 @@ const FIELD_NAME_MAP = {
   emergencyContact: 'emergency_contact',
   paymentTerms: 'payment_terms',
   deletedAt: 'deleted_at',
+  // HR Request fields
+  employeeName: 'employee_name',
+  incidentDate: 'incident_date',
+  acknowledgedBy: 'acknowledged_by',
+  acknowledgedAt: 'acknowledged_at',
+  reviewNotes: 'review_notes',
+  resolvedBy: 'resolved_by',
+  resolvedAt: 'resolved_at',
+  closedBy: 'closed_by',
+  closedAt: 'closed_at',
+  closingNotes: 'closing_notes',
+  rejectionReason: 'rejection_reason',
 };
 
 class SupabaseSyncManager {

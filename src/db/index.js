@@ -395,6 +395,71 @@ db.version(7).stores({
   homeServices: '_id, status, employeeId, transactionId, businessId'
 });
 
+// Version 8: Add OT requests, leave requests, cash advance requests, and incident reports
+db.version(8).stores({
+  // === CORE BUSINESS ===
+  business: '_id, businessId',
+  users: '_id, email, username, role, status, businessId',
+
+  // === PRODUCTS & SERVICES ===
+  products: '_id, type, category, active, name, businessId',
+
+  // === PEOPLE ===
+  employees: '_id, status, department, position, email, businessId',
+  customers: '_id, status, phone, email, name, tier, businessId',
+  suppliers: '_id, status, name, businessId',
+
+  // === OPERATIONS ===
+  transactions: '_id, date, status, employeeId, customerId, businessId',
+  appointments: '_id, scheduledDateTime, status, employeeId, roomId, customerId, businessId',
+  rooms: '_id, type, status, name, businessId',
+
+  // === INVENTORY ===
+  purchaseOrders: '_id, supplierId, orderDate, status, businessId',
+  inventoryMovements: '_id, productId, date, type, businessId',
+  stockHistory: '++id, productId, date, type, businessId',
+  productConsumption: '_id, productId, date, month, businessId',
+
+  // === FINANCIAL ===
+  expenses: '_id, date, category, status, expenseType, businessId',
+  cashDrawerSessions: '_id, oduserId, status, openTime, businessId',
+  giftCertificates: '_id, code, status, recipientEmail, businessId',
+
+  // === HR ===
+  attendance: '_id, date, employeeId, businessId',
+  shiftSchedules: '_id, employeeId, isActive, businessId',
+  payrollRequests: '_id, employeeId, status, createdAt, businessId',
+  timeOffRequests: '_id, employeeId, status, startDate, endDate, businessId',
+
+  // === HR REQUESTS (v8) ===
+  otRequests: '_id, employeeId, status, date, businessId',
+  leaveRequests: '_id, employeeId, status, startDate, endDate, type, businessId',
+  cashAdvanceRequests: '_id, employeeId, status, createdAt, businessId',
+  incidentReports: '_id, employeeId, status, createdAt, businessId',
+
+  // === LOGS ===
+  activityLogs: '_id, userId, type, timestamp, businessId',
+
+  // === SYNC INFRASTRUCTURE ===
+  syncQueue: '++id, entityType, entityId, operation, status, createdAt',
+  syncMetadata: 'entityType, lastSyncTimestamp',
+
+  // === localStorage migration tables ===
+  loyaltyHistory: '++id, customerId, date, type, businessId',
+  advanceBookings: '_id, status, bookingDateTime, employeeId, businessId',
+  activeServices: '_id, roomId, status, advanceBookingId, businessId',
+  settings: 'key',
+  payrollConfig: 'key',
+  payrollConfigLogs: '++id, timestamp, userId, businessId',
+  serviceRotation: 'date, businessId',
+
+  // === Business Configuration ===
+  businessConfig: 'key',
+
+  // === Home Services ===
+  homeServices: '_id, status, employeeId, transactionId, businessId'
+});
+
 // Database event hooks for debugging
 db.on('populate', () => {
   console.log('[Dexie] Database created for the first time');
@@ -446,7 +511,12 @@ export const {
   // New tables from v5
   timeOffRequests,
   // New tables from v6
-  homeServices
+  homeServices,
+  // New tables from v8
+  otRequests,
+  leaveRequests,
+  cashAdvanceRequests,
+  incidentReports
 } = db;
 
 export default db;

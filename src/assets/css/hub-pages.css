@@ -268,3 +268,34 @@
     padding: 1px 4px;
   }
 }
+
+/* ===========================================
+   Embedded Page Styles for Request Components
+   =========================================== */
+
+.hub-content .my-requests-page,
+.hub-content .hr-requests-page {
+  padding: var(--spacing-lg);
+  min-height: auto;
+}
+
+@media (max-width: 768px) {
+  .hub-content .my-requests-page,
+  .hub-content .hr-requests-page {
+    padding: var(--spacing-md);
+  }
+}
+
+/* ===========================================
+   Info Badge Styles
+   =========================================== */
+
+.hub-tab-badge.info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.hub-stat.info {
+  background: #dbeafe;
+  color: #1e40af;
+}

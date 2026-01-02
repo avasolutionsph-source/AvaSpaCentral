@@ -6,9 +6,14 @@ import { format, parseISO, differenceInMinutes } from 'date-fns';
 import MySchedule from './MySchedule';
 import PayrollRequests from './PayrollRequests';
 import MyAttendanceHistory from './MyAttendanceHistory';
+import MyRequests from './MyRequests';
 import CameraCapture from '../components/CameraCapture';
 import { LazyImage } from '../components/OptimizedImage';
 import { logClockIn, logClockOut } from '../utils/activityLogger';
+import OTRequestRepository from '../services/storage/repositories/OTRequestRepository';
+import LeaveRequestRepository from '../services/storage/repositories/LeaveRequestRepository';
+import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
+import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
 import '../assets/css/hub-pages.css';
 
 const MyPortal = () => {
@@ -21,7 +26,8 @@ const MyPortal = () => {
   const [stats, setStats] = useState({
     shiftsThisWeek: 0,
     pendingRequests: 0,
-    upcomingAppointments: 0
+    upcomingAppointments: 0,
+    pendingHRRequests: 0
   });
 
   // Attendance state
@@ -60,10 +66,32 @@ const MyPortal = () => {
         return a.employeeId === user.employeeId && new Date(a.date) >= today;
       }).length;
 
+      // Count pending HR requests
+      let pendingHRRequests = 0;
+      if (user.employeeId) {
+        try {
+          const [otReqs, leaveReqs, cashReqs, incidentReqs] = await Promise.all([
+            OTRequestRepository.getByEmployee(user.employeeId),
+            LeaveRequestRepository.getByEmployee(user.employeeId),
+            CashAdvanceRequestRepository.getByEmployee(user.employeeId),
+            IncidentReportRepository.getByEmployee(user.employeeId)
+          ]);
+          pendingHRRequests = [
+            ...otReqs.filter(r => r.status === 'pending'),
+            ...leaveReqs.filter(r => r.status === 'pending'),
+            ...cashReqs.filter(r => r.status === 'pending'),
+            ...incidentReqs.filter(r => r.status === 'pending')
+          ].length;
+        } catch (e) {
+          // Silent fail for HR requests count
+        }
+      }
+
       setStats({
         shiftsThisWeek: 5, // Placeholder - would come from schedule API
         pendingRequests,
-        upcomingAppointments
+        upcomingAppointments,
+        pendingHRRequests
       });
     } catch (error) {
       // Silent fail for stats
@@ -175,6 +203,12 @@ const MyPortal = () => {
       label: 'My Schedule',
       badge: stats.upcomingAppointments > 0 ? stats.upcomingAppointments : null,
       badgeType: 'info'
+    },
+    {
+      id: 'requests',
+      label: 'My Requests',
+      badge: stats.pendingHRRequests > 0 ? stats.pendingHRRequests : null,
+      badgeType: 'warning'
     },
     {
       id: 'payroll',
@@ -550,6 +584,7 @@ const MyPortal = () => {
         {activeTab === 'attendance' && renderAttendanceTab()}
         {activeTab === 'history' && <MyAttendanceHistory embedded />}
         {activeTab === 'schedule' && <MySchedule embedded onDataChange={loadStats} />}
+        {activeTab === 'requests' && <MyRequests embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <PayrollRequests embedded onDataChange={loadStats} onOpenSubmitRef={payrollSubmitRef} />}
       </div>
 

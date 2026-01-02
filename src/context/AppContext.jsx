@@ -184,30 +184,40 @@ export const AppProvider = ({ children }) => {
       logLogout(user);
     }
 
+    // Helper to add timeout to promises - prevents logout from hanging
+    const withTimeout = (promise, ms, operation) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`${operation} timed out`)), ms)
+        )
+      ]);
+    };
+
     // IMPORTANT: Sync pending data to Supabase BEFORE clearing local data
-    // This ensures no data is lost when user logs back in
+    // Use 3 second timeout to prevent hanging
     if (isSupabaseConfigured()) {
       try {
         console.log('[AppContext] Syncing pending data before logout...');
-        await supabaseSyncManager.sync();
+        await withTimeout(supabaseSyncManager.sync(), 3000, 'Sync');
       } catch (error) {
-        console.warn('[AppContext] Pre-logout sync failed:', error);
+        console.warn('[AppContext] Pre-logout sync failed or timed out:', error);
         // Continue with logout even if sync fails
       }
     }
 
-    // Use Supabase auth service - wrap in try-catch to ensure logout completes
+    // Use Supabase auth service - 2 second timeout
     try {
-      await authService.signOut();
+      await withTimeout(authService.signOut(), 2000, 'SignOut');
     } catch (error) {
-      console.warn('[AppContext] Auth signOut failed:', error);
+      console.warn('[AppContext] Auth signOut failed or timed out:', error);
     }
 
-    // Full cleanup on logout - wrap in try-catch to ensure logout completes
+    // Full cleanup on logout - 2 second timeout
     try {
-      await supabaseSyncManager.cleanupOnLogout();
+      await withTimeout(supabaseSyncManager.cleanupOnLogout(), 2000, 'Cleanup');
     } catch (error) {
-      console.warn('[AppContext] Cleanup failed:', error);
+      console.warn('[AppContext] Cleanup failed or timed out:', error);
     }
 
     // Always clear user state regardless of above errors

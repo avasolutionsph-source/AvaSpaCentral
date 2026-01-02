@@ -334,16 +334,19 @@ class SupabaseSyncManager {
       }
     }
 
-    // Ensure timestamps exist
-    if (!converted.created_at) {
+    // Get table name for schema-aware processing
+    const tableName = this._toSupabaseTableName(entityType);
+    const validColumns = SUPABASE_TABLE_COLUMNS[tableName];
+
+    // Ensure timestamps exist (only if table has these columns)
+    if (!converted.created_at && (!validColumns || validColumns.includes('created_at'))) {
       converted.created_at = new Date().toISOString();
     }
-    if (!converted.updated_at) {
+    if (!converted.updated_at && (!validColumns || validColumns.includes('updated_at'))) {
       converted.updated_at = new Date().toISOString();
     }
 
     // Special handling for service_rotation: wrap rotation fields into rotation_data JSONB
-    const tableName = this._toSupabaseTableName(entityType);
     if (tableName === 'service_rotation') {
       const rotationFields = ['employeeOrder', 'employee_order', 'currentIndex', 'current_index',
         'servicesCompleted', 'services_completed', 'lastAdvanced', 'last_advanced', 'lastServed', 'last_served'];
@@ -360,8 +363,6 @@ class SupabaseSyncManager {
     }
 
     // Filter to only include valid Supabase columns for this table
-    const validColumns = SUPABASE_TABLE_COLUMNS[tableName];
-
     if (validColumns) {
       const filtered = {};
       const skippedFields = [];

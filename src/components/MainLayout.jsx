@@ -14,10 +14,13 @@ const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const notificationRef = React.useRef(null);
 
 
   const handleLogout = async () => {
+    if (loggingOut) return; // Prevent double-click
+    setLoggingOut(true);
     try {
       await logout();
     } catch (error) {
@@ -638,8 +641,10 @@ const MainLayout = () => {
             onClick={handleLogout}
             title="Logout"
             aria-label="Logout from application"
+            disabled={loggingOut}
+            style={loggingOut ? { opacity: 0.6, cursor: 'wait' } : {}}
           >
-            <span aria-hidden="true">⏻</span> {sidebarOpen && 'Logout'}
+            <span aria-hidden="true">{loggingOut ? '...' : '⏻'}</span> {sidebarOpen && (loggingOut ? 'Logging out...' : 'Logout')}
           </button>
         </div>
       </aside>

@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { usersApi } from '../mockApi/offlineApi';
 import Employees from './Employees';
+import Attendance from './Attendance';
 import Payroll from './Payroll';
 import EmployeeAccounts from './EmployeeAccounts';
 import HRRequests from './HRRequests';
@@ -12,6 +13,7 @@ import LeaveRequestRepository from '../services/storage/repositories/LeaveReques
 import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
 import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
 import '../assets/css/hub-pages.css';
+import '../assets/css/pos.css';
 
 const HRHub = () => {
   const { isOwner, canEdit } = useApp();
@@ -89,6 +91,11 @@ const HRHub = () => {
       badge: null
     },
     {
+      id: 'attendance',
+      label: 'Attendance',
+      badge: null
+    },
+    {
       id: 'requests',
       label: 'Requests',
       badge: stats.pendingHRRequests > 0 ? stats.pendingHRRequests : null,
@@ -115,8 +122,8 @@ const HRHub = () => {
         <div className="hub-title-row">
           <div className="hub-title">
             <div>
-              <h1>HR Hub</h1>
-              <p className="hub-subtitle">Manage employees and process payroll</p>
+              <h1>Employees</h1>
+              <p className="hub-subtitle">Manage employees, attendance, and process payroll</p>
             </div>
           </div>
 
@@ -167,16 +174,16 @@ const HRHub = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="hub-tabs">
+        <div className="sales-tabs">
           {tabs.map(tab => (
             <button
               key={tab.id}
-              className={`hub-tab ${activeTab === tab.id ? 'active' : ''}`}
+              className={`sales-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
               <span>{tab.label}</span>
               {tab.badge && (
-                <span className={`hub-tab-badge ${tab.badgeType || ''}`}>
+                <span className={`sales-tab-badge ${tab.badgeType || ''}`}>
                   {tab.badge}
                 </span>
               )}
@@ -188,6 +195,7 @@ const HRHub = () => {
       {/* Tab Content */}
       <div className="hub-content">
         {activeTab === 'employees' && <Employees embedded onDataChange={loadStats} onOpenCreateRef={employeesOpenCreateRef} />}
+        {activeTab === 'attendance' && <Attendance embedded onDataChange={loadStats} />}
         {activeTab === 'requests' && <HRRequests embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} onCalculateRef={payrollCalculateRef} onRemittancesRef={payrollRemittancesRef} onPayslipsRef={payrollPayslipsRef} />}
         {activeTab === 'accounts' && isOwner() && <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />}

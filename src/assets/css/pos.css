@@ -1050,6 +1050,46 @@
   background: var(--primary);
 }
 
+.sales-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: var(--spacing-xs);
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  background: var(--gray-200);
+  color: var(--gray-700);
+}
+
+.sales-tab-badge.warning {
+  background: var(--warning);
+  color: var(--white);
+}
+
+.sales-tab-badge.danger {
+  background: var(--danger);
+  color: var(--white);
+}
+
+.sales-tab-badge.success {
+  background: var(--success);
+  color: var(--white);
+}
+
+.sales-tab-badge.info {
+  background: var(--primary);
+  color: var(--white);
+}
+
+.sales-tab.active .sales-tab-badge {
+  background: rgba(255, 255, 255, 0.3);
+  color: var(--white);
+}
+
 /* Settings Page Tab Navigation */
 .settings-tabs {
   display: flex;

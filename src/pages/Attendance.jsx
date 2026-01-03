@@ -7,7 +7,7 @@ import CameraCapture from '../components/CameraCapture';
 import { LazyImage } from '../components/OptimizedImage';
 import { logClockIn, logClockOut } from '../utils/activityLogger';
 
-const Attendance = () => {
+const Attendance = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
   const { user, showToast, isTherapist, hasManagementAccess } = useApp();
 
@@ -68,6 +68,7 @@ const Attendance = () => {
       });
 
       setLoading(false);
+      if (onDataChange) onDataChange();
     } catch (error) {
       showToast('Failed to load attendance', 'error');
       setLoading(false);
@@ -203,25 +204,27 @@ const Attendance = () => {
   }
 
   return (
-    <div className="attendance-page">
-      <div className="page-header">
-        <div>
-          <button
-            className="btn btn-secondary btn-sm back-to-calendar"
-            onClick={() => navigate('/calendar')}
-          >
-            ← Back to Calendar
-          </button>
-          <h1>{isTherapist() ? 'My Attendance' : 'Attendance'}</h1>
-          <p>{isTherapist() ? 'Track your clock in/out and work hours' : 'Track employee clock in/out and work hours'}</p>
-        </div>
-        {!isTherapist() && (
-          <div className="flex gap-sm">
-            <button className="btn btn-secondary" onClick={() => openClockModal('in')}>⏱ Clock In</button>
-            <button className="btn btn-primary" onClick={() => openClockModal('out')}>⏱ Clock Out</button>
+    <div className={`attendance-page ${embedded ? 'embedded' : ''}`}>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <button
+              className="btn btn-secondary btn-sm back-to-calendar"
+              onClick={() => navigate('/calendar')}
+            >
+              ← Back to Calendar
+            </button>
+            <h1>{isTherapist() ? 'My Attendance' : 'Attendance'}</h1>
+            <p>{isTherapist() ? 'Track your clock in/out and work hours' : 'Track employee clock in/out and work hours'}</p>
           </div>
-        )}
-      </div>
+          {!isTherapist() && (
+            <div className="flex gap-sm">
+              <button className="btn btn-secondary" onClick={() => openClockModal('in')}>⏱ Clock In</button>
+              <button className="btn btn-primary" onClick={() => openClockModal('out')}>⏱ Clock Out</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats Cards - Only for Owner/Manager */}
       {!isTherapist() && (

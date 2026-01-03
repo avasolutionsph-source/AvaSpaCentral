@@ -9,6 +9,7 @@ import Inventory from './Inventory';
 import Suppliers from './Suppliers';
 import PurchaseOrders from './PurchaseOrders';
 import '../assets/css/hub-pages.css';
+import '../assets/css/pos.css';
 
 const InventoryHub = () => {
   const { canEdit } = useApp();
@@ -107,8 +108,8 @@ const InventoryHub = () => {
         <div className="hub-title-row">
           <div className="hub-title">
             <div>
-              <h1>Inventory Hub</h1>
-              <p className="hub-subtitle">Manage products, stock levels, suppliers & purchase orders</p>
+              <h1>Resources</h1>
+              <p className="hub-subtitle">Manage rooms, products, stock levels, suppliers & purchase orders</p>
             </div>
           </div>
 
@@ -149,16 +150,16 @@ const InventoryHub = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="hub-tabs">
+        <div className="sales-tabs">
           {tabs.map(tab => (
             <button
               key={tab.id}
-              className={`hub-tab ${activeTab === tab.id ? 'active' : ''}`}
+              className={`sales-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
               <span>{tab.label}</span>
               {tab.badge && (
-                <span className={`hub-tab-badge ${tab.badgeType || ''}`}>
+                <span className={`sales-tab-badge ${tab.badgeType || ''}`}>
                   {tab.badge}
                 </span>
               )}

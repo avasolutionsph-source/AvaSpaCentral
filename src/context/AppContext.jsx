@@ -6,8 +6,13 @@ import { setBusinessContext, clearBusinessContext } from '../services/storage/Ba
 import { db } from '../db';
 
 /**
- * Migrate orphaned data to current business context
- * This handles legacy data that was created without a businessId
+ * Migrate all local data to current business context
+ * This handles:
+ * 1. Legacy data created without a businessId
+ * 2. Data created with a different businessId (e.g., auto-generated UUIDs)
+ *
+ * Since this is a single-tenant local app (one business per browser),
+ * all local data should belong to the logged-in user's business.
  */
 const migrateOrphanedData = async (businessId) => {
   if (!businessId) return;
@@ -26,18 +31,19 @@ const migrateOrphanedData = async (businessId) => {
       const table = db[tableName];
       if (!table) continue;
 
-      // Find records without businessId
-      const orphanedRecords = await table
-        .filter(item => !item.businessId)
+      // Find records that don't have the current businessId
+      // This includes: no businessId, or different businessId
+      const recordsToMigrate = await table
+        .filter(item => item.businessId !== businessId)
         .toArray();
 
-      if (orphanedRecords.length > 0) {
+      if (recordsToMigrate.length > 0) {
         // Update each record with the current businessId
-        for (const record of orphanedRecords) {
+        for (const record of recordsToMigrate) {
           await table.update(record._id, { businessId });
         }
-        totalMigrated += orphanedRecords.length;
-        console.log(`[AppContext] Migrated ${orphanedRecords.length} orphaned ${tableName} records to business ${businessId}`);
+        totalMigrated += recordsToMigrate.length;
+        console.log(`[AppContext] Migrated ${recordsToMigrate.length} ${tableName} records to business ${businessId}`);
       }
     }
 

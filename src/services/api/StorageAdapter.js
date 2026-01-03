@@ -179,10 +179,12 @@ export const employeesAdapter = {
 
   async createEmployee(data) {
     await delay();
+    const status = data.status || 'active';
     const employee = await storageService.employees.create({
       businessId: getRequiredBusinessId(),
       ...data,
-      status: data.status || 'active',
+      status: status,
+      active: status === 'active',
       hireDate: data.hireDate || new Date().toISOString().split('T')[0]
     });
     return { success: true, employee: clone(employee) };
@@ -190,7 +192,12 @@ export const employeesAdapter = {
 
   async updateEmployee(id, data) {
     await delay();
-    const employee = await storageService.employees.update(id, data);
+    // Sync active boolean if status is being updated
+    const updateData = { ...data };
+    if (data.status !== undefined) {
+      updateData.active = data.status === 'active';
+    }
+    const employee = await storageService.employees.update(id, updateData);
     if (!employee) throw new Error('Employee not found');
     return { success: true, employee: clone(employee) };
   },
@@ -207,7 +214,10 @@ export const employeesAdapter = {
     if (!employee) throw new Error('Employee not found');
 
     const newStatus = employee.status === 'active' ? 'inactive' : 'active';
-    const updated = await storageService.employees.update(id, { status: newStatus });
+    const updated = await storageService.employees.update(id, {
+      status: newStatus,
+      active: newStatus === 'active'
+    });
     return { success: true, employee: clone(updated) };
   }
 };

@@ -249,8 +249,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       filtered = filtered.filter(e => e.role === filterRole);
     }
     if (filterStatus !== 'all') {
-      const isActive = filterStatus === 'active';
-      filtered = filtered.filter(e => e.active === isActive);
+      filtered = filtered.filter(e => e.status === filterStatus);
     }
 
     return filtered;
@@ -344,13 +343,13 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       ) : viewMode === 'cards' ? (
         <div className="employees-grid">
           {filteredEmployees.map(employee => (
-            <div key={employee._id} className={`employee-card ${!employee.active ? 'inactive' : ''}`}>
+            <div key={employee._id} className={`employee-card ${employee.status !== 'active' ? 'inactive' : ''}`}>
               <div className="employee-header">
                 <div className="employee-avatar">
                   {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
                 </div>
                 <div className="employee-status-badge">
-                  {employee.active ? '✓ Active' : '✕ Inactive'}
+                  {employee.status === 'active' ? '✓ Active' : '✕ Inactive'}
                 </div>
               </div>
               <h3 className="employee-name">{employee.firstName} {employee.lastName}</h3>

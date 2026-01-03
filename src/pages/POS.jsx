@@ -7,6 +7,7 @@ import { ConfirmDialog } from '../components/shared';
 import { logTransaction } from '../utils/activityLogger';
 import { formatTimeRange } from '../utils/dateUtils';
 import GiftCertificatesTab from './GiftCertificates';
+import CustomersTab from './Customers';
 import '../assets/css/pos.css';
 
 const POS = () => {
@@ -854,10 +855,18 @@ const POS = () => {
         >
           Gift Certificates
         </button>
+        <button
+          className={`sales-tab ${activeTab === 'customers' ? 'active' : ''}`}
+          onClick={() => setActiveTab('customers')}
+        >
+          Customers
+        </button>
       </div>
 
       {activeTab === 'gc' ? (
         <GiftCertificatesTab />
+      ) : activeTab === 'customers' ? (
+        <CustomersTab />
       ) : (
       <>
       <div className="pos-container">

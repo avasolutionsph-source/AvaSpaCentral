@@ -8,6 +8,7 @@ import Products from './Products';
 import Inventory from './Inventory';
 import Suppliers from './Suppliers';
 import PurchaseOrders from './PurchaseOrders';
+import Expenses from './Expenses';
 import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
@@ -99,6 +100,11 @@ const InventoryHub = () => {
       label: 'Purchase Orders',
       badge: stats.pendingOrders > 0 ? stats.pendingOrders : null,
       badgeType: 'warning'
+    },
+    {
+      id: 'expenses',
+      label: 'Expenses',
+      badge: null
     }
   ];
 
@@ -176,6 +182,7 @@ const InventoryHub = () => {
         {activeTab === 'stock' && <Inventory embedded onDataChange={loadStats} />}
         {activeTab === 'suppliers' && <Suppliers embedded />}
         {activeTab === 'orders' && <PurchaseOrders embedded onDataChange={loadStats} />}
+        {activeTab === 'expenses' && <Expenses embedded onDataChange={loadStats} />}
       </div>
     </div>
   );

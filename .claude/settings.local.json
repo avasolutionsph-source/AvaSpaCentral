@@ -31,7 +31,8 @@
       "Bash(while read f)",
       "Bash(done)",
       "Bash(node scripts/generate-pwa-icons.js:*)",
-      "Bash(node scripts/generate-webp.js:*)"
+      "Bash(node scripts/generate-webp.js:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

@@ -1056,7 +1056,8 @@ select {
 
 .sidebar.closed .nav-item {
   justify-content: center;
-  padding: 0.625rem var(--spacing-md);
+  padding: 0.75rem var(--spacing-md);
+  margin: 2px var(--spacing-xs);
   position: relative;
 }
 
@@ -1091,9 +1092,9 @@ select {
   visibility: visible;
 }
 
-/* Hide dividers in collapsed mode */
+/* Compact dividers in collapsed mode */
 .sidebar.closed .nav-divider {
-  margin: 0.25rem 0.5rem;
+  margin: var(--spacing-sm) var(--spacing-sm);
 }
 
 .sidebar.closed .sidebar-footer {
@@ -1107,11 +1108,12 @@ select {
 }
 
 .sidebar-header {
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: var(--spacing-xs);
 }
 
 .brand {
@@ -1158,58 +1160,64 @@ select {
 
 .sidebar-nav {
   flex: 1;
-  padding: var(--spacing-sm) 0;
+  padding: var(--spacing-md) 0;
+  overflow-y: auto;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  padding: 0.5rem var(--spacing-lg);
-  padding-left: calc(var(--spacing-lg) + 3px);
-  color: rgba(255, 255, 255, 0.7);
+  padding: 0.875rem var(--spacing-lg);
+  padding-left: calc(var(--spacing-lg) + 4px);
+  color: rgba(255, 255, 255, 0.75);
   text-decoration: none;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
   font-size: 0.9375rem;
-  font-weight: var(--font-normal);
-  margin: 0;
+  font-weight: 450;
+  margin: 2px var(--spacing-sm);
+  border-radius: var(--radius-md);
+  letter-spacing: 0.01em;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   color: #FFFFFF;
 }
 
 .nav-item.active {
-  background: rgba(27, 94, 55, 0.25);
+  background: linear-gradient(135deg, rgba(27, 94, 55, 0.35) 0%, rgba(27, 94, 55, 0.2) 100%);
   color: #FFFFFF;
-  font-weight: var(--font-medium);
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(27, 94, 55, 0.15);
 }
 
 .nav-icon {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   flex-shrink: 0;
-  width: 24px;
+  width: 26px;
   text-align: center;
-  opacity: 0.85;
-  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  opacity: 0.8;
+  transition: all 0.2s ease;
 }
 
 /* Icon animation on hover */
 .nav-item:hover .nav-icon {
   opacity: 1;
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .nav-item.active .nav-icon {
   opacity: 1;
+  color: var(--primary-light, #4ade80);
 }
 
-/* Phase 1: Visual dividers between groups */
+/* Clean dividers between groups */
 .nav-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent 10%, rgba(255, 255, 255, 0.12) 50%, transparent 90%);
-  margin: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.08);
+  margin: var(--spacing-md) var(--spacing-lg);
+  position: relative;
 }
 
 /* Phase 2: Improved hover and active states */
@@ -1222,20 +1230,21 @@ select {
   content: '';
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 0;
   width: 3px;
   background: var(--primary);
-  transform: scaleY(0);
-  transition: transform var(--transition-fast);
+  border-radius: 0 2px 2px 0;
+  transition: height 0.2s ease;
 }
 
 .nav-item:hover::before {
-  transform: scaleY(0.5);
+  height: 50%;
 }
 
 .nav-item.active::before {
-  transform: scaleY(1);
+  height: 60%;
 }
 
 .nav-item:focus-visible {
@@ -1243,16 +1252,18 @@ select {
   outline-offset: -2px;
 }
 
-/* Phase 3: Tighter spacing */
+/* Navigation items container */
 .nav-items-flat {
   display: flex;
   flex-direction: column;
-  padding: 0.25rem 0;
+  padding: var(--spacing-xs) 0;
+  gap: 2px;
 }
 
 .sidebar-footer {
   padding: var(--spacing-lg);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: var(--spacing-xs);
 }
 
 .user-info {

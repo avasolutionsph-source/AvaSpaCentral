@@ -130,7 +130,14 @@ class BaseRepository {
    * @returns {Promise<Array>}
    */
   async findByIndex(indexName, value) {
-    return await this.table.where(indexName).equals(value).toArray();
+    let items = await this.table.where(indexName).equals(value).toArray();
+
+    // Apply multi-tenant businessId filter (same as getAll)
+    if (this.multiTenant && currentBusinessId) {
+      items = items.filter(item => item.businessId === currentBusinessId);
+    }
+
+    return items;
   }
 
   /**

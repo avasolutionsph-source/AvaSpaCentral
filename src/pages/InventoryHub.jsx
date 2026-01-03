@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
+import Rooms from './Rooms';
+import ServiceHistory from './ServiceHistory';
 import Products from './Products';
 import Inventory from './Inventory';
 import Suppliers from './Suppliers';
@@ -11,7 +13,7 @@ import '../assets/css/hub-pages.css';
 const InventoryHub = () => {
   const { canEdit } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'products';
+  const initialTab = searchParams.get('tab') || 'rooms';
   const [activeTab, setActiveTab] = useState(initialTab);
 
   // Refs to access child component functions
@@ -19,6 +21,8 @@ const InventoryHub = () => {
 
   // Quick stats for badges
   const [stats, setStats] = useState({
+    availableRooms: 0,
+    occupiedRooms: 0,
     totalProducts: 0,
     lowStock: 0,
     outOfStock: 0,
@@ -31,16 +35,21 @@ const InventoryHub = () => {
 
   const loadStats = async () => {
     try {
-      const [products, poSummary] = await Promise.all([
+      const [products, poSummary, rooms] = await Promise.all([
         mockApi.products.getProducts(),
-        mockApi.purchaseOrders.getSummary()
+        mockApi.purchaseOrders.getSummary(),
+        mockApi.rooms.getRooms()
       ]);
 
       const productItems = products.filter(p => p.type === 'product');
       const lowStock = productItems.filter(p => p.stock > 0 && p.stock <= (p.lowStockAlert || 5)).length;
       const outOfStock = productItems.filter(p => p.stock === 0).length;
+      const availableRooms = rooms.filter(r => r.status === 'available').length;
+      const occupiedRooms = rooms.filter(r => r.status === 'occupied').length;
 
       setStats({
+        availableRooms,
+        occupiedRooms,
         totalProducts: products.length,
         lowStock,
         outOfStock,
@@ -57,6 +66,17 @@ const InventoryHub = () => {
   };
 
   const tabs = [
+    {
+      id: 'rooms',
+      label: 'Rooms',
+      badge: stats.availableRooms > 0 ? stats.availableRooms : null,
+      badgeType: 'success'
+    },
+    {
+      id: 'history',
+      label: 'Service History',
+      badge: null
+    },
     {
       id: 'products',
       label: 'Products & Services',
@@ -149,6 +169,8 @@ const InventoryHub = () => {
 
       {/* Tab Content */}
       <div className="hub-content">
+        {activeTab === 'rooms' && <Rooms embedded onDataChange={loadStats} />}
+        {activeTab === 'history' && <ServiceHistory embedded />}
         {activeTab === 'products' && <Products embedded onDataChange={loadStats} onOpenCreateRef={productsOpenCreateRef} />}
         {activeTab === 'stock' && <Inventory embedded onDataChange={loadStats} />}
         {activeTab === 'suppliers' && <Suppliers embedded />}

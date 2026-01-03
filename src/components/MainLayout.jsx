@@ -495,7 +495,6 @@ const MainLayout = () => {
     {
       label: 'Business',
       items: [
-        { path: '/service-hub', label: 'Service Hub', icon: 'service', page: 'rooms' },
         { path: '/inventory-hub', label: 'Resources', icon: 'inventory', page: 'inventory' },
       ],
       hasDivider: true
@@ -503,7 +502,7 @@ const MainLayout = () => {
     {
       label: 'Management',
       items: [
-        { path: '/hr-hub', label: 'HR Hub', icon: 'hr', page: 'employees' },
+        { path: '/hr-hub', label: 'Employees', icon: 'hr', page: 'employees' },
       ],
       hasDivider: true
     },

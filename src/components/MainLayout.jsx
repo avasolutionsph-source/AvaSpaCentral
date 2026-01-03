@@ -526,7 +526,6 @@ const MainLayout = () => {
     {
       label: 'System',
       items: [
-        { path: '/activity-logs', label: 'Activity Logs', icon: 'logs', page: 'activity-logs' },
         { path: '/settings', label: 'Settings', icon: 'settings', page: 'settings' },
       ],
       hasDivider: false

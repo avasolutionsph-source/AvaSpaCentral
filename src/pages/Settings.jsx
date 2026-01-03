@@ -8,9 +8,13 @@ import { SettingsRepository } from '../services/storage/repositories';
 import { SyncManager, NetworkDetector } from '../services/sync';
 import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
 import db from '../db';
+import ActivityLogsTab from './ActivityLogs';
 
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, hasManagementAccess } = useApp();
+
+  // Tab state for switching between Settings and Activity Logs
+  const [activeTab, setActiveTab] = useState('settings');
 
   // Business Info
   const [businessInfo, setBusinessInfo] = useState({
@@ -750,6 +754,25 @@ const Settings = () => {
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="settings-tabs">
+        <button
+          className={`settings-tab ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          Settings
+        </button>
+        <button
+          className={`settings-tab ${activeTab === 'logs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('logs')}
+        >
+          Activity Logs
+        </button>
+      </div>
+
+      {activeTab === 'logs' ? (
+        <ActivityLogsTab />
+      ) : (
       <div className="settings-content">
         {/* Business Information */}
         <div className="settings-section">
@@ -1609,6 +1632,7 @@ const Settings = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* Payroll Reset Confirmation Dialog */}
       <ConfirmDialog

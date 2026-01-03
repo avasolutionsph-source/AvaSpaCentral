@@ -498,7 +498,6 @@ const MainLayout = () => {
         { path: '/service-hub', label: 'Service Hub', icon: 'service', page: 'rooms' },
         { path: '/customers', label: 'People', icon: 'customers', page: 'customers' },
         { path: '/inventory-hub', label: 'Resources', icon: 'inventory', page: 'inventory' },
-        { path: '/gift-certificates', label: 'Gift Certificates', icon: 'gift', page: 'gift-certificates' },
       ],
       hasDivider: true
     },

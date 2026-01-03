@@ -6,10 +6,14 @@ import { getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog } from '../components/shared';
 import { logTransaction } from '../utils/activityLogger';
 import { formatTimeRange } from '../utils/dateUtils';
+import GiftCertificatesTab from './GiftCertificates';
 import '../assets/css/pos.css';
 
 const POS = () => {
   const { showToast, user } = useApp();
+
+  // Tab state for switching between POS and Gift Certificates
+  const [activeTab, setActiveTab] = useState('pos');
 
   // State
   const [loading, setLoading] = useState(true);
@@ -836,6 +840,26 @@ const POS = () => {
 
   return (
     <div className="pos-page">
+      {/* Tab Navigation */}
+      <div className="sales-tabs">
+        <button
+          className={`sales-tab ${activeTab === 'pos' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pos')}
+        >
+          Products & Services
+        </button>
+        <button
+          className={`sales-tab ${activeTab === 'gc' ? 'active' : ''}`}
+          onClick={() => setActiveTab('gc')}
+        >
+          Gift Certificates
+        </button>
+      </div>
+
+      {activeTab === 'gc' ? (
+        <GiftCertificatesTab />
+      ) : (
+      <>
       <div className="pos-container">
         {/* Left Panel - Products */}
         <div className="pos-products-panel">
@@ -1763,6 +1787,8 @@ const POS = () => {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

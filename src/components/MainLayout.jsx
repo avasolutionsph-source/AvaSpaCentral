@@ -486,9 +486,9 @@ const MainLayout = () => {
     {
       label: 'Core',
       items: [
-        { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', page: 'dashboard' },
-        { path: '/pos', label: 'POS', icon: 'pos', page: 'pos' },
-        { path: '/calendar', label: 'Calendar', icon: 'calendar', page: 'calendar' },
+        { path: '/dashboard', label: 'Home', icon: 'dashboard', page: 'dashboard' },
+        { path: '/pos', label: 'Sales', icon: 'pos', page: 'pos' },
+        { path: '/calendar', label: 'Schedule', icon: 'calendar', page: 'calendar' },
       ],
       hasDivider: true
     },
@@ -496,8 +496,8 @@ const MainLayout = () => {
       label: 'Business',
       items: [
         { path: '/service-hub', label: 'Service Hub', icon: 'service', page: 'rooms' },
-        { path: '/customers', label: 'Customers', icon: 'customers', page: 'customers' },
-        { path: '/inventory-hub', label: 'Inventory Hub', icon: 'inventory', page: 'inventory' },
+        { path: '/customers', label: 'People', icon: 'customers', page: 'customers' },
+        { path: '/inventory-hub', label: 'Resources', icon: 'inventory', page: 'inventory' },
         { path: '/gift-certificates', label: 'Gift Certificates', icon: 'gift', page: 'gift-certificates' },
       ],
       hasDivider: true

@@ -503,7 +503,6 @@ const MainLayout = () => {
     {
       label: 'Management',
       items: [
-        { path: '/finance-hub', label: 'Finance Hub', icon: 'finance', page: 'expenses' },
         { path: '/hr-hub', label: 'HR Hub', icon: 'hr', page: 'employees' },
       ],
       hasDivider: true

@@ -8,6 +8,7 @@ import { logTransaction } from '../utils/activityLogger';
 import { formatTimeRange } from '../utils/dateUtils';
 import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
+import FinanceHubTab from './FinanceHub';
 import '../assets/css/pos.css';
 
 const POS = () => {
@@ -847,7 +848,7 @@ const POS = () => {
           className={`sales-tab ${activeTab === 'pos' ? 'active' : ''}`}
           onClick={() => setActiveTab('pos')}
         >
-          Products & Services
+          POS
         </button>
         <button
           className={`sales-tab ${activeTab === 'gc' ? 'active' : ''}`}
@@ -861,12 +862,20 @@ const POS = () => {
         >
           Customers
         </button>
+        <button
+          className={`sales-tab ${activeTab === 'finance' ? 'active' : ''}`}
+          onClick={() => setActiveTab('finance')}
+        >
+          Finance
+        </button>
       </div>
 
       {activeTab === 'gc' ? (
         <GiftCertificatesTab />
       ) : activeTab === 'customers' ? (
         <CustomersTab />
+      ) : activeTab === 'finance' ? (
+        <FinanceHubTab />
       ) : (
       <>
       <div className="pos-container">

@@ -3,6 +3,52 @@ import { authService, supabaseSyncManager, isSupabaseConfigured } from '../servi
 import { logLogin, logLogout } from '../utils/activityLogger';
 import { setUserContext, clearUserContext } from '../utils/sentry';
 import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
+import { db } from '../db';
+
+/**
+ * Migrate orphaned data to current business context
+ * This handles legacy data that was created without a businessId
+ */
+const migrateOrphanedData = async (businessId) => {
+  if (!businessId) return;
+
+  try {
+    // Tables that support multi-tenant and may have orphaned data
+    const multiTenantTables = [
+      'employees', 'customers', 'products', 'rooms', 'suppliers',
+      'transactions', 'appointments', 'expenses', 'giftCertificates',
+      'purchaseOrders', 'attendance', 'users'
+    ];
+
+    let totalMigrated = 0;
+
+    for (const tableName of multiTenantTables) {
+      const table = db[tableName];
+      if (!table) continue;
+
+      // Find records without businessId
+      const orphanedRecords = await table
+        .filter(item => !item.businessId)
+        .toArray();
+
+      if (orphanedRecords.length > 0) {
+        // Update each record with the current businessId
+        for (const record of orphanedRecords) {
+          await table.update(record._id, { businessId });
+        }
+        totalMigrated += orphanedRecords.length;
+        console.log(`[AppContext] Migrated ${orphanedRecords.length} orphaned ${tableName} records to business ${businessId}`);
+      }
+    }
+
+    if (totalMigrated > 0) {
+      console.log(`[AppContext] Total data migration complete: ${totalMigrated} records updated`);
+    }
+  } catch (error) {
+    console.error('[AppContext] Data migration error:', error);
+    // Don't throw - migration failure shouldn't block app usage
+  }
+};
 
 const AppContext = createContext();
 
@@ -61,6 +107,8 @@ export const AppProvider = ({ children }) => {
           // Set business context for multi-tenant data isolation
           if (authService.currentUser.businessId) {
             setBusinessContext(authService.currentUser.businessId);
+            // Migrate orphaned data to this business (runs in background)
+            migrateOrphanedData(authService.currentUser.businessId);
           }
         } else {
           // Fallback: Check localStorage for offline session
@@ -84,6 +132,8 @@ export const AppProvider = ({ children }) => {
             // Set business context for multi-tenant data isolation
             if (userData.businessId) {
               setBusinessContext(userData.businessId);
+              // Migrate orphaned data to this business (runs in background)
+              migrateOrphanedData(userData.businessId);
             }
           }
         }
@@ -96,6 +146,8 @@ export const AppProvider = ({ children }) => {
             // Set business context for multi-tenant data isolation
             if (userProfile.businessId) {
               setBusinessContext(userProfile.businessId);
+              // Migrate orphaned data to this business (runs in background)
+              migrateOrphanedData(userProfile.businessId);
             }
             // Initialize sync manager when user signs in
             if (isSupabaseConfigured()) {
@@ -157,6 +209,8 @@ export const AppProvider = ({ children }) => {
       // Set business context for multi-tenant data isolation
       if (response.user?.businessId) {
         setBusinessContext(response.user.businessId);
+        // Migrate orphaned data to this business (runs in background)
+        migrateOrphanedData(response.user.businessId);
       }
 
       showToast('Login successful!', 'success');

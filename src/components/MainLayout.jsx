@@ -575,6 +575,7 @@ const MainLayout = () => {
         <div className="sidebar-header">
           <div className="brand">
             <span className="brand-text">Daet Massage & Spa</span>
+            <span className="brand-text-highlight">Business Management</span>
           </div>
           <button
             className="sidebar-toggle"

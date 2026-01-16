@@ -184,8 +184,8 @@ const Login = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1 className="brand-logo">AVA Spa & Wellness</h1>
-          <p className="brand-tagline">SPA Management System</p>
+          <h1 className="brand-logo">Daet Massage & Spa</h1>
+          <p className="brand-tagline">Business Management System</p>
         </div>
 
         <div className="auth-card">
@@ -296,7 +296,7 @@ const Login = () => {
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                  Install AVA Spa App
+                  Install Daet Spa App
                 </button>
               ) : (
                 <p className="pwa-install-hint">

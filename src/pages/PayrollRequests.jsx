@@ -83,7 +83,7 @@ const PayrollRequests = ({ embedded = false, onDataChange, onOpenSubmitRef }) =>
   // Download payslip
   const handleDownloadPayslip = (payroll) => {
     const payslipText = `
-AVA SOLUTIONS DEMO SPA
+DAET MASSAGE & SPA
 PAY SLIP
 
 Employee: ${user?.firstName} ${user?.lastName}

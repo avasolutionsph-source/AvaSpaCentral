@@ -1127,6 +1127,19 @@ select {
   object-fit: contain;
 }
 
+.brand-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar.closed .brand-text {
+  display: none;
+}
+
 .brand h2 {
   font-size: 1.125rem;
   font-weight: var(--font-bold);
@@ -7286,7 +7299,7 @@ a:focus:not(:focus-visible),
   /* Print header for pages */
   .dashboard-page::before,
   .reports-page::before {
-    content: "Printed from Ava Solutions SPA Demo ERP";
+    content: "Printed from Daet Massage & Spa";
     display: block;
     text-align: center;
     font-size: 0.8rem;

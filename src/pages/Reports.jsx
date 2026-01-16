@@ -488,11 +488,11 @@ const Reports = ({ embedded = false }) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('Ava Solutions', 14, 18);
+    doc.text('Daet Massage & Spa', 14, 18);
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text('SPA Demo ERP', 14, 28);
+    doc.text('Business Management System', 14, 28);
 
     doc.setFontSize(14);
     doc.text(reportName, pageWidth - 14, 18, { align: 'right' });

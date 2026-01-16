@@ -715,7 +715,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
             <div className="modal-body">
               <div className="payslip-content">
                 <div className="payslip-header">
-                  <h1>AVA SOLUTIONS DEMO SPA</h1>
+                  <h1>DAET MASSAGE & SPA</h1>
                   <h2>PAY SLIP</h2>
                 </div>
 

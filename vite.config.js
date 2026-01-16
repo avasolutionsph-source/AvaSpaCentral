@@ -11,9 +11,9 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['Ava transparent.png', 'images/**/*'],
       manifest: {
-        name: 'AVA Solutions - Spa ERP',
-        short_name: 'AVA Spa',
-        description: 'Complete Spa & Wellness Business Management System',
+        name: 'Daet Massage & Spa',
+        short_name: 'Daet Spa',
+        description: 'Daet Massage & Spa - Business Management System',
         theme_color: '#1B5E37',
         background_color: '#ffffff',
         display: 'standalone',

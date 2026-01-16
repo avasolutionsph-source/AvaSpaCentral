@@ -516,8 +516,8 @@ const MainLayout = () => {
     {
       label: 'Intelligence',
       items: [
-        { path: '/ava-sensei', label: 'Ava Sensei', icon: 'sensei', page: 'ava-sensei' },
-        { path: '/ai-chatbot', label: 'Ava AI', icon: 'ai', page: 'ai-chatbot' },
+        { path: '/ava-sensei', label: 'Insights', icon: 'sensei', page: 'ava-sensei' },
+        { path: '/ai-chatbot', label: 'Daet AI', icon: 'ai', page: 'ai-chatbot' },
       ],
       hasDivider: true
     },

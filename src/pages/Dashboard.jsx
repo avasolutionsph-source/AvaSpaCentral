@@ -714,7 +714,7 @@ const Dashboard = () => {
         </button>
         <button className="quick-action-btn gradient" onClick={() => navigate('/ava-sensei')}>
           <span className="quick-btn-icon">🤖</span>
-          <span className="quick-btn-text">Ava Sensei</span>
+          <span className="quick-btn-text">Insights</span>
         </button>
         <button className="quick-action-btn secondary" onClick={() => navigate('/reports')}>
           <span className="quick-btn-icon">📊</span>

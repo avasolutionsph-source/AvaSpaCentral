@@ -9,7 +9,7 @@ const AIChatbot = () => {
     {
       id: 1,
       type: 'bot',
-      text: 'Hello! I\'m Ava, your AI business assistant. I\'m connected to your real business data and can help you with insights, analytics, and quick actions. How can I assist you today?',
+      text: 'Hello! I\'m your AI business assistant. I\'m connected to your real business data and can help you with insights, analytics, and quick actions. How can I assist you today?',
       timestamp: new Date().toISOString(),
       suggestions: [
         'Show today\'s sales summary',
@@ -394,7 +394,7 @@ const AIChatbot = () => {
     if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
       const sales = getTodaysSales();
       return {
-        text: `👋 Hello! I'm Ava, connected to your live business data.\n\n📊 Quick update: You've made ₱${sales.revenue.toLocaleString()} today from ${sales.count} transactions.\n\nWhat would you like to know?`,
+        text: `👋 Hello! I'm connected to your live business data.\n\n📊 Quick update: You've made ₱${sales.revenue.toLocaleString()} today from ${sales.count} transactions.\n\nWhat would you like to know?`,
         suggestions: ['Business overview', 'Top services', 'Inventory alerts']
       };
     }
@@ -491,7 +491,7 @@ const AIChatbot = () => {
       {
         id: 1,
         type: 'bot',
-        text: 'Chat cleared! I\'m Ava, ready to help. What would you like to know?',
+        text: 'Chat cleared! Ready to help. What would you like to know?',
         timestamp: new Date().toISOString(),
         suggestions: [
           'Show today\'s sales summary',
@@ -515,7 +515,7 @@ const AIChatbot = () => {
     <div className="chatbot-page">
       <div className="page-header">
         <div>
-          <h1>Ava</h1>
+          <h1>Daet AI</h1>
           <p>Your AI business assistant - Get instant insights and manage your spa with ease</p>
         </div>
         <div className="header-actions">
@@ -544,7 +544,7 @@ const AIChatbot = () => {
                   <div className="message-content">
                     <div className="message-header">
                       <span className="message-sender">
-                        {message.type === 'bot' ? 'Ava' : 'You'}
+                        {message.type === 'bot' ? 'Daet AI' : 'You'}
                       </span>
                       <span className="message-time">
                         {new Date(message.timestamp).toLocaleTimeString('en-US', {

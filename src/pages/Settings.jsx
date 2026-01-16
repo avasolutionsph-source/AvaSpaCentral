@@ -18,11 +18,11 @@ const Settings = () => {
 
   // Business Info
   const [businessInfo, setBusinessInfo] = useState({
-    name: 'Ava Solutions Demo SPA',
-    address: 'Demo Address, Philippines',
+    name: 'Daet Massage & Spa',
+    address: 'Daet, Camarines Norte, Philippines',
     phone: '+63 912 345 6789',
-    email: 'info@avasolutions.ph',
-    website: 'www.avasolutions.ph'
+    email: 'info@daetmassagespa.com',
+    website: 'www.daetmassagespa.com'
   });
 
   // Business Hours

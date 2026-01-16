@@ -671,7 +671,7 @@ const AvaSenseiUltrathink = () => {
       <div className="ava-sensei-page">
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Ava Sensei is analyzing your data...</p>
+          <p>Analyzing your data...</p>
         </div>
       </div>
     );
@@ -683,7 +683,7 @@ const AvaSenseiUltrathink = () => {
       <div className="ava-sensei-header">
         <div className="header-content">
           <h1>
-            Ava Sensei
+            Business Insights
             <span className="ai-badge">AI-POWERED</span>
           </h1>
           <p className="subtitle">Executive insights, predictions & intelligent recommendations</p>

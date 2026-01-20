@@ -1991,6 +1991,94 @@ select {
 }
 
 /* ============================================================================
+   CUSTOMER BOOKING LINK CARD
+   ============================================================================ */
+.booking-link-card {
+  background: linear-gradient(135deg, #1B5E37 0%, #145a2c 100%);
+  border-radius: 12px;
+  padding: var(--spacing-lg);
+  color: white;
+  margin-bottom: var(--spacing-lg);
+}
+
+.booking-link-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.booking-link-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.booking-link-header h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.booking-link-header p {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+.booking-link-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.booking-link-url {
+  flex: 1;
+  font-size: 0.875rem;
+  background: none;
+  color: white;
+  word-break: break-all;
+  font-family: var(--font-mono);
+}
+
+.copy-link-btn {
+  background: white;
+  color: #1B5E37;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.copy-link-btn:hover {
+  background: #f0f0f0;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .booking-link-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .booking-link-url {
+    font-size: 0.75rem;
+  }
+
+  .copy-link-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* ============================================================================
    KPI CARDS & METRICS
    Minimalist white cards
    ============================================================================ */

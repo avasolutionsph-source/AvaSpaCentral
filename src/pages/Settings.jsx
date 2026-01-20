@@ -143,10 +143,156 @@ const Settings = () => {
   const [pendingImportData, setPendingImportData] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Booking Slug State
+  const [bookingSlug, setBookingSlug] = useState('');
+  const [bookingSlugError, setBookingSlugError] = useState('');
+  const [checkingSlug, setCheckingSlug] = useState(false);
+  const [savingSlug, setSavingSlug] = useState(false);
+
   const handleBusinessInfoChange = (e) => {
     const { name, value } = e.target;
     setBusinessInfo(prev => ({ ...prev, [name]: value }));
   };
+
+  // Booking slug validation and save
+  const validateSlugFormat = (slug) => {
+    if (!slug) return true; // Empty is OK (means no custom slug)
+    if (slug.length < 3) return 'Slug must be at least 3 characters';
+    if (slug.length > 50) return 'Slug must be 50 characters or less';
+    if (!/^[a-z0-9-]+$/.test(slug)) return 'Only lowercase letters, numbers, and hyphens allowed';
+    if (slug.startsWith('-') || slug.endsWith('-')) return 'Slug cannot start or end with a hyphen';
+    if (slug.includes('--')) return 'Slug cannot have consecutive hyphens';
+    return true;
+  };
+
+  const handleBookingSlugChange = (e) => {
+    const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    setBookingSlug(value);
+    const validation = validateSlugFormat(value);
+    setBookingSlugError(validation === true ? '' : validation);
+  };
+
+  const checkSlugAvailability = async (slug) => {
+    if (!slug) return true;
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    try {
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${slug}&select=id`,
+        {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        }
+      );
+      const data = await response.json();
+      // If no results or the only result is our own business, it's available
+      return data.length === 0 || (data.length === 1 && data[0].id === user?.businessId);
+    } catch (err) {
+      console.error('Error checking slug availability:', err);
+      return false;
+    }
+  };
+
+  const handleSaveBookingSlug = async () => {
+    // Validate format
+    const validation = validateSlugFormat(bookingSlug);
+    if (validation !== true) {
+      setBookingSlugError(validation);
+      return;
+    }
+
+    setCheckingSlug(true);
+    setSavingSlug(true);
+
+    try {
+      // Check availability
+      const isAvailable = await checkSlugAvailability(bookingSlug);
+      if (!isAvailable) {
+        setBookingSlugError('This booking link is already taken. Please choose another.');
+        setSavingSlug(false);
+        setCheckingSlug(false);
+        return;
+      }
+
+      // Save to Supabase using authenticated session
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      // Get the current session token for authenticated request
+      const { supabase } = await import('../services/supabase/supabaseClient');
+      let accessToken = supabaseKey; // fallback to anon key
+
+      if (supabase) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          accessToken = sessionData.session.access_token;
+        }
+      }
+
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/businesses?id=eq.${user?.businessId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({ booking_slug: bookingSlug || null })
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('PATCH response error:', response.status, errorText);
+        throw new Error('Failed to save booking slug');
+      }
+
+      showToast('Booking link saved successfully!', 'success');
+      setBookingSlugError('');
+    } catch (err) {
+      console.error('Error saving booking slug:', err);
+      showToast('Failed to save booking link. Please try again.', 'error');
+    } finally {
+      setSavingSlug(false);
+      setCheckingSlug(false);
+    }
+  };
+
+  // Load booking slug on mount
+  useEffect(() => {
+    const loadBookingSlug = async () => {
+      if (!user?.businessId) return;
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      try {
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/businesses?id=eq.${user.businessId}&select=booking_slug`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          }
+        );
+        const data = await response.json();
+        if (data?.[0]?.booking_slug) {
+          setBookingSlug(data[0].booking_slug);
+        }
+      } catch (err) {
+        console.error('Error loading booking slug:', err);
+      }
+    };
+
+    loadBookingSlug();
+  }, [user?.businessId]);
 
   const handleBusinessHourChange = (index, field, value) => {
     const updated = [...businessHours];
@@ -840,6 +986,71 @@ const Settings = () => {
                 placeholder="www.yourbusiness.com"
                 disabled={!canEdit()}
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Customer Booking Link */}
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <div className="settings-section-icon">🔗</div>
+            <div className="settings-section-title">
+              <h2>Customer Booking Link</h2>
+              <p>Customize your public booking page URL</p>
+            </div>
+          </div>
+          <div className="settings-section-body">
+            <div className="settings-form-group">
+              <label>Current Booking Link</label>
+              <div className="booking-link-preview">
+                <code>
+                  {window.location.origin}/book/{bookingSlug || user?.businessId || 'your-id'}
+                </code>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => {
+                    const url = `${window.location.origin}/book/${bookingSlug || user?.businessId}`;
+                    navigator.clipboard.writeText(url);
+                    showToast('Booking link copied!', 'success');
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+            <div className="settings-form-group">
+              <label>Custom Booking Slug</label>
+              <p className="settings-help-text">
+                Create a memorable, custom URL for your booking page (e.g., "daet-spa" instead of long ID)
+              </p>
+              <div className="booking-slug-input-group">
+                <span className="booking-slug-prefix">{window.location.origin}/book/</span>
+                <input
+                  type="text"
+                  value={bookingSlug}
+                  onChange={handleBookingSlugChange}
+                  placeholder="your-custom-name"
+                  disabled={!canEdit() || savingSlug}
+                  maxLength={50}
+                />
+              </div>
+              {bookingSlugError && (
+                <p className="settings-error-text">{bookingSlugError}</p>
+              )}
+              <p className="settings-help-text" style={{ marginTop: '0.5rem' }}>
+                Only lowercase letters, numbers, and hyphens. 3-50 characters.
+              </p>
+            </div>
+            <div className="settings-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveBookingSlug}
+                disabled={!canEdit() || savingSlug || !!bookingSlugError}
+              >
+                {savingSlug ? 'Saving...' : 'Save Booking Link'}
+              </button>
             </div>
           </div>
         </div>

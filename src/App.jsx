@@ -18,6 +18,9 @@ import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
 import POS from './pages/POS';
 
+// Public pages (no auth required)
+const BookingPage = lazy(() => import('./pages/BookingPage'));
+
 // Lazy loaded pages (code splitting for better initial load)
 const Products = lazy(() => import('./pages/Products'));
 const Employees = lazy(() => import('./pages/Employees'));
@@ -134,6 +137,16 @@ function AppRoutes() {
             <PublicRoute>
               <Register />
             </PublicRoute>
+          }
+        />
+
+        {/* Customer Booking Page (Public - no auth required) */}
+        <Route
+          path="/book/:businessId"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <BookingPage />
+            </Suspense>
           }
         />
 

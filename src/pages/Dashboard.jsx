@@ -8,7 +8,7 @@ import { DashboardSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, user } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [showAiInsights, setShowAiInsights] = useState(true);
   const [salaryHealth, setSalaryHealth] = useState(null);
   const [insightsData, setInsightsData] = useState({ products: [], rooms: [] });
+  const [bookingSlug, setBookingSlug] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -110,6 +111,38 @@ const Dashboard = () => {
       isMounted = false;
     };
   }, []);
+
+  // Fetch booking slug for the booking link display
+  useEffect(() => {
+    const fetchBookingSlug = async () => {
+      if (!user?.businessId) return;
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) return;
+
+      try {
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/businesses?id=eq.${user.businessId}&select=booking_slug`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          }
+        );
+        const data = await response.json();
+        if (data?.[0]?.booking_slug) {
+          setBookingSlug(data[0].booking_slug);
+        }
+      } catch (err) {
+        console.error('Error fetching booking slug:', err);
+      }
+    };
+
+    fetchBookingSlug();
+  }, [user?.businessId]);
 
   const loadDashboardData = async () => {
     try {
@@ -725,6 +758,33 @@ const Dashboard = () => {
           <span className="quick-btn-text">Employees</span>
         </button>
       </div>
+
+      {/* Customer Booking Link */}
+      {user?.businessId && (
+        <div className="booking-link-card">
+          <div className="booking-link-header">
+            <span className="booking-link-icon">🔗</span>
+            <div>
+              <h3>Customer Booking Link</h3>
+              <p>Share this link with customers to let them book online</p>
+            </div>
+          </div>
+          <div className="booking-link-content">
+            <code className="booking-link-url">
+              {`${window.location.origin}/book/${bookingSlug || user.businessId}`}
+            </code>
+            <button
+              className="copy-link-btn"
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/book/${bookingSlug || user.businessId}`);
+                showToast('Booking link copied to clipboard!', 'success');
+              }}
+            >
+              📋 Copy Link
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="kpi-grid">

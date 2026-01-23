@@ -26,6 +26,12 @@ export { default as CashDrawerRepository } from './CashDrawerRepository';
 export { default as ShiftScheduleRepository } from './ShiftScheduleRepository';
 export { default as TimeOffRequestRepository } from './TimeOffRequestRepository';
 
+// HR Request repositories
+export { default as OTRequestRepository } from './OTRequestRepository';
+export { default as LeaveRequestRepository } from './LeaveRequestRepository';
+export { default as CashAdvanceRequestRepository } from './CashAdvanceRequestRepository';
+export { default as IncidentReportRepository } from './IncidentReportRepository';
+
 // Settings & Config repositories
 export { default as SettingsRepository } from './SettingsRepository';
 export { default as BusinessConfigRepository } from './BusinessConfigRepository';

@@ -7,21 +7,17 @@
  * This enables event-driven sync instead of interval-based polling.
  */
 
+import type { DataChangeEvent, DataChangeListener } from '../../types';
+
 class DataChangeEmitter {
-  constructor() {
-    this._listeners = [];
-  }
+  private _listeners: DataChangeListener[] = [];
 
   /**
    * Emit a data change event
-   * @param {Object} change - The change details
-   * @param {string} change.entityType - The entity type (e.g., 'products', 'customers')
-   * @param {string} change.operation - The operation type ('create', 'update', 'delete')
-   * @param {string} [change.entityId] - The entity ID (optional)
    */
-  emit(change) {
+  emit(change: DataChangeEvent): void {
     console.log('[DataChangeEmitter] Data changed:', change.entityType, change.operation);
-    this._listeners.forEach(callback => {
+    this._listeners.forEach((callback) => {
       try {
         callback(change);
       } catch (error) {
@@ -32,27 +28,25 @@ class DataChangeEmitter {
 
   /**
    * Subscribe to data change events
-   * @param {Function} callback - The callback function to call on data changes
-   * @returns {Function} Unsubscribe function
    */
-  subscribe(callback) {
+  subscribe(callback: DataChangeListener): () => void {
     this._listeners.push(callback);
     return () => {
-      this._listeners = this._listeners.filter(l => l !== callback);
+      this._listeners = this._listeners.filter((l) => l !== callback);
     };
   }
 
   /**
    * Get the number of active listeners
    */
-  get listenerCount() {
+  get listenerCount(): number {
     return this._listeners.length;
   }
 
   /**
    * Remove all listeners
    */
-  clear() {
+  clear(): void {
     this._listeners = [];
   }
 }

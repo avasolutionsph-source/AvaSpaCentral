@@ -9,12 +9,16 @@
 
 import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient';
 
+type NetworkListener = (isOnline: boolean) => void;
+
 class NetworkDetector {
+  private _isOnline: boolean;
+  private _listeners: NetworkListener[] = [];
+  private _checkInterval: ReturnType<typeof setInterval> | null = null;
+  private _checkIntervalMs = 60000; // Check every 60 seconds
+
   constructor() {
-    this._isOnline = navigator.onLine;
-    this._listeners = [];
-    this._checkInterval = null;
-    this._checkIntervalMs = 60000; // Check every 60 seconds (reduced frequency)
+    this._isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
     // Bind event handlers
     this._handleOnline = this._handleOnline.bind(this);
@@ -24,7 +28,9 @@ class NetworkDetector {
   /**
    * Start monitoring network status
    */
-  start() {
+  start(): void {
+    if (typeof window === 'undefined') return;
+
     // Listen to browser events
     window.addEventListener('online', this._handleOnline);
     window.addEventListener('offline', this._handleOffline);
@@ -42,7 +48,9 @@ class NetworkDetector {
   /**
    * Stop monitoring network status
    */
-  stop() {
+  stop(): void {
+    if (typeof window === 'undefined') return;
+
     window.removeEventListener('online', this._handleOnline);
     window.removeEventListener('offline', this._handleOffline);
 
@@ -57,16 +65,14 @@ class NetworkDetector {
   /**
    * Get current online status
    */
-  get isOnline() {
+  get isOnline(): boolean {
     return this._isOnline;
   }
 
   /**
    * Subscribe to network status changes
-   * @param {Function} callback - Called with (isOnline) when status changes
-   * @returns {Function} Unsubscribe function
    */
-  subscribe(callback) {
+  subscribe(callback: NetworkListener): () => void {
     this._listeners.push(callback);
 
     // Return unsubscribe function
@@ -80,9 +86,8 @@ class NetworkDetector {
 
   /**
    * Manually check connectivity
-   * Uses browser online status and optionally pings Supabase
    */
-  async _checkConnectivity() {
+  private async _checkConnectivity(): Promise<void> {
     try {
       // First check browser's online status
       if (!navigator.onLine) {
@@ -94,16 +99,16 @@ class NetworkDetector {
       }
 
       // If Supabase is configured, check if it's reachable
-      if (isSupabaseConfigured()) {
+      if (isSupabaseConfigured() && supabase) {
         const { error } = await supabase.from('businesses').select('id').limit(1);
-        // Consider network-related errors as offline, other errors (auth, permissions) as still online
+        // Consider network-related errors as offline
         const networkErrors = ['NETWORK_ERROR', 'PGRST301', 'FetchError'];
-        const isNetworkError = error && (
-          networkErrors.includes(error.code) ||
-          error.message?.includes('fetch') ||
-          error.message?.includes('network') ||
-          error.message?.includes('Failed to fetch')
-        );
+        const isNetworkError =
+          error &&
+          (networkErrors.includes(error.code || '') ||
+            error.message?.includes('fetch') ||
+            error.message?.includes('network') ||
+            error.message?.includes('Failed to fetch'));
         const isReachable = !isNetworkError;
 
         if (isReachable !== this._isOnline) {
@@ -117,7 +122,7 @@ class NetworkDetector {
           this._notifyListeners();
         }
       }
-    } catch (error) {
+    } catch {
       // If check fails, use browser's online status
       if (navigator.onLine !== this._isOnline) {
         this._isOnline = navigator.onLine;
@@ -128,9 +133,8 @@ class NetworkDetector {
 
   /**
    * Force an immediate connectivity check
-   * @returns {Promise<boolean>} Current online status
    */
-  async checkNow() {
+  async checkNow(): Promise<boolean> {
     await this._checkConnectivity();
     return this._isOnline;
   }
@@ -138,7 +142,7 @@ class NetworkDetector {
   /**
    * Handle browser online event
    */
-  _handleOnline() {
+  private _handleOnline(): void {
     if (!this._isOnline) {
       this._isOnline = true;
       this._notifyListeners();
@@ -149,7 +153,7 @@ class NetworkDetector {
   /**
    * Handle browser offline event
    */
-  _handleOffline() {
+  private _handleOffline(): void {
     if (this._isOnline) {
       this._isOnline = false;
       this._notifyListeners();
@@ -160,7 +164,7 @@ class NetworkDetector {
   /**
    * Notify all listeners of status change
    */
-  _notifyListeners() {
+  private _notifyListeners(): void {
     for (const listener of this._listeners) {
       try {
         listener(this._isOnline);

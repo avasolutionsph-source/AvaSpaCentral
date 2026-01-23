@@ -12,58 +12,66 @@
 
 import { db, syncQueue } from '../../db';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
+import type { Table } from 'dexie';
+import type {
+  BaseEntity,
+  RepositoryOptions,
+  QueryOptions,
+  BulkOperationResult,
+  FilterFunction,
+  SyncOperation,
+} from '../../types';
 
 // Business context for multi-tenant isolation
-let currentBusinessId = null;
+let currentBusinessId: string | null = null;
 
 /**
  * Set the current business context for multi-tenant isolation
- * @param {string} businessId - The business ID to filter by
  */
-export const setBusinessContext = (businessId) => {
+export const setBusinessContext = (businessId: string): void => {
   currentBusinessId = businessId;
 };
 
 /**
  * Get the current business context
- * @returns {string|null} The current business ID
  */
-export const getBusinessContext = () => currentBusinessId;
+export const getBusinessContext = (): string | null => currentBusinessId;
 
 /**
  * Clear the business context (e.g., on logout)
  */
-export const clearBusinessContext = () => {
+export const clearBusinessContext = (): void => {
   currentBusinessId = null;
 };
 
-// Generate a UUID v4 (compatible with Supabase)
-export const generateId = () => {
-  // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-  // where x is random hex and y is 8, 9, a, or b
+/**
+ * Generate a UUID v4 (compatible with Supabase)
+ */
+export const generateId = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 };
 
-class BaseRepository {
-  /**
-   * @param {string} tableName - The Dexie table name
-   * @param {Object} options - Repository options
-   * @param {boolean} options.trackSync - Whether to track operations in sync queue (default: true)
-   * @param {boolean} options.softDelete - Whether to use soft delete (default: false)
-   * @param {boolean} options.multiTenant - Whether to enforce businessId isolation (default: true)
-   */
-  constructor(tableName, options = {}) {
+// Tables that don't use multi-tenant filtering
+const noTenantTables = ['settings', 'payrollConfig', 'businessConfig', 'syncQueue', 'syncMetadata'];
+
+class BaseRepository<T extends BaseEntity> {
+  protected tableName: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  protected table: Table<any, string>;
+  protected trackSync: boolean;
+  protected softDelete: boolean;
+  protected multiTenant: boolean;
+
+  constructor(tableName: string, options: RepositoryOptions = {}) {
     this.tableName = tableName;
-    this.table = db[tableName];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.table = (db as any)[tableName];
     this.trackSync = options.trackSync !== false;
     this.softDelete = options.softDelete || false;
-    // Enable multi-tenant isolation by default for most entities
-    // Exceptions: settings, payrollConfig, businessConfig, syncQueue, syncMetadata
-    const noTenantTables = ['settings', 'payrollConfig', 'businessConfig', 'syncQueue', 'syncMetadata'];
     this.multiTenant = options.multiTenant !== false && !noTenantTables.includes(tableName);
 
     if (!this.table) {
@@ -73,22 +81,18 @@ class BaseRepository {
 
   /**
    * Get all items from the table
-   * @param {Object} options - Query options
-   * @param {boolean} options.includeDeleted - Include soft-deleted items
-   * @param {boolean} options.skipTenantFilter - Skip businessId filtering (for system operations)
-   * @returns {Promise<Array>}
    */
-  async getAll(options = {}) {
+  async getAll(options: QueryOptions = {}): Promise<T[]> {
     let items = await this.table.toArray();
 
     // Filter out soft-deleted items unless requested
     if (this.softDelete && !options.includeDeleted) {
-      items = items.filter(item => !item._deleted);
+      items = items.filter((item) => !item._deleted);
     }
 
     // Apply multi-tenant businessId filter
     if (this.multiTenant && currentBusinessId && !options.skipTenantFilter) {
-      items = items.filter(item => item.businessId === currentBusinessId);
+      items = items.filter((item) => item.businessId === currentBusinessId);
     }
 
     return items;
@@ -96,45 +100,36 @@ class BaseRepository {
 
   /**
    * Get a single item by ID
-   * @param {string} id - The item ID
-   * @returns {Promise<Object|undefined>}
    */
-  async getById(id) {
+  async getById(id: string): Promise<T | undefined> {
     return await this.table.get(id);
   }
 
   /**
    * Find items matching a filter function
-   * @param {Function} filterFn - Filter function
-   * @returns {Promise<Array>}
    */
-  async find(filterFn) {
+  async find(filterFn: FilterFunction<T>): Promise<T[]> {
     const items = await this.getAll();
     return items.filter(filterFn);
   }
 
   /**
    * Find a single item matching a filter function
-   * @param {Function} filterFn - Filter function
-   * @returns {Promise<Object|undefined>}
    */
-  async findOne(filterFn) {
+  async findOne(filterFn: FilterFunction<T>): Promise<T | undefined> {
     const items = await this.find(filterFn);
     return items[0];
   }
 
   /**
    * Find items by index
-   * @param {string} indexName - The index name
-   * @param {*} value - The value to match
-   * @returns {Promise<Array>}
    */
-  async findByIndex(indexName, value) {
+  async findByIndex(indexName: string, value: string | number): Promise<T[]> {
     let items = await this.table.where(indexName).equals(value).toArray();
 
-    // Apply multi-tenant businessId filter (same as getAll)
+    // Apply multi-tenant businessId filter
     if (this.multiTenant && currentBusinessId) {
-      items = items.filter(item => item.businessId === currentBusinessId);
+      items = items.filter((item) => item.businessId === currentBusinessId);
     }
 
     return items;
@@ -142,29 +137,27 @@ class BaseRepository {
 
   /**
    * Create a new item
-   * @param {Object} data - The item data
-   * @returns {Promise<Object>} The created item with _id
    */
-  async create(data) {
+  async create(data: Partial<T>): Promise<T> {
     const now = new Date().toISOString();
     const item = {
       ...data,
       _id: data._id || generateId(),
       _syncStatus: 'pending',
       _createdAt: now,
-      _updatedAt: now
-    };
+      _updatedAt: now,
+    } as T;
 
     // Automatically add businessId for multi-tenant entities
     if (this.multiTenant && currentBusinessId && !item.businessId) {
-      item.businessId = currentBusinessId;
+      (item as BaseEntity).businessId = currentBusinessId;
     }
 
     await this.table.add(item);
 
     // Track in sync queue and emit event for immediate sync
     if (this.trackSync) {
-      await this.addToSyncQueue(item._id, 'create', item);
+      await this.addToSyncQueue(item._id, 'create', item as Record<string, unknown>);
       dataChangeEmitter.emit({ entityType: this.tableName, operation: 'create', entityId: item._id });
     }
 
@@ -173,44 +166,43 @@ class BaseRepository {
 
   /**
    * Create multiple items in a batch
-   * @param {Array} items - Array of item data
-   * @param {Object} options - Options
-   * @param {number} options.batchSize - Max items per batch (default: 100)
-   * @returns {Promise<{results: Array, success: number, failed: number, errors: Array}>} Results with counts
    */
-  async createMany(items, options = {}) {
+  async createMany(
+    items: Array<Partial<T>>,
+    options: { batchSize?: number } = {}
+  ): Promise<BulkOperationResult<T>> {
     const batchSize = options.batchSize || 100;
     const now = new Date().toISOString();
-    const allResults = [];
+    const allResults: T[] = [];
     let success = 0;
     let failed = 0;
-    const errors = [];
+    const errors: Array<{ item?: T; id?: string; error: string }> = [];
 
-    // Process in batches to avoid memory issues with large datasets
+    // Process in batches
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
-      const itemsWithIds = batch.map(data => {
+      const itemsWithIds = batch.map((data) => {
         const item = {
           ...data,
           _id: data._id || generateId(),
           _syncStatus: 'pending',
           _createdAt: now,
-          _updatedAt: now
-        };
-        // Automatically add businessId for multi-tenant entities
+          _updatedAt: now,
+        } as T;
+
         if (this.multiTenant && currentBusinessId && !item.businessId) {
-          item.businessId = currentBusinessId;
+          (item as BaseEntity).businessId = currentBusinessId;
         }
+
         return item;
       });
 
       try {
         await this.table.bulkAdd(itemsWithIds);
 
-        // Track in sync queue
         if (this.trackSync) {
           for (const item of itemsWithIds) {
-            await this.addToSyncQueue(item._id, 'create', item);
+            await this.addToSyncQueue(item._id, 'create', item as Record<string, unknown>);
           }
         }
 
@@ -222,20 +214,20 @@ class BaseRepository {
           try {
             await this.table.add(item);
             if (this.trackSync) {
-              await this.addToSyncQueue(item._id, 'create', item);
+              await this.addToSyncQueue(item._id, 'create', item as Record<string, unknown>);
             }
             allResults.push(item);
             success++;
           } catch (individualError) {
             failed++;
-            errors.push({ item, error: individualError.message });
+            errors.push({ item, error: (individualError as Error).message });
             console.error(`[BaseRepository] createMany individual error:`, individualError);
           }
         }
       }
     }
 
-    // Emit single event for batch create (debounced sync will handle it)
+    // Emit single event for batch create
     if (this.trackSync && success > 0) {
       dataChangeEmitter.emit({ entityType: this.tableName, operation: 'create', count: success });
     }
@@ -245,11 +237,8 @@ class BaseRepository {
 
   /**
    * Update an existing item
-   * @param {string} id - The item ID
-   * @param {Object} data - The updated data (partial)
-   * @returns {Promise<Object>} The updated item
    */
-  async update(id, data) {
+  async update(id: string, data: Partial<T>): Promise<T> {
     const existing = await this.getById(id);
     if (!existing) {
       throw new Error(`Item with id "${id}" not found in ${this.tableName}`);
@@ -259,16 +248,15 @@ class BaseRepository {
     const updatedItem = {
       ...existing,
       ...data,
-      _id: id, // Ensure ID doesn't change
+      _id: id,
       _syncStatus: 'pending',
-      _updatedAt: now
-    };
+      _updatedAt: now,
+    } as T;
 
     await this.table.put(updatedItem);
 
-    // Track in sync queue and emit event for immediate sync
     if (this.trackSync) {
-      await this.addToSyncQueue(id, 'update', updatedItem);
+      await this.addToSyncQueue(id, 'update', updatedItem as Record<string, unknown>);
       dataChangeEmitter.emit({ entityType: this.tableName, operation: 'update', entityId: id });
     }
 
@@ -277,30 +265,25 @@ class BaseRepository {
 
   /**
    * Delete an item
-   * @param {string} id - The item ID
-   * @returns {Promise<boolean>} Success status
    */
-  async delete(id) {
+  async delete(id: string): Promise<boolean> {
     const existing = await this.getById(id);
     if (!existing) {
       return false;
     }
 
     if (this.softDelete) {
-      // Soft delete - mark as deleted
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await this.table.update(id, {
         _deleted: true,
         _deletedAt: new Date().toISOString(),
-        _syncStatus: 'pending'
-      });
+        _syncStatus: 'pending',
+      } as any);
     } else {
-      // Hard delete
       await this.table.delete(id);
     }
 
-    // Track in sync queue and emit event for immediate sync
     if (this.trackSync) {
-      // Clean up any orphaned sync queue entries for this entity before adding delete
       await this._cleanupOrphanedSyncEntries(id);
       await this.addToSyncQueue(id, 'delete', { _id: id });
       dataChangeEmitter.emit({ entityType: this.tableName, operation: 'delete', entityId: id });
@@ -311,25 +294,28 @@ class BaseRepository {
 
   /**
    * Clean up orphaned sync queue entries for an entity
-   * Called before delete to remove create/update entries that are now irrelevant
-   * @param {string} entityId - The entity ID
    */
-  async _cleanupOrphanedSyncEntries(entityId) {
+  private async _cleanupOrphanedSyncEntries(entityId: string): Promise<void> {
     try {
       const orphanedEntries = await syncQueue
-        .filter(item =>
-          item.entityType === this.tableName &&
-          item.entityId === entityId &&
-          (item.operation === 'create' || item.operation === 'update')
+        .filter(
+          (item) =>
+            item.entityType === this.tableName &&
+            item.entityId === entityId &&
+            (item.operation === 'create' || item.operation === 'update')
         )
         .toArray();
 
       for (const entry of orphanedEntries) {
-        await syncQueue.delete(entry.id);
+        if (entry.id !== undefined) {
+          await syncQueue.delete(entry.id);
+        }
       }
 
       if (orphanedEntries.length > 0) {
-        console.log(`[BaseRepository] Cleaned up ${orphanedEntries.length} orphaned sync entries for ${this.tableName}/${entityId}`);
+        console.log(
+          `[BaseRepository] Cleaned up ${orphanedEntries.length} orphaned sync entries for ${this.tableName}/${entityId}`
+        );
       }
     } catch (error) {
       console.warn(`[BaseRepository] Error cleaning orphaned sync entries:`, error);
@@ -338,30 +324,34 @@ class BaseRepository {
 
   /**
    * Bulk update multiple items
-   * @param {Array} updates - Array of { id, data } objects
-   * @returns {Promise<{success: number, failed: number, errors: Array}>} Result with counts and errors
    */
-  async bulkUpdate(updates) {
+  async bulkUpdate(
+    updates: Array<{ id: string; data: Partial<T> }>
+  ): Promise<BulkOperationResult<T>> {
     const now = new Date().toISOString();
     let success = 0;
     let failed = 0;
-    const errors = [];
+    const errors: Array<{ id?: string; error: string }> = [];
+    const results: T[] = [];
 
     for (const { id, data } of updates) {
       try {
         const existing = await this.getById(id);
         if (existing) {
-          await this.table.put({
+          const updatedItem = {
             ...existing,
             ...data,
             _id: id,
             _syncStatus: 'pending',
-            _updatedAt: now
-          });
+            _updatedAt: now,
+          } as T;
+
+          await this.table.put(updatedItem);
+          results.push(updatedItem);
           success++;
 
           if (this.trackSync) {
-            await this.addToSyncQueue(id, 'update', { ...existing, ...data });
+            await this.addToSyncQueue(id, 'update', updatedItem as Record<string, unknown>);
           }
         } else {
           failed++;
@@ -369,25 +359,22 @@ class BaseRepository {
         }
       } catch (error) {
         failed++;
-        errors.push({ id, error: error.message });
+        errors.push({ id, error: (error as Error).message });
         console.error(`[BaseRepository] bulkUpdate error for ${id}:`, error);
       }
     }
 
-    // Emit single event for batch update (debounced sync will handle it)
     if (this.trackSync && success > 0) {
       dataChangeEmitter.emit({ entityType: this.tableName, operation: 'update', count: success });
     }
 
-    return { success, failed, errors };
+    return { results, success, failed, errors };
   }
 
   /**
    * Count items in the table
-   * @param {Function} filterFn - Optional filter function
-   * @returns {Promise<number>}
    */
-  async count(filterFn) {
+  async count(filterFn?: FilterFunction<T>): Promise<number> {
     if (filterFn) {
       const items = await this.find(filterFn);
       return items.length;
@@ -397,29 +384,23 @@ class BaseRepository {
 
   /**
    * Check if an item exists
-   * @param {string} id - The item ID
-   * @returns {Promise<boolean>}
    */
-  async exists(id) {
+  async exists(id: string): Promise<boolean> {
     const item = await this.getById(id);
     return !!item;
   }
 
   /**
    * Clear all items from the table
-   * WARNING: Use with caution!
-   * @returns {Promise<void>}
    */
-  async clear() {
+  async clear(): Promise<void> {
     await this.table.clear();
   }
 
   /**
    * Upsert - Create or update an item
-   * @param {Object} data - The item data (must include _id for update)
-   * @returns {Promise<Object>} The created/updated item
    */
-  async upsert(data) {
+  async upsert(data: Partial<T>): Promise<T> {
     if (data._id) {
       const existing = await this.getById(data._id);
       if (existing) {
@@ -431,14 +412,12 @@ class BaseRepository {
 
   /**
    * Bulk upsert multiple items
-   * @param {Array} items - Array of items to upsert
-   * @returns {Promise<{results: Array, success: number, failed: number, errors: Array}>} Results with counts and errors
    */
-  async bulkUpsert(items) {
-    const results = [];
+  async bulkUpsert(items: Array<Partial<T>>): Promise<BulkOperationResult<T>> {
+    const results: T[] = [];
     let success = 0;
     let failed = 0;
-    const errors = [];
+    const errors: Array<{ item?: T; id?: string; error: string }> = [];
 
     for (const item of items) {
       try {
@@ -447,7 +426,7 @@ class BaseRepository {
         success++;
       } catch (error) {
         failed++;
-        errors.push({ item, error: error.message });
+        errors.push({ item: item as T, error: (error as Error).message });
         console.error(`[BaseRepository] bulkUpsert error:`, error);
       }
     }
@@ -459,11 +438,12 @@ class BaseRepository {
 
   /**
    * Add an operation to the sync queue
-   * @param {string} entityId - The entity ID
-   * @param {string} operation - The operation type (create, update, delete)
-   * @param {Object} data - The operation data
    */
-  async addToSyncQueue(entityId, operation, data) {
+  async addToSyncQueue(
+    entityId: string,
+    operation: SyncOperation,
+    data: Record<string, unknown>
+  ): Promise<void> {
     await syncQueue.add({
       entityType: this.tableName,
       entityId,
@@ -471,52 +451,45 @@ class BaseRepository {
       data,
       status: 'pending',
       createdAt: new Date().toISOString(),
-      retryCount: 0
+      retryCount: 0,
     });
   }
 
   /**
    * Mark an item as synced
-   * @param {string} id - The item ID
    */
-  async markAsSynced(id) {
+  async markAsSynced(id: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.table.update(id, {
       _syncStatus: 'synced',
-      _lastSyncedAt: new Date().toISOString()
-    });
+      _lastSyncedAt: new Date().toISOString(),
+    } as any);
   }
 
   /**
    * Get items pending sync
-   * @returns {Promise<Array>}
    */
-  async getPendingSync() {
-    return await this.table
-      .filter(item => item._syncStatus === 'pending')
-      .toArray();
+  async getPendingSync(): Promise<T[]> {
+    return await this.table.filter((item) => item._syncStatus === 'pending').toArray();
   }
 
   /**
    * Get items that failed to sync
-   * @returns {Promise<Array>}
    */
-  async getFailedSync() {
-    return await this.table
-      .filter(item => item._syncStatus === 'failed')
-      .toArray();
+  async getFailedSync(): Promise<T[]> {
+    return await this.table.filter((item) => item._syncStatus === 'failed').toArray();
   }
 
   /**
    * Mark item sync as failed
-   * @param {string} id - The item ID
-   * @param {string} error - Error message
    */
-  async markSyncFailed(id, error) {
+  async markSyncFailed(id: string, error: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.table.update(id, {
       _syncStatus: 'failed',
       _syncError: error,
-      _lastSyncAttempt: new Date().toISOString()
-    });
+      _lastSyncAttempt: new Date().toISOString(),
+    } as any);
   }
 }
 

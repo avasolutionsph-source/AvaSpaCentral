@@ -8,48 +8,55 @@
  * - Track sync status
  */
 
-import { db, syncQueue } from '../../db';
+import { syncQueue } from '../../db';
+import type { SyncQueueItem, SyncOperation, SyncQueueCount } from '../../types';
 
 class SyncQueue {
-  constructor() {
-    this.MAX_RETRIES = 3;
-    this.RETRY_DELAY_MS = 5000;
-  }
+  readonly MAX_RETRIES = 3;
+  readonly RETRY_DELAY_MS = 5000;
 
   /**
    * Add an operation to the sync queue
    */
-  async add(entityType, entityId, operation, data) {
+  async add(
+    entityType: string,
+    entityId: string,
+    operation: SyncOperation,
+    data: Record<string, unknown>
+  ): Promise<number | null> {
     // Check if there's already a pending or processing operation for this entity
-    // Use filter instead of compound index for reliable lookup
     const existing = await syncQueue
-      .filter(item => item.entityType === entityType && item.entityId === entityId)
+      .filter((item) => item.entityType === entityType && item.entityId === entityId)
       .first();
 
     if (existing && (existing.status === 'pending' || existing.status === 'processing')) {
       // Update existing operation instead of creating duplicate
-      // If it was a create followed by update, keep as create with new data
-      // If it was update followed by delete, just keep delete
       if (operation === 'delete') {
         if (existing.operation === 'create') {
           // Created then deleted - remove from queue entirely
-          await syncQueue.delete(existing.id);
+          if (existing.id !== undefined) {
+            await syncQueue.delete(existing.id);
+          }
           return null;
         }
         // Update to delete
-        await syncQueue.update(existing.id, {
-          operation: 'delete',
-          data,
-          updatedAt: new Date().toISOString()
-        });
-        return existing.id;
+        if (existing.id !== undefined) {
+          await syncQueue.update(existing.id, {
+            operation: 'delete',
+            data,
+            updatedAt: new Date().toISOString(),
+          });
+          return existing.id;
+        }
       } else {
         // Update the data
-        await syncQueue.update(existing.id, {
-          data,
-          updatedAt: new Date().toISOString()
-        });
-        return existing.id;
+        if (existing.id !== undefined) {
+          await syncQueue.update(existing.id, {
+            data,
+            updatedAt: new Date().toISOString(),
+          });
+          return existing.id;
+        }
       }
     }
 
@@ -61,7 +68,7 @@ class SyncQueue {
       data,
       status: 'pending',
       createdAt: new Date().toISOString(),
-      retryCount: 0
+      retryCount: 0,
     });
 
     return id;
@@ -70,56 +77,50 @@ class SyncQueue {
   /**
    * Get all pending operations
    */
-  async getPending() {
-    return syncQueue
-      .where('status')
-      .equals('pending')
-      .toArray();
+  async getPending(): Promise<SyncQueueItem[]> {
+    return syncQueue.where('status').equals('pending').toArray();
   }
 
   /**
    * Get failed operations
    */
-  async getFailed() {
-    return syncQueue
-      .where('status')
-      .equals('failed')
-      .toArray();
+  async getFailed(): Promise<SyncQueueItem[]> {
+    return syncQueue.where('status').equals('failed').toArray();
   }
 
   /**
    * Get queue count
    */
-  async getCount() {
+  async getCount(): Promise<SyncQueueCount> {
     return {
       total: await syncQueue.count(),
       pending: await syncQueue.where('status').equals('pending').count(),
       failed: await syncQueue.where('status').equals('failed').count(),
-      processing: await syncQueue.where('status').equals('processing').count()
+      processing: await syncQueue.where('status').equals('processing').count(),
     };
   }
 
   /**
    * Mark operation as processing
    */
-  async markProcessing(id) {
+  async markProcessing(id: number): Promise<void> {
     await syncQueue.update(id, {
       status: 'processing',
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
     });
   }
 
   /**
    * Mark operation as completed
    */
-  async markCompleted(id) {
+  async markCompleted(id: number): Promise<void> {
     await syncQueue.delete(id);
   }
 
   /**
    * Mark operation as failed
    */
-  async markFailed(id, error) {
+  async markFailed(id: number, error: Error | string): Promise<void> {
     const item = await syncQueue.get(id);
     if (!item) return;
 
@@ -128,23 +129,25 @@ class SyncQueue {
 
     await syncQueue.update(id, {
       status,
-      error: error.message || String(error),
+      error: error instanceof Error ? error.message : String(error),
       retryCount,
-      lastAttempt: new Date().toISOString()
+      lastAttempt: new Date().toISOString(),
     });
   }
 
   /**
    * Reset failed operations for retry
    */
-  async resetFailed() {
+  async resetFailed(): Promise<number> {
     const failed = await this.getFailed();
     for (const item of failed) {
-      await syncQueue.update(item.id, {
-        status: 'pending',
-        retryCount: 0,
-        error: null
-      });
+      if (item.id !== undefined) {
+        await syncQueue.update(item.id, {
+          status: 'pending',
+          retryCount: 0,
+          error: undefined,
+        });
+      }
     }
     return failed.length;
   }
@@ -152,16 +155,16 @@ class SyncQueue {
   /**
    * Clear completed/old operations
    */
-  async cleanup(olderThanDays = 7) {
+  async cleanup(olderThanDays = 7): Promise<number> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - olderThanDays);
 
-    const old = await syncQueue
-      .filter(item => new Date(item.createdAt) < cutoff)
-      .toArray();
+    const old = await syncQueue.filter((item) => new Date(item.createdAt) < cutoff).toArray();
 
     for (const item of old) {
-      await syncQueue.delete(item.id);
+      if (item.id !== undefined) {
+        await syncQueue.delete(item.id);
+      }
     }
 
     return old.length;
@@ -170,7 +173,7 @@ class SyncQueue {
   /**
    * Clear entire queue
    */
-  async clear() {
+  async clear(): Promise<void> {
     await syncQueue.clear();
   }
 }

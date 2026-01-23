@@ -6,43 +6,55 @@
  */
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import type {
+  UserProfile,
+  AuthSession,
+  AuthEvent,
+  AuthListener,
+  SignInResponse,
+  SignUpResponse,
+  CreateStaffParams,
+  CreateStaffResponse,
+  PasswordResetResponse,
+  UserRole,
+} from '../../types';
 
 class AuthService {
-  constructor() {
-    this._currentUser = null;
-    this._session = null;
-    this._listeners = [];
-    this._initialized = false;
-  }
+  private _currentUser: UserProfile | null = null;
+  private _session: AuthSession | null = null;
+  private _listeners: AuthListener[] = [];
+  private _initialized = false;
 
   /**
    * Initialize auth service and listen for auth state changes
    */
-  async initialize() {
+  async initialize(): Promise<void> {
     if (this._initialized) return;
     this._initialized = true;
 
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured() || !supabase) {
       console.log('[AuthService] Supabase not configured, using offline mode');
       // Try to restore session from localStorage for offline mode
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
-        this._currentUser = JSON.parse(storedUser);
+        this._currentUser = JSON.parse(storedUser) as UserProfile;
       }
       return;
     }
 
     // Get initial session
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (session) {
-      this._session = session;
+      this._session = session as unknown as AuthSession;
       await this._loadUserProfile(session.user.id);
     }
 
     // Listen for auth state changes
     supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[AuthService] Auth state changed:', event);
-      this._session = session;
+      this._session = session as unknown as AuthSession;
 
       if (session?.user) {
         await this._loadUserProfile(session.user.id);
@@ -52,14 +64,16 @@ class AuthService {
         localStorage.removeItem('token');
       }
 
-      this._notifyListeners(event, session);
+      this._notifyListeners(event as AuthEvent, session as unknown as AuthSession);
     });
   }
 
   /**
    * Load user profile from Supabase users table
    */
-  async _loadUserProfile(authId) {
+  private async _loadUserProfile(authId: string): Promise<UserProfile | null> {
+    if (!supabase) return null;
+
     try {
       const { data: userProfile, error } = await supabase
         .from('users')
@@ -73,7 +87,6 @@ class AuthService {
       }
 
       // Auto-generate businessId for Owner users if missing
-      // This ensures multi-tenant data isolation works correctly
       if (userProfile.role === 'Owner' && !userProfile.business_id) {
         const newBusinessId = crypto.randomUUID();
         console.log('[AuthService] Auto-generating businessId for Owner:', newBusinessId);
@@ -97,10 +110,10 @@ class AuthService {
         username: userProfile.username,
         firstName: userProfile.first_name,
         lastName: userProfile.last_name,
-        role: userProfile.role,
+        role: userProfile.role as UserRole,
         employeeId: userProfile.employee_id,
         businessId: userProfile.business_id,
-        branchId: userProfile.branch_id, // For Branch Owner filtering
+        branchId: userProfile.branch_id,
         status: userProfile.status,
       };
 
@@ -118,15 +131,15 @@ class AuthService {
   /**
    * Subscribe to auth state changes
    */
-  subscribe(callback) {
+  subscribe(callback: AuthListener): () => void {
     this._listeners.push(callback);
     return () => {
-      this._listeners = this._listeners.filter(l => l !== callback);
+      this._listeners = this._listeners.filter((l) => l !== callback);
     };
   }
 
-  _notifyListeners(event, session) {
-    this._listeners.forEach(cb => {
+  private _notifyListeners(event: AuthEvent, session: AuthSession | null): void {
+    this._listeners.forEach((cb) => {
       try {
         cb(event, session, this._currentUser);
       } catch (error) {
@@ -138,29 +151,29 @@ class AuthService {
   /**
    * Get current session
    */
-  get session() {
+  get session(): AuthSession | null {
     return this._session;
   }
 
   /**
    * Get current user profile
    */
-  get currentUser() {
+  get currentUser(): UserProfile | null {
     return this._currentUser;
   }
 
   /**
    * Check if user is authenticated
    */
-  get isAuthenticated() {
+  get isAuthenticated(): boolean {
     return this._currentUser !== null;
   }
 
   /**
    * Sign in with email and password
    */
-  async signIn(email, password) {
-    if (!isSupabaseConfigured()) {
+  async signIn(email: string, password: string): Promise<SignInResponse> {
+    if (!isSupabaseConfigured() || !supabase) {
       throw new Error('Authentication service not configured. Please contact support.');
     }
 
@@ -190,7 +203,7 @@ class AuthService {
       return {
         success: true,
         user: userProfile,
-        session: data.session,
+        session: data.session as unknown as AuthSession,
       };
     } catch (error) {
       console.error('[AuthService] Sign in error:', error);
@@ -200,22 +213,21 @@ class AuthService {
 
   /**
    * Sign in with username or email and password
-   * Accepts either username or email, looks up the email if username provided
    */
-  async signInWithUsername(usernameOrEmail, password) {
-    if (!isSupabaseConfigured()) {
+  async signInWithUsername(usernameOrEmail: string, password: string): Promise<SignInResponse> {
+    if (!isSupabaseConfigured() || !supabase) {
       throw new Error('Authentication service not configured. Please contact support.');
     }
 
     try {
       let email = usernameOrEmail;
 
-      // Check if input looks like an email (contains @)
+      // Check if input looks like an email
       const isEmail = usernameOrEmail.includes('@');
       console.log('[AuthService] Login attempt:', { usernameOrEmail, isEmail });
 
       if (!isEmail) {
-        // It's a username - look up the email (case-insensitive)
+        // It's a username - look up the email
         console.log('[AuthService] Looking up username:', usernameOrEmail.toLowerCase());
         const { data: userProfile, error: lookupError } = await supabase
           .from('users')
@@ -230,7 +242,6 @@ class AuthService {
           throw new Error('Invalid username or password');
         }
 
-        // Check if user is active
         if (userProfile.status !== 'active') {
           console.error('[AuthService] Account is inactive:', userProfile.status);
           throw new Error('Account is inactive. Please contact administrator.');
@@ -247,7 +258,10 @@ class AuthService {
         password,
       });
 
-      console.log('[AuthService] Supabase auth result:', { success: !!data?.user, error: error?.message });
+      console.log('[AuthService] Supabase auth result:', {
+        success: !!data?.user,
+        error: error?.message,
+      });
 
       if (error) {
         console.error('[AuthService] Supabase auth error:', error.message, error.status);
@@ -270,7 +284,7 @@ class AuthService {
       return {
         success: true,
         user: fullProfile,
-        session: data.session,
+        session: data.session as unknown as AuthSession,
       };
     } catch (error) {
       console.error('[AuthService] Sign in error:', error);
@@ -281,40 +295,35 @@ class AuthService {
   /**
    * Check if a username is available
    */
-  async isUsernameAvailable(username) {
-    if (!isSupabaseConfigured()) {
+  async isUsernameAvailable(username: string): Promise<boolean> {
+    if (!isSupabaseConfigured() || !supabase) {
       throw new Error('Username check requires Supabase connection');
     }
 
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('users')
         .select('id')
         .eq('username', username.toLowerCase())
-        .maybeSingle(); // Use maybeSingle instead of single to avoid error when not found
+        .maybeSingle();
 
-      // If no data found, username is available
-      if (!data) {
-        return true;
-      }
-
-      // Username exists
-      return false;
+      return !data;
     } catch (error) {
       console.error('[AuthService] Error checking username:', error);
-      // On error, assume username might be taken (safer)
       return false;
     }
   }
 
   /**
-   * Create a staff account (for use by Owner in HR Hub)
-   * Creates both the Supabase Auth user and the user profile
+   * Create a staff account
    */
-  async createStaffAccount({ username, password, email, firstName, lastName, role, employeeId, businessId, branchId }) {
-    if (!isSupabaseConfigured()) {
+  async createStaffAccount(params: CreateStaffParams): Promise<CreateStaffResponse> {
+    if (!isSupabaseConfigured() || !supabase) {
       throw new Error('Account creation requires internet connection');
     }
+
+    const { username, password, email, firstName, lastName, role, employeeId, businessId, branchId } =
+      params;
 
     try {
       // Validate username format
@@ -332,7 +341,7 @@ class AuthService {
         throw new Error('Username is already taken');
       }
 
-      // Create Supabase Auth user with the employee's email
+      // Create Supabase Auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -342,7 +351,6 @@ class AuthService {
             first_name: firstName,
             last_name: lastName,
           },
-          // Skip email confirmation for staff accounts (Owner is creating them)
           emailRedirectTo: undefined,
         },
       });
@@ -374,8 +382,6 @@ class AuthService {
         .single();
 
       if (profileError) {
-        // If profile creation fails, we should ideally delete the auth user
-        // but Supabase doesn't allow that without admin access
         console.error('[AuthService] Failed to create profile:', profileError);
         throw new Error('Failed to create user profile: ' + profileError.message);
       }
@@ -388,7 +394,7 @@ class AuthService {
           username: profileData.username,
           firstName: profileData.first_name,
           lastName: profileData.last_name,
-          role: profileData.role,
+          role: profileData.role as UserRole,
           employeeId: profileData.employee_id,
           businessId: profileData.business_id,
           branchId: profileData.branch_id,
@@ -405,8 +411,12 @@ class AuthService {
   /**
    * Sign up a new user
    */
-  async signUp(email, password, metadata = {}) {
-    if (!isSupabaseConfigured()) {
+  async signUp(
+    email: string,
+    password: string,
+    metadata: Record<string, unknown> = {}
+  ): Promise<SignUpResponse> {
+    if (!isSupabaseConfigured() || !supabase) {
       throw new Error('Sign up requires Supabase connection');
     }
 
@@ -437,8 +447,19 @@ class AuthService {
   /**
    * Create a user profile in the users table after sign up
    */
-  async createUserProfile(authId, profileData) {
-    if (!isSupabaseConfigured()) {
+  async createUserProfile(
+    authId: string,
+    profileData: {
+      email: string;
+      username?: string;
+      firstName?: string;
+      lastName?: string;
+      role?: UserRole;
+      businessId?: string;
+      employeeId?: string;
+    }
+  ): Promise<unknown> {
+    if (!isSupabaseConfigured() || !supabase) {
       throw new Error('Creating user profile requires Supabase connection');
     }
 
@@ -468,8 +489,8 @@ class AuthService {
   /**
    * Sign out
    */
-  async signOut() {
-    if (isSupabaseConfigured()) {
+  async signOut(): Promise<{ success: boolean }> {
+    if (isSupabaseConfigured() && supabase) {
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('[AuthService] Sign out error:', error);
@@ -489,8 +510,8 @@ class AuthService {
   /**
    * Send password reset email
    */
-  async resetPassword(email) {
-    if (!isSupabaseConfigured()) {
+  async resetPassword(email: string): Promise<PasswordResetResponse> {
+    if (!isSupabaseConfigured() || !supabase) {
       throw new Error('Password reset requires Supabase connection');
     }
 
@@ -511,8 +532,8 @@ class AuthService {
   /**
    * Update password (after reset)
    */
-  async updatePassword(newPassword) {
-    if (!isSupabaseConfigured()) {
+  async updatePassword(newPassword: string): Promise<{ success: boolean }> {
+    if (!isSupabaseConfigured() || !supabase) {
       throw new Error('Password update requires Supabase connection');
     }
 
@@ -530,37 +551,43 @@ class AuthService {
   /**
    * Get current session
    */
-  async getSession() {
-    if (!isSupabaseConfigured()) {
+  async getSession(): Promise<AuthSession | null> {
+    if (!isSupabaseConfigured() || !supabase) {
       return null;
     }
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
     if (error) {
       throw new Error(error.message);
     }
-    return session;
+    return session as unknown as AuthSession;
   }
 
   /**
    * Refresh session token
    */
-  async refreshSession() {
-    if (!isSupabaseConfigured()) {
+  async refreshSession(): Promise<AuthSession | null> {
+    if (!isSupabaseConfigured() || !supabase) {
       return null;
     }
 
-    const { data: { session }, error } = await supabase.auth.refreshSession();
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.refreshSession();
     if (error) {
       throw new Error(error.message);
     }
-    return session;
+    return session as unknown as AuthSession;
   }
 
   /**
    * Check if Supabase is available
    */
-  isOnline() {
+  isOnline(): boolean {
     return isSupabaseConfigured();
   }
 }

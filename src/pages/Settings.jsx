@@ -2519,17 +2519,6 @@ const Settings = () => {
                   </div>
                 </div>
 
-                <div className="settings-form-group">
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={branchForm.email}
-                    onChange={handleBranchFormChange}
-                    placeholder="branch@example.com"
-                  />
-                </div>
-
                 <div className="branch-service-settings">
                   <h3>Service Location Settings</h3>
                   <p className="settings-help-text">Configure home and hotel service options and fees for this branch</p>

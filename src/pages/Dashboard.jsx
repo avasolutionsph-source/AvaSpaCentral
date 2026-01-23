@@ -749,8 +749,8 @@ const Dashboard = () => {
           <p>Real-time business overview{selectedBranchId && branches.length > 0 ? ` - ${branches.find(b => b.id === selectedBranchId)?.name || ''}` : ''}</p>
         </div>
         <div className="header-actions">
-          {/* Branch selector dropdown - only shows for Owner/Manager with multiple branches */}
-          {branches.length > 1 && canSeeAllBranches() && (
+          {/* Branch selector dropdown - only shows for Owner/Manager with branches */}
+          {branches.length >= 1 && canSeeAllBranches() && (
             <select
               className="branch-selector"
               value={selectedBranchId || ''}

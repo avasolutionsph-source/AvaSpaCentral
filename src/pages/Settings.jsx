@@ -170,6 +170,7 @@ const Settings = () => {
     // Branch Owner account fields
     ownerFirstName: '',
     ownerLastName: '',
+    ownerEmail: '',
     ownerUsername: '',
     ownerPassword: '',
   });
@@ -370,6 +371,7 @@ const Settings = () => {
       // Branch Owner account fields
       ownerFirstName: '',
       ownerLastName: '',
+      ownerEmail: '',
       ownerUsername: '',
       ownerPassword: '',
     });
@@ -435,12 +437,6 @@ const Settings = () => {
       return;
     }
 
-    // Validate branch email (required for Branch Owner account)
-    if (!branchForm.email.trim() || !/\S+@\S+\.\S+/.test(branchForm.email)) {
-      showToast('Valid branch email is required (used for Branch Owner login)', 'error');
-      return;
-    }
-
     // Validate Branch Owner account fields
     if (!branchForm.ownerFirstName.trim()) {
       showToast('Branch Owner first name is required', 'error');
@@ -448,6 +444,10 @@ const Settings = () => {
     }
     if (!branchForm.ownerLastName.trim()) {
       showToast('Branch Owner last name is required', 'error');
+      return;
+    }
+    if (!branchForm.ownerEmail.trim() || !/\S+@\S+\.\S+/.test(branchForm.ownerEmail)) {
+      showToast('Valid Branch Owner email is required for login', 'error');
       return;
     }
     if (!branchForm.ownerUsername.trim() || branchForm.ownerUsername.length < 3) {
@@ -551,7 +551,7 @@ const Settings = () => {
           await authService.createStaffAccount({
             username: branchForm.ownerUsername,
             password: branchForm.ownerPassword,
-            email: branchForm.email, // Use branch email for owner account
+            email: branchForm.ownerEmail,
             firstName: branchForm.ownerFirstName,
             lastName: branchForm.ownerLastName,
             role: 'Branch Owner',
@@ -2597,7 +2597,7 @@ const Settings = () => {
               {/* Branch Owner Account Section */}
               <div className="form-section">
                 <h4>Branch Owner Account</h4>
-                <p className="section-description">Login credentials for the branch manager (uses branch email above)</p>
+                <p className="section-description">Login credentials for the branch manager</p>
 
                 <div className="branch-owner-fields">
                   <div className="form-row">
@@ -2623,6 +2623,17 @@ const Settings = () => {
                     </div>
                   </div>
 
+                  <div className="form-group">
+                    <label>Email * (for login)</label>
+                    <input
+                      type="email"
+                      name="ownerEmail"
+                      value={branchForm.ownerEmail}
+                      onChange={handleBranchFormChange}
+                      placeholder="branch.owner@example.com"
+                    />
+                  </div>
+
                   <div className="form-row">
                     <div className="form-group">
                       <label>Username *</label>
@@ -2631,7 +2642,7 @@ const Settings = () => {
                         name="ownerUsername"
                         value={branchForm.ownerUsername}
                         onChange={handleBranchFormChange}
-                        placeholder="e.g., naga_owner"
+                        placeholder="e.g., daet_owner"
                       />
                     </div>
                     <div className="form-group">

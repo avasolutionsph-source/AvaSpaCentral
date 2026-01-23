@@ -129,25 +129,26 @@ ALTER TABLE users ADD CONSTRAINT users_role_check
 
 ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
 
--- Staff can view branches for their business
+-- Drop old policies if they exist
+DROP POLICY IF EXISTS "Staff view business branches" ON branches;
+DROP POLICY IF EXISTS "Owner manage branches" ON branches;
+DROP POLICY IF EXISTS "Public view active branches" ON branches;
+
+-- Staff can view branches for their business (uses helper function for performance)
 CREATE POLICY "Staff view business branches" ON branches
   FOR SELECT USING (
-    business_id IN (
-      SELECT business_id FROM users WHERE auth_id = auth.uid()
-    )
+    business_id = get_current_user_business_id()
   );
 
--- Only Owner can create/update/delete branches
+-- Only Owner can create/update/delete branches (uses helper function for performance)
 CREATE POLICY "Owner manage branches" ON branches
   FOR ALL USING (
-    business_id IN (
-      SELECT business_id FROM users WHERE auth_id = auth.uid() AND role = 'Owner'
-    )
+    business_id = get_current_user_business_id()
+    AND get_current_user_role() = 'Owner'
   );
 
--- Public can view active branches for booking page
-CREATE POLICY "Public view active branches" ON branches
-  FOR SELECT USING (is_active = true);
+-- NOTE: Public branch viewing removed - use get_business_branches() function instead
+-- This prevents exposing all businesses' branches to anonymous users
 
 -- ============================================================================
 -- 6. HELPER FUNCTIONS
@@ -184,45 +185,168 @@ CREATE TRIGGER branches_updated_at
   EXECUTE FUNCTION update_branches_timestamp();
 
 -- ============================================================================
--- 7. BRANCH OWNER RLS POLICIES
+-- 6B. SECURITY DEFINER FUNCTIONS FOR RLS (PREVENTS RECURSION)
+-- These functions bypass RLS to avoid infinite recursion when policies
+-- need to check user attributes from the users table
 -- ============================================================================
 
--- Branch Owner can only see their assigned branch's data
+-- Get current user's role (bypasses RLS)
+CREATE OR REPLACE FUNCTION get_current_user_role()
+RETURNS TEXT AS $$
+  SELECT role FROM users WHERE auth_id = auth.uid() LIMIT 1;
+$$ LANGUAGE SQL SECURITY DEFINER;
 
--- Products: Branch Owner sees only their branch's products + shared products (NULL branch_id)
+-- Get current user's branch_id (bypasses RLS)
+CREATE OR REPLACE FUNCTION get_current_user_branch_id()
+RETURNS UUID AS $$
+  SELECT branch_id FROM users WHERE auth_id = auth.uid() LIMIT 1;
+$$ LANGUAGE SQL SECURITY DEFINER;
+
+-- Get current user's business_id (bypasses RLS)
+CREATE OR REPLACE FUNCTION get_current_user_business_id()
+RETURNS UUID AS $$
+  SELECT business_id FROM users WHERE auth_id = auth.uid() LIMIT 1;
+$$ LANGUAGE SQL SECURITY DEFINER;
+
+-- ============================================================================
+-- 7. BRANCH OWNER RLS POLICIES (Using helper functions to prevent recursion)
+-- ============================================================================
+
+-- Branch Owner can only see/modify their assigned branch's data
+-- Non-Branch Owners (Owner, Manager, etc.) see all business data
+
+-- ============================================================================
+-- PRODUCTS POLICIES
+-- ============================================================================
 DROP POLICY IF EXISTS "Branch owner view products" ON products;
+DROP POLICY IF EXISTS "Branch owner insert products" ON products;
+DROP POLICY IF EXISTS "Branch owner update products" ON products;
+DROP POLICY IF EXISTS "Branch owner delete products" ON products;
+
 CREATE POLICY "Branch owner view products" ON products
   FOR SELECT USING (
-    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    business_id = get_current_user_business_id()
     AND (
-      -- If user is Branch Owner, filter by their branch
-      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      get_current_user_role() != 'Branch Owner'
       OR branch_id IS NULL
-      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+      OR branch_id = get_current_user_branch_id()
     )
   );
 
--- Appointments: Branch Owner sees only their branch's appointments
+CREATE POLICY "Branch owner insert products" ON products
+  FOR INSERT WITH CHECK (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner update products" ON products
+  FOR UPDATE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner delete products" ON products
+  FOR DELETE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+-- ============================================================================
+-- APPOINTMENTS POLICIES
+-- ============================================================================
 DROP POLICY IF EXISTS "Branch owner view appointments" ON appointments;
+DROP POLICY IF EXISTS "Branch owner insert appointments" ON appointments;
+DROP POLICY IF EXISTS "Branch owner update appointments" ON appointments;
+DROP POLICY IF EXISTS "Branch owner delete appointments" ON appointments;
+
 CREATE POLICY "Branch owner view appointments" ON appointments
   FOR SELECT USING (
-    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    business_id = get_current_user_business_id()
     AND (
-      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      get_current_user_role() != 'Branch Owner'
       OR branch_id IS NULL
-      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+      OR branch_id = get_current_user_branch_id()
     )
   );
 
--- Transactions: Branch Owner sees only their branch's transactions
+CREATE POLICY "Branch owner insert appointments" ON appointments
+  FOR INSERT WITH CHECK (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner update appointments" ON appointments
+  FOR UPDATE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner delete appointments" ON appointments
+  FOR DELETE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+-- ============================================================================
+-- TRANSACTIONS POLICIES
+-- ============================================================================
 DROP POLICY IF EXISTS "Branch owner view transactions" ON transactions;
+DROP POLICY IF EXISTS "Branch owner insert transactions" ON transactions;
+DROP POLICY IF EXISTS "Branch owner update transactions" ON transactions;
+DROP POLICY IF EXISTS "Branch owner delete transactions" ON transactions;
+
 CREATE POLICY "Branch owner view transactions" ON transactions
   FOR SELECT USING (
-    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    business_id = get_current_user_business_id()
     AND (
-      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      get_current_user_role() != 'Branch Owner'
       OR branch_id IS NULL
-      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner insert transactions" ON transactions
+  FOR INSERT WITH CHECK (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner update transactions" ON transactions
+  FOR UPDATE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner delete transactions" ON transactions
+  FOR DELETE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
     )
   );
 
@@ -230,53 +354,222 @@ CREATE POLICY "Branch owner view transactions" ON transactions
 -- 8. ADDITIONAL BRANCH OWNER RLS POLICIES (DATA ISOLATION)
 -- ============================================================================
 
--- Employees: Branch Owner sees only their branch's employees + shared employees
+-- ============================================================================
+-- EMPLOYEES POLICIES
+-- ============================================================================
 DROP POLICY IF EXISTS "Branch owner view employees" ON employees;
+DROP POLICY IF EXISTS "Branch owner insert employees" ON employees;
+DROP POLICY IF EXISTS "Branch owner update employees" ON employees;
+DROP POLICY IF EXISTS "Branch owner delete employees" ON employees;
+
 CREATE POLICY "Branch owner view employees" ON employees
   FOR SELECT USING (
-    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    business_id = get_current_user_business_id()
     AND (
-      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      get_current_user_role() != 'Branch Owner'
       OR branch_id IS NULL
-      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+      OR branch_id = get_current_user_branch_id()
     )
   );
 
--- Rooms: Branch Owner sees only their branch's rooms + shared rooms
+CREATE POLICY "Branch owner insert employees" ON employees
+  FOR INSERT WITH CHECK (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner update employees" ON employees
+  FOR UPDATE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner delete employees" ON employees
+  FOR DELETE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+-- ============================================================================
+-- ROOMS POLICIES
+-- ============================================================================
 DROP POLICY IF EXISTS "Branch owner view rooms" ON rooms;
+DROP POLICY IF EXISTS "Branch owner insert rooms" ON rooms;
+DROP POLICY IF EXISTS "Branch owner update rooms" ON rooms;
+DROP POLICY IF EXISTS "Branch owner delete rooms" ON rooms;
+
 CREATE POLICY "Branch owner view rooms" ON rooms
   FOR SELECT USING (
-    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    business_id = get_current_user_business_id()
     AND (
-      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      get_current_user_role() != 'Branch Owner'
       OR branch_id IS NULL
-      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+      OR branch_id = get_current_user_branch_id()
     )
   );
 
--- Online Bookings: Branch Owner sees only their branch's bookings
+CREATE POLICY "Branch owner insert rooms" ON rooms
+  FOR INSERT WITH CHECK (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner update rooms" ON rooms
+  FOR UPDATE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner delete rooms" ON rooms
+  FOR DELETE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+-- ============================================================================
+-- ONLINE BOOKINGS POLICIES
+-- ============================================================================
 DROP POLICY IF EXISTS "Branch owner view online_bookings" ON online_bookings;
+DROP POLICY IF EXISTS "Branch owner insert online_bookings" ON online_bookings;
+DROP POLICY IF EXISTS "Branch owner update online_bookings" ON online_bookings;
+DROP POLICY IF EXISTS "Branch owner delete online_bookings" ON online_bookings;
+
 CREATE POLICY "Branch owner view online_bookings" ON online_bookings
   FOR SELECT USING (
-    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    business_id = get_current_user_business_id()
     AND (
-      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      get_current_user_role() != 'Branch Owner'
       OR branch_id IS NULL
-      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+      OR branch_id = get_current_user_branch_id()
     )
   );
 
--- Users: Branch Owner can only see users in their branch + users without branch
-DROP POLICY IF EXISTS "Branch owner view users" ON users;
-CREATE POLICY "Branch owner view users" ON users
-  FOR SELECT USING (
-    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+CREATE POLICY "Branch owner insert online_bookings" ON online_bookings
+  FOR INSERT WITH CHECK (
+    business_id = get_current_user_business_id()
     AND (
-      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
-      OR branch_id IS NULL
-      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
     )
   );
+
+CREATE POLICY "Branch owner update online_bookings" ON online_bookings
+  FOR UPDATE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+CREATE POLICY "Branch owner delete online_bookings" ON online_bookings
+  FOR DELETE USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+-- ============================================================================
+-- USERS POLICIES (Branch Owner has limited access)
+-- ============================================================================
+DROP POLICY IF EXISTS "Branch owner view users" ON users;
+
+-- Branch Owner can only see users in their branch (cannot create/modify users)
+CREATE POLICY "Branch owner view users" ON users
+  FOR SELECT USING (
+    business_id = get_current_user_business_id()
+    AND (
+      get_current_user_role() != 'Branch Owner'
+      OR branch_id IS NULL
+      OR branch_id = get_current_user_branch_id()
+    )
+  );
+
+-- NOTE: Branch Owner cannot INSERT/UPDATE/DELETE users - only Owner can manage staff
+
+-- ============================================================================
+-- 9. BRANCH OWNER VALIDATION TRIGGER
+-- Ensures Branch Owner users have a valid branch_id from the same business
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION validate_branch_owner()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Only validate Branch Owner role
+  IF NEW.role = 'Branch Owner' THEN
+    -- Branch Owner must have a branch_id
+    IF NEW.branch_id IS NULL THEN
+      RAISE EXCEPTION 'Branch Owner must be assigned to a branch';
+    END IF;
+
+    -- Verify branch exists and belongs to the same business
+    IF NOT EXISTS (
+      SELECT 1 FROM branches
+      WHERE id = NEW.branch_id
+      AND business_id = NEW.business_id
+    ) THEN
+      RAISE EXCEPTION 'Invalid branch_id: branch does not exist or belongs to a different business';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS validate_branch_owner_trigger ON users;
+CREATE TRIGGER validate_branch_owner_trigger
+  BEFORE INSERT OR UPDATE ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION validate_branch_owner();
+
+-- ============================================================================
+-- 10. PUBLIC BOOKING PAGE FUNCTION (Safe alternative to public RLS policy)
+-- Use this function to fetch branches for public booking pages
+-- Requires business_id as parameter - prevents exposing all businesses
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION get_public_branches(p_business_id UUID)
+RETURNS TABLE (
+  id UUID,
+  name VARCHAR(255),
+  slug VARCHAR(100),
+  address TEXT,
+  city VARCHAR(100),
+  phone VARCHAR(50),
+  enable_home_service BOOLEAN,
+  enable_hotel_service BOOLEAN,
+  home_service_fee DECIMAL(10,2),
+  hotel_service_fee DECIMAL(10,2)
+) AS $$
+  SELECT
+    id, name, slug, address, city, phone,
+    enable_home_service, enable_hotel_service,
+    home_service_fee, hotel_service_fee
+  FROM branches
+  WHERE business_id = p_business_id
+  AND is_active = true
+  ORDER BY display_order, name;
+$$ LANGUAGE SQL SECURITY DEFINER;
 
 -- ============================================================================
 -- DONE!
@@ -287,4 +580,10 @@ CREATE POLICY "Branch owner view users" ON users
 -- 3. Assign employees to branches
 -- 4. Create Branch Owner users with branch_id set
 -- 5. Configure home/hotel service fees per branch
+--
+-- Security improvements made:
+-- - RLS policies use helper functions (better performance)
+-- - Branch Owner has full CRUD on their branch's data
+-- - Public branch exposure removed (use get_public_branches() instead)
+-- - Branch Owner validation prevents invalid branch assignments
 -- ============================================================================

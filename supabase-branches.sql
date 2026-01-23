@@ -227,6 +227,58 @@ CREATE POLICY "Branch owner view transactions" ON transactions
   );
 
 -- ============================================================================
+-- 8. ADDITIONAL BRANCH OWNER RLS POLICIES (DATA ISOLATION)
+-- ============================================================================
+
+-- Employees: Branch Owner sees only their branch's employees + shared employees
+DROP POLICY IF EXISTS "Branch owner view employees" ON employees;
+CREATE POLICY "Branch owner view employees" ON employees
+  FOR SELECT USING (
+    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    AND (
+      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      OR branch_id IS NULL
+      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+    )
+  );
+
+-- Rooms: Branch Owner sees only their branch's rooms + shared rooms
+DROP POLICY IF EXISTS "Branch owner view rooms" ON rooms;
+CREATE POLICY "Branch owner view rooms" ON rooms
+  FOR SELECT USING (
+    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    AND (
+      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      OR branch_id IS NULL
+      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+    )
+  );
+
+-- Online Bookings: Branch Owner sees only their branch's bookings
+DROP POLICY IF EXISTS "Branch owner view online_bookings" ON online_bookings;
+CREATE POLICY "Branch owner view online_bookings" ON online_bookings
+  FOR SELECT USING (
+    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    AND (
+      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      OR branch_id IS NULL
+      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+    )
+  );
+
+-- Users: Branch Owner can only see users in their branch + users without branch
+DROP POLICY IF EXISTS "Branch owner view users" ON users;
+CREATE POLICY "Branch owner view users" ON users
+  FOR SELECT USING (
+    business_id IN (SELECT business_id FROM users WHERE auth_id = auth.uid())
+    AND (
+      (SELECT role FROM users WHERE auth_id = auth.uid()) != 'Branch Owner'
+      OR branch_id IS NULL
+      OR branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid())
+    )
+  );
+
+-- ============================================================================
 -- DONE!
 --
 -- Branches system is now ready:

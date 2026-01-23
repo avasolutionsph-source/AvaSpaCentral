@@ -1275,6 +1275,7 @@ export const usersAdapter = {
               role: supabaseUser.role,
               businessId: supabaseUser.business_id,
               employeeId: supabaseUser.employee_id,
+              branchId: supabaseUser.branch_id,
               status: supabaseUser.status,
               lastLogin: supabaseUser.last_login,
               _createdAt: supabaseUser.created_at,

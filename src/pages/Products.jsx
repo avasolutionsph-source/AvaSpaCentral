@@ -47,7 +47,7 @@ const unitOptions = [
 ];
 
 const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { showToast, canEdit } = useApp();
+  const { showToast, canEdit, isBranchOwner, getUserBranchId } = useApp();
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -142,7 +142,9 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       lowStockAlert: data.type === 'product' && data.lowStockAlert ? parseInt(data.lowStockAlert) : undefined,
       description: data.description.trim(),
       itemsUsed: data.type === 'service' ? data.itemsUsed : [],
-      hideFromPOS: data.hideFromPOS || false
+      hideFromPOS: data.hideFromPOS || false,
+      // Auto-assign branchId when Branch Owner creates a product
+      branchId: isBranchOwner() ? getUserBranchId() : undefined
     }),
     validateForm: validateProduct,
     onSuccess: () => {
@@ -167,6 +169,12 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
+    // Branch Owner can only see products from their branch (or shared products with no branch)
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(p => !p.branchId || p.branchId === userBranchId);
+    }
+
     if (searchTerm.trim()) {
       filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -185,7 +193,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     }
 
     return filtered;
-  }, [products, searchTerm, filterType, filterCategory, filterStatus]);
+  }, [products, searchTerm, filterType, filterCategory, filterStatus, getUserBranchId]);
 
   // Toggle product status
   const handleToggleStatus = async (product) => {

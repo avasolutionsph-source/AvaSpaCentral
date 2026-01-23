@@ -18,7 +18,7 @@ import {
 } from '../components/shared';
 
 const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { user, showToast, isOwner } = useApp();
+  const { user, showToast, isOwner, isBranchOwner, getUserBranchId } = useApp();
 
   // Filter state
   const [filterRole, setFilterRole] = useState('all');
@@ -395,6 +395,14 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         setTimeout(() => reject(new Error('Request timed out. Please try again.')), 30000)
       );
 
+      // Determine branchId:
+      // - If role is Branch Owner, use selected branch
+      // - If current user is Branch Owner, auto-assign their branch
+      // - Otherwise null
+      const assignedBranchId = formData.role === 'Branch Owner'
+        ? formData.branchId
+        : (isBranchOwner() ? getUserBranchId() : null);
+
       const createPromise = authService.createStaffAccount({
         username: formData.username.trim().toLowerCase(),
         password: formData.password,
@@ -404,7 +412,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         role: formData.role,
         employeeId: formData.employeeId,
         businessId: user?.businessId || 'default',
-        branchId: formData.role === 'Branch Owner' ? formData.branchId : null
+        branchId: assignedBranchId
       });
 
       const result = await Promise.race([createPromise, timeoutPromise]);
@@ -421,7 +429,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         role: formData.role,
         employeeId: formData.employeeId,
         businessId: user?.businessId,
-        branchId: formData.role === 'Branch Owner' ? formData.branchId : null,
+        branchId: assignedBranchId,
         status: 'active',
         _syncStatus: 'synced',
         _lastSyncedAt: new Date().toISOString(),
@@ -458,6 +466,12 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const filteredUsers = useMemo(() => {
     let filtered = users;
 
+    // Branch Owner can only see users from their branch (or shared users with no branch)
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(u => !u.branchId || u.branchId === userBranchId);
+    }
+
     if (filterRole !== 'all') {
       filtered = filtered.filter(u => u.role === filterRole);
     }
@@ -474,7 +488,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
 
     return filtered;
-  }, [users, filterRole, filterStatus, searchTerm]);
+  }, [users, filterRole, filterStatus, searchTerm, getUserBranchId]);
 
   // Get employees without accounts (for create dropdown)
   const availableEmployees = useMemo(() => {
@@ -532,13 +546,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   ];
 
-  // Check if user is Owner
-  if (!isOwner()) {
+  // Check if user is Owner or Branch Owner
+  if (!isOwner() && !isBranchOwner()) {
     return (
       <EmptyState
         icon="🔒"
         title="Access Denied"
-        description="Only Owners can manage employee accounts"
+        description="Only Owners and Branch Owners can manage employee accounts"
       />
     );
   }

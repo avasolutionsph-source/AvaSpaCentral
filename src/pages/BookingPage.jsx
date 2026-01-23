@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
+import { getCustomerSession, logoutCustomer } from '../services/customerAuthService';
 import '../assets/css/booking.css';
 
 /**
@@ -27,8 +28,8 @@ const isUUID = (str) => {
 };
 
 const BookingPage = () => {
-  // Get businessId or slug from URL
-  const { businessId: businessIdOrSlug } = useParams();
+  // Get businessId or slug from URL - also support branchSlug
+  const { businessId: businessIdOrSlug, branchSlug } = useParams();
 
   // Loading & error states
   const [loading, setLoading] = useState(true);
@@ -36,6 +37,18 @@ const BookingPage = () => {
 
   // Business info
   const [business, setBusiness] = useState(null);
+
+  // Branch system
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState(null);
+  const [showBranchSelector, setShowBranchSelector] = useState(false);
+
+  // Service location (in-store, home, hotel)
+  const [serviceLocation, setServiceLocation] = useState('in_store');
+  const [serviceAddress, setServiceAddress] = useState('');
+  const [serviceCity, setServiceCity] = useState('');
+  const [serviceLandmark, setServiceLandmark] = useState('');
+  const [serviceInstructions, setServiceInstructions] = useState('');
 
   // Services & therapists from Supabase
   const [services, setServices] = useState([]);
@@ -64,6 +77,43 @@ const BookingPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingReference, setBookingReference] = useState('');
+
+  // Customer auth state
+  const [customerSession, setCustomerSession] = useState(null);
+  const [customerAccount, setCustomerAccount] = useState(null);
+
+  // Check customer session and auto-fill details
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const session = await getCustomerSession(businessIdOrSlug);
+        if (session) {
+          setCustomerSession(session);
+          setCustomerAccount(session.account);
+          // Auto-fill customer details from profile
+          if (session.account) {
+            setCustomerName(session.account.name || '');
+            setCustomerPhone(session.account.phone || '');
+            setCustomerEmail(session.account.email || '');
+          }
+        }
+      } catch (err) {
+        console.error('Error checking customer session:', err);
+      }
+    };
+    checkSession();
+  }, [businessIdOrSlug]);
+
+  // Handle customer logout
+  const handleCustomerLogout = async () => {
+    await logoutCustomer();
+    setCustomerSession(null);
+    setCustomerAccount(null);
+    // Clear auto-filled details
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerEmail('');
+  };
 
   // Fetch business info and services on load
   useEffect(() => {
@@ -161,7 +211,50 @@ const BookingPage = () => {
           });
           const servicesData = await servicesResponse.json();
           console.log('[BookingPage] Services result:', { count: servicesData?.length });
-          setServices(servicesData || []);
+
+          // Fetch branches for this business
+          console.log('[BookingPage] Fetching branches...');
+          const branchesUrl = `${supabaseUrl}/rest/v1/branches?business_id=eq.${actualBusinessId}&is_active=eq.true&order=display_order.asc,name.asc`;
+          const branchesResponse = await fetch(branchesUrl, {
+            method: 'GET',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const branchesData = await branchesResponse.json();
+          console.log('[BookingPage] Branches result:', { count: branchesData?.length });
+          setBranches(branchesData || []);
+
+          // Determine if we need to show branch selector
+          const hasBranches = branchesData && branchesData.length > 1;
+          let activeBranch = null;
+
+          if (branchSlug && branchesData?.length > 0) {
+            // If branchSlug is provided in URL, select that branch
+            activeBranch = branchesData.find(b => b.slug === branchSlug);
+            if (activeBranch) {
+              setSelectedBranch(activeBranch);
+            }
+          } else if (branchesData?.length === 1) {
+            // Single branch - auto-select it
+            activeBranch = branchesData[0];
+            setSelectedBranch(activeBranch);
+          } else if (hasBranches && !branchSlug) {
+            // Multiple branches and no branch selected - show selector
+            setShowBranchSelector(true);
+          }
+
+          // Filter services by selected branch (if branch system is active)
+          let filteredServicesData = servicesData || [];
+          if (activeBranch) {
+            // Show services for this branch + shared services (null branch_id)
+            filteredServicesData = filteredServicesData.filter(s =>
+              !s.branch_id || s.branch_id === activeBranch.id
+            );
+          }
+          setServices(filteredServicesData);
 
           // Fetch active therapists for this business using direct REST API
           console.log('[BookingPage] Fetching therapists...');
@@ -177,13 +270,22 @@ const BookingPage = () => {
           const therapistsData = await therapistsResponse.json();
           console.log('[BookingPage] Therapists result:', { count: therapistsData?.length });
           // Filter therapists by position (massage/facial related)
-          const filteredTherapists = (therapistsData || []).filter(t =>
+          let filteredTherapists = (therapistsData || []).filter(t =>
             t.position?.toLowerCase().includes('therapist') ||
             t.position?.toLowerCase().includes('specialist') ||
             t.department === 'Massage' ||
             t.department === 'Facial'
           );
-          setTherapists(filteredTherapists.length > 0 ? filteredTherapists : therapistsData || []);
+          if (filteredTherapists.length === 0) {
+            filteredTherapists = therapistsData || [];
+          }
+          // Filter by branch if active
+          if (activeBranch) {
+            filteredTherapists = filteredTherapists.filter(t =>
+              !t.branch_id || t.branch_id === activeBranch.id
+            );
+          }
+          setTherapists(filteredTherapists);
 
         } catch (fetchErr) {
           console.error('[BookingPage] Direct fetch error:', fetchErr);
@@ -234,10 +336,26 @@ const BookingPage = () => {
     return filtered;
   }, [services, selectedCategory, searchTerm]);
 
+  // Calculate transport fee based on service location
+  const transportFee = useMemo(() => {
+    if (!selectedBranch) return 0;
+    if (serviceLocation === 'home_service') {
+      return selectedBranch.home_service_fee || 0;
+    }
+    if (serviceLocation === 'hotel_service') {
+      return selectedBranch.hotel_service_fee || 0;
+    }
+    return 0;
+  }, [selectedBranch, serviceLocation]);
+
   // Calculate totals
-  const cartTotal = useMemo(() => {
+  const servicesTotal = useMemo(() => {
     return selectedServices.reduce((sum, service) => sum + (service.price || 0), 0);
   }, [selectedServices]);
+
+  const cartTotal = useMemo(() => {
+    return servicesTotal + transportFee;
+  }, [servicesTotal, transportFee]);
 
   const depositAmount = useMemo(() => {
     return Math.ceil(cartTotal * 0.5); // 50% deposit
@@ -291,6 +409,11 @@ const BookingPage = () => {
       alert('Please enter your phone number.');
       return;
     }
+    // Validate service location address if home/hotel service
+    if (serviceLocation !== 'in_store' && !serviceAddress.trim()) {
+      alert('Please enter your address for home/hotel service.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -299,7 +422,8 @@ const BookingPage = () => {
 
       // Create booking record
       const bookingData = {
-        business_id: businessId,
+        business_id: business?.id || businessIdOrSlug,
+        branch_id: selectedBranch?.id || null,
         reference_number: reference,
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
@@ -320,6 +444,14 @@ const BookingPage = () => {
         status: 'pending', // pending, confirmed, completed, cancelled
         payment_status: 'unpaid', // unpaid, deposit_paid, fully_paid
         source: 'online_booking',
+        customer_account_id: customerSession?.accountId || null,
+        // Service location data
+        service_location: serviceLocation,
+        service_address: serviceLocation !== 'in_store' ? serviceAddress.trim() : null,
+        service_city: serviceLocation !== 'in_store' ? serviceCity.trim() : null,
+        service_landmark: serviceLocation !== 'in_store' ? serviceLandmark.trim() : null,
+        service_instructions: serviceLocation !== 'in_store' ? serviceInstructions.trim() : null,
+        transport_fee: transportFee,
         created_at: new Date().toISOString()
       };
 
@@ -428,18 +560,134 @@ const BookingPage = () => {
     );
   }
 
+  // Calculate current progress step
+  const getCurrentStep = () => {
+    if (selectedServices.length === 0) return 1;
+    if (!selectedDate || !selectedTime) return 3;
+    if (!customerName || !customerPhone) return 4;
+    return 4;
+  };
+
+  const currentProgressStep = getCurrentStep();
+
+  // Scroll to summary section (for mobile)
+  const scrollToSummary = () => {
+    const summaryEl = document.querySelector('.booking-summary');
+    if (summaryEl) {
+      summaryEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   // Main booking form
   return (
     <div className="booking-page">
       {/* Header */}
       <header className="booking-header">
-        <h1>{business?.name || 'Book Now'}</h1>
-        <p className="booking-tagline">Book your relaxation experience</p>
+        <div className="booking-header-content">
+          <div className="booking-header-brand">
+            <h1>{business?.name || 'Book Now'}</h1>
+            <p className="booking-tagline">Book your relaxation experience</p>
+          </div>
+          <div className="booking-header-auth">
+            {customerSession ? (
+              <div className="customer-logged-in">
+                <Link to={`/book/${businessIdOrSlug}/profile`} className="customer-profile-link">
+                  <span className="customer-avatar">{customerAccount?.name?.charAt(0).toUpperCase() || '?'}</span>
+                  <span className="customer-name">{customerAccount?.name?.split(' ')[0]}</span>
+                </Link>
+                <button onClick={handleCustomerLogout} className="customer-logout-btn">
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="customer-auth-buttons">
+                <Link to={`/book/${businessIdOrSlug}/login`} className="auth-btn login-btn">
+                  Sign In
+                </Link>
+                <Link to={`/book/${businessIdOrSlug}/register`} className="auth-btn register-btn">
+                  Register
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
       </header>
+
+      {/* Progress Indicator */}
+      <div className="booking-progress">
+        <div className={`progress-step ${currentProgressStep >= 1 ? 'active' : ''} ${selectedServices.length > 0 ? 'completed' : ''}`}>
+          <span className="progress-step-number">{selectedServices.length > 0 ? '✓' : '1'}</span>
+          <span>Services</span>
+        </div>
+        <div className={`progress-divider ${selectedServices.length > 0 ? 'completed' : ''}`}></div>
+        <div className={`progress-step ${currentProgressStep >= 2 ? 'active' : ''}`}>
+          <span className="progress-step-number">2</span>
+          <span>Therapist</span>
+        </div>
+        <div className="progress-divider"></div>
+        <div className={`progress-step ${currentProgressStep >= 3 ? 'active' : ''} ${selectedDate && selectedTime ? 'completed' : ''}`}>
+          <span className="progress-step-number">{selectedDate && selectedTime ? '✓' : '3'}</span>
+          <span>Date & Time</span>
+        </div>
+        <div className={`progress-divider ${selectedDate && selectedTime ? 'completed' : ''}`}></div>
+        <div className={`progress-step ${currentProgressStep >= 4 ? 'active' : ''}`}>
+          <span className="progress-step-number">4</span>
+          <span>Details</span>
+        </div>
+      </div>
+
+      {/* Branch Selector - Show if multiple branches and no branch selected */}
+      {showBranchSelector && branches.length > 1 && !selectedBranch && (
+        <div className="branch-selector-overlay">
+          <div className="branch-selector-container">
+            <h2>Select a Branch</h2>
+            <p className="branch-selector-subtitle">Choose your preferred location</p>
+            <div className="branch-cards">
+              {branches.map(branch => (
+                <div
+                  key={branch.id}
+                  className="branch-card"
+                  onClick={() => {
+                    setSelectedBranch(branch);
+                    setShowBranchSelector(false);
+                    // Filter services for this branch
+                    const filtered = services.filter(s => !s.branch_id || s.branch_id === branch.id);
+                    setServices(filtered);
+                  }}
+                >
+                  <div className="branch-card-icon">📍</div>
+                  <h3 className="branch-card-name">{branch.name}</h3>
+                  {branch.address && <p className="branch-card-address">{branch.address}</p>}
+                  {branch.city && <p className="branch-card-city">{branch.city}</p>}
+                  {branch.phone && <p className="branch-card-phone">{branch.phone}</p>}
+                  <button className="branch-card-btn">Book Here</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="booking-container">
         {/* Left side: Services */}
         <div className="booking-services">
+          {/* Show selected branch if applicable */}
+          {selectedBranch && branches.length > 1 && (
+            <div className="selected-branch-banner">
+              <span className="selected-branch-icon">📍</span>
+              <span className="selected-branch-name">{selectedBranch.name}</span>
+              <button
+                className="change-branch-btn"
+                onClick={() => {
+                  setSelectedBranch(null);
+                  setShowBranchSelector(true);
+                }}
+              >
+                Change
+              </button>
+            </div>
+          )}
+
           <div className="booking-section">
             <h2>1. Select Services</h2>
 
@@ -547,9 +795,95 @@ const BookingPage = () => {
             </div>
           </div>
 
+          {/* Service Location Selection */}
+          <div className="booking-section">
+            <h2>3. Service Location</h2>
+            <div className="service-location-options">
+              <button
+                className={`location-option ${serviceLocation === 'in_store' ? 'selected' : ''}`}
+                onClick={() => setServiceLocation('in_store')}
+              >
+                <span className="location-icon">💆</span>
+                <span className="location-label">Spa Service</span>
+                <span className="location-desc">Visit our spa</span>
+              </button>
+              {(!selectedBranch || selectedBranch.enable_home_service !== false) && (
+                <button
+                  className={`location-option ${serviceLocation === 'home_service' ? 'selected' : ''}`}
+                  onClick={() => setServiceLocation('home_service')}
+                >
+                  <span className="location-icon">🏠</span>
+                  <span className="location-label">Home Service</span>
+                  <span className="location-desc">
+                    {selectedBranch?.home_service_fee > 0
+                      ? `+₱${selectedBranch.home_service_fee.toLocaleString()} fee`
+                      : 'We come to you'}
+                  </span>
+                </button>
+              )}
+              {(!selectedBranch || selectedBranch.enable_hotel_service !== false) && (
+                <button
+                  className={`location-option ${serviceLocation === 'hotel_service' ? 'selected' : ''}`}
+                  onClick={() => setServiceLocation('hotel_service')}
+                >
+                  <span className="location-icon">🏨</span>
+                  <span className="location-label">Hotel Service</span>
+                  <span className="location-desc">
+                    {selectedBranch?.hotel_service_fee > 0
+                      ? `+₱${selectedBranch.hotel_service_fee.toLocaleString()} fee`
+                      : 'Service at your hotel'}
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {/* Address form for home/hotel service */}
+            {serviceLocation !== 'in_store' && (
+              <div className="service-address-form">
+                <div className="form-group">
+                  <label>Address *</label>
+                  <input
+                    type="text"
+                    placeholder="House/Unit number, Street, Barangay"
+                    value={serviceAddress}
+                    onChange={(e) => setServiceAddress(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>City/Municipality</label>
+                  <input
+                    type="text"
+                    placeholder="City or Municipality"
+                    value={serviceCity}
+                    onChange={(e) => setServiceCity(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Landmark <span className="optional">(Optional)</span></label>
+                  <input
+                    type="text"
+                    placeholder="Nearby landmark for easier finding"
+                    value={serviceLandmark}
+                    onChange={(e) => setServiceLandmark(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Special Instructions <span className="optional">(Optional)</span></label>
+                  <textarea
+                    placeholder="Gate code, parking info, etc."
+                    value={serviceInstructions}
+                    onChange={(e) => setServiceInstructions(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Date & Time Selection */}
           <div className="booking-section">
-            <h2>3. Select Date & Time</h2>
+            <h2>4. Select Date & Time</h2>
             <div className="datetime-picker">
               <div className="date-picker">
                 <label>Date</label>
@@ -580,7 +914,7 @@ const BookingPage = () => {
 
           {/* Customer Details */}
           <div className="booking-section">
-            <h2>4. Your Details</h2>
+            <h2>5. Your Details</h2>
             <div className="customer-form">
               <div className="form-group">
                 <label>Name *</label>
@@ -658,6 +992,18 @@ const BookingPage = () => {
                 </div>
 
                 <div className="summary-totals">
+                  <div className="total-row subtotal">
+                    <span>Services</span>
+                    <span>₱{servicesTotal.toLocaleString()}</span>
+                  </div>
+                  {transportFee > 0 && (
+                    <div className="total-row transport-fee">
+                      <span>
+                        {serviceLocation === 'home_service' ? 'Home Service Fee' : 'Hotel Service Fee'}
+                      </span>
+                      <span>₱{transportFee.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="total-row">
                     <span>Total</span>
                     <span className="total-amount">₱{cartTotal.toLocaleString()}</span>
@@ -667,6 +1013,14 @@ const BookingPage = () => {
                     <span className="deposit-amount">₱{depositAmount.toLocaleString()}</span>
                   </div>
                 </div>
+
+                {/* Service Location Info */}
+                {serviceLocation !== 'in_store' && serviceAddress && (
+                  <div className="summary-location">
+                    <p><strong>Service at:</strong> {serviceLocation === 'home_service' ? 'Home' : 'Hotel'}</p>
+                    <p className="summary-address">{serviceAddress}{serviceCity ? `, ${serviceCity}` : ''}</p>
+                  </div>
+                )}
 
                 {selectedDate && selectedTime && (
                   <div className="summary-schedule">
@@ -703,6 +1057,28 @@ const BookingPage = () => {
         {business?.address && <p>{business.address}</p>}
         {business?.phone && <p>Contact: {business.phone}</p>}
       </footer>
+
+      {/* Mobile Floating Summary Bar */}
+      <div className="mobile-summary-bar">
+        <div className="mobile-summary-info">
+          <span className="mobile-summary-count">
+            {selectedServices.length === 0
+              ? 'No services selected'
+              : `${selectedServices.length} service${selectedServices.length > 1 ? 's' : ''} selected`
+            }
+          </span>
+          {cartTotal > 0 && (
+            <span className="mobile-summary-total">₱{cartTotal.toLocaleString()}</span>
+          )}
+        </div>
+        <button
+          className="mobile-summary-btn"
+          onClick={handleSubmitBooking}
+          disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone}
+        >
+          {submitting ? 'Submitting...' : 'Book Now'}
+        </button>
+      </div>
     </div>
   );
 };

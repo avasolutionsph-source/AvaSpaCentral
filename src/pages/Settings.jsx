@@ -149,6 +149,25 @@ const Settings = () => {
   const [checkingSlug, setCheckingSlug] = useState(false);
   const [savingSlug, setSavingSlug] = useState(false);
 
+  // Branches State
+  const [branches, setBranches] = useState([]);
+  const [branchesLoading, setBranchesLoading] = useState(true);
+  const [editingBranch, setEditingBranch] = useState(null);
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [savingBranch, setSavingBranch] = useState(false);
+  const [branchForm, setBranchForm] = useState({
+    name: '',
+    slug: '',
+    address: '',
+    city: '',
+    phone: '',
+    email: '',
+    enable_home_service: true,
+    enable_hotel_service: true,
+    home_service_fee: 200,
+    hotel_service_fee: 150,
+  });
+
   const handleBusinessInfoChange = (e) => {
     const { name, value } = e.target;
     setBusinessInfo(prev => ({ ...prev, [name]: value }));
@@ -293,6 +312,296 @@ const Settings = () => {
 
     loadBookingSlug();
   }, [user?.businessId]);
+
+  // Load branches on mount
+  useEffect(() => {
+    const loadBranches = async () => {
+      if (!user?.businessId) {
+        setBranchesLoading(false);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      try {
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&order=display_order.asc,name.asc`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setBranches(data || []);
+        }
+      } catch (err) {
+        console.error('Error loading branches:', err);
+      } finally {
+        setBranchesLoading(false);
+      }
+    };
+
+    loadBranches();
+  }, [user?.businessId]);
+
+  // Branch management functions
+  const resetBranchForm = () => {
+    setBranchForm({
+      name: '',
+      slug: '',
+      address: '',
+      city: '',
+      phone: '',
+      email: '',
+      enable_home_service: true,
+      enable_hotel_service: true,
+      home_service_fee: 200,
+      hotel_service_fee: 150,
+    });
+  };
+
+  const handleAddBranch = () => {
+    resetBranchForm();
+    setEditingBranch(null);
+    setShowBranchModal(true);
+  };
+
+  const handleEditBranch = (branch) => {
+    setBranchForm({
+      name: branch.name || '',
+      slug: branch.slug || '',
+      address: branch.address || '',
+      city: branch.city || '',
+      phone: branch.phone || '',
+      email: branch.email || '',
+      enable_home_service: branch.enable_home_service ?? true,
+      enable_hotel_service: branch.enable_hotel_service ?? true,
+      home_service_fee: branch.home_service_fee || 200,
+      hotel_service_fee: branch.hotel_service_fee || 150,
+    });
+    setEditingBranch(branch);
+    setShowBranchModal(true);
+  };
+
+  const handleBranchFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setBranchForm(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const generateSlug = (name) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  };
+
+  const handleBranchNameChange = (e) => {
+    const name = e.target.value;
+    setBranchForm(prev => ({
+      ...prev,
+      name,
+      slug: editingBranch ? prev.slug : generateSlug(name)
+    }));
+  };
+
+  const handleSaveBranch = async () => {
+    if (!branchForm.name.trim()) {
+      showToast('Branch name is required', 'error');
+      return;
+    }
+
+    if (!branchForm.slug.trim()) {
+      showToast('Branch slug is required', 'error');
+      return;
+    }
+
+    setSavingBranch(true);
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    try {
+      // Get auth token
+      const { supabase } = await import('../services/supabase/supabaseClient');
+      let accessToken = supabaseKey;
+
+      if (supabase) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          accessToken = sessionData.session.access_token;
+        }
+      }
+
+      const branchData = {
+        business_id: user.businessId,
+        name: branchForm.name.trim(),
+        slug: branchForm.slug.trim().toLowerCase(),
+        address: branchForm.address.trim() || null,
+        city: branchForm.city.trim() || null,
+        phone: branchForm.phone.trim() || null,
+        email: branchForm.email.trim() || null,
+        enable_home_service: branchForm.enable_home_service,
+        enable_hotel_service: branchForm.enable_hotel_service,
+        home_service_fee: parseFloat(branchForm.home_service_fee) || 0,
+        hotel_service_fee: parseFloat(branchForm.hotel_service_fee) || 0,
+      };
+
+      let response;
+      if (editingBranch) {
+        // Update existing branch
+        response = await fetch(
+          `${supabaseUrl}/rest/v1/branches?id=eq.${editingBranch.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(branchData)
+          }
+        );
+      } else {
+        // Create new branch
+        response = await fetch(
+          `${supabaseUrl}/rest/v1/branches`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(branchData)
+          }
+        );
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Branch save error:', response.status, errorText);
+        if (errorText.includes('duplicate') || errorText.includes('unique')) {
+          throw new Error('A branch with this slug already exists');
+        }
+        throw new Error('Failed to save branch');
+      }
+
+      const savedBranch = await response.json();
+
+      // Update local state
+      if (editingBranch) {
+        setBranches(prev => prev.map(b => b.id === editingBranch.id ? savedBranch[0] : b));
+        showToast('Branch updated successfully!', 'success');
+      } else {
+        setBranches(prev => [...prev, savedBranch[0]]);
+        showToast('Branch created successfully!', 'success');
+      }
+
+      setShowBranchModal(false);
+      resetBranchForm();
+      setEditingBranch(null);
+    } catch (err) {
+      console.error('Error saving branch:', err);
+      showToast(err.message || 'Failed to save branch', 'error');
+    } finally {
+      setSavingBranch(false);
+    }
+  };
+
+  const handleDeleteBranch = async (branch) => {
+    if (!window.confirm(`Are you sure you want to delete the "${branch.name}" branch? This action cannot be undone.`)) {
+      return;
+    }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    try {
+      const { supabase } = await import('../services/supabase/supabaseClient');
+      let accessToken = supabaseKey;
+
+      if (supabase) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          accessToken = sessionData.session.access_token;
+        }
+      }
+
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/branches?id=eq.${branch.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete branch');
+      }
+
+      setBranches(prev => prev.filter(b => b.id !== branch.id));
+      showToast('Branch deleted successfully!', 'success');
+    } catch (err) {
+      console.error('Error deleting branch:', err);
+      showToast('Failed to delete branch', 'error');
+    }
+  };
+
+  const handleToggleBranchActive = async (branch) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    try {
+      const { supabase } = await import('../services/supabase/supabaseClient');
+      let accessToken = supabaseKey;
+
+      if (supabase) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          accessToken = sessionData.session.access_token;
+        }
+      }
+
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/branches?id=eq.${branch.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({ is_active: !branch.is_active })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update branch status');
+      }
+
+      const updatedBranch = await response.json();
+      setBranches(prev => prev.map(b => b.id === branch.id ? updatedBranch[0] : b));
+      showToast(`Branch ${updatedBranch[0].is_active ? 'activated' : 'deactivated'} successfully!`, 'success');
+    } catch (err) {
+      console.error('Error toggling branch status:', err);
+      showToast('Failed to update branch status', 'error');
+    }
+  };
 
   const handleBusinessHourChange = (index, field, value) => {
     const updated = [...businessHours];
@@ -1054,6 +1363,125 @@ const Settings = () => {
             </div>
           </div>
         </div>
+
+        {/* Branch Management - Owner only */}
+        {isOwner() && (
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">🏪</div>
+              <div className="settings-section-title">
+                <h2>Branch Management</h2>
+                <p>Manage your business branches and service location fees</p>
+              </div>
+            </div>
+            <div className="settings-section-body">
+              {branchesLoading ? (
+                <div className="branches-loading">
+                  <div className="spinner"></div>
+                  <p>Loading branches...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="branches-info-banner">
+                    <div className="info-banner-icon">ℹ️</div>
+                    <div className="info-banner-content">
+                      <strong>Multi-Branch Booking</strong>
+                      <p>Add branches to let customers select their preferred location when booking. Each branch can have different home/hotel service fees.</p>
+                    </div>
+                  </div>
+
+                  {branches.length > 0 ? (
+                    <div className="branches-list">
+                      {branches.map(branch => (
+                        <div key={branch.id} className={`branch-card ${!branch.is_active ? 'inactive' : ''}`}>
+                          <div className="branch-card-header">
+                            <div className="branch-info">
+                              <h3>{branch.name}</h3>
+                              <span className="branch-slug">/book/{bookingSlug || user?.businessId}/{branch.slug}</span>
+                            </div>
+                            <div className="branch-status">
+                              <span className={`status-badge ${branch.is_active ? 'active' : 'inactive'}`}>
+                                {branch.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="branch-card-body">
+                            <div className="branch-details">
+                              {branch.address && (
+                                <div className="branch-detail">
+                                  <span className="detail-icon">📍</span>
+                                  <span>{branch.address}{branch.city ? `, ${branch.city}` : ''}</span>
+                                </div>
+                              )}
+                              {branch.phone && (
+                                <div className="branch-detail">
+                                  <span className="detail-icon">📞</span>
+                                  <span>{branch.phone}</span>
+                                </div>
+                              )}
+                              {branch.email && (
+                                <div className="branch-detail">
+                                  <span className="detail-icon">✉️</span>
+                                  <span>{branch.email}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="branch-fees">
+                              <div className="fee-item">
+                                <span className="fee-label">Home Service:</span>
+                                <span className={`fee-value ${!branch.enable_home_service ? 'disabled' : ''}`}>
+                                  {branch.enable_home_service ? `₱${branch.home_service_fee?.toLocaleString() || 0}` : 'Disabled'}
+                                </span>
+                              </div>
+                              <div className="fee-item">
+                                <span className="fee-label">Hotel Service:</span>
+                                <span className={`fee-value ${!branch.enable_hotel_service ? 'disabled' : ''}`}>
+                                  {branch.enable_hotel_service ? `₱${branch.hotel_service_fee?.toLocaleString() || 0}` : 'Disabled'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="branch-card-actions">
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => handleToggleBranchActive(branch)}
+                            >
+                              {branch.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => handleEditBranch(branch)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn btn-sm btn-danger"
+                              onClick={() => handleDeleteBranch(branch)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="branches-empty">
+                      <div className="empty-icon">🏪</div>
+                      <h3>No Branches Yet</h3>
+                      <p>Add your first branch to enable multi-location booking for your customers.</p>
+                    </div>
+                  )}
+
+                  <div className="branches-actions">
+                    <button className="btn btn-primary" onClick={handleAddBranch}>
+                      + Add Branch
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Business Hours */}
         <div className="settings-section">
@@ -1957,6 +2385,168 @@ const Settings = () => {
                 disabled={twoFactorCode.length !== 6}
               >
                 Verify & Enable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Branch Modal */}
+      {showBranchModal && (
+        <div className="modal-overlay" onClick={() => setShowBranchModal(false)}>
+          <div className="modal-content branch-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingBranch ? 'Edit Branch' : 'Add New Branch'}</h2>
+              <button className="modal-close" onClick={() => setShowBranchModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="branch-form">
+                <div className="settings-row">
+                  <div className="settings-form-group">
+                    <label>Branch Name *</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={branchForm.name}
+                      onChange={handleBranchNameChange}
+                      placeholder="e.g., Naga Branch"
+                    />
+                  </div>
+                  <div className="settings-form-group">
+                    <label>URL Slug *</label>
+                    <input
+                      type="text"
+                      name="slug"
+                      value={branchForm.slug}
+                      onChange={handleBranchFormChange}
+                      placeholder="e.g., naga"
+                      disabled={!!editingBranch}
+                    />
+                    <div className="settings-form-hint">
+                      {editingBranch ? 'Slug cannot be changed after creation' : 'Used in booking URL (lowercase, no spaces)'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-form-group">
+                  <label>Address</label>
+                  <textarea
+                    name="address"
+                    value={branchForm.address}
+                    onChange={handleBranchFormChange}
+                    placeholder="Enter branch address"
+                    rows="2"
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <div className="settings-form-group">
+                    <label>City</label>
+                    <input
+                      type="text"
+                      name="city"
+                      value={branchForm.city}
+                      onChange={handleBranchFormChange}
+                      placeholder="e.g., Naga City"
+                    />
+                  </div>
+                  <div className="settings-form-group">
+                    <label>Phone</label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={branchForm.phone}
+                      onChange={handleBranchFormChange}
+                      placeholder="+63 xxx xxx xxxx"
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-form-group">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={branchForm.email}
+                    onChange={handleBranchFormChange}
+                    placeholder="branch@example.com"
+                  />
+                </div>
+
+                <div className="branch-service-settings">
+                  <h3>Service Location Settings</h3>
+                  <p className="settings-help-text">Configure home and hotel service options and fees for this branch</p>
+
+                  <div className="service-setting-row">
+                    <div className="service-setting-toggle">
+                      <label>
+                        <input
+                          type="checkbox"
+                          name="enable_home_service"
+                          checked={branchForm.enable_home_service}
+                          onChange={handleBranchFormChange}
+                        />
+                        <span>Enable Home Service</span>
+                      </label>
+                    </div>
+                    <div className="service-setting-fee">
+                      <label>Transport Fee:</label>
+                      <div className="fee-input-wrapper">
+                        <span className="fee-prefix">₱</span>
+                        <input
+                          type="number"
+                          name="home_service_fee"
+                          value={branchForm.home_service_fee}
+                          onChange={handleBranchFormChange}
+                          disabled={!branchForm.enable_home_service}
+                          min="0"
+                          step="10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="service-setting-row">
+                    <div className="service-setting-toggle">
+                      <label>
+                        <input
+                          type="checkbox"
+                          name="enable_hotel_service"
+                          checked={branchForm.enable_hotel_service}
+                          onChange={handleBranchFormChange}
+                        />
+                        <span>Enable Hotel Service</span>
+                      </label>
+                    </div>
+                    <div className="service-setting-fee">
+                      <label>Transport Fee:</label>
+                      <div className="fee-input-wrapper">
+                        <span className="fee-prefix">₱</span>
+                        <input
+                          type="number"
+                          name="hotel_service_fee"
+                          value={branchForm.hotel_service_fee}
+                          onChange={handleBranchFormChange}
+                          disabled={!branchForm.enable_hotel_service}
+                          min="0"
+                          step="10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowBranchModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveBranch}
+                disabled={savingBranch}
+              >
+                {savingBranch ? 'Saving...' : (editingBranch ? 'Update Branch' : 'Create Branch')}
               </button>
             </div>
           </div>

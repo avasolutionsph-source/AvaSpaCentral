@@ -20,6 +20,9 @@ import POS from './pages/POS';
 
 // Public pages (no auth required)
 const BookingPage = lazy(() => import('./pages/BookingPage'));
+const CustomerLogin = lazy(() => import('./pages/CustomerLogin'));
+const CustomerRegister = lazy(() => import('./pages/CustomerRegister'));
+const CustomerProfile = lazy(() => import('./pages/CustomerProfile'));
 
 // Lazy loaded pages (code splitting for better initial load)
 const Products = lazy(() => import('./pages/Products'));
@@ -146,6 +149,41 @@ function AppRoutes() {
           element={
             <Suspense fallback={<PageLoader />}>
               <BookingPage />
+            </Suspense>
+          }
+        />
+        {/* Branch-specific booking page */}
+        <Route
+          path="/book/:businessId/:branchSlug"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <BookingPage />
+            </Suspense>
+          }
+        />
+
+        {/* Customer Portal Routes (Public - customer auth handled internally) */}
+        <Route
+          path="/book/:businessId/login"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <CustomerLogin />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/book/:businessId/register"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <CustomerRegister />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/book/:businessId/profile"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <CustomerProfile />
             </Suspense>
           }
         />

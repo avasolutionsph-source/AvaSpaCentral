@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { usersApi } from '../mockApi/offlineApi';
@@ -28,12 +29,15 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
+  // Branches list for Branch Owner role
+  const [branches, setBranches] = useState([]);
+
   // Password visibility toggle
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Available roles
-  const roles = ['Owner', 'Manager', 'Therapist', 'Receptionist'];
+  const roles = ['Owner', 'Manager', 'Branch Owner', 'Therapist', 'Receptionist'];
 
   // Initial form data for user accounts
   const initialFormData = {
@@ -44,7 +48,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     firstName: '',
     lastName: '',
     role: 'Therapist',
-    status: 'active'
+    status: 'active',
+    branchId: ''
   };
 
   // Track if we're creating via Supabase
@@ -57,6 +62,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   // Load employees for dropdown
   useEffect(() => {
     loadEmployees();
+    loadBranches();
   }, []);
 
   const loadEmployees = async () => {
@@ -68,6 +74,38 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       // Silent fail for employees load
     } finally {
       setLoadingEmployees(false);
+    }
+  };
+
+  // Load branches for Branch Owner role assignment
+  const loadBranches = async () => {
+    if (!user?.businessId) return;
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.log('[EmployeeAccounts] Supabase not configured, skipping branch load');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&order=display_order.asc,name.asc`,
+        {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setBranches(data || []);
+      }
+    } catch (err) {
+      console.error('[EmployeeAccounts] Error loading branches:', err);
     }
   };
 
@@ -128,6 +166,25 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     checkUsernameAvailability(value);
   };
 
+  // Get active branches for Branch Owner role
+  const activeBranches = useMemo(() => branches.filter(b => b.is_active), [branches]);
+  const hasMultipleBranches = activeBranches.length > 1;
+  const hasSingleBranch = activeBranches.length === 1;
+
+  // Handle role change - auto-select branch for Branch Owner if only one branch
+  const handleRoleChange = (e) => {
+    const newRole = e.target.value;
+    handleInputChange(e);
+
+    if (newRole === 'Branch Owner' && hasSingleBranch) {
+      // Auto-select the only branch
+      setFieldValue('branchId', activeBranches[0].id);
+    } else if (newRole !== 'Branch Owner') {
+      // Clear branchId for non-Branch Owner roles
+      setFieldValue('branchId', '');
+    }
+  };
+
   // Validation function
   const validateForm = (data) => {
     const errors = {};
@@ -157,6 +214,16 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
     if (!data.role) {
       errors.role = 'Role is required';
+    }
+
+    // Branch is required for Branch Owner role
+    if (data.role === 'Branch Owner' && !data.branchId) {
+      const activeBranches = branches.filter(b => b.is_active);
+      if (activeBranches.length === 0) {
+        errors.branchId = 'No branches available. Create a branch in Settings first.';
+      } else {
+        errors.branchId = 'Please select a branch for Branch Owner';
+      }
     }
 
     // Password validation only for create mode or if password is being changed
@@ -220,7 +287,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       firstName: user.firstName || '',
       lastName: user.lastName || '',
       role: user.role || 'Therapist',
-      status: user.status || 'active'
+      status: user.status || 'active',
+      branchId: user.branchId || ''
     }),
     transformForSubmit: (data, mode) => {
       const submitData = {
@@ -230,7 +298,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         lastName: data.lastName.trim(),
         role: data.role,
         status: data.status,
-        businessId: user?.businessId // Inherit businessId from current owner
+        businessId: user?.businessId, // Inherit businessId from current owner
+        branchId: data.role === 'Branch Owner' ? data.branchId : null
       };
 
       // Only include password if it's set
@@ -334,7 +403,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         lastName: formData.lastName.trim(),
         role: formData.role,
         employeeId: formData.employeeId,
-        businessId: user?.businessId || 'default'
+        businessId: user?.businessId || 'default',
+        branchId: formData.role === 'Branch Owner' ? formData.branchId : null
       });
 
       const result = await Promise.race([createPromise, timeoutPromise]);
@@ -351,6 +421,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         role: formData.role,
         employeeId: formData.employeeId,
         businessId: user?.businessId,
+        branchId: formData.role === 'Branch Owner' ? formData.branchId : null,
         status: 'active',
         _syncStatus: 'synced',
         _lastSyncedAt: new Date().toISOString(),
@@ -428,6 +499,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     switch (role) {
       case 'Owner': return 'role-owner';
       case 'Manager': return 'role-manager';
+      case 'Branch Owner': return 'role-branch-owner';
       case 'Therapist': return 'role-therapist';
       case 'Receptionist': return 'role-receptionist';
       default: return '';
@@ -680,7 +752,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
             <select
               name="role"
               value={formData.role}
-              onChange={handleInputChange}
+              onChange={handleRoleChange}
               className={`form-control ${formErrors.role ? 'error' : ''}`}
               required
             >
@@ -702,6 +774,66 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
             </select>
           </div>
         </div>
+
+        {/* Branch Selection for Branch Owner */}
+        {formData.role === 'Branch Owner' && (
+          <>
+            {/* Branch Info Banner */}
+            {branches.length > 0 && (
+              <div className="branch-info-banner">
+                <span className="info-icon">ℹ️</span>
+                <span>
+                  {branches.length} branch{branches.length > 1 ? 'es' : ''} configured.
+                  <Link to="/settings" className="inline-link">Manage in Settings</Link>
+                </span>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>Assigned Branch *</label>
+              {hasMultipleBranches ? (
+                <>
+                  <select
+                    name="branchId"
+                    value={formData.branchId}
+                    onChange={handleInputChange}
+                    className={`form-control ${formErrors.branchId ? 'error' : ''}`}
+                    required
+                  >
+                    <option value="">Select a branch...</option>
+                    {activeBranches.map(branch => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name} {branch.city ? `(${branch.city})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="form-hint">{activeBranches.length} branches available</small>
+                </>
+              ) : hasSingleBranch ? (
+                <div className="branch-auto-selected">
+                  <input
+                    type="text"
+                    value={activeBranches[0]?.name || ''}
+                    className="form-control"
+                    disabled
+                  />
+                  <small className="form-hint success">Auto-assigned to the only active branch</small>
+                </div>
+              ) : (
+                <div className="branch-warning">
+                  <div className="no-branches-message">
+                    <span className="warning-icon">⚠️</span>
+                    <span>No branches available.</span>
+                  </div>
+                  <Link to="/settings" className="btn btn-sm btn-secondary">
+                    + Create Branch in Settings
+                  </Link>
+                </div>
+              )}
+              <small className="form-hint">Branch Owner can only access data from this branch</small>
+            </div>
+          </>
+        )}
 
         <div className="form-group">
           <label>
@@ -850,6 +982,11 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
           color: #333;
         }
 
+        .role-branch-owner {
+          background: linear-gradient(135deg, #8b5cf6, #6366f1);
+          color: white;
+        }
+
         .status-badge {
           padding: 2px 6px;
           border-radius: var(--radius-xs);
@@ -980,6 +1117,64 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
+        }
+
+        /* Branch Info Banner */
+        .branch-info-banner {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-sm);
+          padding: var(--spacing-sm) var(--spacing-md);
+          background: var(--info-bg, rgba(59, 130, 246, 0.1));
+          border: 1px solid var(--info, #3b82f6);
+          border-radius: var(--radius-md);
+          margin-bottom: var(--spacing-md);
+          font-size: 0.9rem;
+        }
+
+        .branch-info-banner .info-icon {
+          font-size: 1rem;
+        }
+
+        .branch-info-banner .inline-link {
+          color: var(--primary);
+          text-decoration: underline;
+          margin-left: var(--spacing-xs);
+        }
+
+        .branch-info-banner .inline-link:hover {
+          text-decoration: none;
+        }
+
+        /* Branch Warning (No branches) */
+        .branch-warning {
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-sm);
+          padding: var(--spacing-md);
+          background: var(--warning-bg, rgba(245, 158, 11, 0.1));
+          border: 1px solid var(--warning, #f59e0b);
+          border-radius: var(--radius-md);
+        }
+
+        .no-branches-message {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-xs);
+          color: var(--warning, #f59e0b);
+          font-weight: 500;
+        }
+
+        .branch-warning .btn {
+          align-self: flex-start;
+        }
+
+        /* Auto-selected Branch Display */
+        .branch-auto-selected input:disabled {
+          background: var(--success-bg, rgba(34, 197, 94, 0.1));
+          border-color: var(--success, #22c55e);
+          color: var(--text-primary);
+          cursor: not-allowed;
         }
 
         @media (max-width: 768px) {

@@ -351,6 +351,13 @@ class SupabaseSyncManager {
       return null;
     }
 
+    // Special handling: Skip payroll_config records with non-UUID IDs
+    // These use string keys like "nightDifferential" which aren't compatible with Supabase UUID column
+    if (entityType === 'payrollConfig' && record._id && !isValidUUID(record._id)) {
+      console.log(`[SupabaseSyncManager] Skipping payrollConfig with non-UUID id: ${record._id}`);
+      return null;
+    }
+
     const converted = { business_id: businessId };
 
     for (const [key, value] of Object.entries(record)) {
@@ -1352,14 +1359,25 @@ class SupabaseSyncManager {
     console.log('[SupabaseSyncManager] Cleaning old mock data...');
     let cleaned = { syncQueue: 0, localRecords: 0 };
 
-    // Clean sync queue items with invalid businessId
+    // Clean sync queue items with invalid businessId or payrollConfig with non-UUID ids
     const allQueueItems = await db.syncQueue.toArray();
     for (const item of allQueueItems) {
       const businessId = item.data?.businessId;
+      const entityId = item.entityId;
+
+      // Remove items with invalid businessId
       if (businessId && !isValidUUID(businessId)) {
         await db.syncQueue.delete(item.id);
         cleaned.syncQueue++;
         console.log(`[SupabaseSyncManager] Removed sync queue item: ${item.entityType}/${item.entityId} (businessId: ${businessId})`);
+        continue;
+      }
+
+      // Remove payrollConfig items with non-UUID entityId (they use string keys like "nightDifferential")
+      if (item.entityType === 'payrollConfig' && entityId && !isValidUUID(entityId)) {
+        await db.syncQueue.delete(item.id);
+        cleaned.syncQueue++;
+        console.log(`[SupabaseSyncManager] Removed payrollConfig sync queue item with non-UUID id: ${entityId}`);
       }
     }
 

@@ -1058,3 +1058,453 @@
     margin-bottom: var(--spacing-sm);
   }
 }
+
+/* ============================================================================
+   BRANCH MANAGEMENT STYLES
+   ============================================================================ */
+
+.branches-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  gap: var(--spacing-md);
+  color: var(--gray-600);
+}
+
+.branches-info-banner {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--primary-light);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--primary-lighter);
+  margin-bottom: var(--spacing-lg);
+}
+
+.branches-info-banner .info-banner-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.branches-info-banner .info-banner-content strong {
+  display: block;
+  color: var(--primary-dark);
+  margin-bottom: var(--spacing-xs);
+}
+
+.branches-info-banner .info-banner-content p {
+  color: var(--gray-700);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.branches-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.branch-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.branch-card:hover {
+  border-color: var(--primary-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.branch-card.inactive {
+  opacity: 0.7;
+  background: var(--gray-100);
+}
+
+.branch-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--spacing-md);
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.branch-info h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.branch-slug {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  font-family: 'Courier New', monospace;
+}
+
+.branch-status .status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.branch-status .status-badge.active {
+  background: var(--success-light);
+  color: var(--success-dark);
+}
+
+.branch-status .status-badge.inactive {
+  background: var(--gray-200);
+  color: var(--gray-600);
+}
+
+.branch-card-body {
+  padding: var(--spacing-md);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+}
+
+.branch-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+}
+
+.branch-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.8125rem;
+  color: var(--gray-600);
+}
+
+.branch-detail .detail-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.branch-fees {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 180px;
+}
+
+.fee-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--white);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+}
+
+.fee-label {
+  color: var(--gray-600);
+}
+
+.fee-value {
+  font-weight: 600;
+  color: var(--success-dark);
+}
+
+.fee-value.disabled {
+  color: var(--gray-400);
+  font-weight: 400;
+}
+
+.branch-card-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--white);
+  border-top: 1px solid var(--gray-200);
+  justify-content: flex-end;
+}
+
+.branches-empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--gray-500);
+}
+
+.branches-empty .empty-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.branches-empty h3 {
+  font-size: 1.125rem;
+  color: var(--gray-700);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.branches-empty p {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.branches-actions {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--gray-200);
+}
+
+/* Branch Modal Styles */
+.settings-page .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--spacing-lg);
+  backdrop-filter: blur(4px);
+}
+
+.settings-page .modal-content {
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalSlideUp 0.3s ease;
+}
+
+@keyframes modalSlideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.settings-page .modal-content.branch-modal {
+  max-width: 600px;
+}
+
+.settings-page .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--white);
+  flex-shrink: 0;
+}
+
+.settings-page .modal-header h2 {
+  font-size: 1.25rem;
+  margin: 0;
+  color: var(--gray-900);
+}
+
+.settings-page .modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--gray-500);
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.settings-page .modal-close:hover {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.settings-page .modal-body {
+  padding: var(--spacing-lg);
+  overflow-y: auto;
+  flex: 1;
+  max-height: calc(90vh - 140px);
+}
+
+.settings-page .modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--gray-200);
+  background: var(--gray-50);
+  flex-shrink: 0;
+}
+
+.branch-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.branch-service-settings {
+  background: var(--gray-50);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--gray-200);
+}
+
+.branch-service-settings h3 {
+  font-size: 1rem;
+  margin: 0 0 var(--spacing-xs) 0;
+  color: var(--gray-800);
+}
+
+.service-setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) 0;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.service-setting-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.service-setting-toggle label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+.service-setting-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.service-setting-fee {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.service-setting-fee label {
+  font-size: 0.8125rem;
+  color: var(--gray-600);
+  white-space: nowrap;
+}
+
+.fee-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--white);
+}
+
+.fee-input-wrapper .fee-prefix {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--gray-100);
+  color: var(--gray-600);
+  font-size: 0.875rem;
+  border-right: 1px solid var(--gray-300);
+}
+
+.fee-input-wrapper input {
+  width: 100px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.fee-input-wrapper input:focus {
+  outline: none;
+}
+
+.fee-input-wrapper input:disabled {
+  background: var(--gray-100);
+  color: var(--gray-400);
+}
+
+/* Responsive Branch Styles */
+@media (max-width: 768px) {
+  .branch-card-body {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .branch-fees {
+    min-width: auto;
+  }
+
+  .branch-card-actions {
+    flex-wrap: wrap;
+  }
+
+  .branch-card-actions .btn {
+    flex: 1;
+    min-width: 80px;
+  }
+
+  .service-setting-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .service-setting-fee {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Modal responsive */
+  .settings-page .modal-overlay {
+    padding: var(--spacing-md);
+  }
+
+  .settings-page .modal-content {
+    max-height: 95vh;
+  }
+
+  .settings-page .modal-content.branch-modal {
+    max-width: 100%;
+  }
+
+  .settings-page .modal-body {
+    max-height: calc(95vh - 140px);
+  }
+
+  .settings-page .modal-footer {
+    flex-direction: column;
+  }
+
+  .settings-page .modal-footer .btn {
+    width: 100%;
+  }
+
+  .settings-row {
+    grid-template-columns: 1fr;
+  }
+}

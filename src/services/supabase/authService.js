@@ -100,6 +100,7 @@ class AuthService {
         role: userProfile.role,
         employeeId: userProfile.employee_id,
         businessId: userProfile.business_id,
+        branchId: userProfile.branch_id, // For Branch Owner filtering
         status: userProfile.status,
       };
 
@@ -310,7 +311,7 @@ class AuthService {
    * Create a staff account (for use by Owner in HR Hub)
    * Creates both the Supabase Auth user and the user profile
    */
-  async createStaffAccount({ username, password, email, firstName, lastName, role, employeeId, businessId }) {
+  async createStaffAccount({ username, password, email, firstName, lastName, role, employeeId, businessId, branchId }) {
     if (!isSupabaseConfigured()) {
       throw new Error('Account creation requires internet connection');
     }
@@ -365,6 +366,7 @@ class AuthService {
           last_name: lastName,
           role: role || 'Therapist',
           business_id: businessId,
+          branch_id: branchId || null,
           employee_id: employeeId,
           status: 'active',
         })
@@ -389,6 +391,7 @@ class AuthService {
           role: profileData.role,
           employeeId: profileData.employee_id,
           businessId: profileData.business_id,
+          branchId: profileData.branch_id,
           status: profileData.status,
         },
         message: 'Staff account created successfully',

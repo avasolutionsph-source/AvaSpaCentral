@@ -66,6 +66,8 @@ const rolePermissions = {
   'Manager': ['dashboard', 'pos', 'products', 'inventory', 'employees', 'customers', 'appointments', 'attendance',
               'payroll', 'rooms', 'service-history', 'gift-certificates', 'expenses', 'ai-chatbot', 'ava-sensei', 'analytics', 'settings',
               'my-schedule', 'shift-schedules', 'payroll-requests'],
+  'Branch Owner': ['dashboard', 'pos', 'products', 'customers', 'appointments', 'attendance', 'rooms',
+                   'gift-certificates', 'service-history', 'inventory', 'reports', 'calendar', 'my-schedule'],
   'Receptionist': ['pos', 'products', 'inventory', 'customers', 'appointments', 'attendance', 'payroll', 'rooms',
                    'service-history', 'expenses', 'my-schedule', 'payroll-requests', 'calendar'],
   'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests']
@@ -76,6 +78,7 @@ const getFirstPageForRole = (role) => {
   switch(role) {
     case 'Owner':
     case 'Manager':
+    case 'Branch Owner':
       return '/dashboard';
     case 'Receptionist':
       return '/pos';
@@ -346,6 +349,24 @@ export const AppProvider = ({ children }) => {
     return ['Owner', 'Manager'].includes(user?.role);
   };
 
+  // Check if user is Branch Owner
+  const isBranchOwner = () => {
+    return user?.role === 'Branch Owner';
+  };
+
+  // Get user's branch ID (for Branch Owner filtering)
+  const getUserBranchId = () => {
+    if (user?.role === 'Branch Owner') {
+      return user.branchId;
+    }
+    return null; // Owner/Manager see all branches
+  };
+
+  // Check if user can see all branches (not restricted to one)
+  const canSeeAllBranches = () => {
+    return ['Owner', 'Manager'].includes(user?.role);
+  };
+
   // Trigger manual sync
   const triggerSync = async () => {
     if (!isSupabaseConfigured()) {
@@ -381,10 +402,14 @@ export const AppProvider = ({ children }) => {
     isManager,
     isReceptionist,
     isTherapist,
+    isBranchOwner,
     canEdit,
     canViewAll,
     hasManagementAccess,
-    // New sync-related exports
+    // Branch-related exports
+    getUserBranchId,
+    canSeeAllBranches,
+    // Sync-related exports
     syncStatus,
     triggerSync,
     isCloudSyncEnabled,

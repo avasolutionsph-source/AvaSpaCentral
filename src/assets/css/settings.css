@@ -1448,6 +1448,88 @@
   color: var(--gray-400);
 }
 
+/* Branch Owner Account Section */
+.branch-form .form-section {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--gray-200);
+}
+
+.branch-form .form-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.branch-form .form-section .section-description {
+  font-size: 0.813rem;
+  color: var(--gray-500);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.branch-owner-fields {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--gray-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--gray-200);
+}
+
+.branch-owner-fields .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+.branch-owner-fields .form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.branch-owner-fields .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.branch-owner-fields .form-group label {
+  display: block;
+  font-size: 0.813rem;
+  font-weight: 500;
+  color: var(--gray-700);
+  margin-bottom: var(--spacing-xs);
+}
+
+.branch-owner-fields .form-group input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
+
+.branch-owner-fields .form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.branch-owner-info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--info-light);
+  border-radius: var(--radius-md);
+  color: var(--info);
+  font-size: 0.813rem;
+}
+
+.branch-owner-info .info-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
 /* Responsive Branch Styles */
 @media (max-width: 768px) {
   .branch-card-body {
@@ -1477,6 +1559,10 @@
   .service-setting-fee {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .branch-owner-fields .form-row {
+    grid-template-columns: 1fr;
   }
 
   /* Modal responsive */

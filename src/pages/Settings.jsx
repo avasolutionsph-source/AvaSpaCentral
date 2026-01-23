@@ -9,6 +9,7 @@ import { SyncManager, NetworkDetector } from '../services/sync';
 import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
 import db from '../db';
 import ActivityLogsTab from './ActivityLogs';
+import { authService } from '../services/supabase';
 
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, hasManagementAccess } = useApp();
@@ -166,6 +167,13 @@ const Settings = () => {
     enable_hotel_service: true,
     home_service_fee: 200,
     hotel_service_fee: 150,
+    // Branch Owner account fields
+    createOwnerAccount: false,
+    ownerFirstName: '',
+    ownerLastName: '',
+    ownerEmail: '',
+    ownerUsername: '',
+    ownerPassword: '',
   });
 
   const handleBusinessInfoChange = (e) => {
@@ -361,6 +369,13 @@ const Settings = () => {
       enable_hotel_service: true,
       home_service_fee: 200,
       hotel_service_fee: 150,
+      // Branch Owner account fields
+      createOwnerAccount: false,
+      ownerFirstName: '',
+      ownerLastName: '',
+      ownerEmail: '',
+      ownerUsername: '',
+      ownerPassword: '',
     });
   };
 
@@ -422,6 +437,34 @@ const Settings = () => {
     if (!branchForm.slug.trim()) {
       showToast('Branch slug is required', 'error');
       return;
+    }
+
+    // Validate Branch Owner account fields if creating account
+    if (branchForm.createOwnerAccount) {
+      if (!branchForm.ownerFirstName.trim()) {
+        showToast('Branch Owner first name is required', 'error');
+        return;
+      }
+      if (!branchForm.ownerLastName.trim()) {
+        showToast('Branch Owner last name is required', 'error');
+        return;
+      }
+      if (!branchForm.ownerEmail.trim() || !/\S+@\S+\.\S+/.test(branchForm.ownerEmail)) {
+        showToast('Valid Branch Owner email is required', 'error');
+        return;
+      }
+      if (!branchForm.ownerUsername.trim() || branchForm.ownerUsername.length < 3) {
+        showToast('Branch Owner username must be at least 3 characters', 'error');
+        return;
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(branchForm.ownerUsername)) {
+        showToast('Username can only contain letters, numbers, and underscores', 'error');
+        return;
+      }
+      if (!branchForm.ownerPassword || branchForm.ownerPassword.length < 8) {
+        showToast('Branch Owner password must be at least 8 characters', 'error');
+        return;
+      }
     }
 
     setSavingBranch(true);
@@ -504,8 +547,30 @@ const Settings = () => {
         setBranches(prev => prev.map(b => b.id === editingBranch.id ? savedBranch[0] : b));
         showToast('Branch updated successfully!', 'success');
       } else {
-        setBranches(prev => [...prev, savedBranch[0]]);
-        showToast('Branch created successfully!', 'success');
+        const newBranch = savedBranch[0];
+        setBranches(prev => [...prev, newBranch]);
+
+        // Create Branch Owner account if requested
+        if (branchForm.createOwnerAccount && branchForm.ownerUsername && branchForm.ownerPassword) {
+          try {
+            await authService.createStaffAccount({
+              username: branchForm.ownerUsername,
+              password: branchForm.ownerPassword,
+              email: branchForm.ownerEmail,
+              firstName: branchForm.ownerFirstName,
+              lastName: branchForm.ownerLastName,
+              role: 'Branch Owner',
+              businessId: user.businessId,
+              branchId: newBranch.id,
+            });
+            showToast(`Branch and Branch Owner account created! Username: ${branchForm.ownerUsername}`, 'success');
+          } catch (accountErr) {
+            console.error('Error creating Branch Owner account:', accountErr);
+            showToast(`Branch created, but failed to create account: ${accountErr.message}`, 'warning');
+          }
+        } else {
+          showToast('Branch created successfully!', 'success');
+        }
       }
 
       setShowBranchModal(false);
@@ -2535,6 +2600,90 @@ const Settings = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Branch Owner Account Section */}
+              <div className="form-section">
+                <h4>Branch Owner Account</h4>
+                <p className="section-description">Create login credentials for the branch manager</p>
+
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="createOwnerAccount"
+                      checked={branchForm.createOwnerAccount}
+                      onChange={handleBranchFormChange}
+                    />
+                    <span>Create Branch Owner Account</span>
+                  </label>
+                </div>
+
+                {branchForm.createOwnerAccount && (
+                  <div className="branch-owner-fields">
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>First Name *</label>
+                        <input
+                          type="text"
+                          name="ownerFirstName"
+                          value={branchForm.ownerFirstName}
+                          onChange={handleBranchFormChange}
+                          placeholder="First name"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Last Name *</label>
+                        <input
+                          type="text"
+                          name="ownerLastName"
+                          value={branchForm.ownerLastName}
+                          onChange={handleBranchFormChange}
+                          placeholder="Last name"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Email *</label>
+                      <input
+                        type="email"
+                        name="ownerEmail"
+                        value={branchForm.ownerEmail}
+                        onChange={handleBranchFormChange}
+                        placeholder="branch.owner@example.com"
+                      />
+                    </div>
+
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Username *</label>
+                        <input
+                          type="text"
+                          name="ownerUsername"
+                          value={branchForm.ownerUsername}
+                          onChange={handleBranchFormChange}
+                          placeholder="branch_owner"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Password *</label>
+                        <input
+                          type="password"
+                          name="ownerPassword"
+                          value={branchForm.ownerPassword}
+                          onChange={handleBranchFormChange}
+                          placeholder="Min 8 characters"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="branch-owner-info">
+                      <span className="info-icon">ℹ</span>
+                      <span>This person will only see this branch's data (employees, appointments, sales, etc.)</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">

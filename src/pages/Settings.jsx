@@ -437,30 +437,32 @@ const Settings = () => {
       return;
     }
 
-    // Validate Branch Owner account fields
-    if (!branchForm.ownerFirstName.trim()) {
-      showToast('Branch Owner first name is required', 'error');
-      return;
-    }
-    if (!branchForm.ownerLastName.trim()) {
-      showToast('Branch Owner last name is required', 'error');
-      return;
-    }
-    if (!branchForm.ownerEmail.trim() || !/\S+@\S+\.\S+/.test(branchForm.ownerEmail)) {
-      showToast('Valid Branch Owner email is required for login', 'error');
-      return;
-    }
-    if (!branchForm.ownerUsername.trim() || branchForm.ownerUsername.length < 3) {
-      showToast('Branch Owner username must be at least 3 characters', 'error');
-      return;
-    }
-    if (!/^[a-zA-Z0-9_]+$/.test(branchForm.ownerUsername)) {
-      showToast('Username can only contain letters, numbers, and underscores', 'error');
-      return;
-    }
-    if (!branchForm.ownerPassword || branchForm.ownerPassword.length < 8) {
-      showToast('Branch Owner password must be at least 8 characters', 'error');
-      return;
+    // Validate Branch Owner account fields (only for new branches)
+    if (!editingBranch) {
+      if (!branchForm.ownerFirstName.trim()) {
+        showToast('Branch Owner first name is required', 'error');
+        return;
+      }
+      if (!branchForm.ownerLastName.trim()) {
+        showToast('Branch Owner last name is required', 'error');
+        return;
+      }
+      if (!branchForm.ownerEmail.trim() || !/\S+@\S+\.\S+/.test(branchForm.ownerEmail)) {
+        showToast('Valid Branch Owner email is required for login', 'error');
+        return;
+      }
+      if (!branchForm.ownerUsername.trim() || branchForm.ownerUsername.length < 3) {
+        showToast('Branch Owner username must be at least 3 characters', 'error');
+        return;
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(branchForm.ownerUsername)) {
+        showToast('Username can only contain letters, numbers, and underscores', 'error');
+        return;
+      }
+      if (!branchForm.ownerPassword || branchForm.ownerPassword.length < 8) {
+        showToast('Branch Owner password must be at least 8 characters', 'error');
+        return;
+      }
     }
 
     setSavingBranch(true);
@@ -2583,7 +2585,8 @@ const Settings = () => {
                 </div>
               </div>
 
-              {/* Branch Owner Account Section */}
+              {/* Branch Owner Account Section - only show for new branches */}
+              {!editingBranch && (
               <div className="form-section">
                 <h4>Branch Owner Account</h4>
                 <p className="section-description">Login credentials for the branch manager</p>
@@ -2652,6 +2655,7 @@ const Settings = () => {
                   </div>
                 </div>
               </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowBranchModal(false)}>

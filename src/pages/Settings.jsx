@@ -332,12 +332,23 @@ const Settings = () => {
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
       try {
+        // Get user's access token for RLS
+        const { supabase } = await import('../services/supabase/supabaseClient');
+        let accessToken = supabaseKey;
+
+        if (supabase) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session?.access_token) {
+            accessToken = sessionData.session.access_token;
+          }
+        }
+
         const response = await fetch(
           `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&order=display_order.asc,name.asc`,
           {
             headers: {
               'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`
+              'Authorization': `Bearer ${accessToken}`
             }
           }
         );

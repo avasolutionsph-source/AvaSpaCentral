@@ -115,8 +115,8 @@ const GiftCertificates = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleAmountPreset = (amount) => {
@@ -183,7 +183,7 @@ const GiftCertificates = () => {
     const gc = redeemConfirm.gc;
     if (!gc) return;
     try {
-      await mockApi.giftCertificates.redeemGiftCertificate(gc._id);
+      await mockApi.giftCertificates.redeemGiftCertificate(gc.code);
       showToast('Gift certificate redeemed!', 'success');
       setRedeemConfirm({ isOpen: false, gc: null });
       loadGiftCertificates();

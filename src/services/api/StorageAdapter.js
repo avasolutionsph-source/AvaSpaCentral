@@ -852,6 +852,12 @@ export const giftCertificatesAdapter = {
     });
 
     return { success: true, giftCertificate: clone(updated) };
+  },
+
+  async deleteGiftCertificate(id) {
+    await delay();
+    await storageService.giftCertificates.delete(id);
+    return { success: true };
   }
 };
 

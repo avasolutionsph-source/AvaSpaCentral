@@ -1168,7 +1168,10 @@ const Calendar = () => {
                         key={slot}
                         type="button"
                         className={`time-slot-btn ${formData.time === slot ? 'selected' : ''}`}
-                        onClick={() => setFormData(prev => ({ ...prev, time: slot }))}
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          time: prev.time === slot ? '' : slot
+                        }))}
                       >
                         {slot}
                       </button>

@@ -496,6 +496,20 @@ const GiftCertificates = () => {
                       </div>
                     </div>
                   )}
+                  {validationResult.valid && validationResult.giftCertificate && (
+                    <button
+                      className="btn btn-primary"
+                      style={{ marginTop: '12px', width: '100%' }}
+                      onClick={() => {
+                        setShowValidateModal(false);
+                        setValidateCode('');
+                        setValidationResult(null);
+                        handleRedeem(validationResult.giftCertificate);
+                      }}
+                    >
+                      Redeem This Certificate
+                    </button>
+                  )}
                 </div>
               )}
             </div>

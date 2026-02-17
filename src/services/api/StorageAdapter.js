@@ -858,6 +858,24 @@ export const giftCertificatesAdapter = {
     await delay();
     await storageService.giftCertificates.delete(id);
     return { success: true };
+  },
+
+  async validateGiftCertificate(code) {
+    await delay();
+    const certificate = await storageService.giftCertificates.getByCode(code);
+    if (!certificate) {
+      return { valid: false, message: 'Gift certificate not found' };
+    }
+    if (certificate.status === 'redeemed') {
+      return { valid: false, message: 'Gift certificate has already been redeemed', giftCertificate: clone(certificate) };
+    }
+    if (certificate.status === 'expired') {
+      return { valid: false, message: 'Gift certificate has expired', giftCertificate: clone(certificate) };
+    }
+    if (certificate.expiryDate && new Date(certificate.expiryDate) < new Date()) {
+      return { valid: false, message: 'Gift certificate has expired', giftCertificate: clone(certificate) };
+    }
+    return { valid: true, message: 'Gift certificate is valid', giftCertificate: clone(certificate) };
   }
 };
 

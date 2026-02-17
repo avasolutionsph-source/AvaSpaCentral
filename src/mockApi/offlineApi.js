@@ -135,7 +135,8 @@ export const giftCertificatesApi = {
   getByCode: giftCertificatesAdapter.getByCode,
   createGiftCertificate: giftCertificatesAdapter.createGiftCertificate,
   redeemGiftCertificate: giftCertificatesAdapter.redeemGiftCertificate,
-  deleteGiftCertificate: giftCertificatesAdapter.deleteGiftCertificate
+  deleteGiftCertificate: giftCertificatesAdapter.deleteGiftCertificate,
+  validateGiftCertificate: giftCertificatesAdapter.validateGiftCertificate
 };
 
 export const purchaseOrdersApi = {

@@ -32,7 +32,9 @@
       "Bash(done)",
       "Bash(node scripts/generate-pwa-icons.js:*)",
       "Bash(node scripts/generate-webp.js:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(del \"c:\\\\Users\\\\opet_\\\\OneDrive\\\\Desktop\\\\Spa Daet\\\\vite.config.js\")",
+      "Bash(Certificate\" button now appears, allowing immediate redemption.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []

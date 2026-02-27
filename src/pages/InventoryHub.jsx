@@ -20,6 +20,7 @@ const InventoryHub = () => {
 
   // Refs to access child component functions
   const productsOpenCreateRef = useRef(null);
+  const roomsOpenCreateRef = useRef(null);
 
   // Quick stats for badges
   const [stats, setStats] = useState({
@@ -144,6 +145,14 @@ const InventoryHub = () => {
                 </div>
               )}
             </div>
+            {activeTab === 'rooms' && canEdit() && (
+              <button
+                className="btn btn-primary"
+                onClick={() => roomsOpenCreateRef.current?.()}
+              >
+                + Add Room
+              </button>
+            )}
             {activeTab === 'products' && canEdit() && (
               <button
                 className="btn btn-primary"
@@ -176,7 +185,7 @@ const InventoryHub = () => {
 
       {/* Tab Content */}
       <div className="hub-content">
-        {activeTab === 'rooms' && <Rooms embedded onDataChange={loadStats} />}
+        {activeTab === 'rooms' && <Rooms embedded onDataChange={loadStats} onOpenCreateRef={roomsOpenCreateRef} />}
         {activeTab === 'history' && <ServiceHistory embedded />}
         {activeTab === 'products' && <Products embedded onDataChange={loadStats} onOpenCreateRef={productsOpenCreateRef} />}
         {activeTab === 'stock' && <Inventory embedded onDataChange={loadStats} />}

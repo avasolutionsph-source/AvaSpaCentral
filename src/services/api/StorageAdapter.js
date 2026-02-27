@@ -843,12 +843,17 @@ export const giftCertificatesAdapter = {
     const certificate = await storageService.giftCertificates.getByCode(code);
     if (!certificate) throw new Error('Gift certificate not found');
     if (certificate.status !== 'active') throw new Error('Gift certificate is not active');
-    if (certificate.balance < amount) throw new Error('Insufficient balance');
 
-    const newBalance = certificate.balance - amount;
+    // Ensure balance is a valid number (fix corrupted NaN/null from previous bugs)
+    const currentBalance = Number.isFinite(certificate.balance) ? certificate.balance : certificate.amount || 0;
+    // Default to full balance if no amount specified
+    const redeemAmount = amount != null ? amount : currentBalance;
+    if (currentBalance < redeemAmount) throw new Error('Insufficient balance');
+
+    const newBalance = currentBalance - redeemAmount;
     const updated = await storageService.giftCertificates.update(certificate._id, {
       balance: newBalance,
-      status: newBalance === 0 ? 'redeemed' : 'active'
+      status: newBalance <= 0 ? 'redeemed' : 'active'
     });
 
     return { success: true, giftCertificate: clone(updated) };
@@ -1285,10 +1290,21 @@ export const usersAdapter = {
           .eq('business_id', businessId);
 
         if (!error && supabaseUsers && supabaseUsers.length > 0) {
+          // Get pending deletes from sync queue to avoid re-adding deleted users
+          const pendingDeletes = await db.syncQueue
+            .filter(item => item.entityType === 'users' && item.operation === 'delete')
+            .toArray();
+          const pendingDeleteIds = new Set(pendingDeletes.map(item => item.entityId));
+
           // Merge Supabase users into local storage
           const localUserIds = new Set(users.map(u => u._id));
 
           for (const supabaseUser of supabaseUsers) {
+            // Skip soft-deleted users and users with pending local delete
+            if (supabaseUser.deleted || pendingDeleteIds.has(supabaseUser.id)) {
+              continue;
+            }
+
             const localUser = {
               _id: supabaseUser.id,
               authId: supabaseUser.auth_id,

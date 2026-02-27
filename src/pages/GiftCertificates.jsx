@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO, isPast } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const GiftCertificates = () => {
   const { showToast } = useApp();
@@ -36,6 +38,28 @@ const GiftCertificates = () => {
 
   useEffect(() => {
     loadGiftCertificates();
+
+    // Listen for cross-device realtime updates
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (status.type === 'realtime_update' && status.entityType === 'giftCertificates') {
+        loadGiftCertificates();
+      }
+      if (status.type === 'pull_complete' || status.type === 'sync_complete') {
+        loadGiftCertificates();
+      }
+    });
+
+    // Listen for local data changes (e.g., from POS page redeeming a GC)
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (change.entityType === 'giftCertificates') {
+        loadGiftCertificates();
+      }
+    });
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+    };
   }, []);
 
   useEffect(() => {

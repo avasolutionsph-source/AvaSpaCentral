@@ -680,7 +680,7 @@ const POS = () => {
         if (discountType === 'gc' && appliedGC) {
           try {
             const gcDiscount = getDiscount();
-            await mockApi.giftCertificates.redeemGiftCertificate(appliedGC._id, gcDiscount);
+            await mockApi.giftCertificates.redeemGiftCertificate(appliedGC.code, gcDiscount);
           } catch (error) {
             // Continue anyway - transaction already saved
           }

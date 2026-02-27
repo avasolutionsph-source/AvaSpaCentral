@@ -100,12 +100,12 @@ const SUPABASE_TABLE_COLUMNS = {
     'id', 'business_id', 'first_name', 'last_name', 'email', 'phone',
     'department', 'position', 'status', 'hire_date', 'hourly_rate',
     'commission_rate', 'photo_url', 'address', 'emergency_contact',
-    'notes', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+    'skills', 'metadata', 'notes', 'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   users: [
     'id', 'auth_id', 'email', 'username', 'first_name', 'last_name',
     'role', 'business_id', 'employee_id', 'status', 'last_login',
-    'created_at', 'updated_at'
+    'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   customers: [
     'id', 'business_id', 'name', 'first_name', 'last_name', 'email', 'phone',
@@ -351,10 +351,10 @@ class SupabaseSyncManager {
       return null;
     }
 
-    // Special handling: Skip payroll_config records with non-UUID IDs
-    // These use string keys like "nightDifferential" which aren't compatible with Supabase UUID column
-    if (entityType === 'payrollConfig' && record._id && !isValidUUID(record._id)) {
-      console.log(`[SupabaseSyncManager] Skipping payrollConfig with non-UUID id: ${record._id}`);
+    // Skip records with non-UUID IDs (old mock data like 'booking_001', 'nightDifferential', etc.)
+    // Exception: serviceRotation uses date strings as IDs
+    if (record._id && !isValidUUID(record._id) && entityType !== 'serviceRotation') {
+      console.log(`[SupabaseSyncManager] Skipping ${entityType} with non-UUID id: ${record._id}`);
       return null;
     }
 
@@ -396,7 +396,8 @@ class SupabaseSyncManager {
 
     // Special handling for service_rotation: wrap rotation fields into rotation_data JSONB
     if (tableName === 'service_rotation') {
-      const rotationFields = ['employeeOrder', 'employee_order', 'currentIndex', 'current_index',
+      const rotationFields = ['queue', 'serviceCount', 'service_count',
+        'employeeOrder', 'employee_order', 'currentIndex', 'current_index',
         'servicesCompleted', 'services_completed', 'lastAdvanced', 'last_advanced', 'lastServed', 'last_served'];
       const rotationData = {};
       for (const field of rotationFields) {
@@ -407,6 +408,43 @@ class SupabaseSyncManager {
       }
       if (Object.keys(rotationData).length > 0) {
         converted.rotation_data = rotationData;
+      }
+    }
+
+    // Special handling for employees: flatten commission object and store extras in metadata
+    if (tableName === 'employees') {
+      // Convert commission object { type, value } to commission_rate number
+      if (converted.commission && typeof converted.commission === 'object') {
+        converted.commission_rate = parseFloat(converted.commission.value) || 0;
+        // Store commission type in metadata so we can reconstruct the object on pull
+        converted.metadata = {
+          ...(converted.metadata || {}),
+          commissionType: converted.commission.type || 'percentage',
+        };
+        delete converted.commission;
+      }
+
+      // Store fields that don't have dedicated Supabase columns in metadata JSONB
+      const metadataExtras = {};
+      const extraFields = ['role', 'active', 'rateType', 'rate_type', 'monthlyRate', 'monthly_rate'];
+      for (const field of extraFields) {
+        if (converted[field] !== undefined) {
+          // Use camelCase key in metadata for consistency
+          const camelKey = field.includes('_') ? this._toCamelCase(field) : field;
+          metadataExtras[camelKey] = converted[field];
+          delete converted[field];
+        }
+      }
+      if (Object.keys(metadataExtras).length > 0) {
+        converted.metadata = { ...(converted.metadata || {}), ...metadataExtras };
+      }
+    }
+
+    // Fix corrupted data before pushing
+    if (tableName === 'gift_certificates') {
+      // Ensure balance is never null/NaN (use amount as fallback)
+      if (converted.balance == null || !Number.isFinite(converted.balance)) {
+        converted.balance = converted.amount || 0;
       }
     }
 
@@ -436,7 +474,7 @@ class SupabaseSyncManager {
   /**
    * Convert Supabase record to Dexie format
    */
-  _toDexieFormat(record) {
+  _toDexieFormat(record, entityType = null) {
     const converted = {
       _syncStatus: 'synced',
       _lastSyncedAt: new Date().toISOString(),
@@ -462,6 +500,27 @@ class SupabaseSyncManager {
         const camelKey = this._toCamelCase(key);
         converted[camelKey] = value;
       }
+    }
+
+    // Special handling for employees: reconstruct commission object and extract metadata fields
+    if (entityType === 'employees') {
+      const metadata = converted.metadata || {};
+
+      // Reconstruct commission object from commission_rate + metadata.commissionType
+      const commissionRate = converted.commissionRate;
+      if (commissionRate !== undefined) {
+        converted.commission = {
+          type: metadata.commissionType || 'percentage',
+          value: typeof commissionRate === 'number' ? commissionRate : parseFloat(commissionRate) || 0,
+        };
+        delete converted.commissionRate;
+      }
+
+      // Restore fields from metadata that don't have dedicated Supabase columns
+      if (metadata.rateType) converted.rateType = metadata.rateType;
+      if (metadata.monthlyRate !== undefined) converted.monthlyRate = metadata.monthlyRate;
+      if (metadata.role) converted.role = metadata.role;
+      if (metadata.active !== undefined) converted.active = metadata.active;
     }
 
     return converted;
@@ -768,9 +827,15 @@ class SupabaseSyncManager {
       switch (eventType) {
         case 'INSERT':
         case 'UPDATE':
-          const dexieRecord = this._toDexieFormat(newRecord);
-          console.log(`[SupabaseSyncManager] Saving to Dexie ${dexieTableName}:`, dexieRecord);
-          await db[dexieTableName].put(dexieRecord);
+          const dexieRecord = this._toDexieFormat(newRecord, entityType);
+          // Handle soft-deleted records: remove from local instead of re-adding
+          if (newRecord.deleted) {
+            console.log(`[SupabaseSyncManager] Removing soft-deleted record from Dexie ${dexieTableName}: ${dexieRecord._id}`);
+            await db[dexieTableName].delete(dexieRecord._id);
+          } else {
+            console.log(`[SupabaseSyncManager] Saving to Dexie ${dexieTableName}:`, dexieRecord);
+            await db[dexieTableName].put(dexieRecord);
+          }
           console.log(`[SupabaseSyncManager] Saved successfully`);
           break;
 
@@ -982,7 +1047,19 @@ class SupabaseSyncManager {
             const { error: createError } = await supabase
               .from(tableName)
               .insert(supabaseRecord);
-            if (createError) throw createError;
+            if (createError) {
+              // If duplicate key conflict (409), retry as update instead of failing
+              if (createError.code === '23505') {
+                console.log(`[SupabaseSyncManager] Duplicate detected for ${tableName}, retrying as UPDATE`);
+                const { error: fallbackError } = await supabase
+                  .from(tableName)
+                  .update(supabaseRecord)
+                  .eq('id', supabaseRecord.id);
+                if (fallbackError) throw fallbackError;
+              } else {
+                throw createError;
+              }
+            }
             console.log(`[SupabaseSyncManager] INSERT successful for ${tableName}`);
             break;
 
@@ -1129,12 +1206,21 @@ class SupabaseSyncManager {
         if (data && data.length > 0) {
           console.log(`[SupabaseSyncManager] Pulled ${data.length} ${entityType} records`);
 
+          // Get pending deletes from sync queue to avoid re-adding deleted records
+          const pendingDeletes = await db.syncQueue
+            .filter(item => item.entityType === entityType && item.operation === 'delete')
+            .toArray();
+          const pendingDeleteIds = new Set(pendingDeletes.map(item => item.entityId));
+
           for (const record of data) {
-            const dexieRecord = this._toDexieFormat(record);
+            const dexieRecord = this._toDexieFormat(record, entityType);
 
             if (record.deleted) {
               // Handle soft delete - remove from local
               await db[dexieTableName].delete(dexieRecord._id);
+            } else if (pendingDeleteIds.has(dexieRecord._id)) {
+              // Skip re-adding records that have a pending local delete
+              console.log(`[SupabaseSyncManager] Skipping pull for ${entityType}/${dexieRecord._id} - pending delete`);
             } else {
               // Upsert to local database
               await db[dexieTableName].put(dexieRecord);

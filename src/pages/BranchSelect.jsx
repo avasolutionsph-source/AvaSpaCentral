@@ -10,12 +10,12 @@ const BranchSelect = () => {
   const [error, setError] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // If user is already logged in and branch is selected, go to app
+  // If branch is already selected, go to its booking page
   useEffect(() => {
-    if (user && selectedBranch) {
-      navigate('/dashboard', { replace: true });
+    if (selectedBranch && selectedBranch.business_id && selectedBranch.slug) {
+      navigate(`/book/${selectedBranch.business_id}/${selectedBranch.slug}`, { replace: true });
     }
-  }, [user, selectedBranch, navigate]);
+  }, [selectedBranch, navigate]);
 
   // Load branches from Supabase
   useEffect(() => {
@@ -67,19 +67,16 @@ const BranchSelect = () => {
           const assignedBranch = (data || []).find(b => b.id === getUserBranchId());
           if (assignedBranch) {
             selectBranch(assignedBranch);
-            navigate('/dashboard', { replace: true });
+            navigate(`/book/${assignedBranch.business_id}/${assignedBranch.slug}`, { replace: true });
             return;
           }
         }
 
         // If only one branch, auto-select it
         if (data && data.length === 1) {
-          selectBranch(data[0]);
-          if (user) {
-            navigate('/dashboard', { replace: true });
-          } else {
-            navigate('/login', { replace: true });
-          }
+          const branch = data[0];
+          selectBranch(branch);
+          navigate(`/book/${branch.business_id}/${branch.slug}`, { replace: true });
           return;
         }
       } catch (err) {
@@ -95,11 +92,8 @@ const BranchSelect = () => {
 
   const handleSelectBranch = (branch) => {
     selectBranch(branch);
-    if (user) {
-      navigate('/dashboard', { replace: true });
-    } else {
-      navigate('/login', { replace: true });
-    }
+    // Navigate to the branch's booking page
+    navigate(`/book/${branch.business_id}/${branch.slug}`, { replace: true });
   };
 
   const handleLogout = async () => {
@@ -145,34 +139,7 @@ const BranchSelect = () => {
     );
   }
 
-  // If no branches returned (RLS blocking anon), prompt user to login first
-  if (branches.length === 0 && !user) {
-    return (
-      <div className="branch-select-page">
-        <div className="branch-select-container">
-          <div className="branch-select-header">
-            <h1>Daet Massage & Spa</h1>
-            <p className="branch-select-subtitle">Please sign in to select a branch</p>
-          </div>
-          <div className="branch-select-login-prompt">
-            <p>Sign in first to view available branches.</p>
-            <button
-              className="btn btn-primary btn-block"
-              onClick={() => {
-                // Temporarily set a placeholder branch to allow login flow
-                // After login, user will be redirected back here to pick a real branch
-                navigate('/login-first');
-              }}
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (branches.length === 0 && user) {
+  if (branches.length === 0) {
     return (
       <div className="branch-select-page">
         <div className="branch-select-container">
@@ -181,9 +148,9 @@ const BranchSelect = () => {
             <p className="branch-select-subtitle">No branches available</p>
           </div>
           <div className="branch-select-error">
-            <p>No active branches found. Please contact your administrator.</p>
-            <button className="btn btn-secondary" onClick={handleLogout} disabled={loggingOut}>
-              {loggingOut ? 'Logging out...' : 'Sign Out'}
+            <p>No active branches found. Please try again later.</p>
+            <button className="btn btn-primary" onClick={() => window.location.reload()}>
+              Try Again
             </button>
           </div>
         </div>

@@ -14,6 +14,7 @@ if (import.meta.env.DEV) {
 // Eagerly loaded pages (frequently accessed, small bundle)
 import Login from './pages/Login';
 import Register from './pages/Register';
+import BranchSelect from './pages/BranchSelect';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
 import POS from './pages/POS';
@@ -80,10 +81,15 @@ const PageLoader = () => (
 
 // Public Route Component (redirect to first allowed page if already logged in)
 const PublicRoute = ({ children }) => {
-  const { user, loading, getFirstPage } = useApp();
+  const { user, loading, selectedBranch, getFirstPage } = useApp();
 
   if (loading) {
     return <LoadingScreen />;
+  }
+
+  // Must select a branch before accessing login/register
+  if (!selectedBranch) {
+    return <Navigate to="/select-branch" replace />;
   }
 
   if (user) {
@@ -108,16 +114,57 @@ const ProtectedLayout = ({ children }) => {
   return children;
 };
 
+// Require both branch selection AND login before accessing main app
+const RequireBranch = ({ children }) => {
+  const { user, loading, selectedBranch } = useApp();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (!selectedBranch) {
+    return <Navigate to="/select-branch" replace />;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
 // Redirect to first allowed page for user's role
 const RedirectToFirstPage = () => {
   const { getFirstPage } = useApp();
   return <Navigate to={getFirstPage()} replace />;
 };
 
-// Catch all redirect - to first page if logged in, to login if not
+// Login-first flow: allows login without a branch selected (for RLS-restricted setups)
+// After login, redirects back to branch select
+const LoginFirst = ({ children }) => {
+  const { user, loading, selectedBranch, getFirstPage } = useApp();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  // Already logged in - go pick a branch (or straight to app if branch already selected)
+  if (user) {
+    if (selectedBranch) {
+      return <Navigate to={getFirstPage()} replace />;
+    }
+    return <Navigate to="/select-branch" replace />;
+  }
+
+  return children;
+};
+
+// Catch all redirect - branch select -> login -> app
 const CatchAllRedirect = () => {
-  const { user, getFirstPage } = useApp();
-  return <Navigate to={user ? getFirstPage() : '/login'} replace />;
+  const { user, selectedBranch, getFirstPage } = useApp();
+  if (!selectedBranch) return <Navigate to="/select-branch" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={getFirstPage()} replace />;
 };
 
 function AppRoutes() {
@@ -188,13 +235,29 @@ function AppRoutes() {
           }
         />
 
-        {/* Protected Routes */}
+        {/* Branch Selection - Landing Page (public, first thing user sees) */}
+        <Route
+          path="/select-branch"
+          element={<BranchSelect />}
+        />
+
+        {/* Login-first flow: when RLS blocks anon from reading branches */}
+        <Route
+          path="/login-first"
+          element={
+            <LoginFirst>
+              <Login />
+            </LoginFirst>
+          }
+        />
+
+        {/* Protected Routes (require branch selection) */}
         <Route
           path="/"
           element={
-            <ProtectedLayout>
+            <RequireBranch>
               <MainLayout />
-            </ProtectedLayout>
+            </RequireBranch>
           }
         >
           <Route index element={<RedirectToFirstPage />} />

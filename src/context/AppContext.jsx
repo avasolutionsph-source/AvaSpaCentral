@@ -103,6 +103,7 @@ export const AppProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [syncStatus, setSyncStatus] = useState({ isOnline: false, isSyncing: false });
+  const [selectedBranch, setSelectedBranch] = useState(null); // { id, name, slug, ... } or null
 
   // Initialize app - check for existing session
   useEffect(() => {
@@ -145,6 +146,16 @@ export const AppProvider = ({ children }) => {
               // Migrate orphaned data to this business (runs in background)
               migrateOrphanedData(userData.businessId);
             }
+          }
+        }
+
+        // Restore selected branch from localStorage
+        const savedBranch = localStorage.getItem('selectedBranch');
+        if (savedBranch) {
+          try {
+            setSelectedBranch(JSON.parse(savedBranch));
+          } catch (e) {
+            localStorage.removeItem('selectedBranch');
           }
         }
 
@@ -286,12 +297,14 @@ export const AppProvider = ({ children }) => {
 
     // Always clear user state regardless of above errors
     setUser(null);
+    setSelectedBranch(null);
     clearUserContext(); // Clear user from Sentry
     clearBusinessContext(); // Clear business context for multi-tenant isolation
 
     // Also clear localStorage directly as backup
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('selectedBranch');
 
     showToast('Logged out successfully', 'info');
   };
@@ -311,6 +324,7 @@ export const AppProvider = ({ children }) => {
 
   // Get first page for user's role
   const getFirstPage = () => {
+    if (!selectedBranch) return '/select-branch';
     if (!user) return '/login';
     return getFirstPageForRole(user.role);
   };
@@ -368,6 +382,22 @@ export const AppProvider = ({ children }) => {
     return ['Owner', 'Manager'].includes(user?.role);
   };
 
+  // Select a branch (called from BranchSelect page)
+  const selectBranch = (branch) => {
+    setSelectedBranch(branch);
+    if (branch) {
+      localStorage.setItem('selectedBranch', JSON.stringify(branch));
+    } else {
+      localStorage.removeItem('selectedBranch');
+    }
+  };
+
+  // Clear branch selection (e.g., to go back to branch select screen)
+  const clearBranch = () => {
+    setSelectedBranch(null);
+    localStorage.removeItem('selectedBranch');
+  };
+
   // Trigger manual sync
   const triggerSync = async () => {
     if (!isSupabaseConfigured()) {
@@ -408,6 +438,9 @@ export const AppProvider = ({ children }) => {
     canViewAll,
     hasManagementAccess,
     // Branch-related exports
+    selectedBranch,
+    selectBranch,
+    clearBranch,
     getUserBranchId,
     canSeeAllBranches,
     // Sync-related exports

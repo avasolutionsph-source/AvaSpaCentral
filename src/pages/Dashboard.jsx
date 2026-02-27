@@ -8,7 +8,7 @@ import { DashboardSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { showToast, user, canSeeAllBranches } = useApp();
+  const { showToast, user, canSeeAllBranches, selectedBranch } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -25,9 +25,8 @@ const Dashboard = () => {
   const [insightsData, setInsightsData] = useState({ products: [], rooms: [] });
   const [bookingSlug, setBookingSlug] = useState(null);
 
-  // Branch selector state (for Owner/Manager to filter by branch)
-  const [branches, setBranches] = useState([]);
-  const [selectedBranchId, setSelectedBranchId] = useState(null); // null = all branches
+  // Use global branch from AppContext
+  const selectedBranchId = selectedBranch?.id || null;
 
   useEffect(() => {
     let isMounted = true;
@@ -148,37 +147,7 @@ const Dashboard = () => {
     fetchBookingSlug();
   }, [user?.businessId]);
 
-  // Fetch branches for Owner/Manager to filter by branch
-  useEffect(() => {
-    const fetchBranches = async () => {
-      if (!user?.businessId || !canSeeAllBranches()) return;
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      if (!supabaseUrl || !supabaseKey) return;
-
-      try {
-        const response = await fetch(
-          `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order`,
-          {
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`
-            }
-          }
-        );
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setBranches(data);
-        }
-      } catch (err) {
-        console.error('Error fetching branches:', err);
-      }
-    };
-
-    fetchBranches();
-  }, [user?.businessId, canSeeAllBranches]);
+  // Branch is now selected globally from the BranchSelect landing page
 
   const loadDashboardData = async () => {
     try {
@@ -746,22 +715,9 @@ const Dashboard = () => {
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p>Real-time business overview{selectedBranchId && branches.length > 0 ? ` - ${branches.find(b => b.id === selectedBranchId)?.name || ''}` : ''}</p>
+          <p>Real-time business overview{selectedBranch ? ` - ${selectedBranch.name}` : ''}</p>
         </div>
         <div className="header-actions">
-          {/* Branch selector dropdown - only shows for Owner/Manager with branches */}
-          {branches.length >= 1 && canSeeAllBranches() && (
-            <select
-              className="branch-selector"
-              value={selectedBranchId || ''}
-              onChange={(e) => setSelectedBranchId(e.target.value || null)}
-            >
-              <option value="">All Branches</option>
-              {branches.map(branch => (
-                <option key={branch.id} value={branch.id}>{branch.name}</option>
-              ))}
-            </select>
-          )}
           <button
             className="btn btn-secondary"
             onClick={refreshDashboard}

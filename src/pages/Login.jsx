@@ -5,7 +5,7 @@ import { authService, isSupabaseConfigured } from '../services/supabase';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, showToast, getFirstPage } = useApp();
+  const { login, showToast, getFirstPage, selectedBranch } = useApp();
 
   const [formData, setFormData] = useState({
     username: '',
@@ -185,6 +185,11 @@ const Login = () => {
       <div className="auth-container">
         <div className="auth-header">
           <h1 className="brand-logo">Daet Massage & Spa</h1>
+          {selectedBranch && (
+            <p className="branch-select-role" style={{ display: 'inline-block', marginBottom: '8px' }}>
+              {selectedBranch.name}
+            </p>
+          )}
           <p className="brand-tagline">Business Management System</p>
         </div>
 

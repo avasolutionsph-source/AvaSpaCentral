@@ -5,7 +5,7 @@ import mockApi from '../mockApi';
 import OfflineIndicator from './OfflineIndicator';
 
 const MainLayout = () => {
-  const { user, logout, hasPermission } = useApp();
+  const { user, logout, hasPermission, selectedBranch, clearBranch } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -575,7 +575,25 @@ const MainLayout = () => {
         <div className="sidebar-header">
           <div className="brand">
             <span className="brand-text">Daet Massage & Spa</span>
-            <span className="brand-text-highlight">Business Management</span>
+            {sidebarOpen && selectedBranch && (
+              <button
+                className="branch-indicator"
+                onClick={() => { clearBranch(); navigate('/select-branch'); }}
+                title="Switch branch"
+              >
+                <span className="branch-indicator-name">{selectedBranch.name}</span>
+                <span className="branch-indicator-switch">Switch</span>
+              </button>
+            )}
+            {!sidebarOpen && selectedBranch && (
+              <button
+                className="branch-indicator-collapsed"
+                onClick={() => { clearBranch(); navigate('/select-branch'); }}
+                title={`${selectedBranch.name} - Click to switch`}
+              >
+                {selectedBranch.name?.charAt(0)}
+              </button>
+            )}
           </div>
           <button
             className="sidebar-toggle"

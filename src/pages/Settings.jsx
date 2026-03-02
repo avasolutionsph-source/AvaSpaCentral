@@ -1387,6 +1387,14 @@ const Settings = () => {
         >
           Settings
         </button>
+        {hasManagementAccess() && (
+          <button
+            className={`settings-tab ${activeTab === 'branding' ? 'active' : ''}`}
+            onClick={() => setActiveTab('branding')}
+          >
+            Branding
+          </button>
+        )}
         <button
           className={`settings-tab ${activeTab === 'logs' ? 'active' : ''}`}
           onClick={() => setActiveTab('logs')}
@@ -1397,80 +1405,8 @@ const Settings = () => {
 
       {activeTab === 'logs' ? (
         <ActivityLogsTab />
-      ) : (
+      ) : activeTab === 'branding' ? (
       <div className="settings-content">
-        {/* Business Information */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <div className="settings-section-icon">🏢</div>
-            <div className="settings-section-title">
-              <h2>Business Information</h2>
-              <p>Update your business details and contact information</p>
-            </div>
-          </div>
-          <div className="settings-section-body">
-            <div className="settings-form-group">
-              <label>Business Name</label>
-              <input
-                type="text"
-                name="name"
-                value={businessInfo.name}
-                onChange={handleBusinessInfoChange}
-                placeholder="Enter business name"
-                disabled={!canEdit()}
-              />
-            </div>
-            <div className="settings-form-group">
-              <label>Address</label>
-              <textarea
-                name="address"
-                value={businessInfo.address}
-                onChange={handleBusinessInfoChange}
-                placeholder="Enter business address"
-                rows="3"
-                disabled={!canEdit()}
-              />
-            </div>
-            <div className="settings-row">
-              <div className="settings-form-group">
-                <label>Phone Number</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={businessInfo.phone}
-                  onChange={handleBusinessInfoChange}
-                  placeholder="+63 xxx xxx xxxx"
-                  disabled={!canEdit()}
-                />
-              </div>
-              <div className="settings-form-group">
-                <label>Email Address</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={businessInfo.email}
-                  onChange={handleBusinessInfoChange}
-                  placeholder="email@example.com"
-                  disabled={!canEdit()}
-                />
-              </div>
-            </div>
-            <div className="settings-form-group">
-              <label>Website</label>
-              <input
-                type="url"
-                name="website"
-                value={businessInfo.website}
-                onChange={handleBusinessInfoChange}
-                placeholder="www.yourbusiness.com"
-                disabled={!canEdit()}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Branding & Appearance */}
-        {hasManagementAccess() && (
         <div className="settings-section">
           <div className="settings-section-header">
             <div className="settings-section-icon">🎨</div>
@@ -1604,7 +1540,78 @@ const Settings = () => {
             )}
           </div>
         </div>
-        )}
+      </div>
+      ) : (
+      <div className="settings-content">
+        {/* Business Information */}
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <div className="settings-section-icon">🏢</div>
+            <div className="settings-section-title">
+              <h2>Business Information</h2>
+              <p>Update your business details and contact information</p>
+            </div>
+          </div>
+          <div className="settings-section-body">
+            <div className="settings-form-group">
+              <label>Business Name</label>
+              <input
+                type="text"
+                name="name"
+                value={businessInfo.name}
+                onChange={handleBusinessInfoChange}
+                placeholder="Enter business name"
+                disabled={!canEdit()}
+              />
+            </div>
+            <div className="settings-form-group">
+              <label>Address</label>
+              <textarea
+                name="address"
+                value={businessInfo.address}
+                onChange={handleBusinessInfoChange}
+                placeholder="Enter business address"
+                rows="3"
+                disabled={!canEdit()}
+              />
+            </div>
+            <div className="settings-row">
+              <div className="settings-form-group">
+                <label>Phone Number</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={businessInfo.phone}
+                  onChange={handleBusinessInfoChange}
+                  placeholder="+63 xxx xxx xxxx"
+                  disabled={!canEdit()}
+                />
+              </div>
+              <div className="settings-form-group">
+                <label>Email Address</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={businessInfo.email}
+                  onChange={handleBusinessInfoChange}
+                  placeholder="email@example.com"
+                  disabled={!canEdit()}
+                />
+              </div>
+            </div>
+            <div className="settings-form-group">
+              <label>Website</label>
+              <input
+                type="url"
+                name="website"
+                value={businessInfo.website}
+                onChange={handleBusinessInfoChange}
+                placeholder="www.yourbusiness.com"
+                disabled={!canEdit()}
+              />
+            </div>
+          </div>
+        </div>
 
         {/* Customer Booking Link */}
         <div className="settings-section">

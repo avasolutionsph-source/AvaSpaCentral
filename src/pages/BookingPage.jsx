@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
 import { getCustomerSession, logoutCustomer } from '../services/customerAuthService';
+import { applyColorTheme } from '../services/brandingService';
 import '../assets/css/booking.css';
 
 /**
@@ -155,10 +156,10 @@ const BookingPage = () => {
           // Determine if this is a UUID or custom slug
           let testUrl;
           if (isUUID(businessIdOrSlug)) {
-            testUrl = `${supabaseUrl}/rest/v1/businesses?id=eq.${businessIdOrSlug}&select=id,name,address,phone,email,booking_slug`;
+            testUrl = `${supabaseUrl}/rest/v1/businesses?id=eq.${businessIdOrSlug}&select=id,name,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
           } else {
             // It's a custom slug
-            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${businessIdOrSlug}&select=id,name,address,phone,email,booking_slug`;
+            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${businessIdOrSlug}&select=id,name,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
           }
           console.log('[BookingPage] Test URL:', testUrl);
 
@@ -194,6 +195,7 @@ const BookingPage = () => {
 
           const businessData = data[0];
           setBusiness(businessData);
+          if (businessData.primary_color) applyColorTheme(businessData.primary_color);
 
           // Use the actual UUID for subsequent queries (in case we looked up by slug)
           const actualBusinessId = businessData.id;
@@ -582,9 +584,16 @@ const BookingPage = () => {
   return (
     <div className="booking-page">
       {/* Header */}
-      <header className="booking-header">
+      <header
+        className={`booking-header${business?.cover_photo_url ? ' booking-header-has-cover' : ''}`}
+        style={business?.cover_photo_url ? { backgroundImage: `url(${business.cover_photo_url})` } : {}}
+      >
+        {business?.cover_photo_url && <div className="booking-header-overlay" />}
         <div className="booking-header-content">
           <div className="booking-header-brand">
+            {business?.logo_url && (
+              <img src={business.logo_url} alt={business.name} className="booking-header-logo" />
+            )}
             <h1>{business?.name || 'Book Now'}</h1>
             <p className="booking-tagline">Book your relaxation experience</p>
           </div>

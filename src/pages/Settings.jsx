@@ -10,6 +10,7 @@ import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../servi
 import db from '../db';
 import ActivityLogsTab from './ActivityLogs';
 import { authService } from '../services/supabase';
+import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
 
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, hasManagementAccess } = useApp();
@@ -45,6 +46,18 @@ const Settings = () => {
 
   // Theme Settings
   const [theme, setTheme] = useState('default');
+
+  // Branding & Appearance
+  const [brandingSettings, setBrandingSettings] = useState({
+    logoUrl: null,
+    coverPhotoUrl: null,
+    primaryColor: '#1B5E37',
+  });
+  const [logoFile, setLogoFile] = useState(null);
+  const [coverFile, setCoverFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [coverPreview, setCoverPreview] = useState(null);
+  const [savingBranding, setSavingBranding] = useState(false);
 
   // Profile Settings
   const [profileData, setProfileData] = useState({
@@ -365,6 +378,93 @@ const Settings = () => {
 
     loadBranches();
   }, [user?.businessId]);
+
+  // Load branding settings on mount
+  useEffect(() => {
+    const loadBranding = async () => {
+      if (!user?.businessId) return;
+      try {
+        const data = await getBrandingSettings(user.businessId);
+        setBrandingSettings(prev => ({
+          ...prev,
+          logoUrl: data.logoUrl,
+          coverPhotoUrl: data.coverPhotoUrl,
+          primaryColor: data.primaryColor || '#1B5E37',
+        }));
+        setLogoPreview(data.logoUrl);
+        setCoverPreview(data.coverPhotoUrl);
+        if (data.primaryColor) applyColorTheme(data.primaryColor);
+      } catch (err) {
+        console.error('Error loading branding:', err);
+      }
+    };
+    loadBranding();
+  }, [user?.businessId]);
+
+  const handleLogoFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Please upload an image file', 'error');
+      return;
+    }
+    setLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setLogoPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleCoverFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Please upload an image file', 'error');
+      return;
+    }
+    setCoverFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setCoverPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleBrandingColorChange = (e) => {
+    const color = e.target.value;
+    setBrandingSettings(prev => ({ ...prev, primaryColor: color }));
+    applyColorTheme(color);
+  };
+
+  const handleSaveBranding = async () => {
+    if (!user?.businessId) return;
+    setSavingBranding(true);
+    try {
+      let newLogoUrl = brandingSettings.logoUrl;
+      let newCoverUrl = brandingSettings.coverPhotoUrl;
+
+      if (logoFile) {
+        newLogoUrl = await uploadBrandingImage(logoFile, user.businessId, 'logo');
+        setLogoFile(null);
+        setBrandingSettings(prev => ({ ...prev, logoUrl: newLogoUrl }));
+      }
+      if (coverFile) {
+        newCoverUrl = await uploadBrandingImage(coverFile, user.businessId, 'cover');
+        setCoverFile(null);
+        setBrandingSettings(prev => ({ ...prev, coverPhotoUrl: newCoverUrl }));
+      }
+
+      await saveBrandingSettings(user.businessId, {
+        logoUrl: newLogoUrl,
+        coverPhotoUrl: newCoverUrl,
+        primaryColor: brandingSettings.primaryColor,
+      });
+
+      showToast('Branding saved successfully!', 'success');
+    } catch (err) {
+      console.error('Error saving branding:', err);
+      showToast('Failed to save branding. Please try again.', 'error');
+    } finally {
+      setSavingBranding(false);
+    }
+  };
 
   // Branch management functions
   const resetBranchForm = () => {
@@ -1368,6 +1468,143 @@ const Settings = () => {
             </div>
           </div>
         </div>
+
+        {/* Branding & Appearance */}
+        {hasManagementAccess() && (
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <div className="settings-section-icon">🎨</div>
+            <div className="settings-section-title">
+              <h2>Branding &amp; Appearance</h2>
+              <p>Customize your logo, cover photo, and color theme shown on the booking pages</p>
+            </div>
+          </div>
+          <div className="settings-section-body">
+
+            {/* Color Theme */}
+            <div className="branding-sub-section">
+              <h3 className="branding-sub-title">Color Theme</h3>
+              <p className="branding-sub-desc">Choose the primary accent color for your booking pages and admin interface.</p>
+              <div className="branding-color-row">
+                <div className="branding-color-picker-wrap">
+                  <label className="branding-color-label">Primary Color</label>
+                  <div className="branding-color-input-row">
+                    <input
+                      type="color"
+                      value={brandingSettings.primaryColor}
+                      onChange={handleBrandingColorChange}
+                      className="branding-color-input"
+                      disabled={!canEdit()}
+                    />
+                    <span className="branding-color-hex">{brandingSettings.primaryColor}</span>
+                  </div>
+                </div>
+                <div className="branding-color-preview">
+                  <span className="branding-preview-label">Preview</span>
+                  <button
+                    className="btn btn-primary branding-preview-btn"
+                    style={{ backgroundColor: brandingSettings.primaryColor, borderColor: brandingSettings.primaryColor }}
+                    disabled
+                  >
+                    Book Now
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Company Logo */}
+            <div className="branding-sub-section">
+              <h3 className="branding-sub-title">Company Logo</h3>
+              <p className="branding-sub-desc">Displayed on your booking page header and branch selection screen.</p>
+              <p className="branding-size-hint">Recommended: 300&times;100px &mdash; PNG with transparent background for best results</p>
+              <div className="branding-upload-area">
+                {logoPreview ? (
+                  <div className="branding-image-preview">
+                    <img src={logoPreview} alt="Logo preview" className="branding-preview-logo" />
+                    {canEdit() && (
+                      <button
+                        type="button"
+                        className="branding-remove-btn"
+                        onClick={() => { setLogoPreview(null); setLogoFile(null); setBrandingSettings(prev => ({ ...prev, logoUrl: null })); }}
+                      >
+                        &times; Remove
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="branding-placeholder">
+                    <span className="branding-placeholder-icon">🖼</span>
+                    <span>No logo uploaded</span>
+                  </div>
+                )}
+                {canEdit() && (
+                  <label className="branding-upload-btn">
+                    {logoFile ? 'Change Logo' : 'Upload Logo'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleLogoFileChange}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Cover Photo */}
+            <div className="branding-sub-section">
+              <h3 className="branding-sub-title">Cover Photo</h3>
+              <p className="branding-sub-desc">Hero/banner image displayed at the top of the branch selection and booking pages.</p>
+              <p className="branding-size-hint">Recommended: 1200&times;400px &mdash; JPG or PNG for best quality</p>
+              <div className="branding-upload-area">
+                {coverPreview ? (
+                  <div className="branding-image-preview">
+                    <img src={coverPreview} alt="Cover preview" className="branding-preview-cover" />
+                    {canEdit() && (
+                      <button
+                        type="button"
+                        className="branding-remove-btn"
+                        onClick={() => { setCoverPreview(null); setCoverFile(null); setBrandingSettings(prev => ({ ...prev, coverPhotoUrl: null })); }}
+                      >
+                        &times; Remove
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="branding-placeholder">
+                    <span className="branding-placeholder-icon">🌄</span>
+                    <span>No cover photo uploaded</span>
+                  </div>
+                )}
+                {canEdit() && (
+                  <label className="branding-upload-btn">
+                    {coverFile ? 'Change Cover Photo' : 'Upload Cover Photo'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={handleCoverFileChange}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {canEdit() && (
+              <div className="settings-form-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSaveBranding}
+                  disabled={savingBranding}
+                >
+                  {savingBranding ? 'Saving...' : 'Save Branding'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
 
         {/* Customer Booking Link */}
         <div className="settings-section">

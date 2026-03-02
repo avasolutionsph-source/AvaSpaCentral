@@ -10740,10 +10740,11 @@ a:focus:not(:focus-visible),
 .branch-select-page {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   background: linear-gradient(135deg, #f8faf9 0%, #e8f0ec 100%);
-  padding: 20px;
+  padding: 0;
 }
 
 .branch-select-container {
@@ -10753,6 +10754,7 @@ a:focus:not(:focus-visible),
   padding: 48px 40px;
   max-width: 560px;
   width: 100%;
+  margin: 40px auto;
 }
 
 .branch-select-header {
@@ -10982,9 +10984,247 @@ a:focus:not(:focus-visible),
 @media (max-width: 480px) {
   .branch-select-container {
     padding: 32px 24px;
+    margin: 24px auto;
   }
 
   .branch-select-header h1 {
     font-size: 20px;
   }
+}
+
+/* ============================================================
+   Branch Select Hero (Cover Photo + Logo)
+   ============================================================ */
+.branch-select-hero {
+  width: 100%;
+  min-height: 220px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.branch-select-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.branch-select-hero-logo {
+  max-height: 80px;
+  max-width: 260px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.45));
+  position: relative;
+  z-index: 1;
+}
+
+.branch-select-header-logo {
+  max-height: 60px;
+  max-width: 220px;
+  width: auto;
+  object-fit: contain;
+  margin: 0 auto 12px;
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .branch-select-hero {
+    min-height: 160px;
+  }
+  .branch-select-hero-logo {
+    max-height: 60px;
+    max-width: 180px;
+  }
+}
+
+/* ============================================================
+   Branding & Appearance — Settings Section
+   ============================================================ */
+.branding-sub-section {
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.branding-sub-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.branding-sub-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.branding-sub-desc {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem 0;
+}
+
+.branding-size-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-subtle);
+  margin: 0 0 0.75rem 0;
+  font-style: italic;
+}
+
+/* Color row */
+.branding-color-row {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.branding-color-picker-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.branding-color-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.branding-color-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.branding-color-input {
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  padding: 2px;
+  cursor: pointer;
+  background: none;
+}
+
+.branding-color-hex {
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.branding-color-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.branding-preview-label {
+  font-size: 0.8rem;
+  color: var(--color-text-subtle);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.branding-preview-btn {
+  pointer-events: none;
+  opacity: 1 !important;
+  cursor: default !important;
+}
+
+/* Upload area */
+.branding-upload-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.branding-image-preview {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.branding-preview-logo {
+  max-height: 80px;
+  max-width: 240px;
+  width: auto;
+  object-fit: contain;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px;
+  background: repeating-conic-gradient(#f0f0f0 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+}
+
+.branding-preview-cover {
+  width: 100%;
+  max-width: 400px;
+  height: 130px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.branding-remove-btn {
+  font-size: 0.8rem;
+  color: var(--color-error);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+}
+
+.branding-remove-btn:hover {
+  text-decoration: underline;
+}
+
+.branding-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 200px;
+  height: 100px;
+  border: 2px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-subtle);
+  font-size: 0.875rem;
+}
+
+.branding-placeholder-icon {
+  font-size: 1.75rem;
+}
+
+.branding-upload-btn {
+  display: inline-block;
+  padding: 0.5rem 1.25rem;
+  background: var(--color-accent, #1B5E37);
+  color: white;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  width: fit-content;
+}
+
+.branding-upload-btn:hover {
+  background: var(--color-accent-hover, #145A2C);
 }

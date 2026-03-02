@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 
 const BranchSelect = () => {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ const BranchSelect = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [branding, setBranding] = useState({ logoUrl: null, coverPhotoUrl: null, primaryColor: null });
 
   // If branch is already selected, go to its booking page
   useEffect(() => {
@@ -61,6 +63,17 @@ const BranchSelect = () => {
 
         const data = await response.json();
         setBranches(data || []);
+
+        // Load branding from the business
+        if (data && data.length > 0 && data[0].business_id) {
+          try {
+            const brandingData = await getBrandingSettings(data[0].business_id);
+            setBranding(brandingData);
+            if (brandingData.primaryColor) applyColorTheme(brandingData.primaryColor);
+          } catch (e) {
+            // Branding is non-critical, ignore errors
+          }
+        }
 
         // If logged in as Branch Owner, auto-select their assigned branch
         if (user && isBranchOwner() && getUserBranchId()) {
@@ -160,9 +173,26 @@ const BranchSelect = () => {
 
   return (
     <div className="branch-select-page">
+      {/* Cover photo hero */}
+      {branding.coverPhotoUrl && (
+        <div
+          className="branch-select-hero"
+          style={{ backgroundImage: `url(${branding.coverPhotoUrl})` }}
+        >
+          <div className="branch-select-hero-overlay">
+            {branding.logoUrl && (
+              <img src={branding.logoUrl} alt="Logo" className="branch-select-hero-logo" />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="branch-select-container">
         <div className="branch-select-header">
-          <h1>Daet Massage & Spa</h1>
+          {!branding.coverPhotoUrl && branding.logoUrl && (
+            <img src={branding.logoUrl} alt="Logo" className="branch-select-header-logo" />
+          )}
+          {!branding.logoUrl && <h1>Daet Massage &amp; Spa</h1>}
           <p className="branch-select-subtitle">Choose a branch</p>
         </div>
 

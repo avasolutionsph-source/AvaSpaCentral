@@ -158,7 +158,8 @@
 /* ── Hero section (cover photo) ─────────────────────────── */
 .booking-hero {
   width: 100%;
-  min-height: 320px;
+  height: calc(100vh - 61px); /* fill the screen below the topbar */
+  min-height: 480px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -1053,7 +1054,8 @@
   }
 
   .booking-hero {
-    min-height: 220px;
+    height: calc(100vh - 53px);
+    min-height: 360px;
   }
 
   .booking-hero-title {

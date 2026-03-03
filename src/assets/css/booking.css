@@ -118,28 +118,90 @@
 }
 
 /* Header */
+/* ── Top bar (logo + auth) ───────────────────────────────── */
+.booking-topbar {
+  background: #fff;
+  border-bottom: 1px solid #e8e8e8;
+  padding: 0.75rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.booking-topbar-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.booking-topbar-brand {
+  display: flex;
+  align-items: center;
+}
+
+.booking-topbar-logo {
+  max-height: 48px;
+  max-width: 160px;
+  width: auto;
+  object-fit: contain;
+}
+
+.booking-topbar-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* ── Hero section (cover photo) ─────────────────────────── */
+.booking-hero {
+  width: 100%;
+  min-height: 320px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.booking-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.65) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  gap: 0.5rem;
+}
+
+.booking-hero-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.booking-hero-tagline {
+  font-size: 1rem;
+  color: rgba(255,255,255,0.88);
+  margin: 0;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+/* ── Fallback header (no cover photo) ───────────────────── */
 .booking-header {
   background: var(--color-accent, #1B5E37);
   color: white;
   padding: 1.5rem 2rem;
-  text-align: center;
-  position: relative;
-}
-
-/* Cover photo variant */
-.booking-header-has-cover {
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  padding: 2.5rem 2rem;
-  min-height: 160px;
-}
-
-.booking-header-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.38) 100%);
-  pointer-events: none;
 }
 
 .booking-header h1 {
@@ -156,31 +218,13 @@
   font-weight: 400;
 }
 
-/* Header Content Layout */
 .booking-header-content {
   max-width: 1200px;
   margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: relative;
-  z-index: 1;
 }
 
 .booking-header-brand {
   text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.booking-header-logo {
-  max-height: 56px;
-  max-width: 180px;
-  width: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35));
-  margin-bottom: 0.25rem;
 }
 
 .booking-header-auth {
@@ -999,6 +1043,23 @@
 }
 
 @media (max-width: 768px) {
+  .booking-topbar {
+    padding: 0.6rem 1rem;
+  }
+
+  .booking-topbar-logo {
+    max-height: 36px;
+    max-width: 120px;
+  }
+
+  .booking-hero {
+    min-height: 220px;
+  }
+
+  .booking-hero-title {
+    font-size: 1.6rem;
+  }
+
   .booking-header {
     padding: 1rem 1.5rem;
   }

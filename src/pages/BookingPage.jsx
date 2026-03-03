@@ -583,19 +583,14 @@ const BookingPage = () => {
   // Main booking form
   return (
     <div className="booking-page">
-      {/* Header */}
-      <header
-        className={`booking-header${business?.cover_photo_url ? ' booking-header-has-cover' : ''}`}
-        style={business?.cover_photo_url ? { backgroundImage: `url(${business.cover_photo_url})` } : {}}
-      >
-        {business?.cover_photo_url && <div className="booking-header-overlay" />}
-        <div className="booking-header-content">
-          <div className="booking-header-brand">
-            {business?.logo_url && (
-              <img src={business.logo_url} alt={business.name} className="booking-header-logo" />
-            )}
-            <h1>{business?.name || 'Book Now'}</h1>
-            <p className="booking-tagline">Book your relaxation experience</p>
+      {/* Top bar — logo + auth buttons */}
+      <header className="booking-topbar">
+        <div className="booking-topbar-content">
+          <div className="booking-topbar-brand">
+            {business?.logo_url
+              ? <img src={business.logo_url} alt={business?.name} className="booking-topbar-logo" />
+              : <span className="booking-topbar-name">{business?.name || 'Book Now'}</span>
+            }
           </div>
           <div className="booking-header-auth">
             {customerSession ? (
@@ -621,6 +616,29 @@ const BookingPage = () => {
           </div>
         </div>
       </header>
+
+      {/* Hero section — full-width cover photo */}
+      {business?.cover_photo_url ? (
+        <div
+          className="booking-hero"
+          style={{ backgroundImage: `url(${business.cover_photo_url})` }}
+        >
+          <div className="booking-hero-overlay">
+            <h1 className="booking-hero-title">{business.name}</h1>
+            <p className="booking-hero-tagline">Book your relaxation experience</p>
+          </div>
+        </div>
+      ) : (
+        /* Fallback compact header when no cover photo */
+        <div className="booking-header">
+          <div className="booking-header-content">
+            <div className="booking-header-brand">
+              <h1>{business?.name || 'Book Now'}</h1>
+              <p className="booking-tagline">Book your relaxation experience</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Progress Indicator */}
       <div className="booking-progress">

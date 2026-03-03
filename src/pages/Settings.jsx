@@ -443,11 +443,13 @@ const Settings = () => {
       if (logoFile) {
         newLogoUrl = await uploadBrandingImage(logoFile, user.businessId, 'logo');
         setLogoFile(null);
+        setLogoPreview(newLogoUrl);
         setBrandingSettings(prev => ({ ...prev, logoUrl: newLogoUrl }));
       }
       if (coverFile) {
         newCoverUrl = await uploadBrandingImage(coverFile, user.businessId, 'cover');
         setCoverFile(null);
+        setCoverPreview(newCoverUrl);
         setBrandingSettings(prev => ({ ...prev, coverPhotoUrl: newCoverUrl }));
       }
 

@@ -52,6 +52,8 @@ const Settings = () => {
     logoUrl: null,
     coverPhotoUrl: null,
     primaryColor: '#1B5E37',
+    businessName: '',
+    contactPhone: '',
   });
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -390,6 +392,8 @@ const Settings = () => {
           logoUrl: data.logoUrl,
           coverPhotoUrl: data.coverPhotoUrl,
           primaryColor: data.primaryColor || '#1B5E37',
+          businessName: data.businessName || '',
+          contactPhone: data.contactPhone || '',
         }));
         setLogoPreview(data.logoUrl);
         setCoverPreview(data.coverPhotoUrl);
@@ -457,6 +461,8 @@ const Settings = () => {
         logoUrl: newLogoUrl,
         coverPhotoUrl: newCoverUrl,
         primaryColor: brandingSettings.primaryColor,
+        businessName: brandingSettings.businessName || undefined,
+        contactPhone: brandingSettings.contactPhone || undefined,
       });
 
       showToast('Branding saved successfully!', 'success');
@@ -1525,6 +1531,41 @@ const Settings = () => {
                     />
                   </label>
                 )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="branding-sub-section">
+              <h3 className="branding-sub-title">Footer</h3>
+              <p className="branding-sub-desc">Shown at the bottom of your booking page.</p>
+              <div className="settings-row">
+                <div className="settings-form-group">
+                  <label>Business Name</label>
+                  <input
+                    type="text"
+                    value={brandingSettings.businessName}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, businessName: e.target.value }))}
+                    placeholder="e.g. Daet Massage & Spa"
+                    disabled={!canEdit()}
+                  />
+                </div>
+                <div className="settings-form-group">
+                  <label>Contact Number</label>
+                  <input
+                    type="text"
+                    value={brandingSettings.contactPhone}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, contactPhone: e.target.value }))}
+                    placeholder="e.g. +639991234567"
+                    disabled={!canEdit()}
+                  />
+                </div>
+              </div>
+              <div className="branding-footer-preview">
+                <span className="branding-preview-label">Preview</span>
+                <div className="branding-footer-preview-box">
+                  <p>© {new Date().getFullYear()} {brandingSettings.businessName || 'Your Business Name'}. All rights reserved.</p>
+                  {brandingSettings.contactPhone && <p>Contact: {brandingSettings.contactPhone}</p>}
+                </div>
               </div>
             </div>
 

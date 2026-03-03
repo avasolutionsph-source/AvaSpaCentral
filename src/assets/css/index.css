@@ -11228,3 +11228,23 @@ a:focus:not(:focus-visible),
 .branding-upload-btn:hover {
   background: var(--color-accent-hover, #145A2C);
 }
+
+.branding-footer-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.branding-footer-preview-box {
+  background: #1a1a1a;
+  color: rgba(255,255,255,0.75);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  font-size: 0.85rem;
+  line-height: 1.8;
+}
+
+.branding-footer-preview-box p {
+  margin: 0;
+}

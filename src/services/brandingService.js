@@ -66,12 +66,11 @@ export async function uploadBrandingImage(file, businessId, type) {
 /**
  * Fetch branding settings for a business from the businesses table.
  * @param {string} businessId
- * @returns {Promise<{ logoUrl: string|null, coverPhotoUrl: string|null, primaryColor: string|null }>}
+ * @returns {Promise<{ logoUrl, coverPhotoUrl, primaryColor, businessName, contactPhone }>}
  */
 export async function getBrandingSettings(businessId) {
-  if (!businessId || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return { logoUrl: null, coverPhotoUrl: null, primaryColor: null };
-  }
+  const empty = { logoUrl: null, coverPhotoUrl: null, primaryColor: null, businessName: null, contactPhone: null };
+  if (!businessId || !SUPABASE_URL || !SUPABASE_ANON_KEY) return empty;
 
   try {
     let accessToken = SUPABASE_ANON_KEY;
@@ -83,7 +82,7 @@ export async function getBrandingSettings(businessId) {
     }
 
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/businesses?id=eq.${businessId}&select=logo_url,cover_photo_url,primary_color`,
+      `${SUPABASE_URL}/rest/v1/businesses?id=eq.${businessId}&select=logo_url,cover_photo_url,primary_color,name,phone`,
       {
         headers: {
           apikey: SUPABASE_ANON_KEY,
@@ -92,7 +91,7 @@ export async function getBrandingSettings(businessId) {
       }
     );
 
-    if (!res.ok) return { logoUrl: null, coverPhotoUrl: null, primaryColor: null };
+    if (!res.ok) return empty;
 
     const data = await res.json();
     const row = data[0] || {};
@@ -100,24 +99,28 @@ export async function getBrandingSettings(businessId) {
       logoUrl: row.logo_url || null,
       coverPhotoUrl: row.cover_photo_url || null,
       primaryColor: row.primary_color || null,
+      businessName: row.name || null,
+      contactPhone: row.phone || null,
     };
   } catch {
-    return { logoUrl: null, coverPhotoUrl: null, primaryColor: null };
+    return empty;
   }
 }
 
 /**
  * Save branding settings to the businesses table.
  * @param {string} businessId
- * @param {{ logoUrl?: string, coverPhotoUrl?: string, primaryColor?: string }} settings
+ * @param {{ logoUrl?, coverPhotoUrl?, primaryColor?, businessName?, contactPhone? }} settings
  */
-export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl, primaryColor }) {
+export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl, primaryColor, businessName, contactPhone }) {
   if (!supabase) throw new Error('Supabase not configured');
 
   const payload = {};
   if (logoUrl !== undefined) payload.logo_url = logoUrl;
   if (coverPhotoUrl !== undefined) payload.cover_photo_url = coverPhotoUrl;
   if (primaryColor !== undefined) payload.primary_color = primaryColor;
+  if (businessName !== undefined) payload.name = businessName;
+  if (contactPhone !== undefined) payload.phone = contactPhone;
 
   const { error } = await supabase
     .from('businesses')

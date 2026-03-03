@@ -54,6 +54,7 @@ const Settings = () => {
     primaryColor: '#1B5E37',
     businessName: '',
     contactPhone: '',
+    heroTagline: '',
   });
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -394,6 +395,7 @@ const Settings = () => {
           primaryColor: data.primaryColor || '#1B5E37',
           businessName: data.businessName || '',
           contactPhone: data.contactPhone || '',
+          heroTagline: data.heroTagline || '',
         }));
         setLogoPreview(data.logoUrl);
         setCoverPreview(data.coverPhotoUrl);
@@ -463,6 +465,7 @@ const Settings = () => {
         primaryColor: brandingSettings.primaryColor,
         businessName: brandingSettings.businessName || undefined,
         contactPhone: brandingSettings.contactPhone || undefined,
+        heroTagline: brandingSettings.heroTagline || undefined,
       });
 
       showToast('Branding saved successfully!', 'success');
@@ -1531,6 +1534,22 @@ const Settings = () => {
                     />
                   </label>
                 )}
+              </div>
+            </div>
+
+            {/* Hero Text */}
+            <div className="branding-sub-section">
+              <h3 className="branding-sub-title">Hero Section Text</h3>
+              <p className="branding-sub-desc">Text shown over the cover photo. Business name is also editable in the Footer section below.</p>
+              <div className="settings-form-group">
+                <label>Tagline</label>
+                <input
+                  type="text"
+                  value={brandingSettings.heroTagline}
+                  onChange={e => setBrandingSettings(prev => ({ ...prev, heroTagline: e.target.value }))}
+                  placeholder="e.g. Book your relaxation experience"
+                  disabled={!canEdit()}
+                />
               </div>
             </div>
 

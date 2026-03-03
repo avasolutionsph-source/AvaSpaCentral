@@ -156,10 +156,10 @@ const BookingPage = () => {
           // Determine if this is a UUID or custom slug
           let testUrl;
           if (isUUID(businessIdOrSlug)) {
-            testUrl = `${supabaseUrl}/rest/v1/businesses?id=eq.${businessIdOrSlug}&select=id,name,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
+            testUrl = `${supabaseUrl}/rest/v1/businesses?id=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
           } else {
             // It's a custom slug
-            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${businessIdOrSlug}&select=id,name,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
+            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
           }
           console.log('[BookingPage] Test URL:', testUrl);
 
@@ -625,7 +625,15 @@ const BookingPage = () => {
         >
           <div className="booking-hero-overlay">
             <h1 className="booking-hero-title">{business.name}</h1>
-            <p className="booking-hero-tagline">Book your relaxation experience</p>
+            <p className="booking-hero-tagline">
+              {business.tagline || 'Book your relaxation experience'}
+            </p>
+            <button
+              className="booking-hero-cta"
+              onClick={() => document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              Book Now
+            </button>
           </div>
         </div>
       ) : (
@@ -634,14 +642,16 @@ const BookingPage = () => {
           <div className="booking-header-content">
             <div className="booking-header-brand">
               <h1>{business?.name || 'Book Now'}</h1>
-              <p className="booking-tagline">Book your relaxation experience</p>
+              <p className="booking-tagline">
+                {business?.tagline || 'Book your relaxation experience'}
+              </p>
             </div>
           </div>
         </div>
       )}
 
       {/* Progress Indicator */}
-      <div className="booking-progress">
+      <div id="booking-form" className="booking-progress">
         <div className={`progress-step ${currentProgressStep >= 1 ? 'active' : ''} ${selectedServices.length > 0 ? 'completed' : ''}`}>
           <span className="progress-step-number">{selectedServices.length > 0 ? '✓' : '1'}</span>
           <span>Services</span>

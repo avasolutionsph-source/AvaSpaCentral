@@ -198,6 +198,31 @@
   text-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 
+.booking-hero-cta {
+  margin-top: 1.75rem;
+  padding: 0.875rem 2.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-accent, #1B5E37);
+  border: 2px solid rgba(255,255,255,0.35);
+  border-radius: 50px;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.booking-hero-cta:hover {
+  background: var(--color-accent-hover, #145A2C);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+}
+
+.booking-hero-cta:active {
+  transform: translateY(0);
+}
+
 /* ── Fallback header (no cover photo) ───────────────────── */
 .booking-header {
   background: var(--color-accent, #1B5E37);

@@ -32,7 +32,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid #e0e0e0;
-  border-top-color: #1B5E37;
+  border-top-color: var(--color-accent, #1B5E37);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -68,7 +68,7 @@
 .success-icon {
   width: 80px;
   height: 80px;
-  background: #1B5E37;
+  background: var(--color-accent, #1B5E37);
   color: white;
   font-size: 2.5rem;
   border-radius: 50%;
@@ -79,7 +79,7 @@
 }
 
 .booking-success h2 {
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
   margin-bottom: 1rem;
 }
 
@@ -286,7 +286,7 @@
 
 .register-btn {
   background: white;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
 }
 
 .register-btn:hover {
@@ -320,7 +320,7 @@
   width: 32px;
   height: 32px;
   background: white;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -370,12 +370,12 @@
 }
 
 .progress-step.active {
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
   font-weight: 500;
 }
 
 .progress-step.completed {
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
 }
 
 .progress-step-number {
@@ -393,12 +393,12 @@
 }
 
 .progress-step.active .progress-step-number {
-  background: #1B5E37;
+  background: var(--color-accent, #1B5E37);
   color: white;
 }
 
 .progress-step.completed .progress-step-number {
-  background: #1B5E37;
+  background: var(--color-accent, #1B5E37);
   color: white;
 }
 
@@ -410,7 +410,7 @@
 }
 
 .progress-step.completed + .progress-divider {
-  background: #1B5E37;
+  background: var(--color-accent, #1B5E37);
 }
 
 @media (max-width: 600px) {
@@ -495,7 +495,7 @@
 
 .booking-search:focus {
   outline: none;
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
 }
 
 .booking-categories {
@@ -516,8 +516,8 @@
 }
 
 .category-btn:hover {
-  border-color: #1B5E37;
-  color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
+  color: var(--color-accent, #1B5E37);
   background: #f0fdf4;
 }
 
@@ -526,8 +526,8 @@
 }
 
 .category-btn.active {
-  background: #1B5E37;
-  border-color: #1B5E37;
+  background: var(--color-accent, #1B5E37);
+  border-color: var(--color-accent, #1B5E37);
   color: white;
 }
 
@@ -558,8 +558,8 @@
 }
 
 .service-card:hover {
-  border-color: #1B5E37;
-  box-shadow: 0 2px 8px rgba(27, 94, 55, 0.1);
+  border-color: var(--color-accent, #1B5E37);
+  box-shadow: 0 2px 8px rgba(var(--color-accent-rgb, 27, 94, 55), 0.1);
 }
 
 .service-card:active {
@@ -567,15 +567,15 @@
 }
 
 .service-card.selected {
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
   background: #f0fdf4;
-  box-shadow: 0 0 0 3px rgba(27, 94, 55, 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--color-accent-rgb, 27, 94, 55), 0.1);
 }
 
 .service-category {
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
   font-weight: 600;
   margin-bottom: 0.5rem;
   letter-spacing: 0.05em;
@@ -609,7 +609,7 @@
 .service-price {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
 }
 
 .service-duration {
@@ -629,7 +629,7 @@
 }
 
 .service-card.selected .service-select-indicator {
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
   font-weight: 600;
 }
 
@@ -653,7 +653,7 @@
 }
 
 .therapist-option:hover {
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
   background: #f0fdf4;
 }
 
@@ -662,9 +662,9 @@
 }
 
 .therapist-option.selected {
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
   background: #f0fdf4;
-  box-shadow: 0 0 0 3px rgba(27, 94, 55, 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--color-accent-rgb, 27, 94, 55), 0.1);
 }
 
 .therapist-option input {
@@ -717,7 +717,7 @@
 
 .date-picker input:focus {
   outline: none;
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
 }
 
 .time-slots {
@@ -750,7 +750,7 @@
 }
 
 .time-slot:hover {
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
   background: #f0fdf4;
 }
 
@@ -759,8 +759,8 @@
 }
 
 .time-slot.selected {
-  background: #1B5E37;
-  border-color: #1B5E37;
+  background: var(--color-accent, #1B5E37);
+  border-color: var(--color-accent, #1B5E37);
   color: white;
   font-weight: 500;
 }
@@ -812,7 +812,7 @@
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
 }
 
 /* Booking Summary (Right Sidebar) */
@@ -885,7 +885,7 @@
 
 .item-price {
   font-weight: 600;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
 }
 
 .remove-item {
@@ -933,7 +933,7 @@
 .deposit-amount {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
 }
 
 /* Summary Schedule */
@@ -953,7 +953,7 @@
 .submit-booking-btn {
   width: 100%;
   padding: 0.875rem 1rem;
-  background: #1B5E37;
+  background: var(--color-accent, #1B5E37);
   color: white;
   border: none;
   border-radius: 10px;
@@ -1028,11 +1028,11 @@
 .mobile-summary-total {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
 }
 
 .mobile-summary-btn {
-  background: #1B5E37;
+  background: var(--color-accent, #1B5E37);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -1229,7 +1229,7 @@
 
 .branch-selector-container h2 {
   margin: 0 0 0.5rem 0;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
   font-size: 1.5rem;
 }
 
@@ -1255,7 +1255,7 @@
 }
 
 .branch-card:hover {
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
   background: #f0fdf4;
   transform: translateY(-2px);
 }
@@ -1283,7 +1283,7 @@
 .branch-card-btn {
   margin-top: 1rem;
   padding: 0.625rem 1.25rem;
-  background: #1B5E37;
+  background: var(--color-accent, #1B5E37);
   color: white;
   border: none;
   border-radius: 8px;
@@ -1302,7 +1302,7 @@
   align-items: center;
   gap: 0.75rem;
   background: #f0fdf4;
-  border: 1px solid #1B5E37;
+  border: 1px solid var(--color-accent, #1B5E37);
   border-radius: 10px;
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;
@@ -1315,14 +1315,14 @@
 .selected-branch-name {
   flex: 1;
   font-weight: 600;
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
 }
 
 .change-branch-btn {
   padding: 0.375rem 0.75rem;
   background: transparent;
-  color: #1B5E37;
-  border: 1px solid #1B5E37;
+  color: var(--color-accent, #1B5E37);
+  border: 1px solid var(--color-accent, #1B5E37);
   border-radius: 6px;
   font-size: 0.8rem;
   cursor: pointer;
@@ -1330,7 +1330,7 @@
 }
 
 .change-branch-btn:hover {
-  background: #1B5E37;
+  background: var(--color-accent, #1B5E37);
   color: white;
 }
 
@@ -1359,14 +1359,14 @@
 }
 
 .location-option:hover {
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
   background: #f0fdf4;
 }
 
 .location-option.selected {
-  border-color: #1B5E37;
+  border-color: var(--color-accent, #1B5E37);
   background: #f0fdf4;
-  box-shadow: 0 0 0 3px rgba(27, 94, 55, 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--color-accent-rgb, 27, 94, 55), 0.1);
 }
 
 .location-icon {
@@ -1386,7 +1386,7 @@
 }
 
 .location-option.selected .location-desc {
-  color: #1B5E37;
+  color: var(--color-accent, #1B5E37);
 }
 
 /* Service Address Form */

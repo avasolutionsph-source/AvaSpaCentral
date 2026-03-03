@@ -20,9 +20,16 @@ export function applyColorTheme(primaryColor) {
   // Darken by ~10% for hover state
   const hover = darkenHex(color, 0.1);
 
+  // Extract R,G,B for rgba() usage in CSS
+  const num = parseInt(color.replace('#', ''), 16);
+  const r = (num >> 16) & 0xff;
+  const g = (num >> 8) & 0xff;
+  const b = num & 0xff;
+
   const root = document.documentElement;
   root.style.setProperty('--color-accent', color);
   root.style.setProperty('--color-accent-hover', hover);
+  root.style.setProperty('--color-accent-rgb', `${r}, ${g}, ${b}`);
   root.style.setProperty('--color-green', color);
   root.style.setProperty('--color-success', color);
   root.style.setProperty('--primary', color);

@@ -1432,30 +1432,48 @@ const Settings = () => {
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Color Theme</h3>
               <p className="branding-sub-desc">Choose the primary accent color for your booking pages and admin interface.</p>
-              <div className="branding-color-row">
-                <div className="branding-color-picker-wrap">
-                  <label className="branding-color-label">Primary Color</label>
-                  <div className="branding-color-input-row">
-                    <input
-                      type="color"
-                      value={brandingSettings.primaryColor}
-                      onChange={handleBrandingColorChange}
-                      className="branding-color-input"
-                      disabled={!canEdit()}
-                    />
-                    <span className="branding-color-hex">{brandingSettings.primaryColor}</span>
-                  </div>
+              <div className="branding-color-input-row" style={{ marginBottom: '1.25rem' }}>
+                <input
+                  type="color"
+                  value={brandingSettings.primaryColor}
+                  onChange={handleBrandingColorChange}
+                  className="branding-color-input"
+                  disabled={!canEdit()}
+                />
+                <span className="branding-color-hex">{brandingSettings.primaryColor}</span>
+              </div>
+
+              {/* Live booking-form preview */}
+              <span className="branding-preview-label">Live Preview</span>
+              <div className="branding-booking-preview">
+                {/* Category pills */}
+                <div className="bbp-row">
+                  <span className="bbp-pill bbp-pill-active" style={{ background: brandingSettings.primaryColor }}>All</span>
+                  <span className="bbp-pill">Massage</span>
+                  <span className="bbp-pill">Facial</span>
                 </div>
-                <div className="branding-color-preview">
-                  <span className="branding-preview-label">Preview</span>
-                  <button
-                    className="btn btn-primary branding-preview-btn"
-                    style={{ backgroundColor: brandingSettings.primaryColor, borderColor: brandingSettings.primaryColor }}
-                    disabled
-                  >
-                    Book Now
-                  </button>
+                {/* Selected card */}
+                <div className="bbp-card bbp-card-selected" style={{ borderColor: brandingSettings.primaryColor, background: `${brandingSettings.primaryColor}12` }}>
+                  <span className="bbp-card-label">No preference</span>
+                  <span className="bbp-card-sub" style={{ color: brandingSettings.primaryColor }}>✓ Selected</span>
                 </div>
+                {/* Unselected card */}
+                <div className="bbp-card">
+                  <span className="bbp-card-label">Maria Santos</span>
+                  <span className="bbp-card-sub">Therapist</span>
+                </div>
+                {/* Progress step */}
+                <div className="bbp-row" style={{ marginTop: '0.5rem', gap: '0.5rem' }}>
+                  <span className="bbp-step bbp-step-active" style={{ background: brandingSettings.primaryColor }}>1</span>
+                  <span className="bbp-step-label" style={{ color: brandingSettings.primaryColor }}>Services</span>
+                  <span className="bbp-divider" />
+                  <span className="bbp-step">2</span>
+                  <span className="bbp-step-label">Therapist</span>
+                </div>
+                {/* CTA */}
+                <button className="bbp-cta" style={{ background: brandingSettings.primaryColor }} disabled>
+                  Book Now
+                </button>
               </div>
             </div>
 

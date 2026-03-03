@@ -11248,3 +11248,105 @@ a:focus:not(:focus-visible),
 .branding-footer-preview-box p {
   margin: 0;
 }
+
+/* ── Booking form color preview (in Settings Branding tab) ── */
+.branding-booking-preview {
+  margin-top: 0.5rem;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 340px;
+}
+
+.bbp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.bbp-pill {
+  padding: 0.3rem 0.9rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: #e0e0e0;
+  color: #555;
+  cursor: default;
+}
+
+.bbp-pill-active {
+  color: #fff;
+}
+
+.bbp-card {
+  background: #fff;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0.6rem 0.875rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bbp-card-selected {
+  border-width: 2px;
+}
+
+.bbp-card-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.bbp-card-sub {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.bbp-step {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  color: #888;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bbp-step-active {
+  color: #fff;
+}
+
+.bbp-step-label {
+  font-size: 0.78rem;
+  color: #888;
+}
+
+.bbp-divider {
+  flex: 1;
+  height: 1px;
+  background: #ddd;
+  max-width: 24px;
+}
+
+.bbp-cta {
+  align-self: center;
+  padding: 0.6rem 2rem;
+  border-radius: 50px;
+  border: none;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: default;
+  opacity: 0.95;
+  letter-spacing: 0.02em;
+}

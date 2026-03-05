@@ -18,16 +18,7 @@ const BranchSelect = () => {
     return `/book/${branch.business_id}/${branch.slug}`;
   };
 
-  // If branch is already selected, redirect appropriately
-  useEffect(() => {
-    if (selectedBranch && selectedBranch.business_id && selectedBranch.slug) {
-      if (user) {
-        navigate(getFirstPage(), { replace: true });
-      } else {
-        navigate(`/book/${selectedBranch.business_id}/${selectedBranch.slug}`, { replace: true });
-      }
-    }
-  }, [selectedBranch, navigate, user]);
+  // No auto-redirect - always show branch selection so user can choose
 
   // Load branches from Supabase
   useEffect(() => {

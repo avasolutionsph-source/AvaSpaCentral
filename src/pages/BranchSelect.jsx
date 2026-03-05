@@ -5,19 +5,29 @@ import { getBrandingSettings, applyColorTheme } from '../services/brandingServic
 
 const BranchSelect = () => {
   const navigate = useNavigate();
-  const { user, selectedBranch, selectBranch, logout, isBranchOwner, getUserBranchId } = useApp();
+  const { user, selectedBranch, selectBranch, logout, isBranchOwner, getUserBranchId, getFirstPage } = useApp();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [branding, setBranding] = useState({ logoUrl: null, coverPhotoUrl: null, primaryColor: null });
 
-  // If branch is already selected, go to its booking page
+  // Helper: staff → POS/dashboard, public → booking page
+  const getRedirectPath = (branch) => {
+    if (user) return getFirstPage();
+    return `/book/${branch.business_id}/${branch.slug}`;
+  };
+
+  // If branch is already selected, redirect appropriately
   useEffect(() => {
     if (selectedBranch && selectedBranch.business_id && selectedBranch.slug) {
-      navigate(`/book/${selectedBranch.business_id}/${selectedBranch.slug}`, { replace: true });
+      if (user) {
+        navigate(getFirstPage(), { replace: true });
+      } else {
+        navigate(`/book/${selectedBranch.business_id}/${selectedBranch.slug}`, { replace: true });
+      }
     }
-  }, [selectedBranch, navigate]);
+  }, [selectedBranch, navigate, user]);
 
   // Load branches from Supabase
   useEffect(() => {
@@ -80,17 +90,14 @@ const BranchSelect = () => {
           const assignedBranch = (data || []).find(b => b.id === getUserBranchId());
           if (assignedBranch) {
             selectBranch(assignedBranch);
-            navigate(`/book/${assignedBranch.business_id}/${assignedBranch.slug}`, { replace: true });
-            return;
+            return; // useEffect will handle redirect
           }
         }
 
         // If only one branch, auto-select it
         if (data && data.length === 1) {
-          const branch = data[0];
-          selectBranch(branch);
-          navigate(`/book/${branch.business_id}/${branch.slug}`, { replace: true });
-          return;
+          selectBranch(data[0]);
+          return; // useEffect will handle redirect
         }
       } catch (err) {
         console.error('Error loading branches:', err);
@@ -105,8 +112,8 @@ const BranchSelect = () => {
 
   const handleSelectBranch = (branch) => {
     selectBranch(branch);
-    // Navigate to the branch's booking page
-    navigate(`/book/${branch.business_id}/${branch.slug}`, { replace: true });
+    // Staff → POS/dashboard, Public → booking page
+    navigate(getRedirectPath(branch), { replace: true });
   };
 
   const handleLogout = async () => {

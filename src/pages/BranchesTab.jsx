@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 const BranchesTab = () => {
   const { user, showToast } = useApp();
   const [branches, setBranches] = useState([]);
+  const [branchStaff, setBranchStaff] = useState({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
@@ -65,7 +66,31 @@ const BranchesTab = () => {
     }
   }, [supabaseUrl, supabaseKey, user?.businessId, getHeaders]);
 
+  const loadStaff = useCallback(async () => {
+    if (!supabaseUrl || !supabaseKey || !user?.businessId) return;
+    try {
+      const headers = await getHeaders();
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/users?business_id=eq.${user.businessId}&status=eq.active&select=id,username,email,first_name,last_name,role,branch_id`,
+        { headers }
+      );
+      if (res.ok) {
+        const staff = await res.json();
+        const grouped = {};
+        staff.forEach(s => {
+          const key = s.branch_id || 'unassigned';
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(s);
+        });
+        setBranchStaff(grouped);
+      }
+    } catch (err) {
+      console.error('Failed to load staff:', err);
+    }
+  }, [supabaseUrl, supabaseKey, user?.businessId, getHeaders]);
+
   useEffect(() => { loadBranches(); }, [loadBranches]);
+  useEffect(() => { if (branches.length > 0) loadStaff(); }, [branches, loadStaff]);
 
   const generateSlug = (name) => {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'branch';
@@ -278,6 +303,32 @@ const BranchesTab = () => {
                     </button>
                     <button className="btn btn-sm btn-secondary" onClick={() => openEdit(branch)}>Edit</button>
                     <button className="btn btn-sm btn-error" onClick={() => setDeleteConfirm(branch)}>Delete</button>
+                  </div>
+
+                  {/* POS Access Info */}
+                  <div className="branch-pos-access">
+                    <h4 style={{ fontSize: '0.85rem', color: '#555', margin: '0 0 0.5rem', borderTop: '1px solid #eee', paddingTop: '0.75rem' }}>POS Access</h4>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
+                      Login URL: <code style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: '3px', fontSize: '0.75rem' }}>{window.location.origin}/login</code>
+                    </div>
+                    {(() => {
+                      const staff = branchStaff[branch.id] || [];
+                      const unassigned = branchStaff['unassigned'] || [];
+                      const allStaff = [...staff, ...unassigned];
+                      if (allStaff.length === 0) {
+                        return <p style={{ fontSize: '0.8rem', color: '#999', fontStyle: 'italic' }}>No staff assigned. Add staff in Staff Management.</p>;
+                      }
+                      return (
+                        <div style={{ fontSize: '0.8rem' }}>
+                          {allStaff.map(s => (
+                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #f3f4f6' }}>
+                              <span><strong>{s.first_name} {s.last_name}</strong> <span style={{ color: '#888' }}>({s.role})</span></span>
+                              <span style={{ color: '#555' }}>{s.username || s.email}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}

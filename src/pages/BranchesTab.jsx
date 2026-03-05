@@ -44,7 +44,10 @@ const BranchesTab = () => {
   }, [supabaseKey]);
 
   const loadBranches = useCallback(async () => {
-    if (!supabaseUrl || !supabaseKey || !user?.businessId) return;
+    if (!supabaseUrl || !supabaseKey || !user?.businessId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const headers = await getHeaders();

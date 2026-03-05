@@ -164,12 +164,6 @@ const CustomerRegister = () => {
             <p>Join {businessInfo?.name || 'us'} to manage your bookings</p>
           </div>
 
-          {/* Welcome bonus badge */}
-          <div className="welcome-bonus">
-            <span className="bonus-icon">🎁</span>
-            <span>Get 50 loyalty points when you sign up!</span>
-          </div>
-
           {/* Error Message */}
           {error && (
             <div className="customer-auth-error">

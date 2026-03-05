@@ -9,6 +9,7 @@ import { SyncManager, NetworkDetector } from '../services/sync';
 import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
 import db from '../db';
 import ActivityLogsTab from './ActivityLogs';
+import BranchesTab from './BranchesTab';
 import { authService } from '../services/supabase';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
 
@@ -1406,6 +1407,14 @@ const Settings = () => {
             Branding
           </button>
         )}
+        {hasManagementAccess() && (
+          <button
+            className={`settings-tab ${activeTab === 'branches' ? 'active' : ''}`}
+            onClick={() => setActiveTab('branches')}
+          >
+            Branches
+          </button>
+        )}
         <button
           className={`settings-tab ${activeTab === 'logs' ? 'active' : ''}`}
           onClick={() => setActiveTab('logs')}
@@ -1416,6 +1425,8 @@ const Settings = () => {
 
       {activeTab === 'logs' ? (
         <ActivityLogsTab />
+      ) : activeTab === 'branches' ? (
+        <BranchesTab />
       ) : activeTab === 'branding' ? (
       <div className="settings-content">
         <div className="settings-section">

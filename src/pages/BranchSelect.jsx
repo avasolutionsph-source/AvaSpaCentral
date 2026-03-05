@@ -79,15 +79,20 @@ const BranchSelect = () => {
         // For public access (not logged in), filter out orphan branches
         // Only show branches whose business has at least one active user
         if (!user && data && data.length > 0) {
-          const businessIds = [...new Set(data.map(b => b.business_id))];
-          const usersRes = await fetch(
-            `${supabaseUrl}/rest/v1/users?status=eq.active&business_id=in.(${businessIds.join(',')})&select=business_id`,
-            { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${accessToken}` } }
-          );
-          if (usersRes.ok) {
-            const usersData = await usersRes.json();
-            const activeBusinessIds = new Set(usersData.map(u => u.business_id));
-            data = data.filter(b => activeBusinessIds.has(b.business_id));
+          try {
+            const businessIds = [...new Set(data.map(b => b.business_id))];
+            const usersRes = await fetch(
+              `${supabaseUrl}/rest/v1/users?status=eq.active&business_id=in.(${businessIds.join(',')})&select=business_id`,
+              { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+            );
+            if (usersRes.ok) {
+              const usersData = await usersRes.json();
+              const activeBusinessIds = new Set(usersData.map(u => u.business_id));
+              data = data.filter(b => activeBusinessIds.has(b.business_id));
+            }
+          } catch (e) {
+            // If orphan check fails, show all branches
+            console.warn('[BranchSelect] Orphan filter failed:', e);
           }
         }
 
@@ -136,17 +141,6 @@ const BranchSelect = () => {
 
         setBranches(data || []);
 
-        // Load branding from the business
-        if (data && data.length > 0 && data[0].business_id) {
-          try {
-            const brandingData = await getBrandingSettings(data[0].business_id);
-            setBranding(brandingData);
-            if (brandingData.primaryColor) applyColorTheme(brandingData.primaryColor);
-          } catch (e) {
-            // Branding is non-critical, ignore errors
-          }
-        }
-
         // If logged in as Branch Owner, auto-select their assigned branch
         if (user && isBranchOwner() && getUserBranchId()) {
           const assignedBranch = (data || []).find(b => b.id === getUserBranchId());
@@ -167,6 +161,18 @@ const BranchSelect = () => {
 
     loadBranches();
   }, [user]);
+
+  // Load branding separately (non-blocking)
+  useEffect(() => {
+    if (branches.length > 0 && branches[0].business_id) {
+      getBrandingSettings(branches[0].business_id)
+        .then(data => {
+          setBranding(data);
+          if (data.primaryColor) applyColorTheme(data.primaryColor);
+        })
+        .catch(() => {});
+    }
+  }, [branches]);
 
   const handleSelectBranch = (branch) => {
     selectBranch(branch);

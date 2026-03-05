@@ -79,10 +79,15 @@ class AuthService {
         .from('users')
         .select('*')
         .eq('auth_id', authId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('[AuthService] Error loading user profile:', error);
+        return null;
+      }
+
+      // No staff profile found (e.g. customer account) - not an error
+      if (!userProfile) {
         return null;
       }
 

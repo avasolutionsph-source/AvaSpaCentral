@@ -749,7 +749,7 @@ const Dashboard = () => {
           <p>Real-time business overview{selectedBranch ? ` - ${selectedBranch.name}` : ''}</p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {branches.length > 0 && (
+          {branches.length > 0 && canSeeAllBranches() && (
             <select
               className="form-control"
               value={selectedBranchId || ''}

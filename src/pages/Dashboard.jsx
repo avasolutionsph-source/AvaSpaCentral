@@ -8,7 +8,7 @@ import { DashboardSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { showToast, user, canSeeAllBranches, selectedBranch } = useApp();
+  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -24,9 +24,28 @@ const Dashboard = () => {
   const [salaryHealth, setSalaryHealth] = useState(null);
   const [insightsData, setInsightsData] = useState({ products: [], rooms: [] });
   const [bookingSlug, setBookingSlug] = useState(null);
+  const [branches, setBranches] = useState([]);
 
   // Use global branch from AppContext
   const selectedBranchId = selectedBranch?.id || null;
+
+  // Fetch branches for the dropdown
+  useEffect(() => {
+    const fetchBranches = async () => {
+      if (!user?.businessId) return;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) return;
+      try {
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order.asc`,
+          { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+        );
+        if (res.ok) setBranches(await res.json());
+      } catch {}
+    };
+    fetchBranches();
+  }, [user?.businessId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,21 +64,33 @@ const Dashboard = () => {
         const now = new Date();
         const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-        // Fetch all data
-        const [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount, salaryHealthData] =
-          await Promise.all([
-            mockApi.transactions.getRevenueSummary('today'),
-            mockApi.transactions.getRevenueSummary('week'),
-            mockApi.transactions.getRevenueSummary('month'),
-            mockApi.transactions.getTransactions({ limit: 10 }),
-            mockApi.appointments.getAppointments({ date: today }),
-            mockApi.attendance.getAttendance({ date: today }),
-            mockApi.products.getProducts(),
-            mockApi.rooms.getRooms(),
-            mockApi.advanceBooking.getPendingRevenue(),
-            mockApi.advanceBooking.getTodaysBookingsCount(),
-            mockApi.analytics.getSalaryHealthMetrics()
-          ]);
+        // Fetch all data - use allSettled so one failure doesn't break everything
+        const results = await Promise.allSettled([
+          mockApi.transactions.getRevenueSummary('today'),
+          mockApi.transactions.getRevenueSummary('week'),
+          mockApi.transactions.getRevenueSummary('month'),
+          mockApi.transactions.getTransactions({ limit: 10 }),
+          mockApi.appointments.getAppointments({ date: today }),
+          mockApi.attendance.getAttendance({ date: today }),
+          mockApi.products.getProducts(),
+          mockApi.rooms.getRooms(),
+          mockApi.advanceBooking.getPendingRevenue(),
+          mockApi.advanceBooking.getTodaysBookingsCount(),
+          mockApi.analytics.getSalaryHealthMetrics()
+        ]);
+
+        const val = (i, fallback) => results[i].status === 'fulfilled' ? results[i].value : fallback;
+        const todaySummary = val(0, { totalRevenue: 0, averageTransaction: 0, totalTransactions: 0 });
+        const weekSummary = val(1, { totalRevenue: 0 });
+        const monthSummary = val(2, { totalRevenue: 0 });
+        const transactions = val(3, []);
+        const appointments = val(4, []);
+        const attendance = val(5, []);
+        const products = val(6, []);
+        const rooms = val(7, []);
+        const pendingRevenueData = val(8, { total: 0 });
+        const todaysBookingsCount = val(9, 0);
+        const salaryHealthData = val(10, null);
 
         // Check if component is still mounted before updating state
         if (!isMounted) return;
@@ -80,7 +111,7 @@ const Dashboard = () => {
           },
           staff: {
             attendanceRate: calculateAttendanceRate(attendance),
-            totalOvertime: 0, // Would calculate from attendance
+            totalOvertime: 0,
             lateArrivals: attendance.filter(a => a.lateMinutes > 0).length,
             activeEmployees: attendance.length
           },
@@ -717,7 +748,22 @@ const Dashboard = () => {
           <h1>Dashboard</h1>
           <p>Real-time business overview{selectedBranch ? ` - ${selectedBranch.name}` : ''}</p>
         </div>
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {branches.length > 0 && (
+            <select
+              className="form-control"
+              value={selectedBranchId || ''}
+              onChange={(e) => {
+                const branch = branches.find(b => b.id === e.target.value);
+                selectBranch(branch || null);
+              }}
+              style={{ minWidth: '160px', fontSize: '0.875rem' }}
+            >
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          )}
           <button
             className="btn btn-secondary"
             onClick={refreshDashboard}

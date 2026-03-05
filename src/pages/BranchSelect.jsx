@@ -59,15 +59,18 @@ const BranchSelect = () => {
           }
         }
 
-        const response = await fetch(
-          `${supabaseUrl}/rest/v1/branches?is_active=eq.true&order=display_order.asc,name.asc`,
-          {
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${accessToken}`
-            }
+        // Filter by business_id when user is logged in
+        let branchQuery = `${supabaseUrl}/rest/v1/branches?is_active=eq.true&order=display_order.asc,name.asc`;
+        if (user?.businessId) {
+          branchQuery += `&business_id=eq.${user.businessId}`;
+        }
+
+        const response = await fetch(branchQuery, {
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${accessToken}`
           }
-        );
+        });
 
         if (!response.ok) throw new Error('Failed to load branches');
 

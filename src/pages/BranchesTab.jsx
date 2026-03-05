@@ -21,7 +21,13 @@ const BranchesTab = () => {
     is_active: true,
     display_order: 1,
     home_service_fee: 0,
-    hotel_service_fee: 0
+    hotel_service_fee: 0,
+    // Branch Owner account fields (create mode only)
+    ownerFirstName: '',
+    ownerLastName: '',
+    ownerEmail: '',
+    ownerUsername: '',
+    ownerPassword: ''
   });
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -32,7 +38,10 @@ const BranchesTab = () => {
     try {
       const { supabase } = await import('../services/supabase/supabaseClient');
       if (supabase) {
-        const { data } = await supabase.auth.getSession();
+        // Timeout after 3s to prevent hanging
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
+        const { data } = await Promise.race([sessionPromise, timeoutPromise]);
         if (data?.session?.access_token) accessToken = data.session.access_token;
       }
     } catch {}
@@ -120,7 +129,12 @@ const BranchesTab = () => {
       is_active: true,
       display_order: branches.length + 1,
       home_service_fee: 100,
-      hotel_service_fee: 200
+      hotel_service_fee: 200,
+      ownerFirstName: '',
+      ownerLastName: '',
+      ownerEmail: '',
+      ownerUsername: '',
+      ownerPassword: ''
     });
     setShowModal(true);
   };
@@ -149,6 +163,22 @@ const BranchesTab = () => {
       return;
     }
 
+    // Validate Branch Owner fields on create
+    if (modalMode === 'create') {
+      if (!formData.ownerEmail.trim()) {
+        showToast('Branch Owner email is required', 'error');
+        return;
+      }
+      if (!formData.ownerPassword || formData.ownerPassword.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+      }
+      if (!formData.ownerFirstName.trim() || !formData.ownerLastName.trim()) {
+        showToast('Branch Owner name is required', 'error');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const headers = await getHeaders();
@@ -167,25 +197,115 @@ const BranchesTab = () => {
 
       let res;
       if (modalMode === 'create') {
+        // 1. Create the branch first
         res = await fetch(`${supabaseUrl}/rest/v1/branches`, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
         });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || 'Failed to create branch');
+        }
+
+        const branchData = await res.json();
+        const newBranchId = branchData?.[0]?.id;
+
+        // 2. Create Supabase Auth account for Branch Owner
+        try {
+          const { supabase } = await import('../services/supabase/supabaseClient');
+          // Use admin-like signup (current session stays intact)
+          const signupRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+            method: 'POST',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data?.session?.access_token || supabaseKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              email: formData.ownerEmail.trim(),
+              password: formData.ownerPassword,
+              email_confirm: true,
+              user_metadata: {
+                first_name: formData.ownerFirstName.trim(),
+                last_name: formData.ownerLastName.trim()
+              }
+            })
+          });
+
+          let authUser = null;
+          if (signupRes.ok) {
+            authUser = await signupRes.json();
+          } else {
+            // Fallback: use regular signUp (won't log out current user if we use fetch directly)
+            const signupRes2 = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+              method: 'POST',
+              headers: {
+                'apikey': supabaseKey,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                email: formData.ownerEmail.trim(),
+                password: formData.ownerPassword,
+                data: {
+                  first_name: formData.ownerFirstName.trim(),
+                  last_name: formData.ownerLastName.trim()
+                }
+              })
+            });
+            if (signupRes2.ok) {
+              authUser = await signupRes2.json();
+            } else {
+              const errData = await signupRes2.json().catch(() => ({}));
+              throw new Error(errData.msg || errData.error_description || 'Failed to create auth account');
+            }
+          }
+
+          // 3. Create user profile in users table
+          if (authUser?.id) {
+            const username = formData.ownerUsername.trim() || formData.ownerEmail.split('@')[0];
+            await fetch(`${supabaseUrl}/rest/v1/users`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                auth_id: authUser.id,
+                email: formData.ownerEmail.trim().toLowerCase(),
+                username: username.toLowerCase(),
+                first_name: formData.ownerFirstName.trim(),
+                last_name: formData.ownerLastName.trim(),
+                role: 'Branch Owner',
+                business_id: user.businessId,
+                branch_id: newBranchId,
+                status: 'active'
+              })
+            });
+          }
+        } catch (authErr) {
+          console.error('Failed to create Branch Owner account:', authErr);
+          showToast('Branch created but failed to create owner account: ' + authErr.message, 'error');
+          setShowModal(false);
+          loadBranches();
+          return;
+        }
+
+        showToast('Branch and owner account created!', 'success');
       } else {
+        // Edit mode - just update branch
         res = await fetch(`${supabaseUrl}/rest/v1/branches?id=eq.${selectedBranch.id}`, {
           method: 'PATCH',
           headers,
           body: JSON.stringify(payload)
         });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || 'Failed to save branch');
+        }
+
+        showToast('Branch updated!', 'success');
       }
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || 'Failed to save branch');
-      }
-
-      showToast(modalMode === 'create' ? 'Branch created!' : 'Branch updated!', 'success');
       setShowModal(false);
       loadBranches();
     } catch (err) {
@@ -467,6 +587,80 @@ const BranchesTab = () => {
                     <label htmlFor="branch-active" style={{ margin: 0, fontWeight: 'normal' }}>Active</label>
                   </div>
                 </div>
+
+                {/* Branch Owner Account (create mode only) */}
+                {modalMode === 'create' && (
+                  <>
+                    <h4 style={{ margin: '1.25rem 0 0.75rem', fontSize: '0.95rem', color: '#333' }}>Branch Owner Account</h4>
+                    <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.75rem' }}>
+                      This will create a login account for the Branch Owner to access the POS system.
+                    </p>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>First Name *</label>
+                        <input
+                          type="text"
+                          name="ownerFirstName"
+                          value={formData.ownerFirstName}
+                          onChange={handleChange}
+                          className="form-control"
+                          placeholder="First name"
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Last Name *</label>
+                        <input
+                          type="text"
+                          name="ownerLastName"
+                          value={formData.ownerLastName}
+                          onChange={handleChange}
+                          className="form-control"
+                          placeholder="Last name"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Email *</label>
+                      <input
+                        type="email"
+                        name="ownerEmail"
+                        value={formData.ownerEmail}
+                        onChange={handleChange}
+                        className="form-control"
+                        placeholder="owner@example.com"
+                        required
+                      />
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Username</label>
+                        <input
+                          type="text"
+                          name="ownerUsername"
+                          value={formData.ownerUsername}
+                          onChange={handleChange}
+                          className="form-control"
+                          placeholder="Optional (uses email prefix)"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Password *</label>
+                        <input
+                          type="password"
+                          name="ownerPassword"
+                          value={formData.ownerPassword}
+                          onChange={handleChange}
+                          className="form-control"
+                          placeholder="Min 6 characters"
+                          minLength={6}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>

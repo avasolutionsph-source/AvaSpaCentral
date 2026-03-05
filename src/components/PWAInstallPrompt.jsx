@@ -14,6 +14,12 @@ const PWAInstallPrompt = () => {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    // Don't show on public-facing pages (booking, branch select)
+    const path = window.location.pathname;
+    if (path.startsWith('/book/') || path.startsWith('/select-branch')) {
+      return;
+    }
+
     // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);

@@ -306,12 +306,18 @@ const BranchesTab = () => {
       const headers = await getHeaders();
       const res = await fetch(`${supabaseUrl}/rest/v1/branches?id=eq.${branch.id}`, {
         method: 'DELETE',
-        headers
+        headers: { ...headers, 'Prefer': 'return=representation' }
       });
       if (!res.ok) throw new Error('Failed to delete');
+      const deleted = await res.json().catch(() => []);
+      if (deleted.length === 0) {
+        // RLS may have blocked the actual delete
+        throw new Error('Delete was blocked. Check database permissions.');
+      }
+      // Remove from local state immediately
+      setBranches(prev => prev.filter(b => b.id !== branch.id));
       showToast('Branch deleted', 'success');
       setDeleteConfirm(null);
-      loadBranches();
     } catch (err) {
       showToast(err.message, 'error');
     }

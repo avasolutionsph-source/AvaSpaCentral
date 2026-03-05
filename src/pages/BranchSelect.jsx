@@ -136,16 +136,27 @@ const BranchSelect = () => {
 
         setBranches(data || []);
 
-        // If logged in as Branch Owner, auto-select their assigned branch
-        if (user && isBranchOwner() && getUserBranchId()) {
-          const assignedBranch = (data || []).find(b => b.id === getUserBranchId());
-          if (assignedBranch) {
-            selectBranch(assignedBranch);
-            return; // useEffect will handle redirect
+        // Staff auto-redirect: if logged in, auto-select branch and go to POS
+        if (user && data && data.length > 0) {
+          // Branch Owner → their assigned branch
+          if (isBranchOwner() && getUserBranchId()) {
+            const assignedBranch = data.find(b => b.id === getUserBranchId());
+            if (assignedBranch) {
+              selectBranch(assignedBranch);
+              navigate(getRedirectPath(assignedBranch), { replace: true });
+              return;
+            }
           }
+          // Owner/Manager/Receptionist/Therapist with only 1 branch → auto-select
+          if (data.length === 1) {
+            selectBranch(data[0]);
+            navigate(getRedirectPath(data[0]), { replace: true });
+            return;
+          }
+          // Staff with multiple branches → show branch selection
         }
 
-        // Always show branch selection - let user choose even if only one branch
+        // Public users (not logged in) → always show branch selection for booking
       } catch (err) {
         console.error('Error loading branches:', err);
         setError('Failed to load branches. Please try again.');

@@ -34,7 +34,6 @@ const CustomerProfile = () => {
   useEffect(() => {
     if (location.state?.welcome) {
       setShowWelcome(true);
-      // Clear the state
       window.history.replaceState({}, document.title);
     }
   }, [location]);
@@ -43,14 +42,12 @@ const CustomerProfile = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Check session
         const session = await getCustomerSession(businessId);
         if (!session) {
           navigate(`/book/${businessId}/login`);
           return;
         }
 
-        // Fetch business info
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -74,7 +71,6 @@ const CustomerProfile = () => {
           }
         }
 
-        // Fetch profile
         const actualBusinessId = session.businessId;
         const profileResult = await getCustomerProfile(actualBusinessId);
         if (profileResult.success) {
@@ -87,7 +83,6 @@ const CustomerProfile = () => {
           });
         }
 
-        // Fetch bookings
         const bookingsResult = await getBookingHistory(actualBusinessId, session.accountId);
         if (bookingsResult.success) {
           setBookings(bookingsResult.data || []);
@@ -103,7 +98,6 @@ const CustomerProfile = () => {
     loadData();
   }, [businessId, navigate]);
 
-  // Filter bookings
   const upcomingBookings = bookings.filter(b =>
     ['pending', 'confirmed'].includes(b.status) &&
     new Date(b.preferred_date) >= new Date(new Date().toDateString())
@@ -159,15 +153,6 @@ const CustomerProfile = () => {
     }
   };
 
-  const getTierBadge = (tier) => {
-    const badges = {
-      'VIP': { icon: '⭐', color: '#FFD700' },
-      'REGULAR': { icon: '🌟', color: '#C0C0C0' },
-      'NEW': { icon: '✨', color: '#1B5E37' }
-    };
-    return badges[tier] || badges['NEW'];
-  };
-
   const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       weekday: 'short',
@@ -201,70 +186,64 @@ const CustomerProfile = () => {
   return (
     <div className="customer-portal">
       {/* Header */}
-      <header className="customer-profile-header">
-        <div className="header-content">
-          <Link to={`/book/${businessId}`} className="business-name">
+      <header className="cp-header">
+        <div className="cp-header-inner">
+          <Link to={`/book/${businessId}`} className="cp-header-brand">
             {businessInfo?.name || 'Back to Booking'}
           </Link>
-          <button onClick={handleLogout} className="logout-btn">
+          <button onClick={handleLogout} className="cp-header-logout">
             Sign Out
           </button>
         </div>
       </header>
 
-      <div className="customer-profile-container">
+      {/* Hero Section */}
+      <div className="cp-hero">
+        <div className="cp-hero-inner">
+          <div className="cp-avatar">
+            {profile?.name?.charAt(0).toUpperCase() || '?'}
+          </div>
+          <h1 className="cp-hero-name">{profile?.name}</h1>
+          {profile?.phone && <p className="cp-hero-phone">{profile.phone}</p>}
+        </div>
+      </div>
+
+      <div className="cp-container">
         {/* Welcome Banner */}
         {showWelcome && (
           <div className="welcome-banner">
-            <span className="welcome-icon">🎉</span>
             <div>
               <strong>Welcome to {businessInfo?.name}!</strong>
-              <p>You've earned 50 bonus points just for signing up.</p>
+              <p>Your account has been created successfully.</p>
             </div>
-            <button onClick={() => setShowWelcome(false)} className="close-banner">×</button>
+            <button onClick={() => setShowWelcome(false)} className="close-banner">&times;</button>
           </div>
         )}
 
-        {/* Profile Card */}
-        <div className="profile-card">
-          <div className="profile-main">
-            <div className="profile-avatar">
-              {profile?.name?.charAt(0).toUpperCase() || '?'}
-            </div>
-            <div className="profile-info">
-              <h1>{profile?.name}</h1>
-              <div className="tier-badge" style={{ backgroundColor: getTierBadge(profile?.tier).color }}>
-                {getTierBadge(profile?.tier).icon} {profile?.tier} Member
-              </div>
-            </div>
+        {/* Stats Row */}
+        <div className="cp-stats-row">
+          <div className="cp-stat-card">
+            <span className="cp-stat-number">{profile?.visit_count || 0}</span>
+            <span className="cp-stat-label">Visits</span>
           </div>
+          <div className="cp-stat-card">
+            <span className="cp-stat-number">{upcomingBookings.length}</span>
+            <span className="cp-stat-label">Upcoming</span>
+          </div>
+          <div className="cp-stat-card">
+            <span className="cp-stat-number">{'\u20B1'}{(profile?.total_spent || 0).toLocaleString()}</span>
+            <span className="cp-stat-label">Total Spent</span>
+          </div>
+        </div>
 
-          <div className="profile-stats">
-            <div className="stat">
-              <span className="stat-value">{profile?.loyalty_points || 0}</span>
-              <span className="stat-label">Points</span>
-            </div>
-            <div className="stat">
-              <span className="stat-value">{profile?.visit_count || 0}</span>
-              <span className="stat-label">Visits</span>
-            </div>
-            <div className="stat">
-              <span className="stat-value">₱{(profile?.total_spent || 0).toLocaleString()}</span>
-              <span className="stat-label">Total Spent</span>
-            </div>
-          </div>
-
-          <div className="profile-actions">
-            <Link to={`/book/${businessId}`} className="action-btn primary">
-              Book Now
-            </Link>
-            <button
-              className="action-btn secondary"
-              onClick={() => setEditMode(true)}
-            >
-              Edit Profile
-            </button>
-          </div>
+        {/* Action Buttons */}
+        <div className="cp-actions">
+          <Link to="/select-branch" className="cp-action-btn cp-action-primary">
+            Book Now
+          </Link>
+          <button className="cp-action-btn cp-action-secondary" onClick={() => setEditMode(true)}>
+            Edit Profile
+          </button>
         </div>
 
         {/* Edit Profile Modal */}
@@ -320,17 +299,10 @@ const CustomerProfile = () => {
               </div>
 
               <div className="modal-actions">
-                <button
-                  className="action-btn secondary"
-                  onClick={() => setEditMode(false)}
-                >
+                <button className="action-btn secondary" onClick={() => setEditMode(false)}>
                   Cancel
                 </button>
-                <button
-                  className="action-btn primary"
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                >
+                <button className="action-btn primary" onClick={handleSaveProfile} disabled={saving}>
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
@@ -339,7 +311,10 @@ const CustomerProfile = () => {
         )}
 
         {/* Bookings Section */}
-        <div className="bookings-section">
+        <div className="cp-bookings">
+          <div className="cp-bookings-header">
+            <h2>My Bookings</h2>
+          </div>
           <div className="bookings-tabs">
             <button
               className={`tab ${activeTab === 'upcoming' ? 'active' : ''}`}
@@ -359,9 +334,10 @@ const CustomerProfile = () => {
             {activeTab === 'upcoming' && (
               <>
                 {upcomingBookings.length === 0 ? (
-                  <div className="no-bookings">
+                  <div className="cp-empty-state">
+                    <div className="cp-empty-icon">📅</div>
                     <p>No upcoming bookings</p>
-                    <Link to={`/book/${businessId}`} className="action-btn primary">
+                    <Link to="/select-branch" className="cp-action-btn cp-action-primary" style={{ display: 'inline-block', padding: '0.625rem 1.5rem' }}>
                       Book Now
                     </Link>
                   </div>
@@ -387,14 +363,11 @@ const CustomerProfile = () => {
                         ))}
                       </div>
                       <div className="booking-footer">
-                        <span className="booking-total">₱{booking.total_amount?.toLocaleString()}</span>
+                        <span className="booking-total">{'\u20B1'}{booking.total_amount?.toLocaleString()}</span>
                         <span className="booking-ref">Ref: {booking.reference_number}</span>
                       </div>
                       {booking.status === 'pending' && (
-                        <button
-                          className="cancel-btn"
-                          onClick={() => handleCancelBooking(booking.id)}
-                        >
+                        <button className="cancel-btn" onClick={() => handleCancelBooking(booking.id)}>
                           Cancel Booking
                         </button>
                       )}
@@ -407,7 +380,8 @@ const CustomerProfile = () => {
             {activeTab === 'past' && (
               <>
                 {pastBookings.length === 0 ? (
-                  <div className="no-bookings">
+                  <div className="cp-empty-state">
+                    <div className="cp-empty-icon">📋</div>
                     <p>No booking history yet</p>
                   </div>
                 ) : (
@@ -431,12 +405,9 @@ const CustomerProfile = () => {
                         ))}
                       </div>
                       <div className="booking-footer">
-                        <span className="booking-total">₱{booking.total_amount?.toLocaleString()}</span>
+                        <span className="booking-total">{'\u20B1'}{booking.total_amount?.toLocaleString()}</span>
                         {booking.status === 'completed' && (
-                          <Link
-                            to={`/book/${businessId}`}
-                            className="rebook-btn"
-                          >
+                          <Link to="/select-branch" className="rebook-btn">
                             Book Again
                           </Link>
                         )}
@@ -447,31 +418,6 @@ const CustomerProfile = () => {
               </>
             )}
           </div>
-        </div>
-
-        {/* Loyalty Info */}
-        <div className="loyalty-info">
-          <h3>Loyalty Program</h3>
-          <div className="loyalty-tiers">
-            <div className={`loyalty-tier ${profile?.tier === 'NEW' ? 'current' : ''}`}>
-              <span className="tier-icon">✨</span>
-              <span className="tier-name">NEW</span>
-              <span className="tier-points">0-99 pts</span>
-            </div>
-            <div className={`loyalty-tier ${profile?.tier === 'REGULAR' ? 'current' : ''}`}>
-              <span className="tier-icon">🌟</span>
-              <span className="tier-name">REGULAR</span>
-              <span className="tier-points">100-499 pts</span>
-            </div>
-            <div className={`loyalty-tier ${profile?.tier === 'VIP' ? 'current' : ''}`}>
-              <span className="tier-icon">⭐</span>
-              <span className="tier-name">VIP</span>
-              <span className="tier-points">500+ pts</span>
-            </div>
-          </div>
-          <p className="loyalty-note">
-            Earn 1 point for every ₱100 spent. VIP members get exclusive perks!
-          </p>
         </div>
       </div>
 

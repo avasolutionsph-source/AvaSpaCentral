@@ -275,22 +275,22 @@
 }
 
 .login-btn {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: var(--color-accent, #1B5E37);
+  border: 1px solid var(--color-accent, #1B5E37);
 }
 
 .login-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(var(--color-accent-rgb, 27, 94, 55), 0.08);
 }
 
 .register-btn {
-  background: white;
-  color: var(--color-accent, #1B5E37);
+  background: var(--color-accent, #1B5E37);
+  color: white;
 }
 
 .register-btn:hover {
-  background: #f0f7f0;
+  background: var(--color-accent-hover, #154a2b);
 }
 
 /* Logged In Customer */

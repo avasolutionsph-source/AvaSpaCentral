@@ -562,12 +562,14 @@ const BookingPage = () => {
     );
   }
 
-  // Calculate current progress step
+  // Calculate current progress step (5 steps: Services, Therapist, Location, Date & Time, Details)
   const getCurrentStep = () => {
     if (selectedServices.length === 0) return 1;
-    if (!selectedDate || !selectedTime) return 3;
-    if (!customerName || !customerPhone) return 4;
-    return 4;
+    if (!selectedTherapist) return 2;
+    if (serviceLocation !== 'in_store' && !serviceAddress) return 3;
+    if (!selectedDate || !selectedTime) return 4;
+    if (!customerName || !customerPhone) return 5;
+    return 5;
   };
 
   const currentProgressStep = getCurrentStep();
@@ -657,18 +659,23 @@ const BookingPage = () => {
           <span>Services</span>
         </div>
         <div className={`progress-divider ${selectedServices.length > 0 ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${currentProgressStep >= 2 ? 'active' : ''}`}>
-          <span className="progress-step-number">2</span>
+        <div className={`progress-step ${currentProgressStep >= 2 ? 'active' : ''} ${selectedTherapist ? 'completed' : ''}`}>
+          <span className="progress-step-number">{selectedTherapist ? '✓' : '2'}</span>
           <span>Therapist</span>
         </div>
-        <div className="progress-divider"></div>
-        <div className={`progress-step ${currentProgressStep >= 3 ? 'active' : ''} ${selectedDate && selectedTime ? 'completed' : ''}`}>
-          <span className="progress-step-number">{selectedDate && selectedTime ? '✓' : '3'}</span>
+        <div className={`progress-divider ${selectedTherapist ? 'completed' : ''}`}></div>
+        <div className={`progress-step ${currentProgressStep >= 3 ? 'active' : ''} ${serviceLocation ? 'completed' : ''}`}>
+          <span className="progress-step-number">{serviceLocation ? '✓' : '3'}</span>
+          <span>Location</span>
+        </div>
+        <div className={`progress-divider ${serviceLocation ? 'completed' : ''}`}></div>
+        <div className={`progress-step ${currentProgressStep >= 4 ? 'active' : ''} ${selectedDate && selectedTime ? 'completed' : ''}`}>
+          <span className="progress-step-number">{selectedDate && selectedTime ? '✓' : '4'}</span>
           <span>Date & Time</span>
         </div>
         <div className={`progress-divider ${selectedDate && selectedTime ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${currentProgressStep >= 4 ? 'active' : ''}`}>
-          <span className="progress-step-number">4</span>
+        <div className={`progress-step ${currentProgressStep >= 5 ? 'active' : ''} ${customerName && customerPhone ? 'completed' : ''}`}>
+          <span className="progress-step-number">{customerName && customerPhone ? '✓' : '5'}</span>
           <span>Details</span>
         </div>
       </div>

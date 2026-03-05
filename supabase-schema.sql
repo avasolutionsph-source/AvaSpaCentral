@@ -473,6 +473,7 @@ CREATE TABLE IF NOT EXISTS service_rotation (
     date DATE NOT NULL,
     rotation_data JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(business_id, date)
 );
 

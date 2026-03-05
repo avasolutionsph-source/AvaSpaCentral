@@ -109,8 +109,9 @@ const SUPABASE_TABLE_COLUMNS = {
   ],
   customers: [
     'id', 'business_id', 'name', 'first_name', 'last_name', 'email', 'phone',
-    'address', 'notes', 'status', 'tier', 'total_spent', 'visit_count',
-    'last_visit', 'loyalty_points', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+    'address', 'birthday', 'gender', 'notes', 'status', 'tier', 'total_spent', 'visit_count',
+    'last_visit', 'loyalty_points', 'preferences', 'sync_status',
+    'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   products: [
     'id', 'business_id', 'name', 'type', 'category', 'description', 'price',
@@ -144,6 +145,11 @@ const SUPABASE_TABLE_COLUMNS = {
     'incident_date', 'status', 'acknowledged_by', 'acknowledged_at', 'review_notes',
     'resolved_by', 'resolved_at', 'resolution', 'closed_by', 'closed_at', 'closing_notes',
     'created_at', 'updated_at'
+  ],
+  advance_bookings: [
+    'id', 'business_id', 'customer_id', 'customer_name', 'employee_id',
+    'booking_date_time', 'status', 'services', 'total_amount',
+    'payment_status', 'notes', 'sync_status', 'created_at', 'updated_at'
   ],
   // Add more tables as needed - if a table isn't listed, all fields pass through
 };
@@ -1206,11 +1212,16 @@ class SupabaseSyncManager {
         if (data && data.length > 0) {
           console.log(`[SupabaseSyncManager] Pulled ${data.length} ${entityType} records`);
 
-          // Get pending deletes from sync queue to avoid re-adding deleted records
-          const pendingDeletes = await db.syncQueue
-            .filter(item => item.entityType === entityType && item.operation === 'delete')
+          // Get pending changes from sync queue to avoid overwriting unsynced local data
+          const pendingChanges = await db.syncQueue
+            .filter(item => item.entityType === entityType)
             .toArray();
-          const pendingDeleteIds = new Set(pendingDeletes.map(item => item.entityId));
+          const pendingDeleteIds = new Set(
+            pendingChanges.filter(item => item.operation === 'delete').map(item => item.entityId)
+          );
+          const pendingLocalIds = new Set(
+            pendingChanges.filter(item => item.operation === 'create' || item.operation === 'update').map(item => item.entityId)
+          );
 
           for (const record of data) {
             const dexieRecord = this._toDexieFormat(record, entityType);
@@ -1221,6 +1232,9 @@ class SupabaseSyncManager {
             } else if (pendingDeleteIds.has(dexieRecord._id)) {
               // Skip re-adding records that have a pending local delete
               console.log(`[SupabaseSyncManager] Skipping pull for ${entityType}/${dexieRecord._id} - pending delete`);
+            } else if (pendingLocalIds.has(dexieRecord._id)) {
+              // Skip overwriting records that have pending local create/update
+              console.log(`[SupabaseSyncManager] Skipping pull for ${entityType}/${dexieRecord._id} - pending local changes`);
             } else {
               // Upsert to local database
               await db[dexieTableName].put(dexieRecord);

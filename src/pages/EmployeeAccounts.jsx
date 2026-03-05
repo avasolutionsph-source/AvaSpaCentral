@@ -228,16 +228,16 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
 
     // Password validation only for create mode or if password is being changed
     if (modalMode === 'create') {
-      if (!data.password || data.password.length < 4) {
-        errors.password = 'Password must be at least 4 characters';
+      if (!data.password || data.password.length < 6) {
+        errors.password = 'Password must be at least 6 characters';
       }
       if (data.password !== data.confirmPassword) {
         errors.confirmPassword = 'Passwords do not match';
       }
     } else if (data.password) {
       // Edit mode with password change
-      if (data.password.length < 4) {
-        errors.password = 'Password must be at least 4 characters';
+      if (data.password.length < 6) {
+        errors.password = 'Password must be at least 6 characters';
       }
       if (data.password !== data.confirmPassword) {
         errors.confirmPassword = 'Passwords do not match';

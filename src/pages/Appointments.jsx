@@ -686,7 +686,7 @@ const Appointments = () => {
                     <label>Room</label>
                     <select name="roomId" value={formData.roomId} onChange={handleInputChange} className="form-control">
                       <option value="">No room</option>
-                      {rooms.filter(r => r.status === 'available').map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
+                      {rooms.filter(r => r.status !== 'maintenance').map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
                     </select>
                   </div>
                 </div>

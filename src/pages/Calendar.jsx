@@ -380,15 +380,22 @@ const Calendar = () => {
     setModalMode('edit');
     setSelectedEvent(event);
     const apptDate = parseISO(event.date);
+
+    // Find matching customer, service, employee, room by name
+    const matchedCustomer = customers.find(c => c.name === event.customer);
+    const matchedService = services.find(s => s.name === event.service);
+    const matchedEmployee = employees.find(e => `${e.firstName} ${e.lastName}` === event.therapist);
+    const matchedRoom = rooms.find(r => r.name === event.room);
+
     setFormData({
-      customerId: '',
+      customerId: matchedCustomer?._id || '',
       customerName: event.customer || '',
-      serviceId: '',
-      employeeId: '',
-      roomId: '',
+      serviceId: matchedService?._id || '',
+      employeeId: matchedEmployee?._id || '',
+      roomId: matchedRoom?._id || '',
       date: format(apptDate, 'yyyy-MM-dd'),
       time: event.startTime,
-      duration: 60,
+      duration: matchedService?.duration || 60,
       notes: event.notes || ''
     });
     setShowDetailModal(false);
@@ -1127,7 +1134,7 @@ const Calendar = () => {
                       className="form-control"
                     >
                       <option value="">No room</option>
-                      {rooms.filter(r => r.status === 'available').map(r => (
+                      {rooms.filter(r => r.status !== 'maintenance').map(r => (
                         <option key={r._id} value={r._id}>{r.name}</option>
                       ))}
                     </select>

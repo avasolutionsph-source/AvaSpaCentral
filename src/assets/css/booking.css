@@ -1240,7 +1240,7 @@
 
 .branch-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1rem;
 }
 
@@ -1252,6 +1252,10 @@
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: visible;
 }
 
 .branch-card:hover {
@@ -1281,7 +1285,7 @@
 }
 
 .branch-card-btn {
-  margin-top: 1rem;
+  margin-top: auto;
   padding: 0.625rem 1.25rem;
   background: var(--color-accent, #1B5E37);
   color: white;
@@ -1290,6 +1294,10 @@
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
+  white-space: nowrap;
+  width: 100%;
+  padding-top: 0.75rem;
+  margin-top: 1rem;
 }
 
 .branch-card-btn:hover {

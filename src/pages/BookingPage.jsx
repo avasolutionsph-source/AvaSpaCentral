@@ -664,8 +664,8 @@ const BookingPage = () => {
           <span>Therapist</span>
         </div>
         <div className={`progress-divider ${selectedTherapist ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${currentProgressStep >= 3 ? 'active' : ''} ${serviceLocation ? 'completed' : ''}`}>
-          <span className="progress-step-number">{serviceLocation ? '✓' : '3'}</span>
+        <div className={`progress-step ${currentProgressStep >= 3 ? 'active' : ''} ${serviceLocation === 'in_store' || (serviceLocation && serviceAddress) ? 'completed' : ''}`}>
+          <span className="progress-step-number">{serviceLocation === 'in_store' || (serviceLocation && serviceAddress) ? '✓' : '3'}</span>
           <span>Location</span>
         </div>
         <div className={`progress-divider ${serviceLocation ? 'completed' : ''}`}></div>

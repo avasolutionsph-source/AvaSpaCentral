@@ -196,11 +196,11 @@ const Appointments = () => {
     setConflicts({ therapist: null, room: null });
     const apptDate = appointment.dateTime ? parseISO(appointment.dateTime) : new Date();
     setFormData({
-      customerId: appointment.customer?._id || '',
-      customerName: appointment.customer?.name || '',
-      serviceId: appointment.service?._id || '',
-      employeeId: appointment.employee?._id || '',
-      roomId: appointment.room?._id || '',
+      customerId: appointment.customerId || appointment.customer?._id || '',
+      customerName: appointment.customerName || appointment.customer?.name || '',
+      serviceId: appointment.serviceId || appointment.service?._id || '',
+      employeeId: appointment.employeeId || appointment.employee?._id || '',
+      roomId: appointment.roomId || appointment.room?._id || '',
       date: format(apptDate, 'yyyy-MM-dd'),
       time: format(apptDate, 'HH:mm'),
       duration: appointment.duration || 60,
@@ -698,7 +698,7 @@ const Appointments = () => {
                   <div className="form-group">
                     <label>Duration (min)</label>
                     <input type="number" name="duration" value={formData.duration} onChange={handleInputChange}
-                      className="form-control" min="15" step="15" />
+                      onWheel={(e) => e.target.blur()} className="form-control" min="15" step="15" />
                   </div>
                 </div>
                 <div className="form-group">

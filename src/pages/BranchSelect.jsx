@@ -76,6 +76,21 @@ const BranchSelect = () => {
 
         let data = await response.json();
 
+        // For public access (not logged in), filter out orphan branches
+        // Only show branches whose business has at least one active user
+        if (!user && data && data.length > 0) {
+          const businessIds = [...new Set(data.map(b => b.business_id))];
+          const usersRes = await fetch(
+            `${supabaseUrl}/rest/v1/users?status=eq.active&business_id=in.(${businessIds.join(',')})&select=business_id`,
+            { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${accessToken}` } }
+          );
+          if (usersRes.ok) {
+            const usersData = await usersRes.json();
+            const activeBusinessIds = new Set(usersData.map(u => u.business_id));
+            data = data.filter(b => activeBusinessIds.has(b.business_id));
+          }
+        }
+
         // Auto-create default branch for Owner/Manager if no branches exist
         if ((!data || data.length === 0) && user && (isOwner() || isManager()) && user.businessId) {
           try {

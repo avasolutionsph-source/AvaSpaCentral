@@ -28,6 +28,21 @@ CREATE TABLE IF NOT EXISTS businesses (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Branches/Locations
+CREATE TABLE IF NOT EXISTS branches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255),
+    address TEXT,
+    city VARCHAR(100),
+    phone VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE,
+    display_order INTEGER DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Users/Auth accounts (linked to Supabase Auth)
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

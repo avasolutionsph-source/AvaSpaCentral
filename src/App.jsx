@@ -176,9 +176,9 @@ function AppRoutes() {
         <Route
           path="/login"
           element={
-            <PublicRoute>
+            <LoginFirst>
               <Login />
-            </PublicRoute>
+            </LoginFirst>
           }
         />
         <Route

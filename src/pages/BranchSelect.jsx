@@ -14,7 +14,11 @@ const BranchSelect = () => {
 
   // Helper: staff → POS/dashboard, public → booking page
   const getRedirectPath = (branch) => {
-    if (user) return getFirstPage();
+    if (user) {
+      // Can't use getFirstPage() here because selectedBranch state hasn't updated yet
+      const rolePages = { Owner: '/dashboard', Manager: '/dashboard', 'Branch Owner': '/dashboard', Receptionist: '/appointments', Therapist: '/appointments' };
+      return rolePages[user.role] || '/dashboard';
+    }
     return `/book/${branch.business_id}/${branch.slug}`;
   };
 

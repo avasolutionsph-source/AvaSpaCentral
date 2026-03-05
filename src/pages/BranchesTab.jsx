@@ -214,52 +214,28 @@ const BranchesTab = () => {
 
         // 2. Create Supabase Auth account for Branch Owner
         try {
-          const { supabase } = await import('../services/supabase/supabaseClient');
-          // Use admin-like signup (current session stays intact)
-          const signupRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+          // Use fetch directly to /auth/v1/signup so current session stays intact
+          let authUser = null;
+          const signupRes = await fetch(`${supabaseUrl}/auth/v1/signup`, {
             method: 'POST',
             headers: {
               'apikey': supabaseKey,
-              'Authorization': `Bearer ${(await supabase.auth.getSession()).data?.session?.access_token || supabaseKey}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
               email: formData.ownerEmail.trim(),
               password: formData.ownerPassword,
-              email_confirm: true,
-              user_metadata: {
+              data: {
                 first_name: formData.ownerFirstName.trim(),
                 last_name: formData.ownerLastName.trim()
               }
             })
           });
-
-          let authUser = null;
           if (signupRes.ok) {
             authUser = await signupRes.json();
           } else {
-            // Fallback: use regular signUp (won't log out current user if we use fetch directly)
-            const signupRes2 = await fetch(`${supabaseUrl}/auth/v1/signup`, {
-              method: 'POST',
-              headers: {
-                'apikey': supabaseKey,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                email: formData.ownerEmail.trim(),
-                password: formData.ownerPassword,
-                data: {
-                  first_name: formData.ownerFirstName.trim(),
-                  last_name: formData.ownerLastName.trim()
-                }
-              })
-            });
-            if (signupRes2.ok) {
-              authUser = await signupRes2.json();
-            } else {
-              const errData = await signupRes2.json().catch(() => ({}));
-              throw new Error(errData.msg || errData.error_description || 'Failed to create auth account');
-            }
+            const errData = await signupRes.json().catch(() => ({}));
+            throw new Error(errData.msg || errData.error_description || 'Failed to create auth account');
           }
 
           // 3. Create user profile in users table

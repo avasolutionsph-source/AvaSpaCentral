@@ -11049,17 +11049,54 @@ a:focus:not(:focus-visible),
 /* ============================================================
    Branches — Settings Section
    ============================================================ */
+.branch-info-banner {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 1rem 1.25rem;
+  background: var(--color-accent, #1B5E37);
+  color: white;
+  border-radius: var(--radius-lg, 10px);
+  margin-bottom: 1.5rem;
+}
+
+.branch-info-banner-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.branch-info-banner strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.branch-info-banner p {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
 .branches-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .branch-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.25rem;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
   background: var(--gray-50, #f9fafb);
   border: 1px solid var(--gray-200, #e5e7eb);
   border-radius: var(--radius-lg, 10px);
@@ -11079,22 +11116,22 @@ a:focus:not(:focus-visible),
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
 }
 
 .branch-item-name {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 600;
   margin: 0;
 }
 
 .branch-status-badge {
-  font-size: 0.7rem;
-  padding: 0.15rem 0.5rem;
+  font-size: 0.65rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 99px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
 .branch-status-badge.active {
@@ -11107,42 +11144,69 @@ a:focus:not(:focus-visible),
   color: #991b1b;
 }
 
-.branch-item-detail {
-  font-size: 0.875rem;
-  color: var(--gray-600, #4b5563);
-  margin: 0;
-}
-
-.branch-item-meta {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.8rem;
-  color: var(--gray-400, #9ca3af);
-  margin-top: 0.25rem;
-}
-
 .branch-item-slug {
   font-family: monospace;
-  background: var(--gray-100, #f3f4f6);
-  padding: 0 0.35rem;
-  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--gray-400, #9ca3af);
+  word-break: break-all;
+}
+
+.branch-item-detail {
+  font-size: 0.85rem;
+  color: var(--gray-500, #6b7280);
+  margin: 0.15rem 0 0;
+}
+
+.branch-item-fees {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  border-left: 1px solid var(--gray-200, #e5e7eb);
+  padding-left: 1.5rem;
+}
+
+.branch-fee-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  white-space: nowrap;
+}
+
+.branch-fee-label {
+  font-size: 0.8rem;
+  color: var(--gray-500, #6b7280);
+}
+
+.branch-fee-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-accent, #1B5E37);
 }
 
 .branch-item-actions {
   display: flex;
   gap: 0.5rem;
   flex-shrink: 0;
-  margin-left: 1rem;
+  border-left: 1px solid var(--gray-200, #e5e7eb);
+  padding-left: 1.5rem;
 }
 
 @media (max-width: 768px) {
   .branch-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: 1rem;
+  }
+  .branch-item-fees {
+    border-left: none;
+    padding-left: 0;
+    flex-direction: row;
+    gap: 1.5rem;
   }
   .branch-item-actions {
-    margin-left: 0;
+    border-left: none;
+    padding-left: 0;
     width: 100%;
   }
   .branch-item-actions .btn {

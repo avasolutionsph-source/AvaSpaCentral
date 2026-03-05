@@ -18,7 +18,9 @@ const BranchesTab = () => {
     city: '',
     phone: '',
     is_active: true,
-    display_order: 1
+    display_order: 1,
+    home_service_fee: 0,
+    hotel_service_fee: 0
   });
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -88,7 +90,9 @@ const BranchesTab = () => {
       city: '',
       phone: '',
       is_active: true,
-      display_order: branches.length + 1
+      display_order: branches.length + 1,
+      home_service_fee: 100,
+      hotel_service_fee: 200
     });
     setShowModal(true);
   };
@@ -103,7 +107,9 @@ const BranchesTab = () => {
       city: branch.city || '',
       phone: branch.phone || '',
       is_active: branch.is_active !== false,
-      display_order: branch.display_order || 1
+      display_order: branch.display_order || 1,
+      home_service_fee: branch.home_service_fee || 0,
+      hotel_service_fee: branch.hotel_service_fee || 0
     });
     setShowModal(true);
   };
@@ -126,7 +132,9 @@ const BranchesTab = () => {
         city: formData.city.trim() || null,
         phone: formData.phone.trim() || null,
         is_active: formData.is_active,
-        display_order: parseInt(formData.display_order) || 1
+        display_order: parseInt(formData.display_order) || 1,
+        home_service_fee: parseFloat(formData.home_service_fee) || 0,
+        hotel_service_fee: parseFloat(formData.hotel_service_fee) || 0
       };
 
       let res;
@@ -191,6 +199,10 @@ const BranchesTab = () => {
     }
   };
 
+  const formatCurrency = (amount) => {
+    return `\u20B1${parseFloat(amount || 0).toLocaleString()}`;
+  };
+
   if (loading) {
     return (
       <div className="settings-content">
@@ -208,18 +220,24 @@ const BranchesTab = () => {
           <div className="settings-section-icon">🏪</div>
           <div className="settings-section-title">
             <h2>Branch Management</h2>
-            <p>Create and manage your business branches/locations</p>
+            <p>Manage your business branches and service location fees</p>
           </div>
         </div>
         <div className="settings-section-body">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#666' }}>{branches.length} branch{branches.length !== 1 ? 'es' : ''}</span>
-            <button className="btn btn-primary" onClick={openCreate}>+ Add Branch</button>
+
+          {/* Info Banner */}
+          <div className="branch-info-banner">
+            <div className="branch-info-banner-icon">i</div>
+            <div>
+              <strong>Multi-Branch Booking</strong>
+              <p>Add branches to let customers select their preferred location when booking. Each branch can have different home/hotel service fees.</p>
+            </div>
           </div>
 
+          {/* Branch List */}
           {branches.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>
-              <p>No branches yet. Click "Add Branch" to create your first location.</p>
+              <p>No branches yet. Click "+ Add Branch" to create your first location.</p>
             </div>
           ) : (
             <div className="branches-list">
@@ -229,30 +247,44 @@ const BranchesTab = () => {
                     <div className="branch-item-header">
                       <h3 className="branch-item-name">{branch.name}</h3>
                       <span className={`branch-status-badge ${branch.is_active ? 'active' : 'inactive'}`}>
-                        {branch.is_active ? 'Active' : 'Inactive'}
+                        {branch.is_active ? 'ACTIVE' : 'INACTIVE'}
                       </span>
                     </div>
+                    <p className="branch-item-slug">/book/{branch.business_id}/{branch.slug}</p>
                     {branch.address && <p className="branch-item-detail">{branch.address}</p>}
-                    <div className="branch-item-meta">
-                      {branch.city && <span>{branch.city}</span>}
-                      {branch.phone && <span>{branch.phone}</span>}
-                      <span className="branch-item-slug">/{branch.slug}</span>
+                    {branch.city && <p className="branch-item-detail">{branch.city}</p>}
+                  </div>
+
+                  <div className="branch-item-fees">
+                    <div className="branch-fee-row">
+                      <span className="branch-fee-label">Home Service:</span>
+                      <span className="branch-fee-value">{formatCurrency(branch.home_service_fee)}</span>
+                    </div>
+                    <div className="branch-fee-row">
+                      <span className="branch-fee-label">Hotel Service:</span>
+                      <span className="branch-fee-value">{formatCurrency(branch.hotel_service_fee)}</span>
                     </div>
                   </div>
+
                   <div className="branch-item-actions">
-                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(branch)}>Edit</button>
                     <button
                       className={`btn btn-sm ${branch.is_active ? 'btn-warning' : 'btn-success'}`}
                       onClick={() => toggleActive(branch)}
                     >
                       {branch.is_active ? 'Deactivate' : 'Activate'}
                     </button>
+                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(branch)}>Edit</button>
                     <button className="btn btn-sm btn-error" onClick={() => setDeleteConfirm(branch)}>Delete</button>
                   </div>
                 </div>
               ))}
             </div>
           )}
+
+          {/* Add Branch Button */}
+          <div style={{ marginTop: '1.5rem' }}>
+            <button className="btn btn-primary" onClick={openCreate}>+ Add Branch</button>
+          </div>
         </div>
       </div>
 
@@ -288,8 +320,7 @@ const BranchesTab = () => {
                     className="form-control"
                     placeholder="auto-generated-from-name"
                   />
-                  <small style={{ color: '#888' }}>Used in booking URL: /book/.../
-                    {formData.slug || 'slug'}</small>
+                  <small style={{ color: '#888' }}>Booking URL: /book/.../{formData.slug || 'slug'}</small>
                 </div>
                 <div className="form-group">
                   <label>Address</label>
@@ -326,6 +357,38 @@ const BranchesTab = () => {
                     />
                   </div>
                 </div>
+
+                {/* Service Location Fees */}
+                <h4 style={{ margin: '1.25rem 0 0.75rem', fontSize: '0.95rem', color: '#333' }}>Service Location Fees</h4>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Home Service Fee</label>
+                    <input
+                      type="number"
+                      name="home_service_fee"
+                      value={formData.home_service_fee}
+                      onChange={handleChange}
+                      onWheel={(e) => e.target.blur()}
+                      className="form-control"
+                      min="0"
+                      step="10"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Hotel Service Fee</label>
+                    <input
+                      type="number"
+                      name="hotel_service_fee"
+                      value={formData.hotel_service_fee}
+                      onChange={handleChange}
+                      onWheel={(e) => e.target.blur()}
+                      className="form-control"
+                      min="0"
+                      step="10"
+                    />
+                  </div>
+                </div>
+
                 <div className="form-row">
                   <div className="form-group">
                     <label>Display Order</label>
@@ -372,7 +435,7 @@ const BranchesTab = () => {
             </div>
             <div className="modal-body">
               <p>Are you sure you want to delete <strong>{deleteConfirm.name}</strong>?</p>
-              <p style={{ color: '#ef4444', fontSize: '0.875rem' }}>This action cannot be undone.</p>
+              <p style={{ color: '#ef4444', fontSize: '0.875rem' }}>This action cannot be undone. All data associated with this branch will be permanently removed.</p>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>

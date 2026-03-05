@@ -239,13 +239,15 @@ const BranchesTab = () => {
           }
 
           // 3. Create user profile in users table
-          if (authUser?.id) {
+          // signup returns { user: { id } } or { id } depending on confirm settings
+          const authId = authUser?.user?.id || authUser?.id;
+          if (authId) {
             const username = formData.ownerUsername.trim() || formData.ownerEmail.split('@')[0];
-            await fetch(`${supabaseUrl}/rest/v1/users`, {
+            const profileRes = await fetch(`${supabaseUrl}/rest/v1/users`, {
               method: 'POST',
               headers,
               body: JSON.stringify({
-                auth_id: authUser.id,
+                auth_id: authId,
                 email: formData.ownerEmail.trim().toLowerCase(),
                 username: username.toLowerCase(),
                 first_name: formData.ownerFirstName.trim(),
@@ -256,6 +258,14 @@ const BranchesTab = () => {
                 status: 'active'
               })
             });
+            if (!profileRes.ok) {
+              const errData = await profileRes.json().catch(() => ({}));
+              console.error('Failed to create user profile:', errData);
+              throw new Error(errData.message || 'Failed to create user profile');
+            }
+          } else {
+            console.error('No auth ID returned from signup:', authUser);
+            throw new Error('Auth account created but no user ID returned');
           }
         } catch (authErr) {
           console.error('Failed to create Branch Owner account:', authErr);

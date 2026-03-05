@@ -156,11 +156,7 @@ const BranchSelect = () => {
           }
         }
 
-        // If only one branch, auto-select it
-        if (data && data.length === 1) {
-          selectBranch(data[0]);
-          return; // useEffect will handle redirect
-        }
+        // Always show branch selection - let user choose even if only one branch
       } catch (err) {
         console.error('Error loading branches:', err);
         setError('Failed to load branches. Please try again.');

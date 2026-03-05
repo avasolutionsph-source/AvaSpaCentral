@@ -306,6 +306,13 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('selectedBranch');
 
+    // Clear Supabase internal auth tokens to prevent auto-login on next visit
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        localStorage.removeItem(key);
+      }
+    });
+
     showToast('Logged out successfully', 'info');
   };
 

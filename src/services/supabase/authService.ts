@@ -491,9 +491,13 @@ class AuthService {
    */
   async signOut(): Promise<{ success: boolean }> {
     if (isSupabaseConfigured() && supabase) {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('[AuthService] Sign out error:', error);
+      try {
+        const { error } = await supabase.auth.signOut({ scope: 'local' });
+        if (error) {
+          console.error('[AuthService] Sign out error:', error);
+        }
+      } catch (err) {
+        console.error('[AuthService] Sign out exception:', err);
       }
     }
 
@@ -501,6 +505,14 @@ class AuthService {
     this._session = null;
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+
+    // Clear Supabase internal auth tokens as fallback
+    // Supabase stores session in keys matching sb-*-auth-token
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        localStorage.removeItem(key);
+      }
+    });
 
     this._notifyListeners('SIGNED_OUT', null);
 

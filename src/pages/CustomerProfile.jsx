@@ -238,7 +238,7 @@ const CustomerProfile = () => {
 
         {/* Action Buttons */}
         <div className="cp-actions">
-          <Link to={`/book/${businessId}`} className="cp-action-btn cp-action-primary">
+          <Link to="/select-branch" className="cp-action-btn cp-action-primary">
             Book Now
           </Link>
           <button className="cp-action-btn cp-action-secondary" onClick={() => setEditMode(true)}>
@@ -337,7 +337,7 @@ const CustomerProfile = () => {
                   <div className="cp-empty-state">
                     <div className="cp-empty-icon">📅</div>
                     <p>No upcoming bookings</p>
-                    <Link to={`/book/${businessId}`} className="cp-action-btn cp-action-primary" style={{ display: 'inline-block', padding: '0.625rem 1.5rem' }}>
+                    <Link to="/select-branch" className="cp-action-btn cp-action-primary" style={{ display: 'inline-block', padding: '0.625rem 1.5rem' }}>
                       Book Now
                     </Link>
                   </div>
@@ -407,7 +407,7 @@ const CustomerProfile = () => {
                       <div className="booking-footer">
                         <span className="booking-total">{'\u20B1'}{booking.total_amount?.toLocaleString()}</span>
                         {booking.status === 'completed' && (
-                          <Link to={`/book/${businessId}`} className="rebook-btn">
+                          <Link to="/select-branch" className="rebook-btn">
                             Book Again
                           </Link>
                         )}

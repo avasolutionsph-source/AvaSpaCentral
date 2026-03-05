@@ -5,7 +5,7 @@ import { getBrandingSettings, applyColorTheme } from '../services/brandingServic
 
 const BranchSelect = () => {
   const navigate = useNavigate();
-  const { user, selectedBranch, selectBranch, logout, isBranchOwner, getUserBranchId, getFirstPage } = useApp();
+  const { user, selectedBranch, selectBranch, logout, isBranchOwner, getUserBranchId, getFirstPage, isOwner, isManager } = useApp();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -71,7 +71,51 @@ const BranchSelect = () => {
 
         if (!response.ok) throw new Error('Failed to load branches');
 
-        const data = await response.json();
+        let data = await response.json();
+
+        // Auto-create default branch for Owner/Manager if no branches exist
+        if ((!data || data.length === 0) && user && (isOwner() || isManager()) && user.businessId) {
+          try {
+            // Get business name for the branch
+            const bizRes = await fetch(
+              `${supabaseUrl}/rest/v1/businesses?id=eq.${user.businessId}&select=name`,
+              { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${accessToken}` } }
+            );
+            const bizData = bizRes.ok ? await bizRes.json() : [];
+            const businessName = bizData?.[0]?.name || 'Main Branch';
+            const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'main';
+
+            const branchPayload = {
+              business_id: user.businessId,
+              name: businessName,
+              slug: slug,
+              is_active: true,
+              display_order: 1
+            };
+
+            const createRes = await fetch(
+              `${supabaseUrl}/rest/v1/branches`,
+              {
+                method: 'POST',
+                headers: {
+                  'apikey': supabaseKey,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(branchPayload)
+              }
+            );
+
+            if (createRes.ok) {
+              data = await createRes.json();
+              console.log('[BranchSelect] Auto-created default branch:', data);
+            }
+          } catch (e) {
+            console.error('[BranchSelect] Failed to auto-create branch:', e);
+          }
+        }
+
         setBranches(data || []);
 
         // Load branding from the business

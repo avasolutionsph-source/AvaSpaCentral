@@ -136,7 +136,7 @@ const BranchSelect = () => {
 
         setBranches(data || []);
 
-        // Staff auto-redirect: if logged in, auto-select branch and go to POS
+        // Staff auto-redirect: always auto-select first branch and go to POS
         if (user && data && data.length > 0) {
           // Branch Owner → their assigned branch
           if (isBranchOwner() && getUserBranchId()) {
@@ -147,13 +147,10 @@ const BranchSelect = () => {
               return;
             }
           }
-          // Owner/Manager/Receptionist/Therapist with only 1 branch → auto-select
-          if (data.length === 1) {
-            selectBranch(data[0]);
-            navigate(getRedirectPath(data[0]), { replace: true });
-            return;
-          }
-          // Staff with multiple branches → show branch selection
+          // All other staff → auto-select first branch
+          selectBranch(data[0]);
+          navigate(getRedirectPath(data[0]), { replace: true });
+          return;
         }
 
         // Public users (not logged in) → always show branch selection for booking

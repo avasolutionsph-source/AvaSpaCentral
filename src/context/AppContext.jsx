@@ -361,14 +361,14 @@ export const AppProvider = ({ children }) => {
     return user?.role === 'Owner';
   };
 
-  // Check if user can edit products/services (Owner and Manager)
+  // Check if user can edit products/services (Owner, Manager, and Branch Owner)
   const canEditProducts = () => {
-    return ['Owner', 'Manager'].includes(user?.role);
+    return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
   };
 
-  // Check if user can manage employees (Owner and Manager)
+  // Check if user can manage employees (Owner, Manager, and Branch Owner)
   const canManageEmployees = () => {
-    return ['Owner', 'Manager'].includes(user?.role);
+    return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
   };
 
   // Check if user can view all data (Owner, Manager, Receptionist for most features)

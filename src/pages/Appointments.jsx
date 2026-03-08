@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../components/shared';
 
 const Appointments = () => {
   const navigate = useNavigate();
-  const { showToast, user, canViewAll, isTherapist } = useApp();
+  const { showToast, user, canViewAll, isTherapist, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState([]);
@@ -157,6 +157,12 @@ const Appointments = () => {
   const getFilteredAppointments = () => {
     let filtered = appointments;
 
+    // Filter by branch
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    }
+
     // Filter by therapist if user is therapist
     if (isTherapist() && user?.employeeId) {
       filtered = filtered.filter(a => a.employee?._id === user.employeeId);
@@ -250,6 +256,7 @@ const Appointments = () => {
     if (!validateForm()) return;
 
     try {
+      const branchId = getUserBranchId();
       const appointmentData = {
         customerId: formData.customerId || undefined,
         customerName: !formData.customerId ? formData.customerName.trim() : undefined,
@@ -259,7 +266,8 @@ const Appointments = () => {
         dateTime: `${formData.date}T${formData.time}:00`,
         duration: parseInt(formData.duration),
         bookingSource: formData.bookingSource,
-        notes: formData.notes.trim() || undefined
+        notes: formData.notes.trim() || undefined,
+        ...(branchId && { branchId })
       };
 
       if (modalMode === 'create') {

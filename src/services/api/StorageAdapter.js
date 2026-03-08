@@ -1086,6 +1086,7 @@ export const attendanceAdapter = {
       clockIn: nowTime,
       clockInPhoto: captureData.photo || null,
       clockInGps: captureData.gps || null,
+      ...(captureData.branchId && { branchId: captureData.branchId }),
       status: 'present'
     });
 

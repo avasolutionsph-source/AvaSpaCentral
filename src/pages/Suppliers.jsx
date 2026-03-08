@@ -19,7 +19,7 @@ import { supplierValidation, validateWithToast } from '../validation/schemas';
 
 const Suppliers = ({ embedded = false }) => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   // Additional state for categories and filters
   const [categories, setCategories] = useState([]);
@@ -81,6 +81,13 @@ const Suppliers = ({ embedded = false }) => {
       category: supplier.category,
       paymentTerms: supplier.paymentTerms
     }),
+    transformForSubmit: (data, mode) => {
+      if (mode === 'create') {
+        const branchId = getUserBranchId();
+        return { ...data, ...(branchId && { branchId }) };
+      }
+      return data;
+    },
     validateForm: (data) => validateWithToast(supplierValidation, data, showToast)
   });
 
@@ -100,6 +107,12 @@ const Suppliers = ({ embedded = false }) => {
   // Filter suppliers
   const filteredSuppliers = useMemo(() => {
     let filtered = [...suppliers];
+
+    // Apply branch filter
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    }
 
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();

@@ -6,7 +6,7 @@ import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
 // jsPDF is loaded dynamically in handleExportPDF to reduce initial bundle size
 
 const Reports = ({ embedded = false }) => {
-  const { showToast, user, isTherapist, canViewAll } = useApp();
+  const { showToast, user, isTherapist, canViewAll, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -97,7 +97,7 @@ const Reports = ({ embedded = false }) => {
   const loadAllData = async () => {
     try {
       setLoading(true);
-      const [txns, emps, attn, prods, rms, custs, appts, advBookings, exps] = await Promise.all([
+      let [txns, emps, attn, prods, rms, custs, appts, advBookings, exps] = await Promise.all([
         mockApi.transactions.getTransactions(),
         mockApi.employees.getEmployees(),
         mockApi.attendance.getAttendance(),
@@ -108,6 +108,20 @@ const Reports = ({ embedded = false }) => {
         mockApi.advanceBooking.listAdvanceBookings(),
         mockApi.expenses.getExpenses()
       ]);
+
+      // Filter data by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        txns = txns.filter(item => !item.branchId || item.branchId === userBranchId);
+        emps = emps.filter(item => !item.branchId || item.branchId === userBranchId);
+        attn = attn.filter(item => !item.branchId || item.branchId === userBranchId);
+        prods = prods.filter(item => !item.branchId || item.branchId === userBranchId);
+        rms = rms.filter(item => !item.branchId || item.branchId === userBranchId);
+        custs = custs.filter(item => !item.branchId || item.branchId === userBranchId);
+        appts = appts.filter(item => !item.branchId || item.branchId === userBranchId);
+        advBookings = advBookings.filter(item => !item.branchId || item.branchId === userBranchId);
+        exps = exps.filter(item => !item.branchId || item.branchId === userBranchId);
+      }
 
       setTransactions(txns);
       setEmployees(emps);

@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, subDays, startOfDay, endOfDay } from 'date-fns';
 
 const ActivityLogs = () => {
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -36,7 +36,14 @@ const ActivityLogs = () => {
   const fetchActivityLogs = async () => {
     setLoading(true);
     try {
-      const apiLogs = await mockApi.activityLogs.getLogs();
+      let apiLogs = await mockApi.activityLogs.getLogs();
+
+      // Filter logs by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        apiLogs = apiLogs.filter(item => !item.branchId || item.branchId === userBranchId);
+      }
+
       setLogs(apiLogs.map((l, i) => ({ ...l, id: l._id || i + 1 })));
     } catch (error) {
       showToast('Failed to load activity logs', 'error');

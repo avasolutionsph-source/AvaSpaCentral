@@ -12,7 +12,7 @@ import CashDrawerHistoryTab from './CashDrawerHistory';
 import '../assets/css/pos.css';
 
 const POS = () => {
-  const { showToast, user } = useApp();
+  const { showToast, user, getUserBranchId } = useApp();
 
   // Tab state for switching between POS and Gift Certificates
   const [activeTab, setActiveTab] = useState('pos');
@@ -99,13 +99,17 @@ const POS = () => {
         // Filter out products marked as hidden from POS
         const visibleProducts = productsData.filter(p => !p.hideFromPOS);
 
-        setProducts(visibleProducts);
-        setEmployees(employeesData);
-        setCustomers(customersData);
-        setRooms(roomsData);
+        // Filter by branch
+        const userBranchId = getUserBranchId();
+        const branchFilter = (item) => !userBranchId || !item.branchId || item.branchId === userBranchId;
+
+        setProducts(visibleProducts.filter(branchFilter));
+        setEmployees(employeesData.filter(branchFilter));
+        setCustomers(customersData.filter(branchFilter));
+        setRooms(roomsData.filter(branchFilter));
 
         // Extract unique categories from visible products only
-        const uniqueCategories = [...new Set(visibleProducts.map(p => p.category))];
+        const uniqueCategories = [...new Set(visibleProducts.filter(branchFilter).map(p => p.category))];
         setCategories(uniqueCategories);
 
         setLoading(false);
@@ -146,13 +150,17 @@ const POS = () => {
         mockApi.rooms.getRooms()
       ]);
 
-      setProducts(productsData);
-      setEmployees(employeesData);
-      setCustomers(customersData);
-      setRooms(roomsData);
+      // Filter by branch
+      const userBranchId = getUserBranchId();
+      const branchFilter = (item) => !userBranchId || !item.branchId || item.branchId === userBranchId;
+
+      setProducts(productsData.filter(branchFilter));
+      setEmployees(employeesData.filter(branchFilter));
+      setCustomers(customersData.filter(branchFilter));
+      setRooms(roomsData.filter(branchFilter));
 
       // Extract unique categories
-      const uniqueCategories = [...new Set(productsData.map(p => p.category))];
+      const uniqueCategories = [...new Set(productsData.filter(branchFilter).map(p => p.category))];
       setCategories(uniqueCategories);
 
       setLoading(false);
@@ -618,6 +626,7 @@ const POS = () => {
         // Build transaction
         const transaction = {
           businessId: user?.businessId,
+          ...(getUserBranchId() && { branchId: getUserBranchId() }),
           receiptNumber,
           date: new Date().toISOString(),
           items: cart.map(item => ({

@@ -17,7 +17,7 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const ShiftSchedules = () => {
   const navigate = useNavigate();
-  const { showToast, hasManagementAccess, user } = useApp();
+  const { showToast, hasManagementAccess, user, getUserBranchId } = useApp();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -62,13 +62,20 @@ const ShiftSchedules = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [schedulesData, employeesData, templatesData, configData, timeOffData] = await Promise.all([
+      let [schedulesData, employeesData, templatesData, configData, timeOffData] = await Promise.all([
         mockApi.shiftSchedules.getAllSchedules(),
         mockApi.employees.getEmployees(),
         mockApi.shiftSchedules.getTemplates(),
         mockApi.shiftSchedules.getShiftConfig(),
         mockApi.shiftSchedules.getTimeOffRequests()
       ]);
+
+      // Filter data by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        schedulesData = schedulesData.filter(item => !item.branchId || item.branchId === userBranchId);
+        employeesData = employeesData.filter(item => !item.branchId || item.branchId === userBranchId);
+      }
 
       setSchedules(schedulesData.filter(s => s.isActive));
       setEmployees(employeesData.filter(e => e.status === 'active'));
@@ -215,6 +222,7 @@ const ShiftSchedules = () => {
         };
       });
 
+      const branchId = getUserBranchId();
       await mockApi.shiftSchedules.createSchedule({
         employeeId: employee._id,
         employeeName: `${employee.firstName} ${employee.lastName}`,
@@ -222,7 +230,8 @@ const ShiftSchedules = () => {
         department: employee.department,
         weeklySchedule: defaultWeeklySchedule,
         isActive: true,
-        effectiveFrom: format(weekStart, 'yyyy-MM-dd')
+        effectiveFrom: format(weekStart, 'yyyy-MM-dd'),
+        ...(branchId && { branchId })
       });
 
       showToast(`${employee.firstName} ${employee.lastName} added to schedule!`, 'success');

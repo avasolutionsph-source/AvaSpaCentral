@@ -17,7 +17,7 @@ import {
 import { roomValidation, validateWithToast } from '../validation/schemas';
 
 const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { user, showToast, isTherapist, canEdit } = useApp();
+  const { user, showToast, isTherapist, canEdit, getUserBranchId } = useApp();
 
   // Filter state (kept separate as it's page-specific)
   const [filterStatus, setFilterStatus] = useState('available');
@@ -160,13 +160,17 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       amenities: room.amenities || [],
       status: room.status
     }),
-    transformForSubmit: (data) => ({
-      name: data.name.trim(),
-      type: data.type,
-      capacity: parseInt(data.capacity),
-      amenities: data.amenities,
-      status: data.status
-    }),
+    transformForSubmit: (data) => {
+      const branchId = getUserBranchId();
+      return {
+        name: data.name.trim(),
+        type: data.type,
+        capacity: parseInt(data.capacity),
+        amenities: data.amenities,
+        status: data.status,
+        ...(branchId && { branchId })
+      };
+    },
     validateForm: (data) => validateWithToast(roomValidation, data, showToast),
     onSuccess: (mode) => {
       if (onDataChange) onDataChange();
@@ -311,6 +315,12 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const filteredRooms = useMemo(() => {
     let filtered = rooms;
 
+    // Branch filtering
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(r => !r.branchId || r.branchId === userBranchId);
+    }
+
     // First filter: Only show rooms with active services by default (pending/occupied)
     // Unless explicitly filtering for available or maintenance
     if (filterStatus === 'all') {
@@ -327,7 +337,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     }
 
     return filtered;
-  }, [rooms, filterStatus, isTherapist, user]);
+  }, [rooms, filterStatus, isTherapist, user, getUserBranchId]);
 
   // Handle amenity toggle (custom handler for checkbox array)
   const handleAmenityToggle = (amenity) => {

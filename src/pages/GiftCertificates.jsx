@@ -7,7 +7,7 @@ import { supabaseSyncManager } from '../services/supabase';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const GiftCertificates = () => {
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [giftCertificates, setGiftCertificates] = useState([]);
@@ -80,6 +80,12 @@ const GiftCertificates = () => {
 
   const filterGiftCertificates = () => {
     let filtered = [...giftCertificates];
+
+    // Apply branch filter
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    }
 
     // Apply search filter
     if (searchTerm.trim()) {
@@ -161,13 +167,15 @@ const GiftCertificates = () => {
     if (!validateForm()) return;
 
     try {
+      const branchId = getUserBranchId();
       const gcData = {
         recipientName: formData.recipientName.trim(),
         recipientEmail: formData.recipientEmail.trim(),
         amount: parseFloat(formData.amount),
         balance: parseFloat(formData.amount),
         expiryDate: formData.noExpiry ? null : formData.expiryDate,
-        message: formData.message.trim() || undefined
+        message: formData.message.trim() || undefined,
+        ...(branchId && { branchId })
       };
 
       await mockApi.giftCertificates.createGiftCertificate(gcData);

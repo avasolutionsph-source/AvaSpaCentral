@@ -7,7 +7,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 
 const CustomerAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [customerData, setCustomerData] = useState(null);
@@ -20,6 +20,20 @@ const CustomerAnalytics = () => {
     try {
       setLoading(true);
       const data = await mockApi.analytics.getCustomerMetrics();
+
+      // Filter customer data by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId && data?.pareto?.top20Customers) {
+        data.pareto.top20Customers = data.pareto.top20Customers.filter(item => !item.branchId || item.branchId === userBranchId);
+      }
+      if (userBranchId && data?.segments) {
+        Object.keys(data.segments).forEach(key => {
+          if (Array.isArray(data.segments[key])) {
+            data.segments[key] = data.segments[key].filter(item => !item.branchId || item.branchId === userBranchId);
+          }
+        });
+      }
+
       setCustomerData(data);
       setLoading(false);
     } catch (error) {

@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns';
 import mockApi from '../mockApi';
 
 const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
   const [sessions, setSessions] = useState([]);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -29,7 +29,7 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
       });
 
       // Transform API sessions to expected format
-      const transformedSessions = apiSessions.map(session => ({
+      let transformedSessions = apiSessions.map(session => ({
         id: session._id,
         user: {
           firstName: session.userName?.split(' ')[0] || 'Unknown',
@@ -45,6 +45,12 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
         status: session.status,
         transactions: session.transactions || []
       }));
+
+      // Filter by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        transformedSessions = transformedSessions.filter(item => !item.branchId || item.branchId === userBranchId);
+      }
 
       // Apply filters
       let filtered = transformedSessions;

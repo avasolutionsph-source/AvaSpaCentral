@@ -7,7 +7,7 @@ import { Bar, Line } from 'react-chartjs-2';
 
 const InventoryAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [inventoryData, setInventoryData] = useState(null);
@@ -26,6 +26,23 @@ const InventoryAnalytics = () => {
         mockApi.analytics.getSupplierMetrics(),
         mockApi.analytics.getForecasts()
       ]);
+      // Filter inventory data by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        if (inventory?.products) {
+          inventory.products = inventory.products.filter(item => !item.branchId || item.branchId === userBranchId);
+        }
+        if (inventory?.alerts?.slowMoving) {
+          inventory.alerts.slowMoving = inventory.alerts.slowMoving.filter(item => !item.branchId || item.branchId === userBranchId);
+        }
+        if (inventory?.alerts?.criticalStock) {
+          inventory.alerts.criticalStock = inventory.alerts.criticalStock.filter(item => !item.branchId || item.branchId === userBranchId);
+        }
+        if (suppliers?.suppliers) {
+          suppliers.suppliers = suppliers.suppliers.filter(item => !item.branchId || item.branchId === userBranchId);
+        }
+      }
+
       setInventoryData(inventory);
       setSupplierData(suppliers);
       setForecasts(forecastData);

@@ -7,7 +7,7 @@ import { StockHistoryRepository } from '../services/storage/repositories';
 
 const Inventory = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
-  const { showToast, canEdit } = useApp();
+  const { showToast, canEdit, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState([]);
@@ -116,6 +116,12 @@ const Inventory = ({ embedded = false, onDataChange }) => {
 
   const applyFilters = () => {
     let filtered = [...inventory];
+
+    // Branch filtering
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    }
 
     // Search filter
     if (searchQuery.trim()) {

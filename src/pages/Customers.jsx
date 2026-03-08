@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../components/shared';
 import { LoyaltyHistoryRepository } from '../services/storage/repositories';
 
 const Customers = () => {
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
@@ -101,6 +101,13 @@ const Customers = () => {
   // Memoized filtered customers list
   const filteredCustomers = useMemo(() => {
     let filtered = [...customers];
+
+    // Filter by branch
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    }
+
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(c =>
@@ -114,7 +121,7 @@ const Customers = () => {
       filtered = filtered.filter(c => c.tier === tierFilter);
     }
     return filtered;
-  }, [customers, searchTerm, tierFilter]);
+  }, [customers, searchTerm, tierFilter, getUserBranchId]);
 
   // Memoized tier stats for display
   const tierStats = useMemo(() => {
@@ -177,12 +184,14 @@ const Customers = () => {
     if (!validateForm()) return;
 
     try {
+      const branchId = getUserBranchId();
       const customerData = {
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         birthday: formData.birthday || undefined,
-        notes: formData.notes.trim() || undefined
+        notes: formData.notes.trim() || undefined,
+        ...(branchId && { branchId })
       };
 
       if (modalMode === 'create') {

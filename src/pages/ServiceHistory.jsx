@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, subDays } from 'date-fns';
 
 const ServiceHistory = ({ embedded = false, onDataChange }) => {
-  const { showToast, user, canViewAll, isTherapist } = useApp();
+  const { showToast, user, canViewAll, isTherapist, getUserBranchId } = useApp();
   const [transactions, setTransactions] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
@@ -76,6 +76,12 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
 
   const applyFilters = () => {
     let filtered = [...transactions];
+
+    // Filter by branch
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(t => !t.branchId || t.branchId === userBranchId);
+    }
 
     // Filter by therapist if user is therapist (only show transactions where they performed services)
     if (isTherapist() && user?.employeeId) {

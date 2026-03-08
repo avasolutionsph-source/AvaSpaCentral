@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, subDays, isWithinInterval } from 'date-fns';
 
 const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef }) => {
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -55,7 +55,12 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
         mockApi.transactions.getTransactions(),
         mockApi.payrollConfig.getPayrollConfig()
       ]);
-      setEmployees(emps.filter(e => e.status === 'active'));
+      let activeEmps = emps.filter(e => e.status === 'active');
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === userBranchId);
+      }
+      setEmployees(activeEmps);
       setAttendance(att);
       setTransactions(trans);
       setPayrollConfig(config);
@@ -340,8 +345,10 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
 
     const netPay = grossPay - totalDeductions;
 
+    const branchId = getUserBranchId();
     return {
       employee,
+      ...(branchId && { branchId }),
       daysWorked: empAttendance.length,
       regularHours: Math.round(regularHours * 10) / 10,
       overtimeHours: Math.round(overtimeHours * 10) / 10,

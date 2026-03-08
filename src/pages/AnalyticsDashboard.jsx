@@ -7,7 +7,7 @@ import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
 const AnalyticsDashboard = () => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
@@ -55,12 +55,19 @@ const AnalyticsDashboard = () => {
         mockApi.analytics.getUtilizationMetrics(period)
       ]);
 
+      // Filter insights by branch
+      const userBranchId = getUserBranchId();
+      let filteredInsights = aiInsights?.insights || [];
+      if (userBranchId) {
+        filteredInsights = filteredInsights.filter(item => !item.branchId || item.branchId === userBranchId);
+      }
+
       setBreakEven(bep);
       setProfitability(profit);
       setBurnRate(burn);
       setCustomerMetrics(customers);
       setForecasts(forecast);
-      setInsights(aiInsights?.insights || []);
+      setInsights(filteredInsights);
       setRealtimeProfit(realtime);
       setSalaryHealth(salaryHealthData);
       setUtilizationMetrics(utilization);

@@ -9,7 +9,7 @@ import { logClockIn, logClockOut } from '../utils/activityLogger';
 
 const Attendance = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
-  const { user, showToast, isTherapist, hasManagementAccess } = useApp();
+  const { user, showToast, isTherapist, hasManagementAccess, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [todayAttendance, setTodayAttendance] = useState([]);
@@ -49,10 +49,19 @@ const Attendance = ({ embedded = false, onDataChange }) => {
 
       // Filter today's attendance
       const today = format(new Date(), 'yyyy-MM-dd');
-      const todayRecords = attendance.filter(a => a.date === today);
+      let todayRecords = attendance.filter(a => a.date === today);
+
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        todayRecords = todayRecords.filter(a => !a.branchId || a.branchId === userBranchId);
+      }
 
       setTodayAttendance(todayRecords);
-      setEmployees(emps.filter(e => e.status === 'active'));
+      let activeEmps = emps.filter(e => e.status === 'active');
+      if (userBranchId) {
+        activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === userBranchId);
+      }
+      setEmployees(activeEmps);
 
       // Calculate stats
       const activeEmployees = emps.filter(e => e.status === 'active');
@@ -106,12 +115,16 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const employee = employees.find(e => e._id === employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown';
 
+      // Include branchId in capture data for branch filtering
+      const branchId = getUserBranchId();
+      const captureWithBranch = { ...captureData, ...(branchId && { branchId }) };
+
       if (type === 'in') {
-        await mockApi.attendance.clockIn(employeeId, captureData);
+        await mockApi.attendance.clockIn(employeeId, captureWithBranch);
         showToast('Clocked in successfully with photo!', 'success');
         logClockIn(user, employeeName);
       } else {
-        await mockApi.attendance.clockOut(employeeId, captureData);
+        await mockApi.attendance.clockOut(employeeId, captureWithBranch);
         showToast('Clocked out successfully with photo!', 'success');
         logClockOut(user, employeeName);
       }

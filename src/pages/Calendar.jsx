@@ -19,7 +19,7 @@ import mockApi from '../mockApi';
 
 const Calendar = () => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // 'month', 'week', 'day'
@@ -138,7 +138,13 @@ const Calendar = () => {
         };
       });
 
-      setAppointments(transformedAppointments);
+      // Filter appointments by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        setAppointments(transformedAppointments.filter(item => !item.branchId || item.branchId === userBranchId));
+      } else {
+        setAppointments(transformedAppointments);
+      }
     } catch (error) {
       if (!isMounted) return;
       // Silent fail for appointments
@@ -171,7 +177,13 @@ const Calendar = () => {
         };
       });
 
-      setAttendanceData(transformedAttendance);
+      // Filter attendance by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        setAttendanceData(transformedAttendance.filter(item => !item.branchId || item.branchId === userBranchId));
+      } else {
+        setAttendanceData(transformedAttendance);
+      }
     } catch (error) {
       if (!isMounted) return;
       // Silent fail for attendance
@@ -235,7 +247,13 @@ const Calendar = () => {
         });
       }
 
-      setShiftData(transformedShifts);
+      // Filter shifts by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        setShiftData(transformedShifts.filter(item => !item.branchId || item.branchId === userBranchId));
+      } else {
+        setShiftData(transformedShifts);
+      }
     } catch (error) {
       if (!isMounted) return;
       // Silent fail for shifts

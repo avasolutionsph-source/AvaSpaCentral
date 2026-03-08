@@ -63,7 +63,7 @@ const INITIAL_FORM_DATA = {
 };
 
 const Expenses = ({ embedded = false, onDataChange }) => {
-  const { showToast } = useApp();
+  const { showToast, getUserBranchId } = useApp();
 
   // Filters
   const [filterCategory, setFilterCategory] = useState('all');
@@ -118,19 +118,23 @@ const Expenses = ({ embedded = false, onDataChange }) => {
   }), []);
 
   // Transform for submit
-  const transformForSubmit = useCallback((data) => ({
-    date: data.date,
-    category: data.category,
-    expenseType: data.expenseType || getDefaultExpenseType(data.category),
-    description: data.description.trim(),
-    vendor: data.vendor.trim(),
-    amount: parseFloat(data.amount),
-    paymentMethod: data.paymentMethod,
-    notes: data.notes?.trim() || undefined,
-    isRecurring: data.isRecurring,
-    recurringFrequency: data.isRecurring ? data.recurringFrequency : undefined,
-    receiptAttachment: data.receiptAttachment || undefined
-  }), []);
+  const transformForSubmit = useCallback((data) => {
+    const branchId = getUserBranchId();
+    return {
+      date: data.date,
+      category: data.category,
+      expenseType: data.expenseType || getDefaultExpenseType(data.category),
+      description: data.description.trim(),
+      vendor: data.vendor.trim(),
+      amount: parseFloat(data.amount),
+      paymentMethod: data.paymentMethod,
+      notes: data.notes?.trim() || undefined,
+      isRecurring: data.isRecurring,
+      recurringFrequency: data.isRecurring ? data.recurringFrequency : undefined,
+      receiptAttachment: data.receiptAttachment || undefined,
+      ...(branchId && { branchId })
+    };
+  }, [getUserBranchId]);
 
   // CRUD operations
   const {
@@ -213,6 +217,12 @@ const Expenses = ({ embedded = false, onDataChange }) => {
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
 
+    // Branch filtering
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    }
+
     if (filterCategory !== 'all') {
       filtered = filtered.filter(e => e.category === filterCategory);
     }
@@ -241,7 +251,7 @@ const Expenses = ({ embedded = false, onDataChange }) => {
 
     // Sort by date descending (create new array to avoid mutation)
     return [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm]);
+  }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm, getUserBranchId]);
 
   // Calculate stats
   const stats = useMemo(() => {

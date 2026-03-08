@@ -8,7 +8,7 @@ import { DashboardSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch } = useApp();
+  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,14 +83,24 @@ const Dashboard = () => {
         const todaySummary = val(0, { totalRevenue: 0, averageTransaction: 0, totalTransactions: 0 });
         const weekSummary = val(1, { totalRevenue: 0 });
         const monthSummary = val(2, { totalRevenue: 0 });
-        const transactions = val(3, []);
-        const appointments = val(4, []);
-        const attendance = val(5, []);
-        const products = val(6, []);
-        const rooms = val(7, []);
+        let transactions = val(3, []);
+        let appointments = val(4, []);
+        let attendance = val(5, []);
+        let products = val(6, []);
+        let rooms = val(7, []);
         const pendingRevenueData = val(8, { total: 0 });
         const todaysBookingsCount = val(9, 0);
         const salaryHealthData = val(10, null);
+
+        // Filter data by branch
+        const userBranchId = getUserBranchId();
+        if (userBranchId) {
+          transactions = transactions.filter(item => !item.branchId || item.branchId === userBranchId);
+          appointments = appointments.filter(item => !item.branchId || item.branchId === userBranchId);
+          attendance = attendance.filter(item => !item.branchId || item.branchId === userBranchId);
+          products = products.filter(item => !item.branchId || item.branchId === userBranchId);
+          rooms = rooms.filter(item => !item.branchId || item.branchId === userBranchId);
+        }
 
         // Check if component is still mounted before updating state
         if (!isMounted) return;
@@ -193,7 +203,7 @@ const Dashboard = () => {
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
       // Fetch all data
-      const [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount] =
+      let [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount] =
         await Promise.all([
           mockApi.transactions.getRevenueSummary('today'),
           mockApi.transactions.getRevenueSummary('week'),
@@ -206,6 +216,16 @@ const Dashboard = () => {
           mockApi.advanceBooking.getPendingRevenue(),
           mockApi.advanceBooking.getTodaysBookingsCount()
         ]);
+
+      // Filter data by branch
+      const userBranchId = getUserBranchId();
+      if (userBranchId) {
+        transactions = transactions.filter(item => !item.branchId || item.branchId === userBranchId);
+        appointments = appointments.filter(item => !item.branchId || item.branchId === userBranchId);
+        attendance = attendance.filter(item => !item.branchId || item.branchId === userBranchId);
+        products = products.filter(item => !item.branchId || item.branchId === userBranchId);
+        rooms = rooms.filter(item => !item.branchId || item.branchId === userBranchId);
+      }
 
       // Calculate KPIs
       const kpiData = {

@@ -16,7 +16,7 @@ import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
 const HRHub = () => {
-  const { isOwner, canEdit } = useApp();
+  const { isOwner, canEdit, canManageEmployees } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'employees';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -130,7 +130,7 @@ const HRHub = () => {
           {/* Action Buttons */}
           <div className="hub-header-actions">
             {/* Employees Tab Button */}
-            {activeTab === 'employees' && canEdit() && (
+            {activeTab === 'employees' && canManageEmployees() && (
               <button
                 className="btn btn-primary"
                 onClick={() => employeesOpenCreateRef.current?.()}

@@ -13,7 +13,7 @@ import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
 const InventoryHub = () => {
-  const { canEdit } = useApp();
+  const { canEdit, canEditProducts } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'rooms';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -153,7 +153,7 @@ const InventoryHub = () => {
                 + Add Room
               </button>
             )}
-            {activeTab === 'products' && canEdit() && (
+            {activeTab === 'products' && canEditProducts() && (
               <button
                 className="btn btn-primary"
                 onClick={() => productsOpenCreateRef.current?.()}

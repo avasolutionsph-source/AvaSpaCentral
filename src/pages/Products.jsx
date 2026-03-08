@@ -47,7 +47,7 @@ const unitOptions = [
 ];
 
 const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { showToast, canEdit, isBranchOwner, getUserBranchId } = useApp();
+  const { showToast, canEdit, canEditProducts, isBranchOwner, getUserBranchId } = useApp();
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -276,9 +276,9 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       {!embedded && (
         <PageHeader
           title="Products & Services"
-          description={canEdit() ? 'Manage your service menu and retail products' : 'View service menu and retail products'}
-          action={canEdit() ? { label: '+ Add Product/Service', onClick: openCreate } : null}
-          showAction={canEdit()}
+          description={canEditProducts() ? 'Manage your service menu and retail products' : 'View service menu and retail products'}
+          action={canEditProducts() ? { label: '+ Add Product/Service', onClick: openCreate } : null}
+          showAction={canEditProducts()}
         />
       )}
 
@@ -301,7 +301,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
             icon="📦"
             title="No products found"
             description="Try adjusting your filters or search term"
-            action={canEdit() ? { label: '+ Add Your First Product', onClick: openCreate } : null}
+            action={canEditProducts() ? { label: '+ Add Your First Product', onClick: openCreate } : null}
           />
         ) : (
           filteredProducts.map(product => (
@@ -337,7 +337,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                 </div>
               </div>
 
-              {canEdit() && (
+              {canEditProducts() && (
                 <div className="product-card-actions">
                   <button
                     className="action-icon-btn edit-btn"

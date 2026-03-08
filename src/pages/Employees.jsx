@@ -34,7 +34,7 @@ const INITIAL_FORM_DATA = {
 };
 
 const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { showToast, canEdit, isManager } = useApp();
+  const { showToast, canEdit, canManageEmployees, isManager, getUserBranchId } = useApp();
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -122,6 +122,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const transformForSubmit = useCallback((data) => {
     const hourlyRate = parseFloat(data.hourlyRate) || 0;
     const monthlyRate = parseFloat(data.monthlyRate) || 0;
+    const branchId = getUserBranchId();
     return {
       firstName: data.firstName.trim(),
       lastName: data.lastName.trim(),
@@ -135,9 +136,10 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       monthlyRate: monthlyRate,
       rateType: data.rateType,
       hireDate: data.hireDate,
-      skills: data.skills
+      skills: data.skills,
+      ...(branchId && { branchId })
     };
-  }, []);
+  }, [getUserBranchId]);
 
   // CRUD operations
   const {
@@ -232,6 +234,12 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const filteredEmployees = useMemo(() => {
     let filtered = [...employees];
 
+    // Filter by branch - only show employees from the current branch
+    const userBranchId = getUserBranchId();
+    if (userBranchId) {
+      filtered = filtered.filter(e => !e.branchId || e.branchId === userBranchId);
+    }
+
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(e =>
@@ -253,7 +261,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     }
 
     return filtered;
-  }, [employees, searchTerm, filterDepartment, filterRole, filterStatus]);
+  }, [employees, searchTerm, filterDepartment, filterRole, filterStatus, getUserBranchId]);
 
   // Filter configuration
   const filters = useMemo(() => [
@@ -299,8 +307,8 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       {!embedded && (
         <PageHeader
           title="Employee Management"
-          description={canEdit() ? 'Manage your team members and their information' : 'View team members and their information'}
-          action={canEdit() ? { label: '+ Add Employee', onClick: openCreate } : null}
+          description={canManageEmployees() ? 'Manage your team members and their information' : 'View team members and their information'}
+          action={canManageEmployees() ? { label: '+ Add Employee', onClick: openCreate } : null}
         />
       )}
 
@@ -338,7 +346,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
             ? 'Try adjusting your filters or search term'
             : 'Add your first team member to get started'
           }
-          action={canEdit() && !searchTerm ? { label: 'Add Your First Employee', onClick: openCreate } : null}
+          action={canManageEmployees() && !searchTerm ? { label: 'Add Your First Employee', onClick: openCreate } : null}
         />
       ) : viewMode === 'cards' ? (
         <div className="employees-grid">
@@ -395,7 +403,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                   </div>
                 )}
               </div>
-              {canEdit() && (
+              {canManageEmployees() && (
                 <div className="employee-actions">
                   <button className="btn btn-sm btn-secondary" onClick={() => openEdit(employee)}>Edit</button>
                   <button
@@ -422,7 +430,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                 <th>Email</th>
                 <th>Phone</th>
                 <th>Status</th>
-                {canEdit() && <th>Actions</th>}
+                {canManageEmployees() && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -444,7 +452,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                       {employee.status === 'active' ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  {canEdit() && (
+                  {canManageEmployees() && (
                     <td className="actions-cell">
                       <button className="btn btn-xs btn-secondary" onClick={() => openEdit(employee)}>Edit</button>
                       <button

@@ -361,6 +361,16 @@ export const AppProvider = ({ children }) => {
     return user?.role === 'Owner';
   };
 
+  // Check if user can edit products/services (Owner and Manager)
+  const canEditProducts = () => {
+    return ['Owner', 'Manager'].includes(user?.role);
+  };
+
+  // Check if user can manage employees (Owner and Manager)
+  const canManageEmployees = () => {
+    return ['Owner', 'Manager'].includes(user?.role);
+  };
+
   // Check if user can view all data (Owner, Manager, Receptionist for most features)
   const canViewAll = () => {
     return ['Owner', 'Manager', 'Receptionist'].includes(user?.role);
@@ -442,6 +452,8 @@ export const AppProvider = ({ children }) => {
     isTherapist,
     isBranchOwner,
     canEdit,
+    canEditProducts,
+    canManageEmployees,
     canViewAll,
     hasManagementAccess,
     // Branch-related exports

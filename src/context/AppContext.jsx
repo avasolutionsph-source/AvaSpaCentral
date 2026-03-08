@@ -356,9 +356,9 @@ export const AppProvider = ({ children }) => {
     return user?.role === 'Therapist';
   };
 
-  // Check if user can edit (Owner only for most features)
+  // Check if user can edit (Owner and Branch Owner for their branch)
   const canEdit = () => {
-    return user?.role === 'Owner';
+    return ['Owner', 'Branch Owner'].includes(user?.role);
   };
 
   // Check if user can edit products/services (Owner, Manager, and Branch Owner)
@@ -376,9 +376,9 @@ export const AppProvider = ({ children }) => {
     return ['Owner', 'Manager', 'Receptionist'].includes(user?.role);
   };
 
-  // Check if user has management access (Owner or Manager)
+  // Check if user has management access (Owner, Manager, or Branch Owner)
   const hasManagementAccess = () => {
-    return ['Owner', 'Manager'].includes(user?.role);
+    return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
   };
 
   // Check if user is Branch Owner

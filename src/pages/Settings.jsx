@@ -14,7 +14,7 @@ import { authService } from '../services/supabase';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
 
 const Settings = () => {
-  const { showToast, user, canEdit, isOwner, hasManagementAccess } = useApp();
+  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess } = useApp();
 
   // Tab state for switching between Settings and Activity Logs
   const [activeTab, setActiveTab] = useState('settings');
@@ -954,8 +954,8 @@ const Settings = () => {
 
   // Handle payroll rate toggle
   const handlePayrollRateToggle = (rateKey) => {
-    if (!isOwner()) {
-      showToast('Only the owner can modify payroll settings', 'error');
+    if (!isOwner() && !isBranchOwner()) {
+      showToast('Only the owner or branch owner can modify payroll settings', 'error');
       return;
     }
     setPayrollConfig(prev => ({
@@ -969,8 +969,8 @@ const Settings = () => {
 
   // Handle payroll rate change
   const handlePayrollRateChange = (rateKey, value) => {
-    if (!isOwner()) {
-      showToast('Only the owner can modify payroll settings', 'error');
+    if (!isOwner() && !isBranchOwner()) {
+      showToast('Only the owner or branch owner can modify payroll settings', 'error');
       return;
     }
     const numValue = parseFloat(value) || 0;
@@ -985,8 +985,8 @@ const Settings = () => {
 
   // Save payroll configuration
   const handleSavePayrollConfig = async () => {
-    if (!isOwner()) {
-      showToast('Only the owner can modify payroll settings', 'error');
+    if (!isOwner() && !isBranchOwner()) {
+      showToast('Only the owner or branch owner can modify payroll settings', 'error');
       return;
     }
 
@@ -1013,8 +1013,8 @@ const Settings = () => {
 
   // Reset payroll configuration to defaults
   const handleResetPayrollConfig = () => {
-    if (!isOwner()) {
-      showToast('Only the owner can modify payroll settings', 'error');
+    if (!isOwner() && !isBranchOwner()) {
+      showToast('Only the owner or branch owner can modify payroll settings', 'error');
       return;
     }
     setResetConfirm(true);
@@ -1860,7 +1860,7 @@ const Settings = () => {
                 <h2>Payroll Settings</h2>
                 <p>Configure overtime, holiday, and night differential rates</p>
               </div>
-              {!isOwner() && (
+              {!isOwner() && !isBranchOwner() && (
                 <span className="settings-view-only-badge">View Only</span>
               )}
             </div>
@@ -1892,9 +1892,9 @@ const Settings = () => {
                           </div>
                           <div className="payroll-rate-toggle">
                             <div
-                              className={`toggle-switch ${config.enabled ? 'active' : ''} ${!isOwner() ? 'disabled' : ''}`}
-                              onClick={() => isOwner() && handlePayrollRateToggle(key)}
-                              title={!isOwner() ? 'Only owner can modify' : (config.enabled ? 'Disable rate' : 'Enable rate')}
+                              className={`toggle-switch ${config.enabled ? 'active' : ''} ${!isOwner() && !isBranchOwner() ? 'disabled' : ''}`}
+                              onClick={() => (isOwner() || isBranchOwner()) && handlePayrollRateToggle(key)}
+                              title={!isOwner() && !isBranchOwner() ? 'Only owner or branch owner can modify' : (config.enabled ? 'Disable rate' : 'Enable rate')}
                             />
                           </div>
                         </div>
@@ -1906,7 +1906,7 @@ const Settings = () => {
                                 type="number"
                                 value={config.rate}
                                 onChange={(e) => handlePayrollRateChange(key, e.target.value)}
-                                disabled={!config.enabled || !isOwner()}
+                                disabled={!config.enabled || (!isOwner() && !isBranchOwner())}
                                 min="0"
                                 max="10"
                                 step="0.01"
@@ -1930,7 +1930,7 @@ const Settings = () => {
                   </div>
 
                   {/* Action Buttons */}
-                  {isOwner() && (
+                  {(isOwner() || isBranchOwner()) && (
                     <div className="payroll-config-actions">
                       <button
                         className="btn btn-secondary"

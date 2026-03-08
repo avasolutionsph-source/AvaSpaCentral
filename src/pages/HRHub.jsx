@@ -16,7 +16,7 @@ import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
 const HRHub = () => {
-  const { isOwner, canEdit, canManageEmployees } = useApp();
+  const { isOwner, isBranchOwner, canEdit, canManageEmployees } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'employees';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -107,8 +107,8 @@ const HRHub = () => {
       badge: stats.pendingRequests > 0 ? stats.pendingRequests : null,
       badgeType: 'warning'
     },
-    // Only show Accounts tab to Owner
-    ...(isOwner() ? [{
+    // Only show Accounts tab to Owner and Branch Owner
+    ...((isOwner() || isBranchOwner()) ? [{
       id: 'accounts',
       label: 'Accounts',
       badge: stats.totalAccounts > 0 ? stats.totalAccounts : null,
@@ -162,7 +162,7 @@ const HRHub = () => {
               </>
             )}
             {/* Accounts Tab Button */}
-            {activeTab === 'accounts' && isOwner() && (
+            {activeTab === 'accounts' && (isOwner() || isBranchOwner()) && (
               <button
                 className="btn btn-primary"
                 onClick={() => accountsOpenCreateRef.current?.()}
@@ -198,7 +198,7 @@ const HRHub = () => {
         {activeTab === 'attendance' && <Attendance embedded onDataChange={loadStats} />}
         {activeTab === 'requests' && <HRRequests embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} onCalculateRef={payrollCalculateRef} onRemittancesRef={payrollRemittancesRef} onPayslipsRef={payrollPayslipsRef} />}
-        {activeTab === 'accounts' && isOwner() && <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />}
+        {activeTab === 'accounts' && (isOwner() || isBranchOwner()) && <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />}
       </div>
     </div>
   );

@@ -178,8 +178,8 @@ const Appointments = () => {
 
   const getAppointmentsForDate = (date) => {
     return appointments.filter(a => {
-      if (!a.dateTime) return false;
-      const apptDate = parseISO(a.dateTime);
+      if (!a.scheduledDateTime) return false;
+      const apptDate = parseISO(a.scheduledDateTime);
       return isSameDay(apptDate, date);
     });
   };
@@ -200,7 +200,7 @@ const Appointments = () => {
     setModalMode('edit');
     setSelectedAppointment(appointment);
     setConflicts({ therapist: null, room: null });
-    const apptDate = appointment.dateTime ? parseISO(appointment.dateTime) : new Date();
+    const apptDate = appointment.scheduledDateTime ? parseISO(appointment.scheduledDateTime) : new Date();
     setFormData({
       customerId: appointment.customerId || appointment.customer?._id || '',
       customerName: appointment.customerName || appointment.customer?.name || '',
@@ -263,7 +263,7 @@ const Appointments = () => {
         serviceId: formData.serviceId,
         employeeId: formData.employeeId,
         roomId: formData.roomId || undefined,
-        dateTime: `${formData.date}T${formData.time}:00`,
+        scheduledDateTime: `${formData.date}T${formData.time}:00`,
         duration: parseInt(formData.duration),
         bookingSource: formData.bookingSource,
         notes: formData.notes.trim() || undefined,
@@ -286,12 +286,17 @@ const Appointments = () => {
 
   // Cancellation Policy Configuration
   const getCancellationFee = (appointment) => {
-    if (!appointment.dateTime) return { fee: 0, percentage: 0, policy: 'Unknown' };
+    if (!appointment.scheduledDateTime) return { fee: 0, percentage: 0, policy: 'Unknown' };
 
-    const appointmentTime = parseISO(appointment.dateTime);
+    const appointmentTime = parseISO(appointment.scheduledDateTime);
     const now = new Date();
     const hoursUntilAppointment = (appointmentTime - now) / (1000 * 60 * 60);
     const servicePrice = appointment.service?.price || 0;
+
+    // Past appointments: treat as same-day cancellation (full fee)
+    if (hoursUntilAppointment < 0) {
+      return { fee: servicePrice, percentage: 100, policy: 'Full charge (past appointment time)' };
+    }
 
     if (hoursUntilAppointment > 24) {
       return { fee: 0, percentage: 0, policy: 'Free cancellation (>24 hours before)' };
@@ -438,7 +443,7 @@ const Appointments = () => {
                 <div className="calendar-appointments">
                   {dayAppts.slice(0, 3).map(appt => (
                     <div key={appt._id} className={`calendar-appointment-dot ${appt.status}`}>
-                      {format(parseISO(appt.dateTime), 'HH:mm')} {appt.customer?.name || 'Walk-in'}
+                      {format(parseISO(appt.scheduledDateTime), 'HH:mm')} {appt.customer?.name || 'Walk-in'}
                     </div>
                   ))}
                   {dayAppts.length > 3 && (
@@ -469,8 +474,8 @@ const Appointments = () => {
     return (
       <div className="appointments-list">
         {filtered.map(appointment => {
-          if (!appointment.dateTime) return null;
-          const apptDate = parseISO(appointment.dateTime);
+          if (!appointment.scheduledDateTime) return null;
+          const apptDate = parseISO(appointment.scheduledDateTime);
           return (
             <div key={appointment._id} className="appointment-card">
               <div className={`appointment-time-block ${appointment.status}`}>
@@ -701,7 +706,7 @@ const Appointments = () => {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Date *</label>
-                    <input type="date" name="date" value={formData.date} onChange={handleInputChange} className="form-control" required />
+                    <input type="date" name="date" value={formData.date} onChange={handleInputChange} className="form-control" required min={format(new Date(), 'yyyy-MM-dd')} />
                   </div>
                   <div className="form-group">
                     <label>Duration (min)</label>

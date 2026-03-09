@@ -114,12 +114,15 @@ const Expenses = ({ embedded = false, onDataChange }) => {
     notes: expense.notes || '',
     isRecurring: expense.isRecurring || false,
     recurringFrequency: expense.recurringFrequency || 'monthly',
-    receiptAttachment: expense.receiptAttachment || null
+    receiptAttachment: expense.receiptAttachment || null,
+    _originalBranchId: expense.branchId || null
   }), []);
 
   // Transform for submit
-  const transformForSubmit = useCallback((data) => {
+  const transformForSubmit = useCallback((data, mode) => {
     const branchId = getUserBranchId();
+    // During edit, preserve the original branchId if the current user has no branch (e.g., Owner role)
+    const effectiveBranchId = branchId || (mode === 'edit' ? data._originalBranchId : null);
     return {
       date: data.date,
       category: data.category,
@@ -132,7 +135,7 @@ const Expenses = ({ embedded = false, onDataChange }) => {
       isRecurring: data.isRecurring,
       recurringFrequency: data.isRecurring ? data.recurringFrequency : undefined,
       receiptAttachment: data.receiptAttachment || undefined,
-      ...(branchId && { branchId })
+      ...(effectiveBranchId && { branchId: effectiveBranchId })
     };
   }, [getUserBranchId]);
 
@@ -239,6 +242,10 @@ const Expenses = ({ embedded = false, onDataChange }) => {
         const toDate = parseISO(filterDateTo);
         return isWithinInterval(expenseDate, { start: fromDate, end: toDate });
       });
+    } else if (filterDateFrom) {
+      filtered = filtered.filter(e => parseISO(e.date) >= parseISO(filterDateFrom));
+    } else if (filterDateTo) {
+      filtered = filtered.filter(e => parseISO(e.date) <= parseISO(filterDateTo));
     }
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();

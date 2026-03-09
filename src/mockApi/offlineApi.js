@@ -126,7 +126,8 @@ export const appointmentsApi = {
   createAppointment: appointmentsAdapter.createAppointment,
   updateAppointment: appointmentsAdapter.updateAppointment,
   deleteAppointment: appointmentsAdapter.deleteAppointment,
-  updateStatus: appointmentsAdapter.updateStatus
+  updateStatus: appointmentsAdapter.updateStatus,
+  checkAvailability: appointmentsAdapter.checkAvailability
 };
 
 export const giftCertificatesApi = {

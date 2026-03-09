@@ -102,6 +102,9 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
         endDate = endOfMonth(today);
         break;
       case 'custom':
+        if (!customStartDate || !customEndDate) {
+          showToast('Custom date range is empty — defaulting to full month', 'warning');
+        }
         startDate = customStartDate ? parseISO(customStartDate) : startOfMonth(today);
         endDate = customEndDate ? parseISO(customEndDate) : endOfMonth(today);
         break;

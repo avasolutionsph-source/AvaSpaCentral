@@ -9,6 +9,7 @@ import { formatTimeRange } from '../utils/dateUtils';
 import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
 import CashDrawerHistoryTab from './CashDrawerHistory';
+import { SettingsRepository } from '../services/storage/repositories';
 import '../assets/css/pos.css';
 
 const POS = () => {
@@ -77,6 +78,9 @@ const POS = () => {
   // Clear cart confirmation state
   const [clearCartConfirm, setClearCartConfirm] = useState(false);
 
+  // Tax settings loaded from SettingsRepository
+  const [taxSettings, setTaxSettings] = useState([]);
+
   // Scheduled employees for advance booking (based on selected date)
   const [scheduledEmployees, setScheduledEmployees] = useState([]);
 
@@ -131,8 +135,20 @@ const POS = () => {
       }
     };
 
+    const loadTaxSettings = async () => {
+      try {
+        const savedTaxSettings = await SettingsRepository.get('taxSettings');
+        if (isMounted && savedTaxSettings) {
+          setTaxSettings(savedTaxSettings);
+        }
+      } catch (error) {
+        // Use default (no tax) if settings can't be loaded
+      }
+    };
+
     loadData();
     loadQueue();
+    loadTaxSettings();
 
     // Cleanup function to prevent memory leaks
     return () => {
@@ -150,17 +166,20 @@ const POS = () => {
         mockApi.rooms.getRooms()
       ]);
 
+      // Filter out products marked as hidden from POS
+      const visibleProducts = productsData.filter(p => !p.hideFromPOS);
+
       // Filter by branch
       const userBranchId = getUserBranchId();
       const branchFilter = (item) => !userBranchId || !item.branchId || item.branchId === userBranchId;
 
-      setProducts(productsData.filter(branchFilter));
+      setProducts(visibleProducts.filter(branchFilter));
       setEmployees(employeesData.filter(branchFilter));
       setCustomers(customersData.filter(branchFilter));
       setRooms(roomsData.filter(branchFilter));
 
-      // Extract unique categories
-      const uniqueCategories = [...new Set(productsData.filter(branchFilter).map(p => p.category))];
+      // Extract unique categories from visible products only
+      const uniqueCategories = [...new Set(visibleProducts.filter(branchFilter).map(p => p.category))];
       setCategories(uniqueCategories);
 
       setLoading(false);
@@ -360,9 +379,17 @@ const POS = () => {
     return discountValue;
   }, [cartSubtotal, discountType, discountValue, appliedGC]);
 
+  const taxAmount = useMemo(() => {
+    if (!taxSettings || taxSettings.length === 0) return 0;
+    const afterDiscount = cartSubtotal - discount;
+    return taxSettings
+      .filter(tax => tax.enabled)
+      .reduce((sum, tax) => sum + (afterDiscount * tax.rate / 100), 0);
+  }, [cartSubtotal, discount, taxSettings]);
+
   const total = useMemo(() => {
-    return cartSubtotal - discount;
-  }, [cartSubtotal, discount]);
+    return cartSubtotal - discount + taxAmount;
+  }, [cartSubtotal, discount, taxAmount]);
 
   const change = useMemo(() => {
     if (paymentMethod !== 'Cash') return 0;
@@ -528,7 +555,8 @@ const POS = () => {
           customerData = newCustomer;
           showToast('Customer saved to database', 'success');
         } catch (error) {
-          // Continue with transaction even if customer save fails
+          console.error('Failed to save customer:', error);
+          showToast('Customer could not be saved, continuing with transaction', 'warning');
         }
       }
 
@@ -544,8 +572,8 @@ const POS = () => {
         // Generate transaction ID (local date)
         const now = new Date();
         const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-        const sequence = Math.floor(Math.random() * 9999) + 1;
-        const transactionId = `txn_adv_${today}_${sequence.toString().padStart(4, '0')}`;
+        const sequence = Date.now().toString().slice(-6) + Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const transactionId = `txn_adv_${today}_${sequence}`;
 
         // Get room details if applicable (use consolidated room state)
         let roomName = null;
@@ -594,6 +622,7 @@ const POS = () => {
           clientPhone: clientPhone,
           clientEmail: clientEmail,
           clientAddress: isHomeService ? homeServiceAddress : clientAddress,
+          ...(getUserBranchId() && { branchId: getUserBranchId() }),
           paymentMethod: paymentMethod,
           paymentTiming: advanceBookingData.paymentTiming,
           paymentStatus: advanceBookingData.paymentTiming === 'pay-now' ? 'paid' : 'pending',
@@ -611,8 +640,8 @@ const POS = () => {
         // Generate receipt number (local date)
         const nowDate = new Date();
         const todayStr = `${nowDate.getFullYear()}${String(nowDate.getMonth() + 1).padStart(2, '0')}${String(nowDate.getDate()).padStart(2, '0')}`;
-        const sequence = Math.floor(Math.random() * 9999) + 1;
-        const receiptNumber = `RCP-${todayStr}-${sequence.toString().padStart(4, '0')}`;
+        const sequence = Date.now().toString().slice(-6) + Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const receiptNumber = `RCP-${todayStr}-${sequence}`;
 
         // Calculate commission (handle missing commission data)
         const commissionAmount = cart.reduce((sum, item) => {
@@ -641,7 +670,7 @@ const POS = () => {
           subtotal: getCartSubtotal(),
           discount: getDiscount(),
           discountType: discountType,
-          tax: 0,
+          tax: taxAmount,
           totalAmount: getTotal(),
           paymentMethod: paymentMethod,
           amountReceived: paymentMethod === 'Cash' ? parseFloat(amountReceived) : getTotal(),
@@ -691,7 +720,8 @@ const POS = () => {
             const gcDiscount = getDiscount();
             await mockApi.giftCertificates.redeemGiftCertificate(appliedGC.code, gcDiscount);
           } catch (error) {
-            // Continue anyway - transaction already saved
+            console.error('Gift certificate redemption failed:', error);
+            showToast('Transaction saved but gift certificate redemption failed. Please redeem manually.', 'warning');
           }
         }
 
@@ -746,7 +776,8 @@ const POS = () => {
               customerEmail: customerEmail
             });
           } catch (error) {
-            // Continue anyway - transaction already saved
+            console.error('Failed to update room/home service status:', error);
+            showToast('Room status could not be updated', 'warning');
           }
         }
 
@@ -795,7 +826,8 @@ const POS = () => {
               transactionId: receiptNumber
             });
           } catch (error) {
-            // Continue anyway - transaction already saved
+            console.error('Failed to update room/home service status:', error);
+            showToast('Room status could not be updated', 'warning');
           }
         }
       }
@@ -1019,6 +1051,12 @@ const POS = () => {
                       'Promo'
                     }):</span>
                     <span>-₱{getDiscount().toLocaleString()}</span>
+                  </div>
+                )}
+                {taxAmount > 0 && (
+                  <div className="summary-row">
+                    <span>Tax ({taxSettings.filter(t => t.enabled).map(t => `${t.name} ${t.rate}%`).join(' + ')}):</span>
+                    <span>₱{taxAmount.toLocaleString()}</span>
                   </div>
                 )}
                 <div className="summary-row total">
@@ -1690,6 +1728,22 @@ const POS = () => {
                   <div className="checkout-total">
                     <strong>Subtotal:</strong>
                     <strong>₱{getCartSubtotal().toLocaleString()}</strong>
+                  </div>
+                  {discountType && (
+                    <div className="checkout-total">
+                      <span>Discount:</span>
+                      <span>-₱{getDiscount().toLocaleString()}</span>
+                    </div>
+                  )}
+                  {taxAmount > 0 && (
+                    <div className="checkout-total">
+                      <span>Tax:</span>
+                      <span>₱{taxAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="checkout-total">
+                    <strong>Total:</strong>
+                    <strong>₱{getTotal().toLocaleString()}</strong>
                   </div>
                 </div>
               </div>

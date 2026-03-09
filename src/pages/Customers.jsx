@@ -33,6 +33,8 @@ const Customers = () => {
   // Delete confirmation dialog state
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, customer: null });
 
+  const [pointsHistoryCache, setPointsHistoryCache] = useState({});
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -325,8 +327,6 @@ const Customers = () => {
     }
   };
 
-  const [pointsHistoryCache, setPointsHistoryCache] = useState({});
-
   const loadPointsHistory = useCallback(async (customerId) => {
     try {
       // Check if we already have it cached
@@ -365,7 +365,7 @@ const Customers = () => {
     } catch (error) {
       return [];
     }
-  }, [pointsHistoryCache]);
+  }, []);
 
   const getPointsHistory = (customerId) => {
     // Return cached data or empty array (will be loaded async)

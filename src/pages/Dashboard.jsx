@@ -202,20 +202,31 @@ const Dashboard = () => {
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-      // Fetch all data
-      let [todaySummary, weekSummary, monthSummary, transactions, appointments, attendance, products, rooms, pendingRevenueData, todaysBookingsCount] =
-        await Promise.all([
-          mockApi.transactions.getRevenueSummary('today'),
-          mockApi.transactions.getRevenueSummary('week'),
-          mockApi.transactions.getRevenueSummary('month'),
-          mockApi.transactions.getTransactions({ limit: 10 }),
-          mockApi.appointments.getAppointments({ date: today }),
-          mockApi.attendance.getAttendance({ date: today }),
-          mockApi.products.getProducts(),
-          mockApi.rooms.getRooms(),
-          mockApi.advanceBooking.getPendingRevenue(),
-          mockApi.advanceBooking.getTodaysBookingsCount()
-        ]);
+      // Fetch all data - use allSettled so one failure doesn't break everything
+      const results = await Promise.allSettled([
+        mockApi.transactions.getRevenueSummary('today'),
+        mockApi.transactions.getRevenueSummary('week'),
+        mockApi.transactions.getRevenueSummary('month'),
+        mockApi.transactions.getTransactions({ limit: 10 }),
+        mockApi.appointments.getAppointments({ date: today }),
+        mockApi.attendance.getAttendance({ date: today }),
+        mockApi.products.getProducts(),
+        mockApi.rooms.getRooms(),
+        mockApi.advanceBooking.getPendingRevenue(),
+        mockApi.advanceBooking.getTodaysBookingsCount()
+      ]);
+
+      const val = (i, fallback) => results[i].status === 'fulfilled' ? results[i].value : fallback;
+      let todaySummary = val(0, { totalRevenue: 0, averageTransaction: 0, totalTransactions: 0 });
+      let weekSummary = val(1, { totalRevenue: 0 });
+      let monthSummary = val(2, { totalRevenue: 0 });
+      let transactions = val(3, []);
+      let appointments = val(4, []);
+      let attendance = val(5, []);
+      let products = val(6, []);
+      let rooms = val(7, []);
+      let pendingRevenueData = val(8, { total: 0 });
+      let todaysBookingsCount = val(9, 0);
 
       // Filter data by branch
       const userBranchId = getUserBranchId();
@@ -283,15 +294,17 @@ const Dashboard = () => {
   };
 
   const calculateAttendanceRate = (attendance) => {
+    if (!attendance || !Array.isArray(attendance)) return 0;
     const present = attendance.filter(a => a.status === 'present').length;
     const total = attendance.length;
     return total > 0 ? Math.round((present / total) * 100) : 0;
   };
 
   const calculateInventoryValue = (products) => {
+    if (!products || !Array.isArray(products)) return 0;
     return products
       .filter(p => p.type === 'product')
-      .reduce((sum, p) => sum + (p.stock * p.cost || 0), 0);
+      .reduce((sum, p) => sum + ((p.stock || 0) * (p.cost || 0)), 0);
   };
 
   // Memoized AI Insights - only recalculates when dependencies change
@@ -304,7 +317,7 @@ const Dashboard = () => {
     const pendingRevenueData = { total: pendingRevenue };
 
     // 1. Revenue Performance & Trend Analysis
-    const revenueGrowth = ((kpiData.financial.weekRevenue / 7) / dailyGoal) * 100;
+    const revenueGrowth = dailyGoal > 0 ? ((kpiData.financial.weekRevenue / 7) / dailyGoal) * 100 : 0;
     const monthlyProjection = (kpiData.financial.weekRevenue / 7) * 30;
 
     if (revenueGrowth >= 120) {
@@ -545,7 +558,7 @@ const Dashboard = () => {
     const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
     const dayOfMonth = today.getDate();
     const monthProgress = (dayOfMonth / daysInMonth) * 100;
-    const revenueProgress = (kpiData.financial.monthRevenue / (dailyGoal * daysInMonth)) * 100;
+    const revenueProgress = dailyGoal > 0 ? (kpiData.financial.monthRevenue / (dailyGoal * daysInMonth)) * 100 : 0;
 
     if (revenueProgress < monthProgress - 10) {
       insights.push({
@@ -732,7 +745,7 @@ const Dashboard = () => {
 
       transactions.forEach(t => {
         const time = new Date(t.date).toLocaleTimeString();
-        const items = t.items.map(i => i.name).join(' + ');
+        const items = (t.items || []).map(i => i.name).join(' + ');
         csv += `"${time}","${t.receiptNumber}","${items}","${t.employee?.name}","${t.customer?.name || 'Walk-in'}","${t.paymentMethod}","₱${t.subtotal}","₱${t.discount}","₱${t.totalAmount}"\n`;
       });
 
@@ -1136,7 +1149,7 @@ const Dashboard = () => {
                   <tr key={t._id}>
                     <td>{t.receiptNumber}</td>
                     <td>{new Date(t.date).toLocaleTimeString()}</td>
-                    <td>{t.customer.name}</td>
+                    <td>{t.customer?.name || 'Walk-in'}</td>
                     <td className="amount">₱{t.totalAmount.toLocaleString()}</td>
                     <td><span className="badge">{t.paymentMethod}</span></td>
                   </tr>

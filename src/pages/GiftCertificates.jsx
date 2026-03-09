@@ -159,6 +159,9 @@ const GiftCertificates = () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail)) { showToast('Invalid email format', 'error'); return false; }
     if (!formData.amount || parseFloat(formData.amount) <= 0) { showToast('Valid amount is required', 'error'); return false; }
     if (!formData.noExpiry && !formData.expiryDate) { showToast('Expiry date is required', 'error'); return false; }
+    if (!formData.noExpiry && formData.expiryDate && new Date(formData.expiryDate) < new Date(new Date().toDateString())) {
+      showToast('Expiry date cannot be in the past', 'error'); return false;
+    }
     return true;
   };
 

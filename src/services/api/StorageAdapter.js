@@ -793,6 +793,41 @@ export const appointmentsAdapter = {
     await delay();
     const appointment = await storageService.appointments.update(id, { status });
     return { success: true, appointment: clone(appointment) };
+  },
+
+  async checkAvailability({ therapistId, roomId, date, time, duration, excludeAppointmentId }) {
+    await delay();
+    const scheduledDateTime = `${date}T${time}:00`;
+    const conflicts = await storageService.appointments.checkConflicts(
+      therapistId, roomId, scheduledDateTime, duration, excludeAppointmentId
+    );
+
+    let therapistConflict = null;
+    let roomConflict = null;
+
+    for (const conflict of conflicts) {
+      if (therapistId && conflict.employeeId === therapistId && !therapistConflict) {
+        const conflictStart = new Date(conflict.scheduledDateTime);
+        therapistConflict = {
+          time: `${String(conflictStart.getHours()).padStart(2, '0')}:${String(conflictStart.getMinutes()).padStart(2, '0')}`,
+          therapistName: conflict.employee?.firstName ? `${conflict.employee.firstName} ${conflict.employee.lastName}` : 'Therapist',
+          serviceName: conflict.service?.name || 'Service',
+          customerName: conflict.customer?.name || 'Customer',
+          duration: conflict.duration || 60
+        };
+      }
+      if (roomId && conflict.roomId === roomId && !roomConflict) {
+        const conflictStart = new Date(conflict.scheduledDateTime);
+        roomConflict = {
+          time: `${String(conflictStart.getHours()).padStart(2, '0')}:${String(conflictStart.getMinutes()).padStart(2, '0')}`,
+          roomName: conflict.room?.name || 'Room',
+          serviceName: conflict.service?.name || 'Service',
+          duration: conflict.duration || 60
+        };
+      }
+    }
+
+    return { therapist: therapistConflict, room: roomConflict };
   }
 };
 

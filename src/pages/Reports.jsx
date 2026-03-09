@@ -233,12 +233,8 @@ const Reports = ({ embedded = false }) => {
       });
     });
 
-    // Normalize if totals don't match
-    if (serviceRevenue + productRevenue + gcRevenue === 0 && totalRevenue > 0) {
-      serviceRevenue = totalRevenue * 0.85;
-      productRevenue = totalRevenue * 0.10;
-      gcRevenue = totalRevenue * 0.05;
-    }
+    // If no item-level breakdown data is available, show zeros instead of fake estimates
+    // (revenue breakdown will be empty until transactions have item.type data)
 
     return {
       totalRevenue,
@@ -290,7 +286,7 @@ const Reports = ({ embedded = false }) => {
       roomUtilization[room.name] = {
         name: room.name,
         bookings: roomBookings.length,
-        utilization: Math.min(100, (roomBookings.length / differenceInDays(new Date(endDate), new Date(startDate))) * 10)
+        utilization: Math.min(100, (roomBookings.length / Math.max(1, differenceInDays(new Date(endDate), new Date(startDate)))) * 10)
       };
     });
 
@@ -371,7 +367,7 @@ const Reports = ({ embedded = false }) => {
       employeePerformance: Object.values(employeePerformance).sort((a, b) => b.revenue - a.revenue),
       totalEmployees: employees.length,
       activeEmployees: employees.filter(e => e.status === 'active').length,
-      avgAttendanceRate: Object.values(employeePerformance).reduce((sum, e) => sum + e.attendance, 0) / employees.length,
+      avgAttendanceRate: employees.length > 0 ? Object.values(employeePerformance).reduce((sum, e) => sum + e.attendance, 0) / employees.length : 0,
       topPerformer: Object.values(employeePerformance).sort((a, b) => b.revenue - a.revenue)[0]
     };
   };
@@ -392,7 +388,7 @@ const Reports = ({ embedded = false }) => {
           };
         }
         customerStats[t.customer.name].visits++;
-        customerStats[t.customer.name].spent += t.total;
+        customerStats[t.customer.name].spent += (t.totalAmount || t.total || 0);
         if (new Date(t.createdAt) > new Date(customerStats[t.customer.name].lastVisit)) {
           customerStats[t.customer.name].lastVisit = t.createdAt;
         }

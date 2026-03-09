@@ -10742,19 +10742,36 @@ a:focus:not(:focus-visible),
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  background: linear-gradient(135deg, #f8faf9 0%, #e8f0ec 100%);
+  justify-content: center;
+  background-color: #5a0a1a;
+  background-image: url('/Copy of Copy of Green and Orange Woman Musicians Facebook Cover.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   padding: 0;
+  position: relative;
+}
+
+.branch-select-overlay {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(60, 5, 18, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  padding: 40px 16px;
 }
 
 .branch-select-container {
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
   padding: 48px 40px;
   max-width: 560px;
   width: 100%;
-  margin: 40px auto;
 }
 
 .branch-select-header {
@@ -10763,33 +10780,36 @@ a:focus:not(:focus-visible),
 }
 
 .branch-select-header h1 {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: #3c0512;
   margin: 0 0 8px;
 }
 
 .branch-select-subtitle {
   font-size: 15px;
-  color: var(--color-text-muted);
+  color: #7a6068;
   margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 500;
 }
 
 .branch-select-user {
   text-align: center;
   font-size: 14px;
-  color: var(--color-text-muted);
+  color: #7a6068;
   margin-bottom: 28px;
   padding-bottom: 20px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid rgba(90, 10, 26, 0.12);
 }
 
 .branch-select-role {
   display: inline-block;
   margin-left: 8px;
   padding: 2px 10px;
-  background: rgba(27, 94, 55, 0.08);
-  color: var(--color-accent);
+  background: rgba(90, 10, 26, 0.08);
+  color: #7a1a2e;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
@@ -10807,10 +10827,10 @@ a:focus:not(:focus-visible),
   gap: 16px;
   padding: 16px 20px;
   background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border: 1px solid rgba(90, 10, 26, 0.1);
+  border-radius: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   text-align: left;
   width: 100%;
   font-family: inherit;
@@ -10818,10 +10838,10 @@ a:focus:not(:focus-visible),
 }
 
 .branch-card:hover {
-  border-color: var(--color-accent);
-  background: rgba(27, 94, 55, 0.02);
-  box-shadow: 0 2px 8px rgba(27, 94, 55, 0.1);
-  transform: translateY(-1px);
+  border-color: #7a1a2e;
+  background: rgba(90, 10, 26, 0.03);
+  box-shadow: 0 4px 16px rgba(90, 10, 26, 0.12);
+  transform: translateY(-2px);
 }
 
 .branch-card:active {
@@ -10835,8 +10855,8 @@ a:focus:not(:focus-visible),
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(27, 94, 55, 0.08);
-  color: var(--color-accent);
+  background: linear-gradient(135deg, #5a0a1a 0%, #7a1a2e 100%);
+  color: #fff;
   border-radius: 12px;
 }
 
@@ -10848,14 +10868,14 @@ a:focus:not(:focus-visible),
 .branch-card-info h3 {
   font-size: 16px;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: #2d0a12;
   margin: 0 0 2px;
 }
 
 .branch-card-address,
 .branch-card-city {
   font-size: 13px;
-  color: var(--color-text-muted);
+  color: #7a6068;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -10864,26 +10884,26 @@ a:focus:not(:focus-visible),
 
 .branch-card-arrow {
   flex-shrink: 0;
-  color: var(--color-text-subtle);
-  transition: transform 0.2s ease;
+  color: #b0949a;
+  transition: all 0.25s ease;
 }
 
 .branch-card:hover .branch-card-arrow {
-  color: var(--color-accent);
-  transform: translateX(2px);
+  color: #7a1a2e;
+  transform: translateX(3px);
 }
 
 .branch-select-footer {
   text-align: center;
   margin-top: 28px;
   padding-top: 20px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid rgba(90, 10, 26, 0.12);
 }
 
 .btn-link {
   background: none;
   border: none;
-  color: var(--color-text-muted);
+  color: #7a6068;
   font-size: 14px;
   cursor: pointer;
   padding: 4px 8px;
@@ -10892,7 +10912,7 @@ a:focus:not(:focus-visible),
 }
 
 .btn-link:hover {
-  color: var(--color-text-primary);
+  color: #3c0512;
 }
 
 .branch-select-loading {
@@ -10902,7 +10922,7 @@ a:focus:not(:focus-visible),
 
 .branch-select-loading p {
   margin-top: 16px;
-  color: var(--color-text-muted);
+  color: #7a6068;
 }
 
 .branch-select-error {
@@ -10911,7 +10931,7 @@ a:focus:not(:focus-visible),
 }
 
 .branch-select-error p {
-  color: var(--color-text-muted);
+  color: #7a6068;
   margin-bottom: 16px;
 }
 
@@ -10982,9 +11002,13 @@ a:focus:not(:focus-visible),
 }
 
 @media (max-width: 480px) {
+  .branch-select-overlay {
+    padding: 24px 12px;
+  }
+
   .branch-select-container {
     padding: 32px 24px;
-    margin: 24px auto;
+    border-radius: 16px;
   }
 
   .branch-select-header h1 {
@@ -10992,58 +11016,13 @@ a:focus:not(:focus-visible),
   }
 }
 
-/* ============================================================
-   Branch Select Hero (Cover Photo + Logo)
-   ============================================================ */
-.branch-select-hero {
-  width: 100%;
-  min-height: 220px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.branch-select-hero-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.branch-select-hero-logo {
-  max-height: 80px;
-  max-width: 260px;
-  width: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.45));
-  position: relative;
-  z-index: 1;
-}
-
 .branch-select-header-logo {
-  max-height: 60px;
-  max-width: 220px;
+  max-height: 70px;
+  max-width: 240px;
   width: auto;
   object-fit: contain;
-  margin: 0 auto 12px;
+  margin: 0 auto 16px;
   display: block;
-}
-
-@media (max-width: 640px) {
-  .branch-select-hero {
-    min-height: 160px;
-  }
-  .branch-select-hero-logo {
-    max-height: 60px;
-    max-width: 180px;
-  }
 }
 
 /* ============================================================

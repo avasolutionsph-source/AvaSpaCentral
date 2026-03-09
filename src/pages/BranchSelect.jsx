@@ -197,10 +197,12 @@ const BranchSelect = () => {
   if (loading) {
     return (
       <div className="branch-select-page">
-        <div className="branch-select-container">
-          <div className="branch-select-loading">
-            <div className="spinner"></div>
-            <p>Loading branches...</p>
+        <div className="branch-select-overlay">
+          <div className="branch-select-container">
+            <div className="branch-select-loading">
+              <div className="spinner"></div>
+              <p>Loading branches...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -210,16 +212,18 @@ const BranchSelect = () => {
   if (error) {
     return (
       <div className="branch-select-page">
-        <div className="branch-select-container">
-          <div className="branch-select-header">
-            <h1>Daet Massage & Spa</h1>
-            <p className="branch-select-subtitle">Something went wrong</p>
-          </div>
-          <div className="branch-select-error">
-            <p>{error}</p>
-            <button className="btn btn-primary" onClick={() => window.location.reload()}>
-              Try Again
-            </button>
+        <div className="branch-select-overlay">
+          <div className="branch-select-container">
+            <div className="branch-select-header">
+              <h1>Daet Massage & Spa</h1>
+              <p className="branch-select-subtitle">Something went wrong</p>
+            </div>
+            <div className="branch-select-error">
+              <p>{error}</p>
+              <button className="btn btn-primary" onClick={() => window.location.reload()}>
+                Try Again
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -229,16 +233,18 @@ const BranchSelect = () => {
   if (branches.length === 0) {
     return (
       <div className="branch-select-page">
-        <div className="branch-select-container">
-          <div className="branch-select-header">
-            <h1>Daet Massage & Spa</h1>
-            <p className="branch-select-subtitle">No branches available</p>
-          </div>
-          <div className="branch-select-error">
-            <p>No active branches found. Please try again later.</p>
-            <button className="btn btn-primary" onClick={() => window.location.reload()}>
-              Try Again
-            </button>
+        <div className="branch-select-overlay">
+          <div className="branch-select-container">
+            <div className="branch-select-header">
+              <h1>Daet Massage & Spa</h1>
+              <p className="branch-select-subtitle">No branches available</p>
+            </div>
+            <div className="branch-select-error">
+              <p>No active branches found. Please try again later.</p>
+              <button className="btn btn-primary" onClick={() => window.location.reload()}>
+                Try Again
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -246,71 +252,60 @@ const BranchSelect = () => {
   }
 
   return (
-    <div className="branch-select-page">
-      {/* Cover photo hero */}
-      {branding.coverPhotoUrl && (
-        <div
-          className="branch-select-hero"
-          style={{ backgroundImage: `url(${branding.coverPhotoUrl})` }}
-        >
-          <div className="branch-select-hero-overlay">
-            {branding.logoUrl && (
-              <img src={branding.logoUrl} alt="Logo" className="branch-select-hero-logo" />
+    <div className="branch-select-page" style={{ backgroundImage: `url('/Copy of Copy of Green and Orange Woman Musicians Facebook Cover.png')` }}>
+      <div className="branch-select-overlay">
+        <div className="branch-select-container">
+          <div className="branch-select-header">
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} alt="Logo" className="branch-select-header-logo" />
+            ) : (
+              <h1>Daet Massage &amp; Spa</h1>
             )}
+            <p className="branch-select-subtitle">Choose a branch</p>
           </div>
-        </div>
-      )}
 
-      <div className="branch-select-container">
-        <div className="branch-select-header">
-          {!branding.coverPhotoUrl && branding.logoUrl && (
-            <img src={branding.logoUrl} alt="Logo" className="branch-select-header-logo" />
+          {user && (
+            <div className="branch-select-user">
+              Welcome, <strong>{user.firstName} {user.lastName}</strong>
+              <span className="branch-select-role">{user.role}</span>
+            </div>
           )}
-          {!branding.logoUrl && <h1>Daet Massage &amp; Spa</h1>}
-          <p className="branch-select-subtitle">Choose a branch</p>
-        </div>
 
-        {user && (
-          <div className="branch-select-user">
-            Welcome, <strong>{user.firstName} {user.lastName}</strong>
-            <span className="branch-select-role">{user.role}</span>
+          <div className="branch-select-grid">
+            {branches.map((branch) => (
+              <button
+                key={branch.id}
+                className="branch-card"
+                onClick={() => handleSelectBranch(branch)}
+              >
+                <div className="branch-card-icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </div>
+                <div className="branch-card-info">
+                  <h3>{branch.name}</h3>
+                  {branch.address && <p className="branch-card-address">{branch.address}</p>}
+                  {branch.city && <p className="branch-card-city">{branch.city}</p>}
+                </div>
+                <span className="branch-card-arrow">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </span>
+              </button>
+            ))}
           </div>
-        )}
 
-        <div className="branch-select-grid">
-          {branches.map((branch) => (
-            <button
-              key={branch.id}
-              className="branch-card"
-              onClick={() => handleSelectBranch(branch)}
-            >
-              <div className="branch-card-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              </div>
-              <div className="branch-card-info">
-                <h3>{branch.name}</h3>
-                {branch.address && <p className="branch-card-address">{branch.address}</p>}
-                {branch.city && <p className="branch-card-city">{branch.city}</p>}
-              </div>
-              <span className="branch-card-arrow">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </span>
-            </button>
-          ))}
+          {user && (
+            <div className="branch-select-footer">
+              <button className="btn-link" onClick={handleLogout} disabled={loggingOut}>
+                {loggingOut ? 'Logging out...' : 'Sign out'}
+              </button>
+            </div>
+          )}
         </div>
-
-        {user && (
-          <div className="branch-select-footer">
-            <button className="btn-link" onClick={handleLogout} disabled={loggingOut}>
-              {loggingOut ? 'Logging out...' : 'Sign out'}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -46,28 +46,31 @@ export default defineConfig(({ mode }) => ({
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api/],
         // Runtime caching strategies
+        // Skip waiting so new SW activates immediately
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
-            // Cache JS chunks (for any dynamically imported chunks not in precache)
+            // Cache JS chunks - use StaleWhileRevalidate so updates are fetched in background
             urlPattern: /\.js$/i,
-            handler: 'CacheFirst',
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'js-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
               }
             }
           },
           {
-            // Cache CSS files
+            // Cache CSS files - use StaleWhileRevalidate so updates are fetched in background
             urlPattern: /\.css$/i,
-            handler: 'CacheFirst',
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'css-cache',
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
               }
             }
           },
@@ -87,9 +90,9 @@ export default defineConfig(({ mode }) => ({
             }
           },
           {
-            // Cache images
+            // Cache images - StaleWhileRevalidate so new images appear on next visit
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
-            handler: 'CacheFirst',
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'images-cache',
               expiration: {

@@ -24,7 +24,7 @@ const Modal = ({
   // Handle escape key
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape') {
-      onClose();
+      onClose?.();
     }
 
     // Focus trap
@@ -85,7 +85,7 @@ const Modal = ({
 
   const handleOverlayClick = (e) => {
     if (closeOnOverlay && e.target === e.currentTarget) {
-      onClose();
+      onClose?.();
     }
   };
 

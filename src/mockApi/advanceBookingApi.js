@@ -125,7 +125,7 @@ export const advanceBookingApi = {
     if (!booking) throw new Error('Booking not found');
 
     // Use repository for event-driven sync
-    const updatedBooking = await AdvanceBookingRepository.checkIn(bookingId);
+    const updatedBooking = await AdvanceBookingRepository.checkIn(bookingId, 'system');
 
     // Create active service using repository
     const activeService = await ActiveServiceRepository.startFromBooking({
@@ -140,7 +140,7 @@ export const advanceBookingApi = {
       employeeName: booking.employeeName,
       transactionId: booking.transactionId,
       estimatedDuration: booking.estimatedDuration,
-      advanceBookingId: booking.id
+      advanceBookingId: booking._id
     });
 
     return { booking: clone(updatedBooking), activeService: clone(activeService) };
@@ -155,7 +155,7 @@ export const advanceBookingApi = {
     const now = new Date().toISOString();
 
     // Use repository for event-driven sync
-    const updatedBooking = await AdvanceBookingRepository.complete(bookingId, paymentData);
+    const updatedBooking = await AdvanceBookingRepository.complete(bookingId, 'system');
 
     // Find and complete active service using repository
     const activeServices = await ActiveServiceRepository.getByBooking(bookingId);
@@ -175,7 +175,7 @@ export const advanceBookingApi = {
       paymentStatus: 'completed',
       paymentTiming: booking.paymentTiming,
       isAdvanceBooking: true,
-      advanceBookingId: booking.id
+      advanceBookingId: booking._id
     };
 
     return { booking: clone(updatedBooking), transaction: clone(transaction), activeService: completedService ? clone(completedService) : null };
@@ -185,7 +185,7 @@ export const advanceBookingApi = {
     await delay(500);
     await initAdvanceBookings();
     // Use repository for event-driven sync
-    const updatedBooking = await AdvanceBookingRepository.cancel(bookingId, reason);
+    const updatedBooking = await AdvanceBookingRepository.cancel(bookingId, 'system', reason);
     return clone(updatedBooking);
   },
 

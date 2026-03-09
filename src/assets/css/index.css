@@ -152,9 +152,9 @@
   --z-base: 0;
   --z-dropdown: 100;
   --z-sticky: 200;
-  --z-modal: 300;
-  --z-toast: 400;
-  --z-tooltip: 500;
+  --z-modal: 1050;
+  --z-toast: 1100;
+  --z-tooltip: 1150;
 }
 
 /* ============================================================================
@@ -1082,7 +1082,7 @@ select {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s, visibility 0.2s;
-  z-index: 1000;
+  z-index: var(--z-tooltip);
   pointer-events: none;
   margin-left: 0.5rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -1517,7 +1517,7 @@ select {
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  z-index: var(--z-dropdown);
   overflow: hidden;
   animation: dropdownFadeIn 0.2s ease;
 }
@@ -10575,7 +10575,7 @@ a:focus:not(:focus-visible),
   top: 0;
   left: 0;
   right: 0;
-  z-index: 9999;
+  z-index: var(--z-toast);
   pointer-events: none;
 }
 

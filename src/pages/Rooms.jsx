@@ -503,7 +503,8 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                   });
                   showToast(`${room.name} service completed and payment recorded`, 'success');
                 } catch (bookingError) {
-                  // Silent fail for booking completion
+                  console.error(`Failed to process pay-after booking for ${room.name}:`, bookingError);
+                  showToast(`${room.name} service completed but payment recording failed. Please process manually.`, 'warning');
                 }
               }
 
@@ -604,7 +605,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   // Handle starting a service from booking
   const handleStartService = async (booking) => {
     try {
-      await mockApi.advanceBooking.startServiceFromBooking(booking.id);
+      await mockApi.advanceBooking.startServiceFromBooking(booking._id || booking.id);
       const bookingTime = new Date(booking.bookingDateTime);
       const now = new Date();
       if (now < bookingTime) {
@@ -950,17 +951,21 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                 )}
 
                 {/* Countdown timer for occupied rooms */}
-                {room.status === 'occupied' && getRemainingTime(room) && (
-                  <div className={`room-timer ${getRemainingTime(room).isCritical ? 'critical' : ''}`}>
-                    {getRemainingTime(room).isExpired ? (
-                      <span>Time's up!</span>
-                    ) : (
-                      <span>
-                        {getRemainingTime(room).minutes}:{String(getRemainingTime(room).seconds).padStart(2, '0')} remaining
-                      </span>
-                    )}
-                  </div>
-                )}
+                {room.status === 'occupied' && (() => {
+                  const timer = getRemainingTime(room);
+                  if (!timer) return null;
+                  return (
+                    <div className={`room-timer ${timer.isCritical ? 'critical' : ''}`}>
+                      {timer.isExpired ? (
+                        <span>Time's up!</span>
+                      ) : (
+                        <span>
+                          {timer.minutes}:{String(timer.seconds).padStart(2, '0')} remaining
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Status change buttons - only for admin/manager/receptionist */}
                 {!isTherapist() && (
@@ -1126,7 +1131,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
           <h3>Upcoming Advance Bookings</h3>
           <div className="upcoming-bookings-grid">
             {upcomingBookings.map(booking => (
-              <div key={booking.id} className="upcoming-booking-card">
+              <div key={booking._id || booking.id} className="upcoming-booking-card">
                 <div className="booking-card-header">
                   <span className="room-badge">{booking.roomName}</span>
                   <span className={`status-badge ${booking.status}`}>

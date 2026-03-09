@@ -462,12 +462,11 @@ const BookingPage = () => {
         .insert([bookingData]);
 
       if (insertError) {
-        // If table doesn't exist, show a message
+        // If table doesn't exist, show error instead of false success
         if (insertError.code === '42P01') {
-          console.error('online_bookings table not found');
-          // For now, just show success (we'll create the table later)
-          setBookingReference(reference);
-          setBookingSuccess(true);
+          console.error('online_bookings table not found. Please create the table in Supabase.');
+          alert('Online booking is temporarily unavailable. Please contact the business directly to book your appointment.');
+          return;
         } else {
           throw insertError;
         }

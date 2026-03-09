@@ -78,11 +78,16 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       const storedHistory = localStorage.getItem('stockHistory');
       if (storedHistory) {
         const parsed = JSON.parse(storedHistory);
-        // Migrate using repository (triggers sync events)
+        // Migrate using repository (triggers sync events), skip duplicates
         for (const entry of parsed) {
+          const entryId = entry.id || entry._id;
+          if (entryId) {
+            const existing = await StockHistoryRepository.getById(entryId);
+            if (existing) continue;
+          }
           await StockHistoryRepository.create({
             ...entry,
-            _id: entry.id || entry._id
+            _id: entryId
           });
         }
         localStorage.removeItem('stockHistory');
@@ -246,12 +251,11 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       // Persist stock history using repository (event-driven sync)
       await StockHistoryRepository.addAdjustment(
         selectedProduct._id,
-        selectedProduct.name,
-        adjustmentType === 'add' ? quantity : -quantity,
         selectedProduct.stock,
         newStock,
+        'adjustment',
         adjustmentReason,
-        'Current User'
+        { userName: 'Current User' }
       );
       setStockHistory([historyEntry, ...stockHistory]);
 
@@ -366,13 +370,9 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       for (const entry of newHistoryEntries) {
         await StockHistoryRepository.addPurchase(
           entry.productId,
-          entry.productName,
-          entry.quantity,
           entry.oldStock,
-          entry.newStock,
-          entry.cost,
-          entry.reason,
-          'Current User'
+          entry.quantity,
+          { userName: 'Current User', reason: entry.reason }
         );
       }
       setStockHistory([...newHistoryEntries, ...stockHistory]);

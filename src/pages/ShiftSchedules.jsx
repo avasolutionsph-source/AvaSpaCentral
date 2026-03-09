@@ -230,7 +230,7 @@ const ShiftSchedules = () => {
         department: employee.department,
         weeklySchedule: defaultWeeklySchedule,
         isActive: true,
-        effectiveFrom: format(weekStart, 'yyyy-MM-dd'),
+        effectiveDate: format(weekStart, 'yyyy-MM-dd'),
         ...(branchId && { branchId })
       });
 

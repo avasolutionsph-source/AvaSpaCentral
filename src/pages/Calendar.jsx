@@ -120,11 +120,15 @@ const Calendar = () => {
         const endTime = format(endDate, 'HH:mm');
 
         return {
-          id: booking.id,
+          id: booking._id || booking.id,
           type: 'appointment',
           customer: booking.clientName,
+          customerId: booking.clientId || booking.customerId,
           service: booking.serviceName,
+          serviceId: booking.serviceId,
           therapist: booking.employeeName,
+          employeeId: booking.employeeId,
+          roomId: booking.roomId,
           date: booking.bookingDateTime,
           startTime,
           endTime,
@@ -399,11 +403,11 @@ const Calendar = () => {
     setSelectedEvent(event);
     const apptDate = parseISO(event.date);
 
-    // Find matching customer, service, employee, room by name
-    const matchedCustomer = customers.find(c => c.name === event.customer);
-    const matchedService = services.find(s => s.name === event.service);
-    const matchedEmployee = employees.find(e => `${e.firstName} ${e.lastName}` === event.therapist);
-    const matchedRoom = rooms.find(r => r.name === event.room);
+    // Match by stored ID first, fall back to name matching
+    const matchedCustomer = (event.customerId && customers.find(c => c._id === event.customerId)) || customers.find(c => c.name === event.customer);
+    const matchedService = (event.serviceId && services.find(s => s._id === event.serviceId)) || services.find(s => s.name === event.service);
+    const matchedEmployee = (event.employeeId && employees.find(e => e._id === event.employeeId)) || employees.find(e => `${e.firstName} ${e.lastName}` === event.therapist);
+    const matchedRoom = (event.roomId && rooms.find(r => r._id === event.roomId)) || rooms.find(r => r.name === event.room);
 
     setFormData({
       customerId: matchedCustomer?._id || '',

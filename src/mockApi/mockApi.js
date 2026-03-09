@@ -666,10 +666,9 @@ export const productConsumptionApi = {
     // Use repository for event-driven sync
     const log = await ProductConsumptionRepository.logConsumption(
       data.productId,
-      data.productName,
       data.quantityUsed,
-      data.servicesDone || 0,
-      data.note || ''
+      'service',
+      { notes: data.note || '', employeeId: data.employeeId }
     );
 
     return { success: true, log: clone(log) };
@@ -708,15 +707,15 @@ export const productConsumptionApi = {
 
     // Calculate averages
     const months = Object.values(monthlyData);
-    const avgServicesPerUnit = months.reduce((sum, m) => {
-      return sum + (m.totalServices / m.totalUnitsUsed);
-    }, 0) / months.length;
+    const avgServicesPerUnit = months.length > 0 ? months.reduce((sum, m) => {
+      return sum + (m.totalUnitsUsed > 0 ? m.totalServices / m.totalUnitsUsed : 0);
+    }, 0) / months.length : 0;
 
     // Detect anomalies
     const anomalies = [];
     months.forEach(m => {
-      const monthAvg = m.totalServices / m.totalUnitsUsed;
-      const deviation = Math.abs(monthAvg - avgServicesPerUnit) / avgServicesPerUnit;
+      const monthAvg = m.totalUnitsUsed > 0 ? m.totalServices / m.totalUnitsUsed : 0;
+      const deviation = avgServicesPerUnit > 0 ? Math.abs(monthAvg - avgServicesPerUnit) / avgServicesPerUnit : 0;
 
       if (deviation > 0.5) { // More than 50% deviation
         anomalies.push({
@@ -1089,7 +1088,7 @@ export const analyticsApi = {
       m.type === 'sale' && new Date(m.date) >= thirtyDaysAgo
     );
     const cogs30Days = recentSales.reduce((sum, m) =>
-      sum + (Math.abs(m.quantity) * m.unitCost), 0
+      sum + (Math.abs(m.quantity || 0) * (m.unitCost || 0)), 0
     );
 
     // Annualized turnover
@@ -1210,7 +1209,7 @@ export const analyticsApi = {
 
     // Average metrics
     const avgCLV = customerData.length > 0 ? totalCLV / customerData.length : 0;
-    const avgAOV = customerData.reduce((sum, c) => sum + c.avgOrderValue, 0) / customerData.length;
+    const avgAOV = customerData.length > 0 ? customerData.reduce((sum, c) => sum + c.avgOrderValue, 0) / customerData.length : 0;
 
     // Retention rate (simplified: customers with 2+ visits / total)
     const returningCustomers = customerData.filter(c => c.visitCount >= 2).length;
@@ -1304,13 +1303,13 @@ export const analyticsApi = {
     // Overall stats
     const totalOrders = orders.length;
     const onTimeTotal = orders.filter(o => o.isOnTime).length;
-    const avgDefectRate = supplierAnalysis.reduce((sum, s) => sum + parseFloat(s.defectRate), 0) / suppliers.length;
+    const avgDefectRate = suppliers.length > 0 ? supplierAnalysis.reduce((sum, s) => sum + parseFloat(s.defectRate), 0) / suppliers.length : 0;
 
     return {
       summary: {
         totalSuppliers: suppliers.length,
         totalOrders,
-        overallOnTimeRate: ((onTimeTotal / totalOrders) * 100).toFixed(1),
+        overallOnTimeRate: totalOrders > 0 ? ((onTimeTotal / totalOrders) * 100).toFixed(1) : '0.0',
         avgDefectRate: avgDefectRate.toFixed(2),
         totalSpent: orders.reduce((sum, o) => sum + o.totalAmount, 0)
       },
@@ -1507,7 +1506,7 @@ export const analyticsApi = {
 
     // Overall stats
     const totalAppointments = appointments.length;
-    const avgUtilization = roomData.reduce((sum, r) => sum + parseFloat(r.utilizationRate), 0) / rooms.length;
+    const avgUtilization = rooms.length > 0 ? roomData.reduce((sum, r) => sum + parseFloat(r.utilizationRate), 0) / rooms.length : 0;
     const totalRoomRevenue = roomData.reduce((sum, r) => sum + r.revenue, 0);
 
     // Hourly demand across all rooms

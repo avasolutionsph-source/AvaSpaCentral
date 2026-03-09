@@ -11,6 +11,7 @@ import db from '../db';
 import ActivityLogsTab from './ActivityLogs';
 import BranchesTab from './BranchesTab';
 import { authService } from '../services/supabase';
+import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
 
 const Settings = () => {
@@ -154,6 +155,11 @@ const Settings = () => {
   });
   const [testingConnection, setTestingConnection] = useState(false);
   const [syncOperation, setSyncOperation] = useState(null); // 'push' | 'pull' | 'sync'
+
+  // Parked Sync Items State
+  const [parkedItems, setParkedItems] = useState([]);
+  const [parkedLoading, setParkedLoading] = useState(false);
+  const [retryingId, setRetryingId] = useState(null);
 
   // Backup/Export State
   const [backupOperation, setBackupOperation] = useState(null); // 'export' | 'import'
@@ -1044,13 +1050,18 @@ const Settings = () => {
     // Load sync configuration
     loadSyncConfig();
 
+    // Load parked sync items
+    loadParkedItems();
+
     // Subscribe to sync status changes
     const unsubscribeSync = SyncManager.subscribe((status) => {
       if (status.type === 'sync_complete' || status.type === 'push_complete' || status.type === 'pull_complete') {
         loadSyncStatus();
+        loadParkedItems();
         setSyncOperation(null);
       } else if (status.type === 'sync_error' || status.type === 'push_error' || status.type === 'pull_error') {
         setSyncOperation(null);
+        loadParkedItems();
         showToast(status.error || 'Sync operation failed', 'error');
       }
     });
@@ -1302,6 +1313,50 @@ const Settings = () => {
     } finally {
       setSyncOperation(null);
       loadSyncStatus();
+    }
+  };
+
+  // Load parked sync items
+  const loadParkedItems = async () => {
+    setParkedLoading(true);
+    try {
+      const items = await supabaseSyncManager.getParkedItems();
+      setParkedItems(items);
+    } catch (error) {
+      console.error('Failed to load parked items:', error);
+    } finally {
+      setParkedLoading(false);
+    }
+  };
+
+  // Retry a single parked item
+  const handleRetryParkedItem = async (id) => {
+    setRetryingId(id);
+    try {
+      await supabaseSyncManager.retryParkedItem(id);
+      showToast('Item queued for retry', 'success');
+      await loadParkedItems();
+      await loadSyncStatus();
+    } catch (error) {
+      showToast('Failed to retry item: ' + error.message, 'error');
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  // Retry all parked items
+  const handleRetryAllParked = async () => {
+    try {
+      for (const item of parkedItems) {
+        if (item.id !== undefined) {
+          await supabaseSyncManager.retryParkedItem(item.id);
+        }
+      }
+      showToast(`${parkedItems.length} items queued for retry`, 'success');
+      await loadParkedItems();
+      await loadSyncStatus();
+    } catch (error) {
+      showToast('Failed to retry items: ' + error.message, 'error');
     }
   };
 
@@ -2594,6 +2649,98 @@ const Settings = () => {
 
               <div className="backup-warning-notice">
                 ⚠️ <strong>Warning:</strong> Importing a backup will replace all existing data. Make sure to export your current data first if needed.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sync Queue - Failed/Parked Items - Owner/Manager only */}
+        {hasManagementAccess() && parkedItems.length > 0 && (
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">⚠️</div>
+              <div className="settings-section-title">
+                <h2>Failed Sync Items</h2>
+                <p>{parkedItems.length} item{parkedItems.length !== 1 ? 's' : ''} failed to sync after 3 attempts and need attention</p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={loadParkedItems}
+                disabled={parkedLoading}
+              >
+                {parkedLoading ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
+            <div className="settings-section-body">
+              <div className="parked-items-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Operation</th>
+                      <th>Entity ID</th>
+                      <th>Error</th>
+                      <th>Retries</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parkedItems.map(item => (
+                      <tr key={item.id}>
+                        <td>
+                          <span className="badge badge-secondary">
+                            {item.entityType}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge ${
+                            item.operation === 'create' ? 'badge-success' :
+                            item.operation === 'update' ? 'badge-warning' :
+                            'badge-error'
+                          }`}>
+                            {item.operation}
+                          </span>
+                        </td>
+                        <td>
+                          <code style={{ fontSize: '0.75rem' }}>
+                            {item.entityId?.substring(0, 8)}...
+                          </code>
+                        </td>
+                        <td>
+                          <span className="parked-item-error" title={item.error}>
+                            {item.error?.substring(0, 60)}{item.error?.length > 60 ? '...' : ''}
+                          </span>
+                        </td>
+                        <td>{item.retryCount || 0}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-primary"
+                            onClick={() => handleRetryParkedItem(item.id)}
+                            disabled={retryingId === item.id}
+                          >
+                            {retryingId === item.id ? 'Retrying...' : 'Retry'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="parked-items-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleRetryAllParked}
+                  disabled={parkedItems.length === 0 || retryingId !== null}
+                >
+                  Retry All ({parkedItems.length})
+                </button>
+                <span className="parked-items-hint">
+                  Items will be re-queued and attempted on the next sync cycle
+                </span>
               </div>
             </div>
           </div>

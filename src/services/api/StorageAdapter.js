@@ -1766,11 +1766,11 @@ export const homeServicesAdapter = {
     let updated;
 
     if (status === 'occupied') {
-      updated = await HomeServiceRepository.startService(id);
+      updated = await HomeServiceRepository.startService(id, timingData.startedBy || 'system');
     } else if (status === 'completed') {
-      updated = await HomeServiceRepository.completeService(id);
+      updated = await HomeServiceRepository.completeService(id, timingData.completedBy || 'system', timingData.notes || '');
     } else if (status === 'cancelled') {
-      updated = await HomeServiceRepository.cancelService(id, timingData.reason);
+      updated = await HomeServiceRepository.cancelService(id, timingData.cancelledBy || 'system', timingData.reason);
     } else {
       updated = await HomeServiceRepository.update(id, { status });
     }

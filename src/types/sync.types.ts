@@ -22,6 +22,7 @@ export interface SyncQueueItem {
   error?: string;
   lastAttempt?: string;
   startedAt?: string;
+  nextRetryAt?: string;
 }
 
 // Sync metadata per entity type
@@ -64,7 +65,8 @@ export interface SyncStatusUpdate {
     | 'pull_start'
     | 'pull_complete'
     | 'pull_error'
-    | 'realtime_update';
+    | 'realtime_update'
+    | 'items_parked';
   pushed?: number;
   pulled?: number;
   failed?: number;
@@ -72,6 +74,7 @@ export interface SyncStatusUpdate {
   processed?: number;
   total?: number;
   entityType?: string;
+  entityId?: string;
   eventType?: string;
   record?: Record<string, unknown>;
 }

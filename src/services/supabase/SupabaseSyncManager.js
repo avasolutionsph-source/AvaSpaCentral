@@ -287,7 +287,7 @@ class SupabaseSyncManager {
       eventDrivenDebounce: 500, // 500ms debounce for rapid changes
       batchSize: 50,
       conflictResolution: 'server-wins', // or 'last-write-wins'
-      maxRetries: 5,
+      maxRetries: 3,
       baseRetryDelay: 1000, // 1 second base delay for exponential backoff
     };
 
@@ -1118,12 +1118,23 @@ class SupabaseSyncManager {
         const backoffDelay = this.config.baseRetryDelay * Math.pow(2, newRetryCount - 1);
         const nextRetryAt = new Date(Date.now() + backoffDelay).toISOString();
 
+        const isParked = newRetryCount >= maxRetries;
         await db.syncQueue.update(item.id, {
-          status: newRetryCount >= maxRetries ? 'failed' : 'pending',
+          status: isParked ? 'failed' : 'pending',
           error: error.message,
           retryCount: newRetryCount,
-          nextRetryAt: newRetryCount < maxRetries ? nextRetryAt : null,
+          nextRetryAt: isParked ? null : nextRetryAt,
         });
+
+        if (isParked) {
+          this._notifyListeners({
+            type: 'items_parked',
+            entityType: item.entityType,
+            entityId: item.entityId,
+            error: error.message,
+          });
+        }
+
         failed++;
       }
     }
@@ -1137,6 +1148,20 @@ class SupabaseSyncManager {
   _shouldSkipDueToBackoff(item) {
     if (!item.nextRetryAt) return false;
     return new Date(item.nextRetryAt) > new Date();
+  }
+
+  /**
+   * Remove pending sync queue items for a specific entity
+   */
+  async _removePendingQueueItems(entityType, entityId) {
+    const items = await db.syncQueue
+      .filter(item => item.entityType === entityType && item.entityId === entityId)
+      .toArray();
+    for (const item of items) {
+      if (item.id !== undefined) {
+        await db.syncQueue.delete(item.id);
+      }
+    }
   }
 
   /**
@@ -1227,16 +1252,16 @@ class SupabaseSyncManager {
             const dexieRecord = this._toDexieFormat(record, entityType);
 
             if (record.deleted) {
-              // Handle soft delete - remove from local
+              // Handle soft delete - remove from local and clear any pending queue items
               await db[dexieTableName].delete(dexieRecord._id);
-            } else if (pendingDeleteIds.has(dexieRecord._id)) {
-              // Skip re-adding records that have a pending local delete
-              console.log(`[SupabaseSyncManager] Skipping pull for ${entityType}/${dexieRecord._id} - pending delete`);
-            } else if (pendingLocalIds.has(dexieRecord._id)) {
-              // Skip overwriting records that have pending local create/update
-              console.log(`[SupabaseSyncManager] Skipping pull for ${entityType}/${dexieRecord._id} - pending local changes`);
+              await this._removePendingQueueItems(entityType, dexieRecord._id);
             } else {
-              // Upsert to local database
+              // Server wins: if there are pending local changes, discard them
+              if (pendingDeleteIds.has(dexieRecord._id) || pendingLocalIds.has(dexieRecord._id)) {
+                console.log(`[SupabaseSyncManager] Server wins: overwriting local ${entityType}/${dexieRecord._id}`);
+                await this._removePendingQueueItems(entityType, dexieRecord._id);
+              }
+              // Upsert server data to local database
               await db[dexieTableName].put(dexieRecord);
             }
           }
@@ -1614,6 +1639,25 @@ class SupabaseSyncManager {
       console.log(`[SupabaseSyncManager] Auto-repair complete: ${repaired} records fixed`);
     }
     return { repaired, removed };
+  }
+
+  /**
+   * Get parked (permanently failed) sync items for admin review
+   */
+  async getParkedItems() {
+    return db.syncQueue.where('status').equals('failed').toArray();
+  }
+
+  /**
+   * Retry a specific parked item
+   */
+  async retryParkedItem(id) {
+    await db.syncQueue.update(id, {
+      status: 'pending',
+      retryCount: 0,
+      error: undefined,
+      nextRetryAt: undefined,
+    });
   }
 }
 

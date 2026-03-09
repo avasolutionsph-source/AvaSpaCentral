@@ -314,8 +314,11 @@ class MigrationService {
           this._transformRecord(record, businessId)
         );
 
-        // Insert in batches
+        // Insert in batches, with per-record fallback on batch failure
         const batchSize = 100;
+        let tableSuccessCount = 0;
+        const tableFailedRecords = [];
+
         for (let j = 0; j < transformedData.length; j += batchSize) {
           const batch = transformedData.slice(j, j + batchSize);
 
@@ -324,16 +327,51 @@ class MigrationService {
             .upsert(batch, { onConflict: 'id' });
 
           if (error) {
-            throw error;
+            // Batch failed — fall back to individual inserts
+            console.warn(`[MigrationService] Batch failed for ${table.dexie}, falling back to individual inserts:`, error.message);
+            for (const record of batch) {
+              const { error: individualError } = await supabase
+                .from(table.supabase)
+                .upsert([record], { onConflict: 'id' });
+              if (individualError) {
+                tableFailedRecords.push({
+                  id: record.id,
+                  error: individualError.message,
+                });
+              } else {
+                tableSuccessCount++;
+              }
+            }
+          } else {
+            tableSuccessCount += batch.length;
           }
         }
 
-        results.migratedTables++;
-        results.migratedRecords += localData.length;
-        this._progress.migratedCount += localData.length;
+        results.migratedRecords += tableSuccessCount;
+        this._progress.migratedCount += tableSuccessCount;
+
+        if (tableFailedRecords.length > 0) {
+          const summary = `Migrated ${tableSuccessCount}/${localData.length} records. ${tableFailedRecords.length} failed.`;
+          console.warn(`[MigrationService] ${table.dexie}: ${summary}`);
+          results.errors.push({
+            table: table.dexie,
+            error: summary,
+            failedRecords: tableFailedRecords,
+          });
+          this._progress.errorCount += tableFailedRecords.length;
+          this._progress.errors.push({
+            table: table.dexie,
+            error: summary,
+          });
+        }
+
+        if (tableSuccessCount > 0) {
+          results.migratedTables++;
+        }
+
         this._notify();
 
-        console.log(`[MigrationService] Successfully migrated ${localData.length} ${table.dexie} records`);
+        console.log(`[MigrationService] ${table.dexie}: ${tableSuccessCount}/${localData.length} records migrated`);
       } catch (error) {
         console.error(`[MigrationService] Failed to migrate ${table.dexie}:`, error);
         results.failedTables++;
@@ -362,10 +400,12 @@ class MigrationService {
     // Clear sync queue since all data is now in sync
     await db.syncQueue.clear();
 
-    this._progress.status = results.failedTables > 0 ? 'error' : 'complete';
+    const hasPartialFailures = results.errors.length > 0 && results.failedTables === 0;
+    this._progress.status = results.failedTables > 0 ? 'error' : (hasPartialFailures ? 'complete' : 'complete');
     this._notify();
 
     results.success = results.failedTables === 0;
+    results.hasPartialFailures = hasPartialFailures;
     console.log('[MigrationService] Migration complete:', results);
 
     return results;

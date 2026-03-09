@@ -42,6 +42,7 @@ const PageHeader = memo(function PageHeader({
     return (
       <button
         key={index}
+        type="button"
         className={`btn btn-${variant} ${actionClassName}`.trim()}
         onClick={onClick}
         disabled={disabled}
@@ -87,6 +88,7 @@ export const PageHeaderCompact = memo(function PageHeaderCompact({
       {title && <h2>{title}</h2>}
       {showAction && action && (
         <button
+          type="button"
           className={`btn btn-${action.variant || 'primary'}`}
           onClick={action.onClick}
           disabled={action.disabled}

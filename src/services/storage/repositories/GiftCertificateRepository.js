@@ -12,7 +12,8 @@ class GiftCertificateRepository extends BaseRepository {
    * Get by code
    */
   async getByCode(code) {
-    return this.findOne(gc => gc.code.toUpperCase() === code.toUpperCase());
+    if (!code) return null;
+    return this.findOne(gc => gc.code?.toUpperCase() === code.toUpperCase());
   }
 
   /**

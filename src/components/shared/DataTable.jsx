@@ -92,7 +92,7 @@ const DataTable = memo(function DataTable({
         <tbody>
           {data.map((row, rowIndex) => (
             <tr
-              key={getRowKey(row)}
+              key={getRowKey(row) || rowIndex}
               className={`${onRowClick ? 'clickable-row' : ''} ${rowClassName ? rowClassName(row) : ''}`.trim()}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >

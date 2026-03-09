@@ -14,6 +14,7 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
   const [loading, setLoading] = useState(false);
   const [showVarianceModal, setShowVarianceModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [allCashiers, setAllCashiers] = useState([]);
 
   useEffect(() => {
     fetchCashDrawerSessions();
@@ -51,6 +52,16 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
       if (userBranchId) {
         transformedSessions = transformedSessions.filter(item => !item.branchId || item.branchId === userBranchId);
       }
+
+      // Build dynamic cashier list from session data
+      const cashierMap = new Map();
+      transformedSessions.forEach(s => {
+        const fullName = `${s.user.firstName} ${s.user.lastName}`.trim();
+        if (fullName && !cashierMap.has(fullName)) {
+          cashierMap.set(fullName, fullName);
+        }
+      });
+      setAllCashiers([...cashierMap.keys()]);
 
       // Apply filters
       let filtered = transformedSessions;
@@ -178,9 +189,9 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
           <label>Cashier</label>
           <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
             <option value="all">All Cashiers</option>
-            <option value="maria">Maria Santos</option>
-            <option value="john">John Doe</option>
-            <option value="anna">Anna Cruz</option>
+            {allCashiers.map(name => (
+              <option key={name} value={name.toLowerCase()}>{name}</option>
+            ))}
           </select>
         </div>
         <div className="filter-group">
@@ -296,7 +307,7 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
                   {expandedSessions.has(session.id) && (
                     <div className="session-transactions-list">
                       {session.transactions.map(transaction => (
-                        <div key={transaction.id} className="transaction-item">
+                        <div key={transaction._id || transaction.id} className="transaction-item">
                           <div className="transaction-info">
                             <div className="transaction-type">{transaction.type}</div>
                             <div className="transaction-time">{transaction.time}</div>

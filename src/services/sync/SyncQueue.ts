@@ -136,6 +136,30 @@ class SyncQueue {
   }
 
   /**
+   * Get detailed info on failed/parked items for admin review
+   */
+  async getFailedDetails(): Promise<Array<{
+    id: number;
+    entityType: string;
+    entityId: string;
+    operation: SyncOperation;
+    error: string;
+    retryCount: number;
+    lastAttempt: string;
+  }>> {
+    const failed = await this.getFailed();
+    return failed.map(item => ({
+      id: item.id!,
+      entityType: item.entityType,
+      entityId: item.entityId,
+      operation: item.operation,
+      error: item.error || 'Unknown error',
+      retryCount: item.retryCount,
+      lastAttempt: item.lastAttempt || item.createdAt,
+    }));
+  }
+
+  /**
    * Reset failed operations for retry
    */
   async resetFailed(): Promise<number> {

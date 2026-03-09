@@ -26,6 +26,16 @@ class StockHistoryRepository extends BaseRepository {
   }
 
   /**
+   * Get recent history entries across all products
+   */
+  async getRecent(limit = 100) {
+    const all = await this.getAll();
+    return all
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, limit);
+  }
+
+  /**
    * Get recent history for a product
    */
   async getRecentForProduct(productId, limit = 10) {

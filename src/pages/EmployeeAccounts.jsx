@@ -202,6 +202,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       errors.username = 'Username must be 30 characters or less';
     } else if (!/^[a-zA-Z0-9_]+$/.test(data.username)) {
       errors.username = 'Username can only contain letters, numbers, and underscores';
+    } else if (modalMode === 'create' && usernameStatus.checking) {
+      errors.username = 'Checking username availability...';
     } else if (modalMode === 'create' && usernameStatus.available === false) {
       errors.username = 'Username is already taken';
     }

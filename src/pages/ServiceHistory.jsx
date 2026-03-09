@@ -153,10 +153,11 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
   };
 
   const handleExport = () => {
+    const escapeCsv = (val) => String(val || '').replace(/"/g, '""');
     let csv = 'Receipt Number,Date,Customer,Phone,Items,Subtotal,Discount,Tax,Total,Payment Method,Cashier\n';
     filteredTransactions.forEach(t => {
       const itemsList = t.items.map(i => `${i.name} x${i.quantity}`).join('; ');
-      csv += `"${t.receiptNumber}","${format(parseISO(t.date), 'yyyy-MM-dd HH:mm')}","${t.customer.name}","${t.customer.phone}","${itemsList}","₱${t.subtotal.toFixed(2)}","₱${t.discount.toFixed(2)}","₱${t.tax.toFixed(2)}","₱${t.total.toFixed(2)}","${t.paymentMethod}","${t.cashier}"\n`;
+      csv += `"${escapeCsv(t.receiptNumber)}","${format(parseISO(t.date), 'yyyy-MM-dd HH:mm')}","${escapeCsv(t.customer.name)}","${escapeCsv(t.customer.phone)}","${escapeCsv(itemsList)}","₱${t.subtotal.toFixed(2)}","₱${t.discount.toFixed(2)}","₱${t.tax.toFixed(2)}","₱${t.total.toFixed(2)}","${escapeCsv(t.paymentMethod)}","${escapeCsv(t.cashier)}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -426,9 +427,9 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                     <td>
                       <div className="transaction-employee">
                         <div className="employee-avatar">
-                          {getInitials(transaction.items[0].employeeName)}
+                          {getInitials(transaction.items[0]?.employeeName || 'Staff')}
                         </div>
-                        <span>{transaction.items[0].employeeName}</span>
+                        <span>{transaction.items[0]?.employeeName || 'Staff'}</span>
                       </div>
                     </td>
                     <td className="right">₱{transaction.total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>

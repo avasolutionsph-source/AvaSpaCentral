@@ -143,6 +143,13 @@ interface HomeService extends BaseEntity {
   transactionId?: string;
 }
 
+interface MigrationLog {
+  id?: number;
+  version: number;
+  timestamp: string;
+  description?: string;
+}
+
 interface OTRequest extends BaseEntity {
   employeeId: string;
   date: string;
@@ -240,6 +247,9 @@ class SpaDatabase extends Dexie {
   // Home Services
   homeServices!: Table<HomeService, string>;
 
+  // Schema migration tracking
+  migrationLog!: Table<MigrationLog, number>;
+
   constructor() {
     super('SpaERP');
 
@@ -307,6 +317,26 @@ class SpaDatabase extends Dexie {
       // === Home Services ===
       homeServices: '_id, status, employeeId, transactionId, businessId',
     });
+
+    // Version 9: Add nextRetryAt index to syncQueue for backoff queries
+    this.version(9).stores({
+      syncQueue: '++id, entityType, entityId, operation, status, createdAt, nextRetryAt',
+    }).upgrade(async (tx) => {
+      console.log('[Dexie] Upgrading to version 9: adding nextRetryAt index to syncQueue');
+      // Index-only change — no data transformation needed
+    });
+
+    // Version 10: Add migrationLog table for tracking schema upgrades
+    this.version(10).stores({
+      migrationLog: '++id, version, timestamp',
+    }).upgrade(async (tx) => {
+      console.log('[Dexie] Upgrading to version 10: adding migrationLog table');
+      await tx.table('migrationLog').add({
+        version: 10,
+        timestamp: new Date().toISOString(),
+        description: 'Added migrationLog table and nextRetryAt index',
+      });
+    });
   }
 }
 
@@ -364,6 +394,7 @@ export const {
   leaveRequests,
   cashAdvanceRequests,
   incidentReports,
+  migrationLog,
 } = db;
 
 export default db;

@@ -855,12 +855,12 @@ const Dashboard = () => {
           </div>
           <div className="booking-link-content">
             <code className="booking-link-url">
-              {`${window.location.origin}/book/${bookingSlug || user.businessId}`}
+              {`${window.location.origin}/book/${bookingSlug || user.businessId}${selectedBranch?.slug ? '/' + selectedBranch.slug : ''}`}
             </code>
             <button
               className="copy-link-btn"
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/book/${bookingSlug || user.businessId}`);
+                navigator.clipboard.writeText(`${window.location.origin}/book/${bookingSlug || user.businessId}${selectedBranch?.slug ? '/' + selectedBranch.slug : ''}`);
                 showToast('Booking link copied to clipboard!', 'success');
               }}
             >

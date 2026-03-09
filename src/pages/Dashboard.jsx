@@ -829,7 +829,7 @@ const Dashboard = () => {
           <span className="quick-btn-icon">📦</span>
           <span className="quick-btn-text">Inventory</span>
         </button>
-        <button className="quick-action-btn gradient" onClick={() => navigate('/ava-sensei')}>
+        <button className="quick-action-btn gradient" onClick={() => navigate('/daet-insights')}>
           <span className="quick-btn-icon">🤖</span>
           <span className="quick-btn-text">Insights</span>
         </button>

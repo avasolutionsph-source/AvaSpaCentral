@@ -1,7 +1,7 @@
-# AVA Spa & Wellness ERP
+# Daet Massage & Spa ERP
 
 **Version:** 3.3.0
-**Brand:** Ava Solutions AI Business Assistant
+**Brand:** Daet Massage & Spa
 
 ## Overview
 
@@ -256,4 +256,4 @@ window.resetDatabase?.() // If exposed
 
 ---
 
-**Built by Ava Solutions** | **SPA Demo ERP v3.2.0** | Offline-First Edition
+**Daet Massage & Spa** | **Spa ERP v3.3.0** | Offline-First Edition

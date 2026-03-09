@@ -1019,7 +1019,7 @@ Charts:
 
 Artificial intelligence capabilities for business insights.
 
-### 16.1 Ava Chatbot
+### 16.1 Daet AI Chatbot
 
 #### Natural Language Queries
 Ask questions like:
@@ -1046,7 +1046,7 @@ Ask questions like:
 - Real-time data integration
 - Clear chat option
 
-### 16.2 Ava Sensei Ultrathink
+### 16.2 Daet Business Insights
 
 Advanced AI business intelligence:
 - Deep pattern analysis

@@ -1,4 +1,4 @@
-Ava Solutions Spa ERP - Detailed Role-Based Feature Views
+Daet Massage & Spa ERP - Detailed Role-Based Feature Views
 What Each Role Sees Inside Each Feature
 This document details the exact content and functionality each role sees within every page/feature they have access to.
 1. DASHBOARD

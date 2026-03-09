@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const sizes = [192, 512];
-const inputPath = join(__dirname, '../public/Ava transparent.png');
+const inputPath = join(__dirname, '../public/daet-logo.png');
 const outputDir = join(__dirname, '../public');
 
 async function generateIcons() {

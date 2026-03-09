@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['Ava transparent.png', 'images/**/*'],
+      includeAssets: ['favicon.png', 'images/**/*'],
       manifest: {
         name: 'Daet Massage & Spa',
         short_name: 'Daet Spa',

@@ -68,7 +68,7 @@ const Settings = () => {
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || 'Admin',
     lastName: user?.lastName || 'User',
-    email: user?.email || 'admin@avasolutions.ph',
+    email: user?.email || 'admin@daetmassagespa.com',
     phone: '',
     currentPassword: '',
     newPassword: '',

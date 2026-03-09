@@ -100,7 +100,7 @@ import {
   businessId: 'biz_001',
   firstName: 'Maria',
   lastName: 'Santos',
-  email: 'maria@avasolutions.ph',
+  email: 'maria@daetmassagespa.com',
   phone: '+639171234567',
   position: 'Senior Therapist',
   department: 'Massage',

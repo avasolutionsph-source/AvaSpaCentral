@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, subDays, differenceInDays, addDays } from 'date-fns';
 // ChartJS is registered globally in main.jsx via utils/chartConfig
 import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
-import '../assets/css/ava-sensei-ultrathink.css';
+import '../assets/css/daet-insights.css';
 import Reports from './Reports';
 
 const AvaSenseiUltrathink = () => {
@@ -668,7 +668,7 @@ const AvaSenseiUltrathink = () => {
 
   if (loading) {
     return (
-      <div className="ava-sensei-page">
+      <div className="daet-insights-page">
         <div className="loading-container">
           <div className="loading-spinner"></div>
           <p>Analyzing your data...</p>
@@ -678,9 +678,9 @@ const AvaSenseiUltrathink = () => {
   }
 
   return (
-    <div className="ava-sensei-page">
+    <div className="daet-insights-page">
       {/* Header */}
-      <div className="ava-sensei-header">
+      <div className="daet-insights-header">
         <div className="header-content">
           <h1>
             Business Insights

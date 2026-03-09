@@ -1,9 +1,9 @@
 /* ============================================================================
-   AVA SENSEI ULTRATHINK PAGE STYLES
+   DAET INSIGHTS PAGE STYLES
    Combined Analytics Dashboard + AI Insights - Professional Design
    ============================================================================ */
 
-.ava-sensei-page {
+.daet-insights-page {
   padding: var(--spacing-lg);
   max-width: 1400px;
   margin: 0 auto;
@@ -11,7 +11,7 @@
 }
 
 /* Header */
-.ava-sensei-header {
+.daet-insights-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -20,7 +20,7 @@
   gap: var(--spacing-md);
 }
 
-.ava-sensei-header .header-content h1 {
+.daet-insights-header .header-content h1 {
   font-size: 1.5rem;
   font-weight: 600;
   color: #1A1A1A;
@@ -30,7 +30,7 @@
   gap: 10px;
 }
 
-.ava-sensei-header .header-content h1 .ai-badge {
+.daet-insights-header .header-content h1 .ai-badge {
   background: linear-gradient(135deg, #1B5E37 0%, #2E7D4A 100%);
   color: white;
   font-size: 0.6rem;
@@ -41,13 +41,13 @@
   letter-spacing: 0.5px;
 }
 
-.ava-sensei-header .subtitle {
+.daet-insights-header .subtitle {
   font-size: 0.85rem;
   color: #666666;
   margin: 0;
 }
 
-.ava-sensei-header .header-actions {
+.daet-insights-header .header-actions {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -1707,7 +1707,7 @@
 }
 
 /* Loading State */
-.ava-sensei-page .loading-container {
+.daet-insights-page .loading-container {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1716,7 +1716,7 @@
   gap: var(--spacing-md);
 }
 
-.ava-sensei-page .loading-spinner {
+.daet-insights-page .loading-spinner {
   width: 40px;
   height: 40px;
   border: 3px solid #E0E0E0;
@@ -1729,7 +1729,7 @@
   to { transform: rotate(360deg); }
 }
 
-.ava-sensei-page .loading-container p {
+.daet-insights-page .loading-container p {
   font-size: 0.85rem;
   color: #666666;
 }
@@ -1779,11 +1779,11 @@
 }
 
 @media (max-width: 768px) {
-  .ava-sensei-page {
+  .daet-insights-page {
     padding: var(--spacing-md);
   }
 
-  .ava-sensei-header {
+  .daet-insights-header {
     flex-direction: column;
     align-items: flex-start;
   }

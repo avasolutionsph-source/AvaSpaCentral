@@ -1,4 +1,4 @@
-Ava Solutions Spa ERP - Detailed Role Restrictions
+Daet Massage & Spa ERP - Detailed Role Restrictions
 System Overview
 The PWA system uses role-based access control (RBAC) to restrict what different users can see and do. There are two user types and six role levels.
 User Types

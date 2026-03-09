@@ -6,6 +6,7 @@ import { format, parseISO, differenceInMinutes, isAfter, startOfDay } from 'date
 import CameraCapture from '../components/CameraCapture';
 import { LazyImage } from '../components/OptimizedImage';
 import { logClockIn, logClockOut } from '../utils/activityLogger';
+import { SettingsRepository } from '../services/storage/repositories';
 
 const Attendance = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
@@ -27,6 +28,9 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   // Camera capture state
   const [showCamera, setShowCamera] = useState(false);
   const [pendingClockAction, setPendingClockAction] = useState(null); // { type: 'in'|'out', employeeId: string }
+
+  // Pending GPS approvals
+  const [pendingApprovals, setPendingApprovals] = useState([]);
 
   // Photo viewer modal state
   const [showPhotoModal, setShowPhotoModal] = useState(false);
@@ -57,6 +61,8 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       }
 
       setTodayAttendance(todayRecords);
+      const pending = todayRecords.filter(a => a.status === 'pending_approval');
+      setPendingApprovals(pending);
       let activeEmps = emps.filter(e => e.status === 'active');
       if (userBranchId) {
         activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === userBranchId);
@@ -104,6 +110,18 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     setShowCamera(true);
   };
 
+  // Calculate distance between two GPS coordinates using Haversine formula (returns meters)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   // Handle camera capture completion
   const handleCameraCapture = async (captureData) => {
     if (!pendingClockAction) return;
@@ -111,6 +129,14 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     const { type, employeeId } = pendingClockAction;
 
     try {
+      // 1. Check if GPS location was captured
+      if (!captureData.location || !captureData.location.latitude) {
+        showToast('GPS is required for attendance. Please enable location services.', 'error');
+        setShowCamera(false);
+        setPendingClockAction(null);
+        return;
+      }
+
       // Find employee name for logging
       const employee = employees.find(e => e._id === employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown';
@@ -119,13 +145,55 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const branchId = getUserBranchId();
       const captureWithBranch = { ...captureData, ...(branchId && { branchId }) };
 
+      // 2. Check GPS geofencing
+      let isOutOfRange = false;
+      try {
+        const gpsConfig = await SettingsRepository.get('gpsConfig');
+        if (gpsConfig && gpsConfig.branches) {
+          // Find the branch config - use user's branchId or selectedBranch
+          const activeBranchId = branchId || user?.branchId;
+          // Try to find by branchId
+          let branchGps = null;
+          if (activeBranchId && gpsConfig.branches[activeBranchId]) {
+            branchGps = gpsConfig.branches[activeBranchId];
+          }
+
+          if (branchGps && branchGps.latitude && branchGps.longitude) {
+            const distance = calculateDistance(
+              captureData.location.latitude,
+              captureData.location.longitude,
+              branchGps.latitude,
+              branchGps.longitude
+            );
+            const radius = branchGps.radius || 100;
+            if (distance > radius) {
+              isOutOfRange = true;
+            }
+          }
+          // If no branch GPS configured, allow freely
+        }
+      } catch (err) {
+        console.warn('GPS config check failed, allowing attendance:', err);
+      }
+
+      // Add out of range flag to capture data
+      captureWithBranch.isOutOfRange = isOutOfRange;
+
       if (type === 'in') {
         await mockApi.attendance.clockIn(employeeId, captureWithBranch);
-        showToast('Clocked in successfully with photo!', 'success');
+        if (isOutOfRange) {
+          showToast('Clocked in but you are outside the allowed area. Pending manager approval.', 'warning');
+        } else {
+          showToast('Clocked in successfully with photo!', 'success');
+        }
         logClockIn(user, employeeName);
       } else {
         await mockApi.attendance.clockOut(employeeId, captureWithBranch);
-        showToast('Clocked out successfully with photo!', 'success');
+        if (isOutOfRange) {
+          showToast('Clocked out but you are outside the allowed area. Pending manager approval.', 'warning');
+        } else {
+          showToast('Clocked out successfully with photo!', 'success');
+        }
         logClockOut(user, employeeName);
       }
 
@@ -149,6 +217,42 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   const handleCameraCancel = () => {
     setShowCamera(false);
     setPendingClockAction(null);
+  };
+
+  // Approve pending attendance
+  const handleApproveAttendance = async (record) => {
+    try {
+      const clockInParts = record.clockIn.split(':');
+      const clockInHour = parseInt(clockInParts[0]);
+      const clockInMin = parseInt(clockInParts[1]);
+      const isLate = clockInHour > 9 || (clockInHour === 9 && clockInMin > 0);
+
+      await mockApi.attendance.updateAttendance(record._id, {
+        status: isLate ? 'late' : 'present',
+        isOutOfRange: true,
+        approvedBy: user?._id,
+        approvedAt: new Date().toISOString()
+      });
+      showToast('Attendance approved', 'success');
+      loadData();
+    } catch (err) {
+      showToast('Failed to approve', 'error');
+    }
+  };
+
+  // Reject pending attendance
+  const handleRejectAttendance = async (record) => {
+    try {
+      await mockApi.attendance.updateAttendance(record._id, {
+        status: 'rejected',
+        rejectedBy: user?._id,
+        rejectedAt: new Date().toISOString()
+      });
+      showToast('Attendance rejected', 'success');
+      loadData();
+    } catch (err) {
+      showToast('Failed to reject', 'error');
+    }
   };
 
   const handleModalClock = async () => {
@@ -436,6 +540,62 @@ const Attendance = ({ embedded = false, onDataChange }) => {
           </tbody>
         </table>
       </div>
+
+      {/* Pending Approval Section - only visible to managers/owners */}
+      {hasManagementAccess() && pendingApprovals.length > 0 && (
+        <div className="attendance-section" style={{ marginTop: '2rem' }}>
+          <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ color: '#f59e0b' }}>&#9888;&#65039;</span>
+            Pending GPS Approval ({pendingApprovals.length})
+          </h3>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Clock In</th>
+                  <th>Clock Out</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingApprovals.map(record => (
+                  <tr key={record._id}>
+                    <td>
+                      {record.employee ? `${record.employee.firstName} ${record.employee.lastName}` : 'Unknown'}
+                    </td>
+                    <td>{record.clockIn || '-'}</td>
+                    <td>{record.clockOut || '-'}</td>
+                    <td>
+                      <span className="status-badge" style={{ background: '#fef3c7', color: '#92400e' }}>
+                        Pending Approval
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => handleApproveAttendance(record)}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          style={{ background: '#fee2e2', color: '#dc2626', border: 'none' }}
+                          onClick={() => handleRejectAttendance(record)}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Clock In/Out Modal */}
       {showClockModal && (

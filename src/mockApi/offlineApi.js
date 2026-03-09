@@ -153,7 +153,8 @@ export const purchaseOrdersApi = {
 export const attendanceApi = {
   getAttendance: attendanceAdapter.getAttendance,
   clockIn: attendanceAdapter.clockIn,
-  clockOut: attendanceAdapter.clockOut
+  clockOut: attendanceAdapter.clockOut,
+  updateAttendance: attendanceAdapter.updateAttendance
 };
 
 export const activityLogsApi = {

@@ -1080,14 +1080,17 @@ export const attendanceAdapter = {
     // Get employee info
     const employee = await storageService.employees.getById(employeeId);
 
+    const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
+
     const record = await storageService.attendance.create({
       employeeId,
       date: today,
       clockIn: nowTime,
       clockInPhoto: captureData.photo || null,
-      clockInGps: captureData.gps || null,
+      clockInGps: captureData.location || null,
       ...(captureData.branchId && { branchId: captureData.branchId }),
-      status: 'present'
+      status: captureData.isOutOfRange ? 'pending_approval' : (isLate ? 'late' : 'present'),
+      isOutOfRange: captureData.isOutOfRange || false
     });
 
     console.log('[AttendanceAdapter] clockIn - created record:', record._id, 'employeeId:', record.employeeId, 'date:', record.date);
@@ -1099,6 +1102,12 @@ export const attendanceAdapter = {
         employee: employee || null
       })
     };
+  },
+
+  async updateAttendance(attendanceId, updates) {
+    await delay();
+    const updated = await storageService.attendance.update(attendanceId, updates);
+    return { success: true, attendance: clone(updated) };
   },
 
   async clockOut(employeeId, captureData = {}) {
@@ -1118,10 +1127,20 @@ export const attendanceAdapter = {
     }
 
     const record = existing[0];
+
+    // Validate clock out is after clock in
+    const clockInParts = record.clockIn.split(':');
+    const clockInMinutes = parseInt(clockInParts[0]) * 60 + parseInt(clockInParts[1]);
+    const clockOutMinutes = now.getHours() * 60 + now.getMinutes();
+    if (clockOutMinutes <= clockInMinutes) {
+      throw new Error('Clock out time must be after clock in time');
+    }
+
     const updated = await storageService.attendance.update(record._id, {
       clockOut: nowTime,
       clockOutPhoto: captureData.photo || null,
-      clockOutGps: captureData.gps || null
+      clockOutGps: captureData.location || null,
+      isOutOfRange: captureData.isOutOfRange || false
     });
 
     // Get employee info

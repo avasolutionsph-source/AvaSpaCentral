@@ -14,7 +14,7 @@ import { authService } from '../services/supabase';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
 
 const Settings = () => {
-  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess } = useApp();
+  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, getUserBranchId } = useApp();
 
   // Tab state for switching between Settings and Activity Logs
   const [activeTab, setActiveTab] = useState('settings');
@@ -191,6 +191,137 @@ const Settings = () => {
     ownerUsername: '',
     ownerPassword: '',
   });
+
+  // GPS Geofencing State
+  const [gpsConfig, setGpsConfig] = useState({ branches: {} });
+  const [gpsBranches, setGpsBranches] = useState([]);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsSaving, setGpsSaving] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(null); // branchId being located
+
+  const loadGpsConfig = async () => {
+    setGpsLoading(true);
+    try {
+      // Load GPS config from SettingsRepository
+      const saved = await SettingsRepository.get('gpsConfig');
+      if (saved) {
+        setGpsConfig(saved);
+      }
+
+      // Load branches from Supabase
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey || !user?.businessId) {
+        setGpsLoading(false);
+        return;
+      }
+
+      const { supabase } = await import('../services/supabase/supabaseClient');
+      let accessToken = supabaseKey;
+      if (supabase) {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
+        try {
+          const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+          if (data?.session?.access_token) accessToken = data.session.access_token;
+        } catch {}
+      }
+
+      const headers = {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      };
+
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&order=display_order.asc,name.asc`,
+        { headers }
+      );
+
+      if (res.ok) {
+        let branchList = await res.json();
+        // Branch Owner can only see their own branch
+        if (isBranchOwner()) {
+          const userBranchId = getUserBranchId();
+          if (userBranchId) {
+            branchList = branchList.filter(b => b.id === userBranchId);
+          }
+        }
+        setGpsBranches(branchList);
+      }
+    } catch (err) {
+      console.error('Failed to load GPS config:', err);
+    } finally {
+      setGpsLoading(false);
+    }
+  };
+
+  const handleUseCurrentLocation = (branchId, branchName) => {
+    if (!navigator.geolocation) {
+      showToast('Geolocation is not supported by your browser', 'error');
+      return;
+    }
+
+    setGettingLocation(branchId);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setGpsConfig(prev => ({
+          ...prev,
+          branches: {
+            ...prev.branches,
+            [branchId]: {
+              ...(prev.branches?.[branchId] || {}),
+              latitude,
+              longitude,
+              radius: prev.branches?.[branchId]?.radius || 100,
+              name: branchName
+            }
+          }
+        }));
+        showToast(`Location set for ${branchName}: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, 'success');
+        setGettingLocation(null);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        let msg = 'Failed to get location';
+        if (error.code === 1) msg = 'Location access denied. Please allow location access in your browser settings.';
+        else if (error.code === 2) msg = 'Location unavailable. Please try again.';
+        else if (error.code === 3) msg = 'Location request timed out. Please try again.';
+        showToast(msg, 'error');
+        setGettingLocation(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleRadiusChange = (branchId, radius) => {
+    const clampedRadius = Math.min(1000, Math.max(50, radius));
+    setGpsConfig(prev => ({
+      ...prev,
+      branches: {
+        ...prev.branches,
+        [branchId]: {
+          ...(prev.branches?.[branchId] || {}),
+          radius: clampedRadius
+        }
+      }
+    }));
+  };
+
+  const handleSaveGpsConfig = async () => {
+    setGpsSaving(true);
+    try {
+      await SettingsRepository.set('gpsConfig', gpsConfig);
+      showToast('GPS settings saved successfully!', 'success');
+    } catch (err) {
+      console.error('Failed to save GPS config:', err);
+      showToast('Failed to save GPS settings. Please try again.', 'error');
+    } finally {
+      setGpsSaving(false);
+    }
+  };
 
   const handleBusinessInfoChange = (e) => {
     const { name, value } = e.target;
@@ -1415,6 +1546,14 @@ const Settings = () => {
             Branches
           </button>
         )}
+        {canEdit() && (
+          <button
+            className={`settings-tab ${activeTab === 'gps' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('gps'); loadGpsConfig(); }}
+          >
+            GPS
+          </button>
+        )}
         <button
           className={`settings-tab ${activeTab === 'logs' ? 'active' : ''}`}
           onClick={() => setActiveTab('logs')}
@@ -1425,6 +1564,98 @@ const Settings = () => {
 
       {activeTab === 'logs' ? (
         <ActivityLogsTab />
+      ) : activeTab === 'gps' ? (
+        <div className="settings-content">
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">📍</div>
+              <div className="settings-section-title">
+                <h2>GPS Geofencing</h2>
+                <p>Configure spa location and attendance radius for each branch. Employees can only clock in/out within the configured radius.</p>
+              </div>
+            </div>
+            <div className="settings-section-body">
+              {gpsLoading ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>Loading GPS configuration...</p>
+              ) : gpsBranches.length === 0 ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>No branches found. Add branches first in the Branches tab.</p>
+              ) : (
+                <>
+                  {gpsBranches.map(branch => {
+                    const config = gpsConfig.branches?.[branch.id] || {};
+                    const isConfigured = config.latitude && config.longitude;
+                    return (
+                      <div key={branch.id} style={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        padding: '1.5rem',
+                        marginBottom: '1rem',
+                        background: isConfigured ? '#f0fdf4' : '#fefce8'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{branch.name}</h3>
+                            <span style={{
+                              fontSize: '0.75rem',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              background: isConfigured ? '#dcfce7' : '#fef9c3',
+                              color: isConfigured ? '#166534' : '#854d0e'
+                            }}>
+                              {isConfigured ? 'Configured' : 'Not Configured'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isConfigured && (
+                          <div style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#64748b' }}>
+                            <span>📍 {config.latitude.toFixed(6)}, {config.longitude.toFixed(6)}</span>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div style={{ flex: '1', minWidth: '200px' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.25rem' }}>
+                              Radius (meters)
+                            </label>
+                            <input
+                              type="number"
+                              value={config.radius || 100}
+                              onChange={(e) => handleRadiusChange(branch.id, parseInt(e.target.value) || 100)}
+                              min="50"
+                              max="1000"
+                              step="10"
+                              className="form-input"
+                              style={{ width: '100%' }}
+                            />
+                          </div>
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => handleUseCurrentLocation(branch.id, branch.name)}
+                            disabled={gettingLocation === branch.id}
+                            style={{ marginTop: '1.2rem' }}
+                          >
+                            {gettingLocation === branch.id ? 'Getting Location...' : '📍 Use My Current Location'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleSaveGpsConfig}
+                      disabled={gpsSaving}
+                    >
+                      {gpsSaving ? 'Saving...' : 'Save GPS Settings'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       ) : activeTab === 'branches' ? (
         <BranchesTab />
       ) : activeTab === 'branding' ? (

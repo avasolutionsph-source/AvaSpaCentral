@@ -154,47 +154,9 @@ const clone = (obj) => JSON.parse(JSON.stringify(obj));
 // =============================================================================
 
 export const authApi = {
-  // Login with username (for offline mode fallback)
+  // Login - delegates to Supabase auth (this mock fallback is not used in production)
   async login(username, password) {
-    await delay(800); // Simulate auth check
-
-    // First, check against users in Dexie database
-    const users = await db.users.toArray();
-
-    // Try to find matching user by username (primary) or email (fallback)
-    const matchedUser = users.find(
-      u => (u.username?.toLowerCase() === username?.toLowerCase() ||
-            u.email?.toLowerCase() === username?.toLowerCase()) &&
-           u.password === password
-    );
-
-    if (matchedUser) {
-      // Check if user is active
-      if (matchedUser.status !== 'active') {
-        throw new Error('Account is inactive. Please contact administrator.');
-      }
-
-      const token = 'mock_jwt_token_' + Date.now();
-      const user = clone(matchedUser);
-      delete user.password;
-
-      // Update last login time
-      await db.users.update(matchedUser._id, {
-        lastLogin: new Date().toISOString()
-      });
-
-      // Store in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      return {
-        success: true,
-        token,
-        user
-      };
-    }
-
-    throw new Error('Invalid username or password');
+    throw new Error('Offline login is not supported. Please use Supabase authentication.');
   },
 
   // Register

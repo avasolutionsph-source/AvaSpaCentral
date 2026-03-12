@@ -4,7 +4,8 @@
 
 import { AdvanceBookingRepository, ActiveServiceRepository } from '../services/storage/repositories';
 
-const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
+// No artificial delay - Dexie is already async and fast
+const delay = () => Promise.resolve();
 
 // Helper to clone objects
 const clone = (obj) => JSON.parse(JSON.stringify(obj));

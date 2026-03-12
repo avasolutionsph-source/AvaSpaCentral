@@ -143,8 +143,8 @@ const getData = {
   }
 };
 
-// Simulate network delay (50-300ms for realistic feel)
-const delay = (ms = 200) => new Promise(resolve => setTimeout(resolve, ms + Math.random() * 100));
+// No artificial delay - Dexie is already async and fast
+const delay = () => Promise.resolve();
 
 // Clone helper to prevent direct mutation
 const clone = (obj) => JSON.parse(JSON.stringify(obj));

@@ -391,9 +391,6 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
 
     setCalculating(true);
 
-    // Simulate calculation delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
     const { startDate, endDate } = getPeriodDates();
     const calculated = employees.map(emp => calculateEmployeePayroll(emp, startDate, endDate));
 

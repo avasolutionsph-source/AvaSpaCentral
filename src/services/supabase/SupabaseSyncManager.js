@@ -116,7 +116,7 @@ const SUPABASE_TABLE_COLUMNS = {
   products: [
     'id', 'business_id', 'name', 'type', 'category', 'description', 'price',
     'duration', 'active', 'stock_quantity', 'reorder_level', 'image_url',
-    'hide_from_pos', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+    'hide_from_pos', 'items_used', 'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   service_rotation: [
     'id', 'business_id', 'date', 'rotation_data', 'created_at', 'updated_at'

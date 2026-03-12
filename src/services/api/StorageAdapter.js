@@ -1353,6 +1353,8 @@ export const usersAdapter = {
 
           // Merge Supabase users into local storage
           const localUserIds = new Set(users.map(u => u._id));
+          const now = new Date().toISOString();
+          const newUsers = [];
 
           for (const supabaseUser of supabaseUsers) {
             // Skip soft-deleted users and users with pending local delete
@@ -1360,30 +1362,33 @@ export const usersAdapter = {
               continue;
             }
 
-            const localUser = {
-              _id: supabaseUser.id,
-              authId: supabaseUser.auth_id,
-              email: supabaseUser.email,
-              username: supabaseUser.username,
-              firstName: supabaseUser.first_name,
-              lastName: supabaseUser.last_name,
-              role: supabaseUser.role,
-              businessId: supabaseUser.business_id,
-              employeeId: supabaseUser.employee_id,
-              branchId: supabaseUser.branch_id,
-              status: supabaseUser.status,
-              lastLogin: supabaseUser.last_login,
-              _createdAt: supabaseUser.created_at,
-              _updatedAt: supabaseUser.updated_at,
-              _syncStatus: 'synced',
-              _lastSyncedAt: new Date().toISOString(),
-            };
-
-            // Add to local Dexie if not already present (or update if newer)
-            if (!localUserIds.has(localUser._id)) {
-              await db.users.put(localUser);
-              users.push(localUser);
+            if (!localUserIds.has(supabaseUser.id)) {
+              const localUser = {
+                _id: supabaseUser.id,
+                authId: supabaseUser.auth_id,
+                email: supabaseUser.email,
+                username: supabaseUser.username,
+                firstName: supabaseUser.first_name,
+                lastName: supabaseUser.last_name,
+                role: supabaseUser.role,
+                businessId: supabaseUser.business_id,
+                employeeId: supabaseUser.employee_id,
+                branchId: supabaseUser.branch_id,
+                status: supabaseUser.status,
+                lastLogin: supabaseUser.last_login,
+                _createdAt: supabaseUser.created_at,
+                _updatedAt: supabaseUser.updated_at,
+                _syncStatus: 'synced',
+                _lastSyncedAt: now,
+              };
+              newUsers.push(localUser);
             }
+          }
+
+          // Bulk write all new users in one transaction instead of N separate puts
+          if (newUsers.length > 0) {
+            await db.users.bulkPut(newUsers);
+            users.push(...newUsers);
           }
         }
       } catch (error) {

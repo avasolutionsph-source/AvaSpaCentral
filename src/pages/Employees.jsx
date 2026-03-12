@@ -36,6 +36,9 @@ const INITIAL_FORM_DATA = {
 const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const { showToast, canEdit, canManageEmployees, isManager, getUserBranchId } = useApp();
 
+  // Ref to hold current employees list for duplicate-email check inside validateEmployee
+  const employeesRef = useRef([]);
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('all');
@@ -59,6 +62,15 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       showToast('Invalid email format', 'error');
+      return false;
+    }
+    // Check for duplicate email (exclude self when editing)
+    const emailLower = data.email.trim().toLowerCase();
+    const duplicate = employeesRef.current.find(
+      e => e.email?.toLowerCase() === emailLower && e._id !== data._id
+    );
+    if (duplicate) {
+      showToast(`Email is already used by ${duplicate.firstName} ${duplicate.lastName}`, 'error');
       return false;
     }
     if (!data.phone?.trim()) {
@@ -102,6 +114,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     const hourlyRate = employee.hourlyRate || 0;
     const monthlyRate = employee.monthlyRate || (hourlyRate * HOURS_PER_MONTH);
     return {
+      _id: employee._id, // for duplicate email exclusion during edit
       firstName: employee.firstName,
       lastName: employee.lastName,
       email: employee.email,
@@ -168,6 +181,11 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     transformForSubmit,
     validateForm: validateEmployee
   });
+
+  // Keep employeesRef in sync for duplicate email validation
+  useEffect(() => {
+    employeesRef.current = employees;
+  }, [employees]);
 
   // Expose openCreate to parent via ref
   React.useEffect(() => {

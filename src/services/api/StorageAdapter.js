@@ -16,8 +16,8 @@ import { TimeOffRequestRepository, HomeServiceRepository, SettingsRepository } f
 import { authService, supabase, isSupabaseConfigured, supabaseSyncManager } from '../supabase';
 import { db } from '../../db';
 
-// Simulate network delay (optional, for realistic feel during development)
-const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
+// No artificial delay - Dexie is already async and fast
+const delay = () => Promise.resolve();
 
 // Clone helper
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
@@ -606,32 +606,48 @@ export const transactionsAdapter = {
 
       // Update product stock for sold items and track service counts
       if (transaction.items) {
+        // Collect all product IDs we need to update
+        const productIdsToFetch = new Set();
         for (const item of transaction.items) {
           if (item.type === 'product') {
-            // Deduct stock for retail product sales
-            const product = await storageService.products.getById(item.id);
-            if (product && product.stock !== undefined) {
-              await storageService.products.update(item.id, {
-                stock: product.stock - item.quantity
-              });
+            productIdsToFetch.add(item.id);
+          } else if (item.type === 'service' && item.itemsUsed?.length > 0) {
+            for (const lp of item.itemsUsed) {
+              productIdsToFetch.add(lp.productId);
             }
-          } else if (item.type === 'service' && item.itemsUsed && item.itemsUsed.length > 0) {
-            // Increment service count for each linked product (for consumption tracking)
-            for (const linkedProduct of item.itemsUsed) {
-              try {
-                const product = await storageService.products.getById(linkedProduct.productId);
+          }
+        }
+
+        if (productIdsToFetch.size > 0) {
+          // Batch-fetch all needed products in one query
+          const allProducts = await db.products.where('_id').anyOf([...productIdsToFetch]).toArray();
+          const productMap = new Map(allProducts.map(p => [p._id, p]));
+
+          // Calculate updates
+          const updates = new Map(); // productId -> updated fields
+          for (const item of transaction.items) {
+            if (item.type === 'product') {
+              const product = productMap.get(item.id);
+              if (product && product.stock !== undefined) {
+                const existing = updates.get(item.id) || { ...product };
+                existing.stock = (existing.stock ?? product.stock) - item.quantity;
+                updates.set(item.id, existing);
+              }
+            } else if (item.type === 'service' && item.itemsUsed?.length > 0) {
+              for (const linkedProduct of item.itemsUsed) {
+                const product = productMap.get(linkedProduct.productId);
                 if (product) {
-                  const currentCount = product.servicesSinceLastAdjustment || 0;
-                  await storageService.products.update(linkedProduct.productId, {
-                    servicesSinceLastAdjustment: currentCount + item.quantity
-                  });
+                  const existing = updates.get(linkedProduct.productId) || { ...product };
+                  existing.servicesSinceLastAdjustment = (existing.servicesSinceLastAdjustment ?? product.servicesSinceLastAdjustment ?? 0) + item.quantity;
+                  updates.set(linkedProduct.productId, existing);
                 }
-              } catch (err) {
-                console.error('Failed to increment service count for product:', linkedProduct.productId, err);
-                // Re-throw to trigger transaction rollback
-                throw err;
               }
             }
+          }
+
+          // Batch-write all product updates at once
+          if (updates.size > 0) {
+            await db.products.bulkPut([...updates.values()]);
           }
         }
       }

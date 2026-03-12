@@ -9,9 +9,11 @@ const POSITIONS = [
   { value: 'Owner', label: 'Owner', role: 'Owner', department: 'Management' },
   { value: 'Manager', label: 'Manager', role: 'Manager', department: 'Management' },
   { value: 'Therapist', label: 'Therapist', role: 'Therapist', department: 'Services' },
-  { value: 'Receptionist', label: 'Receptionist', role: 'Receptionist', department: 'Front Desk' }
+  { value: 'Receptionist', label: 'Receptionist', role: 'Receptionist', department: 'Front Desk' },
+  { value: 'Rider', label: 'Rider', role: 'Rider', department: 'Operations' },
+  { value: 'Utility', label: 'Utility', role: 'Utility', department: 'Operations' }
 ];
-const DEPARTMENTS = ['Management', 'Services', 'Front Desk'];
+const DEPARTMENTS = ['Management', 'Services', 'Front Desk', 'Operations'];
 const SKILLS_LIST = ['Swedish Massage', 'Deep Tissue', 'Hot Stone', 'Aromatherapy', 'Facial Treatment', 'Body Scrub', 'Manicure', 'Pedicure', 'Nail Art', 'Waxing'];
 
 // Hours per month for rate calculation (22 working days * 8 hours)

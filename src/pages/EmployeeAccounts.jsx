@@ -37,7 +37,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Available roles
-  const roles = ['Owner', 'Manager', 'Branch Owner', 'Therapist', 'Receptionist'];
+  const roles = ['Owner', 'Manager', 'Branch Owner', 'Therapist', 'Receptionist', 'Rider', 'Utility'];
 
   // Initial form data for user accounts
   const initialFormData = {

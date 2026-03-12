@@ -38,7 +38,9 @@ export const POSITIONS = [
   'Receptionist',
   'Manager',
   'Supervisor',
-  'Housekeeper'
+  'Housekeeper',
+  'Rider',
+  'Utility'
 ];
 
 // Employee skills

@@ -71,7 +71,9 @@ const rolePermissions = {
                    'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings'],
   'Receptionist': ['pos', 'products', 'inventory', 'customers', 'appointments', 'attendance', 'payroll', 'rooms',
                    'service-history', 'expenses', 'my-schedule', 'payroll-requests', 'calendar'],
-  'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests']
+  'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests'],
+  'Rider': ['appointments', 'attendance', 'my-schedule', 'payroll-requests'],
+  'Utility': ['attendance', 'my-schedule', 'payroll-requests']
 };
 
 // First page redirect after login
@@ -85,6 +87,10 @@ const getFirstPageForRole = (role) => {
       return '/pos';
     case 'Therapist':
       return '/appointments';
+    case 'Rider':
+      return '/appointments';
+    case 'Utility':
+      return '/attendance';
     default:
       return '/dashboard';
   }

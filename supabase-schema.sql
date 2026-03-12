@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS businesses (
     phone VARCHAR(50),
     email VARCHAR(255),
     logo_url TEXT,
+    cover_photo_url TEXT,
+    primary_color VARCHAR(20) DEFAULT '#1B5E37',
+    booking_slug VARCHAR(100),
     settings JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

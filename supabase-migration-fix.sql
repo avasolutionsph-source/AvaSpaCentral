@@ -5,6 +5,14 @@
 -- to your existing tables. This fixes the sync errors.
 -- ============================================
 
+-- Add branding columns to businesses table
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS cover_photo_url TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS primary_color VARCHAR(20) DEFAULT '#1B5E37';
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS booking_slug VARCHAR(100);
+
+-- Add items_used to products table (for service-product linking)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS items_used JSONB DEFAULT '[]';
+
 -- Add hide_from_pos to products table
 ALTER TABLE products ADD COLUMN IF NOT EXISTS hide_from_pos BOOLEAN DEFAULT FALSE;
 

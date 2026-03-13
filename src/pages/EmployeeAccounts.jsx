@@ -18,7 +18,7 @@ import {
 } from '../components/shared';
 
 const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { user, showToast, isOwner, isBranchOwner, getUserBranchId } = useApp();
+  const { user, showToast, isOwner, isManager, isBranchOwner, getUserBranchId } = useApp();
 
   // Filter state
   const [filterRole, setFilterRole] = useState('all');
@@ -548,13 +548,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   ];
 
-  // Check if user is Owner or Branch Owner
-  if (!isOwner() && !isBranchOwner()) {
+  // Check if user is Owner, Manager, or Branch Owner
+  if (!isOwner() && !isManager() && !isBranchOwner()) {
     return (
       <EmptyState
         icon="🔒"
         title="Access Denied"
-        description="Only Owners and Branch Owners can manage employee accounts"
+        description="Only Owners, Managers, and Branch Owners can manage employee accounts"
       />
     );
   }

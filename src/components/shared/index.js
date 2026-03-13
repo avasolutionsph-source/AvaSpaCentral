@@ -10,3 +10,4 @@ export { default as CrudModal } from './CrudModal';
 export { default as FilterBar, FilterSelect, SearchInput } from './FilterBar';
 export { default as PageHeader, PageHeaderCompact } from './PageHeader';
 export { default as DataTable, ActionButtons, StatusBadge } from './DataTable';
+export { default as ManageOrder } from './ManageOrder';

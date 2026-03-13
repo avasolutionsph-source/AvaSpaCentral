@@ -34,6 +34,7 @@ export interface Product extends BaseEntity {
   lowStockAlert?: number;
   imageUrl?: string;
   hideFromPOS?: boolean;
+  displayOrder?: number;
   commission?: {
     type: 'percentage' | 'fixed';
     value: number;
@@ -158,6 +159,7 @@ export interface Room extends BaseEntity {
   status: 'active' | 'inactive' | 'maintenance';
   features?: string[];
   branchId?: string;
+  displayOrder?: number;
 }
 
 // Expense entity

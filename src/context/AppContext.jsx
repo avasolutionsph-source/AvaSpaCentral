@@ -362,9 +362,9 @@ export const AppProvider = ({ children }) => {
     return user?.role === 'Therapist';
   };
 
-  // Check if user can edit (Owner and Branch Owner for their branch)
+  // Check if user can edit (Owner, Manager, and Branch Owner for their branch)
   const canEdit = () => {
-    return ['Owner', 'Branch Owner'].includes(user?.role);
+    return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
   };
 
   // Check if user can edit products/services (Owner, Manager, and Branch Owner)

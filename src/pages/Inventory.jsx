@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
 import { StockHistoryRepository } from '../services/storage/repositories';
+import { ManageOrder } from '../components/shared';
 
 const Inventory = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
@@ -15,6 +16,10 @@ const Inventory = ({ embedded = false, onDataChange }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+
+  // Manage order modal state
+  const [showManageOrder, setShowManageOrder] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   // Modals
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
@@ -152,7 +157,27 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       filtered = filtered.filter(p => p.category === filterCategory);
     }
 
+    // Sort by displayOrder
+    filtered.sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999));
+
     setFilteredInventory(filtered);
+  };
+
+  // Save reordered inventory items
+  const handleSaveOrder = async (reorderedItems) => {
+    setSavingOrder(true);
+    try {
+      for (let i = 0; i < reorderedItems.length; i++) {
+        await mockApi.products.updateProduct(reorderedItems[i]._id, { displayOrder: i });
+      }
+      showToast('Inventory order saved', 'success');
+      setShowManageOrder(false);
+      loadInventory();
+    } catch (error) {
+      showToast('Failed to save order', 'error');
+    } finally {
+      setSavingOrder(false);
+    }
   };
 
   const calculateSummary = () => {
@@ -442,6 +467,13 @@ const Inventory = ({ embedded = false, onDataChange }) => {
             <h1>Inventory Management</h1>
             <p>{canEdit() ? 'Track stock levels, manage orders, and monitor inventory valuation' : 'View stock levels and inventory valuation'}</p>
           </div>
+          {canEdit() && (
+            <div className="page-header-actions">
+              <button className="btn btn-secondary" onClick={() => setShowManageOrder(true)}>
+                Manage Order
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -980,6 +1012,18 @@ const Inventory = ({ embedded = false, onDataChange }) => {
           </div>
         </div>
       )}
+
+      {/* Manage Order Modal */}
+      <ManageOrder
+        isOpen={showManageOrder}
+        onClose={() => setShowManageOrder(false)}
+        items={inventory.slice().sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999))}
+        onSave={handleSaveOrder}
+        title="Manage Inventory Order"
+        renderLabel={(product) => product.name}
+        renderSubLabel={(product) => `${product.category} - Stock: ${product.stock} ${product.unit || 'pcs'}`}
+        saving={savingOrder}
+      />
     </div>
   );
 };

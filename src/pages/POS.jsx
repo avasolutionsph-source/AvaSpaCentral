@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
 import { getTherapists } from '../utils/employeeFilters';
-import { ConfirmDialog } from '../components/shared';
+import { ConfirmDialog, ManageOrder } from '../components/shared';
 import { logTransaction } from '../utils/activityLogger';
 import { formatTimeRange } from '../utils/dateUtils';
 import GiftCertificatesTab from './GiftCertificates';
@@ -25,6 +25,8 @@ const POS = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
+  const [showManageOrder, setShowManageOrder] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
 
   // Checkout state
@@ -271,8 +273,33 @@ const POS = () => {
       );
     }
 
+    // Sort by displayOrder
+    filtered.sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999));
+
     return filtered;
   }, [products, selectedCategory, searchTerm]);
+
+  // Save reordered products (POS)
+  const handleSaveOrder = useCallback(async (reorderedItems) => {
+    setSavingOrder(true);
+    try {
+      for (let i = 0; i < reorderedItems.length; i++) {
+        await mockApi.products.updateProduct(reorderedItems[i]._id, { displayOrder: i });
+      }
+      showToast('Product order saved', 'success');
+      setShowManageOrder(false);
+      // Reload products
+      const productsData = await mockApi.products.getProducts({ active: true });
+      const visibleProducts = productsData.filter(p => !p.hideFromPOS);
+      const userBranchId = getUserBranchId();
+      const branchFilter = (item) => !userBranchId || !item.branchId || item.branchId === userBranchId;
+      setProducts(visibleProducts.filter(branchFilter));
+    } catch (error) {
+      showToast('Failed to save order', 'error');
+    } finally {
+      setSavingOrder(false);
+    }
+  }, [showToast, getUserBranchId]);
 
   const addToCart = useCallback((product) => {
     setCart(prevCart => {
@@ -923,14 +950,22 @@ const POS = () => {
         {/* Left Panel - Products */}
         <div className="pos-products-panel">
           {/* Search Bar */}
-          <div className="pos-search">
+          <div className="pos-search" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
               type="text"
               placeholder="Search products and services..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pos-search-input"
+              style={{ flex: 1 }}
             />
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowManageOrder(true)}
+              style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              Manage Order
+            </button>
           </div>
 
           {/* Category Filters */}
@@ -1871,6 +1906,18 @@ const POS = () => {
       )}
       </>
       )}
+
+      {/* Manage Order Modal */}
+      <ManageOrder
+        isOpen={showManageOrder}
+        onClose={() => setShowManageOrder(false)}
+        items={products.slice().sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999))}
+        onSave={handleSaveOrder}
+        title="Manage POS Product Order"
+        renderLabel={(product) => product.name}
+        renderSubLabel={(product) => `${product.category} - ₱${product.price}`}
+        saving={savingOrder}
+      />
     </div>
   );
 };

@@ -12,7 +12,8 @@ import {
   FilterBar,
   CrudModal,
   PageLoading,
-  EmptyState
+  EmptyState,
+  ManageOrder
 } from '../components/shared';
 import { roomValidation, validateWithToast } from '../validation/schemas';
 
@@ -33,6 +34,10 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
 
   // Home services state
   const [homeServices, setHomeServices] = useState([]);
+
+  // Manage order modal state
+  const [showManageOrder, setShowManageOrder] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   // Predefined stop reasons
   const stopReasons = [
@@ -310,6 +315,23 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     };
   };
 
+  // Save reordered rooms
+  const handleSaveOrder = async (reorderedItems) => {
+    setSavingOrder(true);
+    try {
+      for (let i = 0; i < reorderedItems.length; i++) {
+        await mockApi.rooms.updateRoom(reorderedItems[i]._id, { displayOrder: i });
+      }
+      showToast('Room order saved', 'success');
+      setShowManageOrder(false);
+      loadRooms();
+    } catch (error) {
+      showToast('Failed to save order', 'error');
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
   // Filter rooms based on status and role
   // By default, only show rooms with active services (pending/occupied)
   const filteredRooms = useMemo(() => {
@@ -335,6 +357,9 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     if (isTherapist() && user?.employeeId) {
       filtered = filtered.filter(r => r.assignedEmployeeId === user.employeeId);
     }
+
+    // Sort by displayOrder
+    filtered.sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999));
 
     return filtered;
   }, [rooms, filterStatus, isTherapist, user, getUserBranchId]);
@@ -826,7 +851,10 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
         <PageHeader
           title="Rooms Management"
           description={isTherapist() ? 'View your assigned rooms and their availability' : 'Manage treatment rooms and their availability'}
-          action={canEdit() ? { label: '+ Add Room', onClick: openCreate } : null}
+          actions={canEdit() ? [
+            { label: 'Manage Order', onClick: () => setShowManageOrder(true), variant: 'secondary' },
+            { label: '+ Add Room', onClick: openCreate }
+          ] : null}
           showAction={canEdit()}
         />
       )}
@@ -1319,6 +1347,18 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
           </div>
         </div>
       )}
+
+      {/* Manage Order Modal */}
+      <ManageOrder
+        isOpen={showManageOrder}
+        onClose={() => setShowManageOrder(false)}
+        items={rooms.slice().sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999))}
+        onSave={handleSaveOrder}
+        title="Manage Room Order"
+        renderLabel={(room) => room.name}
+        renderSubLabel={(room) => `${room.type} - Capacity: ${room.capacity}`}
+        saving={savingOrder}
+      />
     </div>
   );
 };

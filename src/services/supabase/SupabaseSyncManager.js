@@ -906,14 +906,14 @@ class SupabaseSyncManager {
   async cleanupOnLogout() {
     console.log('[SupabaseSyncManager] Cleaning up on logout...');
 
-    // First do regular cleanup
+    // First do regular cleanup (stops intervals, listeners, etc.)
     this.cleanup();
 
-    // Clear the stored business ID so next login will pull fresh data
-    localStorage.removeItem('currentBusinessId');
-
-    // Clear all local data to prevent data leakage between accounts
-    await this._clearLocalDataForAccountSwitch();
+    // NOTE: We do NOT clear local data here anymore.
+    // The initialize() method already handles account switching by comparing
+    // businessId on next login - it will clear data only if a DIFFERENT account logs in.
+    // This preserves rooms, products, and all other data for same-account re-login,
+    // which is critical when Supabase sync is not configured.
 
     console.log('[SupabaseSyncManager] Logout cleanup complete');
   }

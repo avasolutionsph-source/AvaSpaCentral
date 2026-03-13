@@ -10,7 +10,7 @@ import { SettingsRepository } from '../services/storage/repositories';
 
 const Attendance = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
-  const { user, showToast, isTherapist, hasManagementAccess, getUserBranchId } = useApp();
+  const { user, showToast, hasManagementAccess, getUserBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [todayAttendance, setTodayAttendance] = useState([]);
@@ -97,8 +97,8 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   };
 
   const handleQuickClock = async (type) => {
-    // For therapists, use their own employeeId
-    const employeeId = isTherapist() ? user?.employeeId : quickEmployeeId;
+    // For non-management roles, use their own employeeId
+    const employeeId = !hasManagementAccess() ? user?.employeeId : quickEmployeeId;
 
     if (!employeeId) {
       showToast('Please select an employee', 'error');
@@ -201,7 +201,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       setShowCamera(false);
       setPendingClockAction(null);
       setShowClockModal(false);
-      if (!isTherapist()) {
+      if (hasManagementAccess()) {
         setQuickEmployeeId('');
       }
       setSelectedEmployeeId('');
@@ -331,10 +331,10 @@ const Attendance = ({ embedded = false, onDataChange }) => {
             >
               ← Back to Calendar
             </button>
-            <h1>{isTherapist() ? 'My Attendance' : 'Attendance'}</h1>
-            <p>{isTherapist() ? 'Track your clock in/out and work hours' : 'Track employee clock in/out and work hours'}</p>
+            <h1>{!hasManagementAccess() ? 'My Attendance' : 'Attendance'}</h1>
+            <p>{!hasManagementAccess() ? 'Track your clock in/out and work hours' : 'Track employee clock in/out and work hours'}</p>
           </div>
-          {!isTherapist() && (
+          {hasManagementAccess() && (
             <div className="flex gap-sm">
               <button className="btn btn-secondary" onClick={() => openClockModal('in')}>⏱ Clock In</button>
               <button className="btn btn-primary" onClick={() => openClockModal('out')}>⏱ Clock Out</button>
@@ -344,7 +344,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       )}
 
       {/* Stats Cards - Only for Owner/Manager */}
-      {!isTherapist() && (
+      {hasManagementAccess() && (
         <div className="attendance-stats-grid">
           <div className="attendance-stat-card">
             <div className="attendance-stat-value">{stats.total}</div>
@@ -368,9 +368,9 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       {/* Quick Clock In/Out */}
       <div className="quick-clock-section">
         <h3 className="mb-md text-base">
-          {isTherapist() ? 'My Attendance' : 'Quick Clock In/Out'}
+          {!hasManagementAccess() ? 'My Attendance' : 'Quick Clock In/Out'}
         </h3>
-        {isTherapist() ? (
+        {!hasManagementAccess() ? (
           // Simplified UI for therapists - no dropdown
           <div className="quick-clock-form">
             <div className="flex-1 flex items-center gap-sm">
@@ -430,7 +430,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       {/* Today's Attendance Table */}
       <div className="attendance-table-section">
         <h3 className="mb-lg text-lg">
-          {isTherapist() ? 'My Attendance Today' : "Today's Attendance"} - {format(new Date(), 'EEEE, MMMM dd, yyyy')}
+          {!hasManagementAccess() ? 'My Attendance Today' : "Today's Attendance"} - {format(new Date(), 'EEEE, MMMM dd, yyyy')}
         </h3>
         <table className="attendance-table">
           <thead>
@@ -442,13 +442,13 @@ const Attendance = ({ embedded = false, onDataChange }) => {
               <th>Hours Worked</th>
               <th>Overtime</th>
               <th>Photos</th>
-              {!isTherapist() && <th>Actions</th>}
+              {hasManagementAccess() && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {employees.filter(emp => {
               // Filter to show only the therapist's own record if they're a therapist
-              if (isTherapist() && user?.employeeId) {
+              if (!hasManagementAccess() && user?.employeeId) {
                 return emp._id === user.employeeId;
               }
               return true;
@@ -511,7 +511,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                       <span className="no-photos">-</span>
                     )}
                   </td>
-                  {!isTherapist() && (
+                  {hasManagementAccess() && (
                     <td>
                       {!record?.clockIn ? (
                         <button

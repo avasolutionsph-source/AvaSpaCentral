@@ -10,7 +10,8 @@ import {
   FilterBar,
   CrudModal,
   PageLoading,
-  EmptyState
+  EmptyState,
+  ManageOrder
 } from '../components/shared';
 
 // Initial form data - defined outside component to prevent recreation on each render
@@ -54,6 +55,10 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+
+  // Manage order modal state
+  const [showManageOrder, setShowManageOrder] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   // Custom validation for products (more complex than schema-based)
   const validateProduct = (data) => {
@@ -165,6 +170,23 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     [products]
   );
 
+  // Save reordered products
+  const handleSaveOrder = async (reorderedItems) => {
+    setSavingOrder(true);
+    try {
+      for (let i = 0; i < reorderedItems.length; i++) {
+        await mockApi.products.updateProduct(reorderedItems[i]._id, { displayOrder: i });
+      }
+      showToast('Product order saved', 'success');
+      setShowManageOrder(false);
+      loadProducts();
+    } catch (error) {
+      showToast('Failed to save order', 'error');
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
   // Filter products
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
@@ -191,6 +213,9 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       const isActive = filterStatus === 'active';
       filtered = filtered.filter(p => p.active === isActive);
     }
+
+    // Sort by displayOrder
+    filtered.sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999));
 
     return filtered;
   }, [products, searchTerm, filterType, filterCategory, filterStatus, getUserBranchId]);
@@ -277,7 +302,10 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
         <PageHeader
           title="Products & Services"
           description={canEditProducts() ? 'Manage your service menu and retail products' : 'View service menu and retail products'}
-          action={canEditProducts() ? { label: '+ Add Product/Service', onClick: openCreate } : null}
+          actions={canEditProducts() ? [
+            { label: 'Manage Order', onClick: () => setShowManageOrder(true), variant: 'secondary' },
+            { label: '+ Add Product/Service', onClick: openCreate }
+          ] : null}
           showAction={canEditProducts()}
         />
       )}
@@ -607,6 +635,18 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
         confirmText="Delete"
         confirmVariant="danger"
         isLoading={isDeleting}
+      />
+
+      {/* Manage Order Modal */}
+      <ManageOrder
+        isOpen={showManageOrder}
+        onClose={() => setShowManageOrder(false)}
+        items={products.slice().sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999))}
+        onSave={handleSaveOrder}
+        title="Manage Product Order"
+        renderLabel={(product) => product.name}
+        renderSubLabel={(product) => `${product.type === 'service' ? 'Service' : 'Product'} - ${product.category} - ₱${product.price}`}
+        saving={savingOrder}
       />
     </div>
   );

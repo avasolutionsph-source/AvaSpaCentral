@@ -411,6 +411,11 @@ const BookingPage = () => {
       alert('Please enter your phone number.');
       return;
     }
+    const digitsOnly = customerPhone.trim().replace(/\D/g, '');
+    if (digitsOnly.length !== 11) {
+      alert('Phone number must be exactly 11 digits (e.g., 09XX XXX XXXX).');
+      return;
+    }
     // Validate service location address if home/hotel service
     if (serviceLocation !== 'in_store' && !serviceAddress.trim()) {
       alert('Please enter your address for home/hotel service.');
@@ -975,7 +980,11 @@ const BookingPage = () => {
                   type="tel"
                   placeholder="09XX XXX XXXX"
                   value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val.length <= 11) setCustomerPhone(val);
+                  }}
+                  maxLength={11}
                   required
                 />
               </div>
@@ -1080,7 +1089,7 @@ const BookingPage = () => {
                 <button
                   className="submit-booking-btn"
                   onClick={handleSubmitBooking}
-                  disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone}
+                  disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
                 >
                   {submitting ? 'Submitting...' : `Book Now`}
                 </button>
@@ -1117,7 +1126,7 @@ const BookingPage = () => {
         <button
           className="mobile-summary-btn"
           onClick={handleSubmitBooking}
-          disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone}
+          disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
         >
           {submitting ? 'Submitting...' : 'Book Now'}
         </button>

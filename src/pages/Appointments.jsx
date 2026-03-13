@@ -225,6 +225,16 @@ const Appointments = () => {
       if (service && service.duration) {
         setFormData(prev => ({ ...prev, duration: service.duration }));
       }
+      // Keep employeeId only if the therapist is still available for the new service
+      setFormData(prev => {
+        if (!prev.employeeId) return prev;
+        const selectedService = services.find(s => s._id === value);
+        const availableTherapists = value
+          ? getEmployeesForService(employees, selectedService)
+          : getTherapists(employees);
+        const stillAvailable = availableTherapists.some(e => e._id === prev.employeeId);
+        return stillAvailable ? prev : { ...prev, employeeId: '' };
+      });
     }
   };
 
@@ -630,18 +640,22 @@ const Appointments = () => {
               <div className="modal-body">
                 <div className="form-group">
                   <label>Customer *</label>
-                  {modalMode === 'create' ? (
-                    <select name="customerId" value={formData.customerId} onChange={handleInputChange} className="form-control">
-                      <option value="">Walk-in (or select existing)</option>
-                      {customers.map(c => (
-                        <option key={c._id} value={c._id}>
-                          {c.name} {(c.noShowCount || 0) >= 2 ? '⚠️' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input type="text" value={formData.customerName} className="form-control" disabled />
-                  )}
+                  <select name="customerId" value={formData.customerId} onChange={(e) => {
+                    const val = e.target.value;
+                    const customer = customers.find(c => c._id === val);
+                    setFormData(prev => ({
+                      ...prev,
+                      customerId: val,
+                      customerName: customer ? customer.name : prev.customerName
+                    }));
+                  }} className="form-control">
+                    <option value="">Walk-in (or select existing)</option>
+                    {customers.map(c => (
+                      <option key={c._id} value={c._id}>
+                        {c.name} {(c.noShowCount || 0) >= 2 ? '⚠️' : ''}
+                      </option>
+                    ))}
+                  </select>
                   {/* No-Show Warning for selected customer */}
                   {formData.customerId && (() => {
                     const selectedCustomer = customers.find(c => c._id === formData.customerId);
@@ -665,7 +679,7 @@ const Appointments = () => {
                     return null;
                   })()}
                 </div>
-                {!formData.customerId && modalMode === 'create' && (
+                {!formData.customerId && (
                   <div className="form-group">
                     <label>Walk-in Customer Name</label>
                     <input type="text" name="customerName" value={formData.customerName} onChange={handleInputChange}

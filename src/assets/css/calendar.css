@@ -2,10 +2,11 @@
    CALENDAR PAGE SPECIFIC STYLES
    ============================================================================ */
 .calendar-page {
+  padding: 0;
+}
+
+.calendar-page .hub-content {
   padding: var(--spacing-lg);
-  height: calc(100vh - 120px);
-  display: flex;
-  flex-direction: column;
 }
 
 /* View Switcher */
@@ -1227,4 +1228,52 @@
     font-size: 0.75rem;
     padding: 6px 8px;
   }
+}
+
+/* Calendar Shift Item Styles */
+.calendar-shift-item {
+  border-left: 3px solid var(--primary-500);
+  padding-left: 4px;
+}
+
+.calendar-shift-item.shift {
+  border-left-color: var(--color-accent);
+}
+
+.calendar-shift-item.day-off,
+.calendar-shift-item.time-off {
+  border-left-color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.calendar-shift-item.appointment {
+  border-left-color: var(--primary);
+}
+
+/* Manage Navigation Buttons */
+.calendar-manage-btn {
+  font-size: 0.85rem !important;
+  opacity: 1;
+  background: var(--bg-secondary, #f3f4f6) !important;
+  border: 1px solid var(--border-color, #e5e7eb) !important;
+  border-radius: 6px !important;
+  color: var(--text-secondary, #6b7280) !important;
+  padding: 0.4rem 0.75rem !important;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.calendar-manage-btn:hover {
+  background: var(--primary-color, #6366f1) !important;
+  color: white !important;
+  border-color: var(--primary-color, #6366f1) !important;
+}
+
+.shift-item-icon {
+  font-size: 0.75rem;
+}
+
+.shift-item-time {
+  font-size: 0.625rem;
+  color: var(--gray-600);
 }

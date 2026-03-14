@@ -23,7 +23,6 @@ const Calendar = () => {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // 'month', 'week', 'day'
-  const [dataFilter, setDataFilter] = useState('all'); // 'all', 'appointments', 'attendance', 'shifts'
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -295,42 +294,36 @@ const Calendar = () => {
     let events = [];
 
     // Add appointments
-    if (dataFilter === 'all' || dataFilter === 'appointments') {
-      const dayAppointments = appointments.filter(apt => {
-        try {
-          return isSameDay(parseISO(apt.date), date);
-        } catch {
-          return false;
-        }
-      });
-      events = [...events, ...dayAppointments];
-    }
+    const dayAppointments = appointments.filter(apt => {
+      try {
+        return isSameDay(parseISO(apt.date), date);
+      } catch {
+        return false;
+      }
+    });
+    events = [...events, ...dayAppointments];
 
     // Add attendance
-    if (dataFilter === 'all' || dataFilter === 'attendance') {
-      const dayAttendance = attendanceData.filter(att => {
-        try {
-          const attDate = typeof att.date === 'string' ? att.date : format(new Date(att.date), 'yyyy-MM-dd');
-          return attDate === dateStr;
-        } catch {
-          return false;
-        }
-      });
-      events = [...events, ...dayAttendance];
-    }
+    const dayAttendance = attendanceData.filter(att => {
+      try {
+        const attDate = typeof att.date === 'string' ? att.date : format(new Date(att.date), 'yyyy-MM-dd');
+        return attDate === dateStr;
+      } catch {
+        return false;
+      }
+    });
+    events = [...events, ...dayAttendance];
 
     // Add shifts
-    if (dataFilter === 'all' || dataFilter === 'shifts') {
-      const dayShifts = shiftData.filter(shift => {
-        try {
-          const shiftDate = typeof shift.date === 'string' ? shift.date : format(new Date(shift.date), 'yyyy-MM-dd');
-          return shiftDate === dateStr;
-        } catch {
-          return false;
-        }
-      });
-      events = [...events, ...dayShifts];
-    }
+    const dayShifts = shiftData.filter(shift => {
+      try {
+        const shiftDate = typeof shift.date === 'string' ? shift.date : format(new Date(shift.date), 'yyyy-MM-dd');
+        return shiftDate === dateStr;
+      } catch {
+        return false;
+      }
+    });
+    events = [...events, ...dayShifts];
 
     return events;
   };
@@ -933,52 +926,25 @@ const Calendar = () => {
           </div>
         </div>
 
-        {/* Tab Navigation - consistent with Resources/Employees */}
+        {/* Manage navigation buttons */}
         <div className="sales-tabs">
-          <button
-            className={`sales-tab ${dataFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setDataFilter('all')}
-          >
-            <span>All</span>
-          </button>
-          <button
-            className={`sales-tab ${dataFilter === 'appointments' ? 'active' : ''}`}
-            onClick={() => setDataFilter('appointments')}
-          >
-            <span>Appointments</span>
-          </button>
-          <button
-            className={`sales-tab ${dataFilter === 'attendance' ? 'active' : ''}`}
-            onClick={() => setDataFilter('attendance')}
-          >
-            <span>Attendance</span>
-          </button>
-          <button
-            className={`sales-tab ${dataFilter === 'shifts' ? 'active' : ''}`}
-            onClick={() => setDataFilter('shifts')}
-          >
-            <span>Shifts</span>
-          </button>
-
-          {/* Manage navigation buttons */}
-          <div className="calendar-tab-nav-spacer" />
           <button
             className="sales-tab calendar-manage-btn"
             onClick={() => navigate('/appointments')}
           >
-            <span>◐ Appointments</span>
+            <span>Appointments</span>
           </button>
           <button
             className="sales-tab calendar-manage-btn"
             onClick={() => navigate('/attendance')}
           >
-            <span>◑ Attendance</span>
+            <span>Attendance</span>
           </button>
           <button
             className="sales-tab calendar-manage-btn"
             onClick={() => navigate('/shift-schedules')}
           >
-            <span>◒ Shift Schedules</span>
+            <span>Shift Schedules</span>
           </button>
         </div>
       </div>

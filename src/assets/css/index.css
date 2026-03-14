@@ -7985,26 +7985,17 @@ a:focus:not(:focus-visible),
   flex-wrap: wrap;
 }
 
-.calendar-quick-nav {
-  display: flex;
-  gap: var(--spacing-sm);
+.calendar-tab-nav-spacer {
+  flex: 1;
 }
 
-.quick-nav-btn {
-  padding: 6px 14px;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 500;
-  transition: all 0.15s ease;
+.calendar-manage-btn {
+  font-size: 0.8rem !important;
+  opacity: 0.7;
 }
 
-.quick-nav-btn:hover {
-  background: var(--color-accent);
-  color: #fff;
-  border-color: var(--color-accent);
+.calendar-manage-btn:hover {
+  opacity: 1;
 }
 
 .view-switcher {

@@ -959,6 +959,27 @@ const Calendar = () => {
           >
             <span>Shifts</span>
           </button>
+
+          {/* Manage navigation buttons */}
+          <div className="calendar-tab-nav-spacer" />
+          <button
+            className="sales-tab calendar-manage-btn"
+            onClick={() => navigate('/appointments')}
+          >
+            <span>◐ Appointments</span>
+          </button>
+          <button
+            className="sales-tab calendar-manage-btn"
+            onClick={() => navigate('/attendance')}
+          >
+            <span>◑ Attendance</span>
+          </button>
+          <button
+            className="sales-tab calendar-manage-btn"
+            onClick={() => navigate('/shift-schedules')}
+          >
+            <span>◒ Shift Schedules</span>
+          </button>
         </div>
       </div>
 
@@ -1001,30 +1022,6 @@ const Calendar = () => {
               </button>
             </div>
 
-            {/* Quick navigation to management pages */}
-            <div className="calendar-quick-nav">
-              <button
-                className="quick-nav-btn appointments"
-                onClick={() => navigate('/appointments')}
-                title="Go to Appointments Management"
-              >
-                ◐ Appointments
-              </button>
-              <button
-                className="quick-nav-btn attendance"
-                onClick={() => navigate('/attendance')}
-                title="Go to Attendance Management"
-              >
-                ◑ Attendance
-              </button>
-              <button
-                className="quick-nav-btn shifts"
-                onClick={() => navigate('/shift-schedules')}
-                title="Go to Shift Schedules"
-              >
-                ◒ Shift Schedules
-              </button>
-            </div>
           </div>
         </div>
 

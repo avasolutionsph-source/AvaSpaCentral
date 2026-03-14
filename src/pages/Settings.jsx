@@ -240,10 +240,14 @@ const Settings = () => {
         'Content-Type': 'application/json'
       };
 
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 5000);
+
       const res = await fetch(
         `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&order=display_order.asc,name.asc`,
-        { headers }
+        { headers, signal: controller.signal }
       );
+      clearTimeout(fetchTimeout);
 
       if (res.ok) {
         let branchList = await res.json();
@@ -257,7 +261,9 @@ const Settings = () => {
         setGpsBranches(branchList);
       }
     } catch (err) {
-      console.error('Failed to load GPS config:', err);
+      if (err.name !== 'AbortError') {
+        console.error('Failed to load GPS config:', err);
+      }
     } finally {
       setGpsLoading(false);
     }
@@ -485,17 +491,29 @@ const Settings = () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+      if (!supabaseUrl || !supabaseKey) {
+        setBranchesLoading(false);
+        return;
+      }
+
       try {
-        // Get user's access token for RLS
+        // Get user's access token for RLS with timeout
         const { supabase } = await import('../services/supabase/supabaseClient');
         let accessToken = supabaseKey;
 
         if (supabase) {
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData?.session?.access_token) {
-            accessToken = sessionData.session.access_token;
-          }
+          try {
+            const sessionPromise = supabase.auth.getSession();
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
+            const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
+            if (sessionData?.session?.access_token) {
+              accessToken = sessionData.session.access_token;
+            }
+          } catch {}
         }
+
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 5000);
 
         const response = await fetch(
           `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&order=display_order.asc,name.asc`,
@@ -503,15 +521,20 @@ const Settings = () => {
             headers: {
               'apikey': supabaseKey,
               'Authorization': `Bearer ${accessToken}`
-            }
+            },
+            signal: controller.signal
           }
         );
+        clearTimeout(fetchTimeout);
+
         if (response.ok) {
           const data = await response.json();
           setBranches(data || []);
         }
       } catch (err) {
-        console.error('Error loading branches:', err);
+        if (err.name !== 'AbortError') {
+          console.error('Error loading branches:', err);
+        }
       } finally {
         setBranchesLoading(false);
       }

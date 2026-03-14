@@ -61,15 +61,18 @@ const BranchesTab = () => {
     setLoading(true);
     try {
       const headers = await getHeaders();
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 5000);
       const res = await fetch(
         `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&order=display_order.asc,name.asc`,
-        { headers }
+        { headers, signal: controller.signal }
       );
+      clearTimeout(fetchTimeout);
       if (res.ok) {
         setBranches(await res.json());
       }
     } catch (err) {
-      console.error('Failed to load branches:', err);
+      if (err.name !== 'AbortError') console.error('Failed to load branches:', err);
     } finally {
       setLoading(false);
     }
@@ -79,10 +82,13 @@ const BranchesTab = () => {
     if (!supabaseUrl || !supabaseKey || !user?.businessId) return;
     try {
       const headers = await getHeaders();
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 5000);
       const res = await fetch(
         `${supabaseUrl}/rest/v1/users?business_id=eq.${user.businessId}&status=eq.active&select=id,username,email,first_name,last_name,role,branch_id`,
-        { headers }
+        { headers, signal: controller.signal }
       );
+      clearTimeout(fetchTimeout);
       if (res.ok) {
         const staff = await res.json();
         const grouped = {};

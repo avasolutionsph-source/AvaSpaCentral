@@ -780,20 +780,20 @@
   background: var(--white);
 }
 
-.appointment-time {
+.calendar-page .appointment-time {
   font-size: 0.75rem;
   font-weight: 700;
   margin-bottom: var(--spacing-xs);
   color: var(--gray-900);
 }
 
-.appointment-customer {
+.calendar-page .appointment-customer {
   font-weight: 700;
   margin-bottom: var(--spacing-xs);
   color: var(--gray-900);
 }
 
-.appointment-service {
+.calendar-page .appointment-service {
   font-size: 0.75rem;
   color: var(--gray-600);
 }
@@ -1001,7 +1001,7 @@
   margin-bottom: var(--spacing-lg);
 }
 
-.appointment-status-badge {
+.calendar-page .appointment-status-badge {
   padding: 6px 12px;
   border-radius: var(--radius-full);
   font-size: 0.75rem;
@@ -1009,22 +1009,22 @@
   text-transform: uppercase;
 }
 
-.appointment-status-badge.pending {
+.calendar-page .appointment-status-badge.pending {
   background: var(--warning-light);
   color: var(--warning-dark);
 }
 
-.appointment-status-badge.confirmed {
+.calendar-page .appointment-status-badge.confirmed {
   background: var(--success-light);
   color: var(--success-dark);
 }
 
-.appointment-status-badge.completed {
+.calendar-page .appointment-status-badge.completed {
   background: var(--info-light);
   color: var(--info-dark);
 }
 
-.appointment-status-badge.cancelled {
+.calendar-page .appointment-status-badge.cancelled {
   background: var(--error-light);
   color: var(--error-dark);
 }

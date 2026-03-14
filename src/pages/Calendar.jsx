@@ -916,126 +916,137 @@ const Calendar = () => {
   }
 
   return (
-    <div className="calendar-page">
-      {/* Controls */}
-      <div className="calendar-controls">
-        <div className="calendar-nav">
-          <button className="nav-btn" onClick={goToPrevious}>
-            ◀
-          </button>
-          <div className="current-date-display">{getDateDisplay()}</div>
-          <button className="nav-btn" onClick={goToNext}>
-            ▶
-          </button>
-          <button className="today-btn" onClick={goToToday}>
-            Today
-          </button>
-        </div>
-
-        <div className="calendar-filters">
-          {/* Data type filter */}
-          <div className="data-filter">
-            <button
-              className={`filter-btn ${dataFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setDataFilter('all')}
-            >
-              All
-            </button>
-            <button
-              className={`filter-btn filter-appointments ${dataFilter === 'appointments' ? 'active' : ''}`}
-              onClick={() => setDataFilter('appointments')}
-            >
-              Appointments
-            </button>
-            <button
-              className={`filter-btn filter-attendance ${dataFilter === 'attendance' ? 'active' : ''}`}
-              onClick={() => setDataFilter('attendance')}
-            >
-              Attendance
-            </button>
-            <button
-              className={`filter-btn filter-shifts ${dataFilter === 'shifts' ? 'active' : ''}`}
-              onClick={() => setDataFilter('shifts')}
-            >
-              Shifts
-            </button>
+    <div className="calendar-page hub-page">
+      {/* Hub Header */}
+      <div className="hub-header">
+        <div className="hub-title-row">
+          <div className="hub-title">
+            <div>
+              <h1>Schedule</h1>
+              <p className="hub-subtitle">Calendar, appointments, attendance & shift schedules</p>
+            </div>
           </div>
-
-          {/* View switcher */}
-          <div className="view-switcher">
-            <button
-              className={`view-btn ${view === 'month' ? 'active' : ''}`}
-              onClick={() => setView('month')}
-            >
-              Month
-            </button>
-            <button
-              className={`view-btn ${view === 'week' ? 'active' : ''}`}
-              onClick={() => setView('week')}
-            >
-              Week
-            </button>
-            <button
-              className={`view-btn ${view === 'day' ? 'active' : ''}`}
-              onClick={() => setView('day')}
-            >
-              Day
-            </button>
-          </div>
-
-          {/* Quick navigation to management pages */}
-          <div className="calendar-quick-nav">
-            <span className="quick-nav-label">Manage:</span>
-            <button
-              className="quick-nav-btn appointments"
-              onClick={() => navigate('/appointments')}
-              title="Go to Appointments Management"
-            >
-              ◐ Appointments
-            </button>
-            <button
-              className="quick-nav-btn attendance"
-              onClick={() => navigate('/attendance')}
-              title="Go to Attendance Management"
-            >
-              ◑ Attendance
-            </button>
-            <button
-              className="quick-nav-btn shifts"
-              onClick={() => navigate('/shift-schedules')}
-              title="Go to Shift Schedules"
-            >
-              ◒ Shift Schedules
+          <div className="hub-header-actions">
+            <button className="btn btn-primary" onClick={() => openCreateModal(selectedDate || currentDate)}>
+              + New Appointment
             </button>
           </div>
         </div>
 
-        <div className="calendar-actions">
-          <button className="btn btn-primary" onClick={() => openCreateModal(selectedDate || currentDate)}>
-            + New Appointment
+        {/* Tab Navigation - consistent with Resources/Employees */}
+        <div className="sales-tabs">
+          <button
+            className={`sales-tab ${dataFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setDataFilter('all')}
+          >
+            <span>All</span>
+          </button>
+          <button
+            className={`sales-tab ${dataFilter === 'appointments' ? 'active' : ''}`}
+            onClick={() => setDataFilter('appointments')}
+          >
+            <span>Appointments</span>
+          </button>
+          <button
+            className={`sales-tab ${dataFilter === 'attendance' ? 'active' : ''}`}
+            onClick={() => setDataFilter('attendance')}
+          >
+            <span>Attendance</span>
+          </button>
+          <button
+            className={`sales-tab ${dataFilter === 'shifts' ? 'active' : ''}`}
+            onClick={() => setDataFilter('shifts')}
+          >
+            <span>Shifts</span>
           </button>
         </div>
       </div>
 
-      {/* Legend bar */}
-      <div className="calendar-legend-bar">
-        <div className="legend-item">
-          <span className="legend-dot event-appointment"></span>
-          <span>Appointments</span>
+      {/* Calendar Controls */}
+      <div className="hub-content">
+        <div className="calendar-controls">
+          <div className="calendar-nav">
+            <button className="nav-btn" onClick={goToPrevious}>
+              ◀
+            </button>
+            <div className="current-date-display">{getDateDisplay()}</div>
+            <button className="nav-btn" onClick={goToNext}>
+              ▶
+            </button>
+            <button className="today-btn" onClick={goToToday}>
+              Today
+            </button>
+          </div>
+
+          <div className="calendar-filters">
+            {/* View switcher */}
+            <div className="view-switcher">
+              <button
+                className={`view-btn ${view === 'month' ? 'active' : ''}`}
+                onClick={() => setView('month')}
+              >
+                Month
+              </button>
+              <button
+                className={`view-btn ${view === 'week' ? 'active' : ''}`}
+                onClick={() => setView('week')}
+              >
+                Week
+              </button>
+              <button
+                className={`view-btn ${view === 'day' ? 'active' : ''}`}
+                onClick={() => setView('day')}
+              >
+                Day
+              </button>
+            </div>
+
+            {/* Quick navigation to management pages */}
+            <div className="calendar-quick-nav">
+              <button
+                className="quick-nav-btn appointments"
+                onClick={() => navigate('/appointments')}
+                title="Go to Appointments Management"
+              >
+                ◐ Appointments
+              </button>
+              <button
+                className="quick-nav-btn attendance"
+                onClick={() => navigate('/attendance')}
+                title="Go to Attendance Management"
+              >
+                ◑ Attendance
+              </button>
+              <button
+                className="quick-nav-btn shifts"
+                onClick={() => navigate('/shift-schedules')}
+                title="Go to Shift Schedules"
+              >
+                ◒ Shift Schedules
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="legend-item">
-          <span className="legend-dot event-attendance event-present"></span>
-          <span>Attendance</span>
+
+        {/* Legend bar */}
+        <div className="calendar-legend-bar">
+          <div className="legend-item">
+            <span className="legend-dot event-appointment"></span>
+            <span>Appointments</span>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot event-attendance event-present"></span>
+            <span>Attendance</span>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot event-shift event-day"></span>
+            <span>Day Shift</span>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot event-shift event-night"></span>
+            <span>Night Shift</span>
+          </div>
         </div>
-        <div className="legend-item">
-          <span className="legend-dot event-shift event-day"></span>
-          <span>Day Shift</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-dot event-shift event-night"></span>
-          <span>Night Shift</span>
-        </div>
-      </div>
 
       {/* Calendar Content */}
       <div className="calendar-container">
@@ -1043,6 +1054,7 @@ const Calendar = () => {
         {view === 'week' && renderWeekView()}
         {view === 'day' && renderDayView()}
       </div>
+      </div>{/* end hub-content */}
 
       {/* Event Detail Modal */}
       {showDetailModal && selectedEvent && (

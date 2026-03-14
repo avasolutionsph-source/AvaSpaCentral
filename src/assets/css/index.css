@@ -7934,6 +7934,10 @@ a:focus:not(:focus-visible),
    CALENDAR PAGE STYLES
    ============================================================================ */
 .calendar-page {
+  padding: 0;
+}
+
+.calendar-page .hub-content {
   padding: var(--spacing-lg);
 }
 

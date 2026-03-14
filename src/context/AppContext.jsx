@@ -65,7 +65,7 @@ const rolePermissions = {
             'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings'],
   'Manager': ['dashboard', 'pos', 'products', 'inventory', 'employees', 'customers', 'appointments', 'attendance',
               'payroll', 'rooms', 'service-history', 'gift-certificates', 'expenses', 'ai-chatbot', 'daet-insights', 'analytics', 'settings',
-              'my-schedule', 'shift-schedules', 'payroll-requests'],
+              'my-schedule', 'shift-schedules', 'payroll-requests', 'calendar'],
   'Branch Owner': ['dashboard', 'pos', 'products', 'employees', 'customers', 'appointments', 'attendance', 'rooms',
                    'gift-certificates', 'expenses', 'payroll', 'my-schedule', 'shift-schedules', 'payroll-requests', 'cash-drawer-history',
                    'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings'],

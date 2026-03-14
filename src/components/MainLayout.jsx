@@ -482,6 +482,10 @@ const MainLayout = () => {
   }, [isMobile, sidebarOpen]);
 
   // Menu items organized by logical groups - Professional icons
+  // Roles without 'calendar' but with 'appointments' see a standalone Appointments link
+  const hasCalendar = hasPermission('calendar');
+  const hasEmployeesAccess = hasPermission('employees');
+
   const menuGroups = [
     {
       label: 'Core',
@@ -489,6 +493,8 @@ const MainLayout = () => {
         { path: '/dashboard', label: 'Home', icon: 'dashboard', page: 'dashboard' },
         { path: '/pos', label: 'Sales', icon: 'pos', page: 'pos' },
         { path: '/calendar', label: 'Schedule', icon: 'calendar', page: 'calendar' },
+        // Show standalone Appointments for roles that have it but not calendar
+        ...(!hasCalendar ? [{ path: '/appointments', label: 'Appointments', icon: 'calendar', page: 'appointments' }] : []),
       ],
       hasDivider: true
     },
@@ -496,6 +502,8 @@ const MainLayout = () => {
       label: 'Business',
       items: [
         { path: '/inventory-hub', label: 'Resources', icon: 'inventory', page: 'inventory' },
+        // Show standalone Rooms for roles that have it but not inventory
+        ...(!hasPermission('inventory') ? [{ path: '/rooms', label: 'Rooms', icon: 'service', page: 'rooms' }] : []),
       ],
       hasDivider: true
     },
@@ -503,6 +511,8 @@ const MainLayout = () => {
       label: 'Management',
       items: [
         { path: '/hr-hub', label: 'Employees', icon: 'hr', page: 'employees' },
+        // Show standalone Attendance for roles that have it but not employees hub
+        ...(!hasEmployeesAccess ? [{ path: '/attendance', label: 'Attendance', icon: 'attendance', page: 'attendance' }] : []),
       ],
       hasDivider: true
     },
@@ -542,6 +552,7 @@ const MainLayout = () => {
       gift: '◇',
       finance: '◎',
       hr: '◈',
+      attendance: '⏱',
       portal: '◧',
       sensei: '◬',
       ai: '◍',

@@ -1256,12 +1256,17 @@ class SupabaseSyncManager {
               await db[dexieTableName].delete(dexieRecord._id);
               await this._removePendingQueueItems(entityType, dexieRecord._id);
             } else {
-              // Server wins: if there are pending local changes, discard them
-              if (pendingDeleteIds.has(dexieRecord._id) || pendingLocalIds.has(dexieRecord._id)) {
-                console.log(`[SupabaseSyncManager] Server wins: overwriting local ${entityType}/${dexieRecord._id}`);
-                await this._removePendingQueueItems(entityType, dexieRecord._id);
+              // Local wins: skip records that have pending unsynced local changes
+              // These will be pushed to server in the next push cycle
+              if (pendingLocalIds.has(dexieRecord._id)) {
+                console.log(`[SupabaseSyncManager] Local wins: skipping pull for ${entityType}/${dexieRecord._id} (pending local changes)`);
+                continue;
               }
-              // Upsert server data to local database
+              if (pendingDeleteIds.has(dexieRecord._id)) {
+                console.log(`[SupabaseSyncManager] Local wins: skipping pull for ${entityType}/${dexieRecord._id} (pending local delete)`);
+                continue;
+              }
+              // No pending local changes - safe to upsert server data
               await db[dexieTableName].put(dexieRecord);
             }
           }

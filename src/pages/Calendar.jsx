@@ -929,19 +929,19 @@ const Calendar = () => {
         {/* Manage navigation buttons */}
         <div className="sales-tabs">
           <button
-            className="sales-tab calendar-manage-btn"
+            className="sales-tab"
             onClick={() => navigate('/appointments')}
           >
             <span>Appointments</span>
           </button>
           <button
-            className="sales-tab calendar-manage-btn"
+            className="sales-tab"
             onClick={() => navigate('/attendance')}
           >
             <span>Attendance</span>
           </button>
           <button
-            className="sales-tab calendar-manage-btn"
+            className="sales-tab"
             onClick={() => navigate('/shift-schedules')}
           >
             <span>Shift Schedules</span>

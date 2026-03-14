@@ -7978,6 +7978,35 @@ a:focus:not(:focus-visible),
   text-align: center;
 }
 
+.calendar-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.calendar-quick-nav {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.quick-nav-btn {
+  padding: 6px 14px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.quick-nav-btn:hover {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
 .view-switcher {
   display: flex;
   border: 1px solid var(--color-border);

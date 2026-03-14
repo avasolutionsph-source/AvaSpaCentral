@@ -6,15 +6,19 @@ import MySchedule from './MySchedule';
 import PayrollRequests from './PayrollRequests';
 import MyAttendanceHistory from './MyAttendanceHistory';
 import MyRequests from './MyRequests';
+import CameraCapture from '../components/CameraCapture';
 import OTRequestRepository from '../services/storage/repositories/OTRequestRepository';
 import LeaveRequestRepository from '../services/storage/repositories/LeaveRequestRepository';
 import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
 import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
+import { SettingsRepository } from '../services/storage/repositories';
+import { logClockIn, logClockOut } from '../utils/activityLogger';
+import { format } from 'date-fns';
 import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
 const MyPortal = () => {
-  const { user } = useApp();
+  const { user, showToast, hasManagementAccess, getUserBranchId } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'history';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -27,12 +31,40 @@ const MyPortal = () => {
     pendingHRRequests: 0
   });
 
+  // Clock In/Out state
+  const [showCamera, setShowCamera] = useState(false);
+  const [pendingClockAction, setPendingClockAction] = useState(null);
+  const [todayRecord, setTodayRecord] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [clockLoading, setClockLoading] = useState(false);
+
   // Ref for Submit Request button
   const payrollSubmitRef = useRef(null);
 
   useEffect(() => {
     loadStats();
+    loadTodayAttendance();
   }, [user]);
+
+  // Update current time every second
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const loadTodayAttendance = async () => {
+    if (!user?.employeeId) return;
+    try {
+      const allAttendance = await mockApi.attendance.getAttendance();
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const myToday = allAttendance.find(
+        a => a.employeeId === user.employeeId && a.date === today
+      );
+      setTodayRecord(myToday || null);
+    } catch (e) {
+      // Silent fail
+    }
+  };
 
   const loadStats = async () => {
     if (!user) return;
@@ -84,6 +116,93 @@ const MyPortal = () => {
     }
   };
 
+  // Calculate distance between two GPS coordinates using Haversine formula (returns meters)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const handleClockAction = (type) => {
+    setPendingClockAction({ type, employeeId: user?.employeeId });
+    setShowCamera(true);
+  };
+
+  const handleCameraCapture = async (captureData) => {
+    if (!pendingClockAction) return;
+
+    const { type, employeeId } = pendingClockAction;
+    setClockLoading(true);
+
+    try {
+      const captureWithBranch = { ...captureData };
+      const activeBranchId = getUserBranchId();
+      if (activeBranchId) {
+        captureWithBranch.branchId = activeBranchId;
+      }
+
+      // GPS geofencing check
+      let isOutOfRange = false;
+      try {
+        const gpsConfig = await SettingsRepository.get('gpsConfig');
+        if (gpsConfig && captureData.location) {
+          let branchGps = null;
+          if (activeBranchId && gpsConfig.branches[activeBranchId]) {
+            branchGps = gpsConfig.branches[activeBranchId];
+          }
+          if (branchGps && branchGps.latitude && branchGps.longitude) {
+            const distance = calculateDistance(
+              captureData.location.latitude,
+              captureData.location.longitude,
+              branchGps.latitude,
+              branchGps.longitude
+            );
+            const radius = branchGps.radius || 100;
+            if (distance > radius) {
+              isOutOfRange = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('GPS config check failed, allowing attendance:', err);
+      }
+
+      captureWithBranch.isOutOfRange = isOutOfRange;
+      const employeeName = user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+
+      if (type === 'in') {
+        await mockApi.attendance.clockIn(employeeId, captureWithBranch);
+        if (isOutOfRange) {
+          showToast('Clocked in but you are outside the allowed area. Pending manager approval.', 'warning');
+        } else {
+          showToast('Clocked in successfully!', 'success');
+        }
+        logClockIn(user, employeeName);
+      } else {
+        await mockApi.attendance.clockOut(employeeId, captureWithBranch);
+        if (isOutOfRange) {
+          showToast('Clocked out but you are outside the allowed area. Pending manager approval.', 'warning');
+        } else {
+          showToast('Clocked out successfully!', 'success');
+        }
+        logClockOut(user, employeeName);
+      }
+
+      setShowCamera(false);
+      setPendingClockAction(null);
+      loadTodayAttendance();
+    } catch (error) {
+      showToast(`Failed to clock ${type}: ${error.message}`, 'error');
+    } finally {
+      setClockLoading(false);
+    }
+  };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setSearchParams({ tab });
@@ -114,6 +233,15 @@ const MyPortal = () => {
       badgeType: 'warning'
     }
   ];
+
+  const getTodayStatus = () => {
+    if (!todayRecord) return { label: 'Not Clocked In', color: '#888' };
+    if (todayRecord.clockIn && todayRecord.clockOut) return { label: 'Completed', color: '#22c55e' };
+    if (todayRecord.clockIn) return { label: 'Clocked In', color: '#3b82f6' };
+    return { label: 'Not Clocked In', color: '#888' };
+  };
+
+  const todayStatus = getTodayStatus();
 
   return (
     <div className="hub-page">
@@ -155,6 +283,44 @@ const MyPortal = () => {
           </div>
         </div>
 
+        {/* Clock In/Out Section */}
+        {!hasManagementAccess() && user?.employeeId && (
+          <div className="my-portal-clock-section">
+            <div className="my-portal-clock-info">
+              <div className="my-portal-clock-time">
+                {format(currentTime, 'hh:mm:ss a')}
+              </div>
+              <div className="my-portal-clock-date">
+                {format(currentTime, 'EEEE, MMMM dd, yyyy')}
+              </div>
+              <div className="my-portal-clock-status" style={{ color: todayStatus.color }}>
+                {todayStatus.label}
+                {todayRecord?.clockIn && (
+                  <span style={{ color: '#666', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+                    (In: {todayRecord.clockIn}{todayRecord.clockOut ? ` - Out: ${todayRecord.clockOut}` : ''})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="my-portal-clock-buttons">
+              <button
+                className="btn btn-success"
+                onClick={() => handleClockAction('in')}
+                disabled={clockLoading || (todayRecord?.clockIn && !todayRecord?.clockOut)}
+              >
+                Clock In
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleClockAction('out')}
+                disabled={clockLoading || !todayRecord?.clockIn || !!todayRecord?.clockOut}
+              >
+                Clock Out
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Tab Navigation */}
         <div className="sales-tabs">
           {tabs.map(tab => (
@@ -181,6 +347,15 @@ const MyPortal = () => {
         {activeTab === 'requests' && <MyRequests embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <PayrollRequests embedded onDataChange={loadStats} onOpenSubmitRef={payrollSubmitRef} />}
       </div>
+
+      {/* Camera Capture Modal */}
+      {showCamera && (
+        <CameraCapture
+          onCapture={handleCameraCapture}
+          onClose={() => { setShowCamera(false); setPendingClockAction(null); }}
+          title={`Clock ${pendingClockAction?.type === 'in' ? 'In' : 'Out'} - Photo Capture`}
+        />
+      )}
     </div>
   );
 };

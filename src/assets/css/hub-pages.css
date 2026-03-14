@@ -193,10 +193,72 @@
   color: #065f46;
 }
 
+/* My Portal Clock In/Out Section */
+.my-portal-clock-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--gray-50, #f9fafb);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: var(--radius-lg, 12px);
+  padding: 1rem 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.my-portal-clock-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.my-portal-clock-time {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900, #111);
+  font-variant-numeric: tabular-nums;
+}
+
+.my-portal-clock-date {
+  font-size: 0.85rem;
+  color: var(--gray-500, #6b7280);
+}
+
+.my-portal-clock-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.my-portal-clock-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.my-portal-clock-buttons .btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .hub-header {
     padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .my-portal-clock-section {
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  .my-portal-clock-buttons {
+    width: 100%;
+  }
+
+  .my-portal-clock-buttons .btn {
+    flex: 1;
   }
 
   .hub-tabs {

@@ -271,6 +271,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     setFieldValue,
     setFormData,
     handleSubmit,
+    selectedItem,
     deleteConfirm,
     handleDelete,
     confirmDelete,
@@ -464,6 +465,74 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   };
 
+  // Custom edit handler that also syncs role/username changes to Supabase
+  const handleEditAccount = async (e) => {
+    if (e) e.preventDefault();
+
+    // Validate
+    if (validateForm) {
+      const validationResult = validateForm(formData);
+      if (typeof validationResult === 'object' && !validationResult.isValid) {
+        return false;
+      }
+    }
+
+    setIsCreatingSupabase(true);
+    try {
+      const submitData = {
+        employeeId: formData.employeeId,
+        username: formData.username.trim().toLowerCase(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        role: formData.role,
+        status: formData.status,
+        businessId: user?.businessId,
+        branchId: formData.role === 'Branch Owner' ? formData.branchId : null
+      };
+
+      // Update local Dexie
+      await usersApi.update(selectedItem._id, submitData);
+
+      // Also sync to Supabase users table
+      if (isSupabaseConfigured()) {
+        try {
+          const { supabase } = await import('../services/supabase/supabaseClient');
+          if (supabase) {
+            const supabaseData = {
+              username: submitData.username,
+              first_name: submitData.firstName,
+              last_name: submitData.lastName,
+              role: submitData.role,
+              status: submitData.status,
+              branch_id: submitData.branchId || null,
+            };
+
+            const { error } = await supabase
+              .from('users')
+              .update(supabaseData)
+              .eq('id', selectedItem._id);
+
+            if (error) {
+              console.error('[EmployeeAccounts] Supabase sync error:', error);
+              showToast('Account updated locally but failed to sync to server. Changes will sync later.', 'warning');
+            }
+          }
+        } catch (syncErr) {
+          console.warn('[EmployeeAccounts] Supabase sync failed:', syncErr);
+        }
+      }
+
+      showToast('Account updated!', 'success');
+      closeModal();
+      loadUsers();
+      if (onDataChange) onDataChange();
+    } catch (err) {
+      showToast('Failed to update account', 'error');
+    } finally {
+      setIsCreatingSupabase(false);
+    }
+  };
+
   // Filter users
   const filteredUsers = useMemo(() => {
     let filtered = users;
@@ -502,7 +571,21 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const handleToggleStatus = async (userAccount) => {
     try {
       await usersApi.toggleStatus(userAccount._id);
+      const newStatus = userAccount.status === 'active' ? 'inactive' : 'active';
       showToast(`Account ${userAccount.status === 'active' ? 'deactivated' : 'activated'}`, 'success');
+
+      // Sync status to Supabase
+      if (isSupabaseConfigured()) {
+        try {
+          const { supabase } = await import('../services/supabase/supabaseClient');
+          if (supabase) {
+            await supabase.from('users').update({ status: newStatus }).eq('id', userAccount._id);
+          }
+        } catch (syncErr) {
+          console.warn('[EmployeeAccounts] Status sync failed:', syncErr);
+        }
+      }
+
       loadUsers();
       if (onDataChange) onDataChange();
     } catch (error) {
@@ -667,7 +750,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         onClose={closeModal}
         mode={modalMode}
         title={{ create: 'Create Account', edit: 'Edit Account' }}
-        onSubmit={modalMode === 'create' ? handleCreateAccount : handleSubmit}
+        onSubmit={modalMode === 'create' ? handleCreateAccount : handleEditAccount}
         isSubmitting={isSubmitting || isCreatingSupabase}
         className="account-modal"
       >

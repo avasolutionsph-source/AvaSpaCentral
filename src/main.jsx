@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import './assets/css/index.css'
 import './assets/css/utilities.css'
@@ -46,6 +47,18 @@ InitializationService.initialize()
     console.error('[App] Initialization failed:', error);
     // App will still render, but may have limited functionality
   });
+
+// Auto-reload when new version is deployed
+// This ensures users always get the latest CSS/JS without manual refresh
+const updateSW = registerSW({
+  onNeedRefresh() {
+    // New content available — reload immediately so users get the update
+    updateSW(true)
+  },
+  onOfflineReady() {
+    console.log('[SW] App ready for offline use')
+  }
+})
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

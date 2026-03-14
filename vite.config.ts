@@ -51,27 +51,29 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         runtimeCaching: [
           {
-            // Cache JS chunks - use StaleWhileRevalidate so updates are fetched in background
+            // Cache JS chunks - NetworkFirst so users always get latest when online
             urlPattern: /\.js$/i,
-            handler: 'StaleWhileRevalidate',
+            handler: 'NetworkFirst',
             options: {
               cacheName: 'js-cache',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
-              }
+              },
+              networkTimeoutSeconds: 3
             }
           },
           {
-            // Cache CSS files - use StaleWhileRevalidate so updates are fetched in background
+            // Cache CSS files - NetworkFirst so users always get latest when online
             urlPattern: /\.css$/i,
-            handler: 'StaleWhileRevalidate',
+            handler: 'NetworkFirst',
             options: {
               cacheName: 'css-cache',
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
-              }
+              },
+              networkTimeoutSeconds: 3
             }
           },
           {

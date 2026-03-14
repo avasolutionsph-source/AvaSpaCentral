@@ -2093,6 +2093,15 @@ const Settings = () => {
                 </div>
               ))}
             </div>
+            <div className="settings-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveSettings}
+              >
+                Save Business Hours
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2133,6 +2142,15 @@ const Settings = () => {
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="settings-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveSettings}
+              >
+                Save Tax Settings
+              </button>
             </div>
           </div>
         </div>

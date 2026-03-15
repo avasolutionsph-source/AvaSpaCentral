@@ -65,6 +65,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     loadBranches();
   }, []);
 
+  // Auto-assign branch when modal opens and there's only one branch
+  useEffect(() => {
+    if (showModal && !formData.branchId && activeBranches.length === 1) {
+      setFieldValue('branchId', activeBranches[0].id);
+    }
+  }, [showModal, activeBranches]);
+
   const loadEmployees = async () => {
     try {
       setLoadingEmployees(true);
@@ -171,17 +178,14 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const hasMultipleBranches = activeBranches.length > 1;
   const hasSingleBranch = activeBranches.length === 1;
 
-  // Handle role change - auto-select branch for Branch Owner if only one branch
+  // Handle role change - auto-select branch if only one branch
   const handleRoleChange = (e) => {
     const newRole = e.target.value;
     handleInputChange(e);
 
-    if (newRole === 'Branch Owner' && hasSingleBranch) {
-      // Auto-select the only branch
+    if (hasSingleBranch) {
+      // Auto-select the only branch for any role
       setFieldValue('branchId', activeBranches[0].id);
-    } else if (newRole !== 'Branch Owner') {
-      // Clear branchId for non-Branch Owner roles
-      setFieldValue('branchId', '');
     }
   };
 
@@ -218,13 +222,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       errors.role = 'Role is required';
     }
 
-    // Branch is required for Branch Owner role
-    if (data.role === 'Branch Owner' && !data.branchId) {
-      const activeBranches = branches.filter(b => b.is_active);
-      if (activeBranches.length === 0) {
+    // Branch is required for all roles
+    if (!data.branchId) {
+      const activeBranchList = branches.filter(b => b.is_active);
+      if (activeBranchList.length === 0) {
         errors.branchId = 'No branches available. Create a branch in Settings first.';
       } else {
-        errors.branchId = 'Please select a branch for Branch Owner';
+        errors.branchId = 'Please select a branch';
       }
     }
 
@@ -302,7 +306,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         role: data.role,
         status: data.status,
         businessId: user?.businessId, // Inherit businessId from current owner
-        branchId: data.role === 'Branch Owner' ? data.branchId : null
+        branchId: data.branchId || null
       };
 
       // Only include password if it's set
@@ -399,12 +403,10 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       );
 
       // Determine branchId:
-      // - If role is Branch Owner, use selected branch
-      // - If current user is Branch Owner, auto-assign their branch
-      // - Otherwise null
-      const assignedBranchId = formData.role === 'Branch Owner'
-        ? formData.branchId
-        : (isBranchOwner() ? getUserBranchId() : null);
+      // - Use selected branch from form (applies to all roles)
+      // - If current user is Branch Owner, fallback to their branch
+      const assignedBranchId = formData.branchId
+        || (isBranchOwner() ? getUserBranchId() : null);
 
       const createPromise = authService.createStaffAccount({
         username: formData.username.trim().toLowerCase(),
@@ -487,7 +489,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         role: formData.role,
         status: formData.status,
         businessId: user?.businessId,
-        branchId: formData.role === 'Branch Owner' ? formData.branchId : null
+        branchId: formData.branchId || null
       };
 
       // Update local Dexie
@@ -874,8 +876,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
           </div>
         </div>
 
-        {/* Branch Selection for Branch Owner */}
-        {formData.role === 'Branch Owner' && (
+        {/* Branch Selection for all roles */}
+        {activeBranches.length > 0 && (
           <>
             {/* Branch Info Banner */}
             {branches.length > 0 && (
@@ -929,7 +931,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
                   </Link>
                 </div>
               )}
-              <small className="form-hint">Branch Owner can only access data from this branch</small>
+              <small className="form-hint">Staff will only see data from their assigned branch</small>
             </div>
           </>
         )}

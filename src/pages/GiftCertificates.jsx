@@ -39,26 +39,32 @@ const GiftCertificates = () => {
   useEffect(() => {
     loadGiftCertificates();
 
-    // Listen for cross-device realtime updates
+    // Listen for cross-device realtime updates (debounced to avoid re-renders while typing)
+    let syncDebounce = null;
     const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
-      if (status.type === 'realtime_update' && status.entityType === 'giftCertificates') {
-        loadGiftCertificates();
-      }
-      if (status.type === 'pull_complete' || status.type === 'sync_complete') {
-        loadGiftCertificates();
+      if (
+        (status.type === 'realtime_update' && status.entityType === 'giftCertificates') ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadGiftCertificates(), 500);
       }
     });
 
     // Listen for local data changes (e.g., from POS page redeeming a GC)
+    let dataDebounce = null;
     const unsubscribeData = dataChangeEmitter.subscribe((change) => {
       if (change.entityType === 'giftCertificates') {
-        loadGiftCertificates();
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadGiftCertificates(), 300);
       }
     });
 
     return () => {
       unsubscribeSync();
       unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
     };
   }, []);
 

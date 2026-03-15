@@ -107,7 +107,7 @@ const POS = () => {
 
         // Filter by branch
         const userBranchId = getUserBranchId();
-        const branchFilter = (item) => !userBranchId || !item.branchId || item.branchId === userBranchId;
+        const branchFilter = (item) => !userBranchId || item.branchId === userBranchId;
 
         setProducts(visibleProducts.filter(branchFilter));
         setEmployees(employeesData.filter(branchFilter));
@@ -173,7 +173,7 @@ const POS = () => {
 
       // Filter by branch
       const userBranchId = getUserBranchId();
-      const branchFilter = (item) => !userBranchId || !item.branchId || item.branchId === userBranchId;
+      const branchFilter = (item) => !userBranchId || item.branchId === userBranchId;
 
       setProducts(visibleProducts.filter(branchFilter));
       setEmployees(employeesData.filter(branchFilter));
@@ -292,7 +292,7 @@ const POS = () => {
       const productsData = await mockApi.products.getProducts({ active: true });
       const visibleProducts = productsData.filter(p => !p.hideFromPOS);
       const userBranchId = getUserBranchId();
-      const branchFilter = (item) => !userBranchId || !item.branchId || item.branchId === userBranchId;
+      const branchFilter = (item) => !userBranchId || item.branchId === userBranchId;
       setProducts(visibleProducts.filter(branchFilter));
     } catch (error) {
       showToast('Failed to save order', 'error');

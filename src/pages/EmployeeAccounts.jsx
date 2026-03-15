@@ -537,10 +537,10 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const filteredUsers = useMemo(() => {
     let filtered = users;
 
-    // Branch Owner can only see users from their branch (or shared users with no branch)
+    // Branch Owner can only see users from their branch
     const userBranchId = getUserBranchId();
     if (userBranchId) {
-      filtered = filtered.filter(u => !u.branchId || u.branchId === userBranchId);
+      filtered = filtered.filter(u => u.branchId === userBranchId);
     }
 
     if (filterRole !== 'all') {

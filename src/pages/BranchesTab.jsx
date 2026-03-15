@@ -430,9 +430,7 @@ const BranchesTab = () => {
                       Login URL: <code style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: '3px', fontSize: '0.75rem' }}>{window.location.origin}/login</code>
                     </div>
                     {(() => {
-                      const staff = branchStaff[branch.id] || [];
-                      const unassigned = branchStaff['unassigned'] || [];
-                      const allStaff = [...staff, ...unassigned];
+                      const allStaff = branchStaff[branch.id] || [];
                       if (allStaff.length === 0) {
                         return <p style={{ fontSize: '0.8rem', color: '#999', fontStyle: 'italic' }}>No staff assigned. Add staff in Staff Management.</p>;
                       }

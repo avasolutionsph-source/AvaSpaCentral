@@ -995,18 +995,30 @@ const Settings = () => {
       // Save settings to Dexie (local)
       await SettingsRepository.setMany(settingsData);
 
-      // Also sync to Supabase (cloud) so settings persist across devices
+      // Sync to Supabase 'settings' table (uuid id, business_id, key varchar, value jsonb, updated_at)
       let cloudSynced = false;
       try {
         const { supabase } = await import('../services/supabase/supabaseClient');
         if (supabase && user?.businessId) {
-          // Save settings as JSONB in the businesses table's settings_data column
-          // NOTE: You must add this column in Supabase Dashboard:
-          //   ALTER TABLE businesses ADD COLUMN IF NOT EXISTS settings_data jsonb DEFAULT '{}'::jsonb;
+          const now = new Date().toISOString();
+          const records = Object.entries(settingsData).map(([key, value]) => ({
+            id: crypto.randomUUID(),
+            business_id: user.businessId,
+            key,
+            value,
+            updated_at: now
+          }));
+
+          // Delete existing settings for this business, then insert fresh
+          await supabase
+            .from('settings')
+            .delete()
+            .eq('business_id', user.businessId)
+            .in('key', Object.keys(settingsData));
+
           const { error } = await supabase
-            .from('businesses')
-            .update({ settings_data: settingsData })
-            .eq('id', user.businessId);
+            .from('settings')
+            .insert(records);
 
           if (!error) {
             cloudSynced = true;
@@ -1090,18 +1102,20 @@ const Settings = () => {
         if (savedSecuritySettings) setSecuritySettings(savedSecuritySettings);
         if (saved2FA !== undefined) setTwoFactorEnabled(saved2FA);
 
-        // Then try to load from Supabase (cloud) for cross-device sync
+        // Then try to load from Supabase 'settings' table for cross-device sync
         try {
           const { supabase } = await import('../services/supabase/supabaseClient');
           if (supabase && user?.businessId) {
-            const { data: bizData, error: bizError } = await supabase
-              .from('businesses')
-              .select('settings_data')
-              .eq('id', user.businessId)
-              .single();
+            const { data, error } = await supabase
+              .from('settings')
+              .select('key, value')
+              .eq('business_id', user.businessId);
 
-            if (!bizError && bizData?.settings_data) {
-              const cloudSettings = bizData.settings_data;
+            if (!error && data && data.length > 0) {
+              const cloudSettings = {};
+              for (const row of data) {
+                cloudSettings[row.key] = row.value;
+              }
 
               // Cloud data takes priority (latest saved from any device)
               if (cloudSettings.businessInfo) {

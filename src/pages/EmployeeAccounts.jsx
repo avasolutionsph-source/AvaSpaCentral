@@ -325,14 +325,20 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   }, [showModal, hasSingleBranch]);
 
-  // Wrap confirmDelete to also delete from Supabase
+  // Wrap confirmDelete to also delete from Supabase (profile + auth)
   const handleConfirmDelete = async () => {
     const item = deleteConfirm.item;
     if (item && isSupabaseConfigured()) {
       try {
         const { supabase } = await import('../services/supabase/supabaseClient');
         if (supabase) {
-          await supabase.from('users').delete().eq('id', item._id);
+          // Use RPC to delete both profile and auth user
+          const { error: rpcError } = await supabase.rpc('delete_user_account', { user_id: item._id });
+          if (rpcError) {
+            // Fallback: delete profile only if RPC not available
+            console.warn('[EmployeeAccounts] RPC failed, deleting profile only:', rpcError.message);
+            await supabase.from('users').delete().eq('id', item._id);
+          }
         }
       } catch (err) {
         console.error('[EmployeeAccounts] Failed to delete from Supabase:', err);

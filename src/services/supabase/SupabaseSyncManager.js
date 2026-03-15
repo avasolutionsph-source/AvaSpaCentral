@@ -585,6 +585,15 @@ class SupabaseSyncManager {
       console.log(`[SupabaseSyncManager] Recovered ${stuckCount} stuck sync items`);
     }
 
+    // Purge orphaned sync queue entries for entity types with no Supabase table
+    try {
+      const orphanedSettings = await db.syncQueue.where('entityType').equals('settings').toArray();
+      if (orphanedSettings.length > 0) {
+        await db.syncQueue.where('entityType').equals('settings').delete();
+        console.log(`[SupabaseSyncManager] Purged ${orphanedSettings.length} orphaned 'settings' sync entries`);
+      }
+    } catch (e) { /* ignore */ }
+
     // Start network detector (only once)
     if (!this._initialized) {
       NetworkDetector.start();
@@ -1037,10 +1046,9 @@ class SupabaseSyncManager {
       try {
         await db.syncQueue.update(item.id, { status: 'processing' });
 
-        // Skip entity types that have no Supabase table (e.g., 'settings' is local-only)
+        // Skip and remove entity types that have no Supabase table
         const SKIP_ENTITY_TYPES = ['settings'];
         if (SKIP_ENTITY_TYPES.includes(item.entityType)) {
-          console.log(`[SupabaseSyncManager] Removing unsupported entity type from queue: ${item.entityType}/${item.entityId}`);
           await db.syncQueue.delete(item.id);
           continue;
         }

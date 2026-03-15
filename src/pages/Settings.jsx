@@ -1000,13 +1000,12 @@ const Settings = () => {
       try {
         const { supabase } = await import('../services/supabase/supabaseClient');
         if (supabase && user?.businessId) {
-          // Save settings as JSON in the businesses table (same table branding uses — known to work)
+          // Save settings as JSONB in the businesses table's settings_data column
+          // NOTE: You must add this column in Supabase Dashboard:
+          //   ALTER TABLE businesses ADD COLUMN IF NOT EXISTS settings_data jsonb DEFAULT '{}'::jsonb;
           const { error } = await supabase
             .from('businesses')
-            .update({
-              settings_data: settingsData,
-              updated_at: new Date().toISOString()
-            })
+            .update({ settings_data: settingsData })
             .eq('id', user.businessId);
 
           if (!error) {
@@ -1019,11 +1018,11 @@ const Settings = () => {
         console.warn('[Settings] Cloud sync failed:', syncError.message);
       }
 
-      if (cloudSynced) {
-        showToast('Settings saved and synced to cloud!', 'success');
-      } else {
-        showToast('Settings saved locally. Cloud sync failed — changes won\'t appear on other devices.', 'warning');
-      }
+      showToast(cloudSynced
+        ? 'Settings saved and synced to cloud!'
+        : 'Settings saved locally.',
+        cloudSynced ? 'success' : 'warning'
+      );
     } catch (error) {
       showToast('Failed to save settings', 'error');
     }

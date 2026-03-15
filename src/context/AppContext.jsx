@@ -190,13 +190,19 @@ export const AppProvider = ({ children }) => {
         // Initialize sync manager if user is already logged in and Supabase is configured
         // Non-blocking: don't hold up loading screen for sync
         if (authService.currentUser && isSupabaseConfigured()) {
-          // Subscribe to sync status updates immediately
+          // Subscribe to sync status updates (debounced to avoid re-renders while user is typing)
+          let syncDebounce = null;
           supabaseSyncManager.subscribe((status) => {
-            setSyncStatus(prev => ({
-              ...prev,
-              isSyncing: status.type === 'sync_start',
-              lastSync: status.type === 'sync_complete' ? new Date().toISOString() : prev.lastSync,
-            }));
+            clearTimeout(syncDebounce);
+            syncDebounce = setTimeout(() => {
+              setSyncStatus(prev => {
+                const newIsSyncing = status.type === 'sync_start';
+                const newLastSync = status.type === 'sync_complete' ? new Date().toISOString() : prev.lastSync;
+                // Skip update if nothing changed (prevents unnecessary re-renders)
+                if (prev.isSyncing === newIsSyncing && prev.lastSync === newLastSync) return prev;
+                return { ...prev, isSyncing: newIsSyncing, lastSync: newLastSync };
+              });
+            }, 500);
           });
 
           // Initialize sync in background

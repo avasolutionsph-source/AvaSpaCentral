@@ -1076,27 +1076,40 @@ const Settings = () => {
     // Load parked sync items
     loadParkedItems();
 
-    // Subscribe to sync status changes
+    // Subscribe to sync status changes (debounced to avoid re-renders while typing)
+    let syncDebounceTimer = null;
     const unsubscribeSync = SyncManager.subscribe((status) => {
       if (status.type === 'sync_complete' || status.type === 'push_complete' || status.type === 'pull_complete') {
-        loadSyncStatus();
-        loadParkedItems();
-        setSyncOperation(null);
+        clearTimeout(syncDebounceTimer);
+        syncDebounceTimer = setTimeout(() => {
+          loadSyncStatus();
+          loadParkedItems();
+          setSyncOperation(null);
+        }, 1000);
       } else if (status.type === 'sync_error' || status.type === 'push_error' || status.type === 'pull_error') {
         setSyncOperation(null);
-        loadParkedItems();
+        clearTimeout(syncDebounceTimer);
+        syncDebounceTimer = setTimeout(() => {
+          loadParkedItems();
+        }, 1000);
         showToast(status.error || 'Sync operation failed', 'error');
       }
     });
 
-    // Subscribe to network status changes
+    // Subscribe to network status changes (debounced)
+    let networkDebounceTimer = null;
     const unsubscribeNetwork = NetworkDetector.subscribe((isOnline) => {
-      setSyncConfig(prev => ({ ...prev, isOnline }));
+      clearTimeout(networkDebounceTimer);
+      networkDebounceTimer = setTimeout(() => {
+        setSyncConfig(prev => ({ ...prev, isOnline }));
+      }, 500);
     });
 
     return () => {
       unsubscribeSync();
       unsubscribeNetwork();
+      clearTimeout(syncDebounceTimer);
+      clearTimeout(networkDebounceTimer);
     };
   }, []);
 

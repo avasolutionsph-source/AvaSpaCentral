@@ -77,7 +77,7 @@ class AuthService {
     try {
       const { data: userProfile, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, email, username, first_name, last_name, role, employee_id, business_id, branch_id, status')
         .eq('auth_id', authId)
         .maybeSingle();
 
@@ -192,18 +192,18 @@ class AuthService {
         throw new Error(error.message);
       }
 
-      // Load user profile
-      const userProfile = await this._loadUserProfile(data.user.id);
+      // Load profile and update last_login in parallel
+      const [userProfile] = await Promise.all([
+        this._loadUserProfile(data.user.id),
+        supabase
+          .from('users')
+          .update({ last_login: new Date().toISOString() })
+          .eq('auth_id', data.user.id)
+      ]);
 
       if (!userProfile) {
         throw new Error('User profile not found. Please contact support.');
       }
-
-      // Update last login
-      await supabase
-        .from('users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('auth_id', data.user.id);
 
       return {
         success: true,
@@ -273,18 +273,18 @@ class AuthService {
         throw new Error('Invalid username or password');
       }
 
-      // Load full user profile
-      const fullProfile = await this._loadUserProfile(data.user.id);
+      // Load profile and update last_login in parallel
+      const [fullProfile] = await Promise.all([
+        this._loadUserProfile(data.user.id),
+        supabase
+          .from('users')
+          .update({ last_login: new Date().toISOString() })
+          .eq('auth_id', data.user.id)
+      ]);
 
       if (!fullProfile) {
         throw new Error('User profile not found. Please contact support.');
       }
-
-      // Update last login
-      await supabase
-        .from('users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('auth_id', data.user.id);
 
       return {
         success: true,

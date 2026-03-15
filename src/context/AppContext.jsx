@@ -188,16 +188,20 @@ export const AppProvider = ({ children }) => {
         });
 
         // Initialize sync manager if user is already logged in and Supabase is configured
+        // Non-blocking: don't hold up loading screen for sync
         if (authService.currentUser && isSupabaseConfigured()) {
-          await supabaseSyncManager.initialize();
-
-          // Subscribe to sync status updates
+          // Subscribe to sync status updates immediately
           supabaseSyncManager.subscribe((status) => {
             setSyncStatus(prev => ({
               ...prev,
               isSyncing: status.type === 'sync_start',
               lastSync: status.type === 'sync_complete' ? new Date().toISOString() : prev.lastSync,
             }));
+          });
+
+          // Initialize sync in background
+          supabaseSyncManager.initialize().catch(err => {
+            console.warn('[AppContext] Sync manager init error:', err);
           });
         }
       } catch (error) {

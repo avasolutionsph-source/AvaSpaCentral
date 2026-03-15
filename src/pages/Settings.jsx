@@ -985,13 +985,41 @@ const Settings = () => {
     }
 
     try {
-      // Save settings to Dexie
-      await SettingsRepository.setMany({
+      const settingsData = {
         businessInfo: businessInfo,
         businessHours: businessHours,
         taxSettings: taxSettings,
         theme: theme
-      });
+      };
+
+      // Save settings to Dexie (local)
+      await SettingsRepository.setMany(settingsData);
+
+      // Also sync to Supabase (cloud) so settings persist across devices
+      try {
+        const { supabase } = await import('../services/supabase/supabaseClient');
+        if (supabase && user?.businessId) {
+          const now = new Date().toISOString();
+          const records = Object.entries(settingsData).map(([key, value]) => ({
+            id: `${user.businessId}_setting_${key}`,
+            business_id: user.businessId,
+            key: `setting_${key}`,
+            value: JSON.stringify(value),
+            updated_at: now
+          }));
+
+          const { error } = await supabase
+            .from('business_config')
+            .upsert(records, { onConflict: 'id' });
+
+          if (error) {
+            console.warn('[Settings] Supabase sync failed (saved locally):', error.message);
+          }
+        }
+      } catch (syncError) {
+        // Supabase sync is best-effort — local save already succeeded
+        console.warn('[Settings] Cloud sync failed:', syncError.message);
+      }
 
       showToast('Settings saved successfully!', 'success');
     } catch (error) {
@@ -1046,7 +1074,7 @@ const Settings = () => {
           }
         }
 
-        // Load from Dexie
+        // Load from Dexie first (instant, offline-ready)
         const savedBusinessInfo = await SettingsRepository.get('businessInfo');
         const savedBusinessHours = await SettingsRepository.get('businessHours');
         const savedTaxSettings = await SettingsRepository.get('taxSettings');
@@ -1060,6 +1088,49 @@ const Settings = () => {
         if (savedTheme) setTheme(savedTheme);
         if (savedSecuritySettings) setSecuritySettings(savedSecuritySettings);
         if (saved2FA !== undefined) setTwoFactorEnabled(saved2FA);
+
+        // Then try to load from Supabase (cloud) for cross-device sync
+        try {
+          const { supabase } = await import('../services/supabase/supabaseClient');
+          if (supabase && user?.businessId) {
+            const { data, error } = await supabase
+              .from('business_config')
+              .select('key, value')
+              .eq('business_id', user.businessId)
+              .like('key', 'setting_%');
+
+            if (!error && data && data.length > 0) {
+              const cloudSettings = {};
+              for (const row of data) {
+                const settingKey = row.key.replace('setting_', '');
+                try {
+                  cloudSettings[settingKey] = JSON.parse(row.value);
+                } catch { cloudSettings[settingKey] = row.value; }
+              }
+
+              // Cloud data takes priority (latest saved from any device)
+              if (cloudSettings.businessInfo) {
+                setBusinessInfo(cloudSettings.businessInfo);
+                await SettingsRepository.set('businessInfo', cloudSettings.businessInfo);
+              }
+              if (cloudSettings.businessHours) {
+                setBusinessHours(cloudSettings.businessHours);
+                await SettingsRepository.set('businessHours', cloudSettings.businessHours);
+              }
+              if (cloudSettings.taxSettings) {
+                setTaxSettings(cloudSettings.taxSettings);
+                await SettingsRepository.set('taxSettings', cloudSettings.taxSettings);
+              }
+              if (cloudSettings.theme) {
+                setTheme(cloudSettings.theme);
+                await SettingsRepository.set('theme', cloudSettings.theme);
+              }
+            }
+          }
+        } catch (cloudError) {
+          // Cloud load is best-effort — Dexie data already loaded
+          console.warn('[Settings] Cloud settings load failed:', cloudError.message);
+        }
       } catch (error) {
         // Silent fail for settings load
       }

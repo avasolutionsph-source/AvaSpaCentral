@@ -996,32 +996,67 @@ const Settings = () => {
       await SettingsRepository.setMany(settingsData);
 
       // Also sync to Supabase (cloud) so settings persist across devices
+      let cloudSynced = false;
       try {
         const { supabase } = await import('../services/supabase/supabaseClient');
         if (supabase && user?.businessId) {
           const now = new Date().toISOString();
-          const records = Object.entries(settingsData).map(([key, value]) => ({
-            id: `${user.businessId}_setting_${key}`,
-            business_id: user.businessId,
-            key: `setting_${key}`,
-            value: JSON.stringify(value),
-            updated_at: now
-          }));
 
-          const { error } = await supabase
-            .from('business_config')
-            .upsert(records, { onConflict: 'id' });
+          // Save each setting individually to avoid batch upsert issues
+          for (const [key, value] of Object.entries(settingsData)) {
+            const recordId = `${user.businessId}_setting_${key}`;
+            const record = {
+              id: recordId,
+              business_id: user.businessId,
+              key: `setting_${key}`,
+              value: value,  // Pass as object (JSONB column), not stringified
+              updated_at: now
+            };
 
-          if (error) {
-            console.warn('[Settings] Supabase sync failed (saved locally):', error.message);
+            // Try upsert first
+            const { error: upsertError } = await supabase
+              .from('business_config')
+              .upsert(record, { onConflict: 'id' });
+
+            if (upsertError) {
+              // If business_config fails, try saving as JSON in businesses table metadata
+              console.warn(`[Settings] business_config upsert failed for ${key}:`, upsertError.message);
+              throw upsertError;
+            }
           }
+          cloudSynced = true;
         }
       } catch (syncError) {
-        // Supabase sync is best-effort — local save already succeeded
-        console.warn('[Settings] Cloud sync failed:', syncError.message);
+        console.warn('[Settings] Cloud sync failed, trying businesses table:', syncError.message);
+
+        // Fallback: save settings as JSON in the businesses table
+        try {
+          const { supabase } = await import('../services/supabase/supabaseClient');
+          if (supabase && user?.businessId) {
+            const { error } = await supabase
+              .from('businesses')
+              .update({
+                settings_data: settingsData,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', user.businessId);
+
+            if (!error) {
+              cloudSynced = true;
+            } else {
+              console.warn('[Settings] businesses table fallback also failed:', error.message);
+            }
+          }
+        } catch (fallbackError) {
+          console.warn('[Settings] All cloud sync methods failed:', fallbackError.message);
+        }
       }
 
-      showToast('Settings saved successfully!', 'success');
+      if (cloudSynced) {
+        showToast('Settings saved and synced to cloud!', 'success');
+      } else {
+        showToast('Settings saved locally. Cloud sync failed — changes won\'t appear on other devices.', 'warning');
+      }
     } catch (error) {
       showToast('Failed to save settings', 'error');
     }
@@ -1093,6 +1128,9 @@ const Settings = () => {
         try {
           const { supabase } = await import('../services/supabase/supabaseClient');
           if (supabase && user?.businessId) {
+            let cloudSettings = null;
+
+            // Try 1: Load from business_config table
             const { data, error } = await supabase
               .from('business_config')
               .select('key, value')
@@ -1100,15 +1138,34 @@ const Settings = () => {
               .like('key', 'setting_%');
 
             if (!error && data && data.length > 0) {
-              const cloudSettings = {};
+              cloudSettings = {};
               for (const row of data) {
                 const settingKey = row.key.replace('setting_', '');
-                try {
-                  cloudSettings[settingKey] = JSON.parse(row.value);
-                } catch { cloudSettings[settingKey] = row.value; }
+                // value could be JSONB (object) or string
+                if (typeof row.value === 'string') {
+                  try { cloudSettings[settingKey] = JSON.parse(row.value); }
+                  catch { cloudSettings[settingKey] = row.value; }
+                } else {
+                  cloudSettings[settingKey] = row.value;
+                }
               }
+            }
 
-              // Cloud data takes priority (latest saved from any device)
+            // Try 2: Fallback to businesses table settings_data column
+            if (!cloudSettings) {
+              const { data: bizData, error: bizError } = await supabase
+                .from('businesses')
+                .select('settings_data')
+                .eq('id', user.businessId)
+                .single();
+
+              if (!bizError && bizData?.settings_data) {
+                cloudSettings = bizData.settings_data;
+              }
+            }
+
+            // Apply cloud settings if found
+            if (cloudSettings) {
               if (cloudSettings.businessInfo) {
                 setBusinessInfo(cloudSettings.businessInfo);
                 await SettingsRepository.set('businessInfo', cloudSettings.businessInfo);

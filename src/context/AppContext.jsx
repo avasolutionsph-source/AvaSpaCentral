@@ -3,6 +3,7 @@ import { authService, supabaseSyncManager, isSupabaseConfigured } from '../servi
 import { logLogin, logLogout } from '../utils/activityLogger';
 import { setUserContext, clearUserContext } from '../utils/sentry';
 import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
+import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 import { db } from '../db';
 
 /**
@@ -112,6 +113,19 @@ export const AppProvider = ({ children }) => {
   const [selectedBranch, setSelectedBranch] = useState(null); // { id, name, slug, ... } or null
 
   // Initialize app - check for existing session
+  // Load and apply branding (color theme) from Supabase
+  const loadBranding = async (businessId) => {
+    if (!businessId) return;
+    try {
+      const data = await getBrandingSettings(businessId);
+      if (data?.primaryColor) {
+        applyColorTheme(data.primaryColor);
+      }
+    } catch (e) {
+      // Best-effort — default theme stays
+    }
+  };
+
   useEffect(() => {
     const initApp = async () => {
       try {
@@ -124,7 +138,7 @@ export const AppProvider = ({ children }) => {
           // Set business context for multi-tenant data isolation
           if (authService.currentUser.businessId) {
             setBusinessContext(authService.currentUser.businessId);
-            // Migrate orphaned data to this business (runs in background)
+            loadBranding(authService.currentUser.businessId);
             migrateOrphanedData(authService.currentUser.businessId);
           }
         } else {
@@ -149,7 +163,7 @@ export const AppProvider = ({ children }) => {
             // Set business context for multi-tenant data isolation
             if (userData.businessId) {
               setBusinessContext(userData.businessId);
-              // Migrate orphaned data to this business (runs in background)
+              loadBranding(userData.businessId);
               migrateOrphanedData(userData.businessId);
             }
           }
@@ -173,7 +187,7 @@ export const AppProvider = ({ children }) => {
             // Set business context for multi-tenant data isolation
             if (userProfile.businessId) {
               setBusinessContext(userProfile.businessId);
-              // Migrate orphaned data to this business (runs in background)
+              loadBranding(userProfile.businessId);
               migrateOrphanedData(userProfile.businessId);
             }
             // Initialize sync manager when user signs in

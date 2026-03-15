@@ -172,13 +172,6 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const hasMultipleBranches = activeBranches.length > 1;
   const hasSingleBranch = activeBranches.length === 1;
 
-  // Auto-assign branch when modal opens and there's only one branch
-  useEffect(() => {
-    if (showModal && !formData.branchId && hasSingleBranch) {
-      setFieldValue('branchId', activeBranches[0].id);
-    }
-  }, [showModal, hasSingleBranch]);
-
   // Handle role change - auto-select branch if only one branch
   const handleRoleChange = (e) => {
     const newRole = e.target.value;
@@ -324,6 +317,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       setShowConfirmPassword(false);
     }
   });
+
+  // Auto-assign branch when modal opens and there's only one branch
+  useEffect(() => {
+    if (showModal && !formData.branchId && hasSingleBranch) {
+      setFieldValue('branchId', activeBranches[0].id);
+    }
+  }, [showModal, hasSingleBranch]);
 
   // Expose openCreate to parent via ref
   React.useEffect(() => {

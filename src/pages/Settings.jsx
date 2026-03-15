@@ -2023,6 +2023,17 @@ const Settings = () => {
                 disabled={!canEdit()}
               />
             </div>
+            {canEdit() && (
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSaveSettings}
+                >
+                  Save Business Information
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

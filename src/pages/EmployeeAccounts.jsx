@@ -325,6 +325,22 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   }, [showModal, hasSingleBranch]);
 
+  // Wrap confirmDelete to also delete from Supabase
+  const handleConfirmDelete = async () => {
+    const item = deleteConfirm.item;
+    if (item && isSupabaseConfigured()) {
+      try {
+        const { supabase } = await import('../services/supabase/supabaseClient');
+        if (supabase) {
+          await supabase.from('users').delete().eq('id', item._id);
+        }
+      } catch (err) {
+        console.error('[EmployeeAccounts] Failed to delete from Supabase:', err);
+      }
+    }
+    return confirmDelete();
+  };
+
   // Expose openCreate to parent via ref
   React.useEffect(() => {
     if (onOpenCreateRef) {
@@ -993,7 +1009,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
         onClose={cancelDelete}
-        onConfirm={confirmDelete}
+        onConfirm={handleConfirmDelete}
         title="Delete Account"
         message={`Are you sure you want to delete the account for "${deleteConfirm.item?.firstName} ${deleteConfirm.item?.lastName}"? This action cannot be undone.`}
         confirmText="Delete"

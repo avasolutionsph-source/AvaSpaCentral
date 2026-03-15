@@ -33,24 +33,28 @@ const BranchesTab = () => {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+  const cachedHeadersRef = React.useRef(null);
   const getHeaders = useCallback(async () => {
+    // Return cached headers if available (token valid for the session)
+    if (cachedHeadersRef.current) return cachedHeadersRef.current;
     let accessToken = supabaseKey;
     try {
       const { supabase } = await import('../services/supabase/supabaseClient');
       if (supabase) {
-        // Timeout after 3s to prevent hanging
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
         const { data } = await Promise.race([sessionPromise, timeoutPromise]);
         if (data?.session?.access_token) accessToken = data.session.access_token;
       }
     } catch {}
-    return {
+    const headers = {
       'apikey': supabaseKey,
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     };
+    cachedHeadersRef.current = headers;
+    return headers;
   }, [supabaseKey]);
 
   const loadBranches = useCallback(async () => {

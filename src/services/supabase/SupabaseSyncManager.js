@@ -59,8 +59,8 @@ const SYNCABLE_ENTITIES = [
   'otRequests', 'leaveRequests', 'cashAdvanceRequests', 'incidentReports',
   // Financial
   'cashDrawerSessions',
-  // Settings & Config
-  'settings', 'businessConfig', 'serviceRotation',
+  // Settings & Config (no 'settings' — handled directly via businesses table)
+  'businessConfig', 'serviceRotation',
   // Services & Bookings
   'loyaltyHistory', 'advanceBookings', 'activeServices', 'homeServices'
 ];
@@ -676,7 +676,7 @@ class SupabaseSyncManager {
       'purchaseOrders', 'inventoryMovements', 'stockHistory', 'productConsumption',
       'attendance', 'shiftSchedules', 'activityLogs', 'payrollRequests',
       'payrollConfig', 'payrollConfigLogs', 'timeOffRequests',
-      'cashDrawerSessions', 'settings', 'businessConfig', 'serviceRotation',
+      'cashDrawerSessions', 'businessConfig', 'serviceRotation',
       'loyaltyHistory', 'advanceBookings', 'activeServices', 'homeServices',
       'business', 'users'
     ];
@@ -1036,6 +1036,14 @@ class SupabaseSyncManager {
     for (const item of itemsToProcess) {
       try {
         await db.syncQueue.update(item.id, { status: 'processing' });
+
+        // Skip entity types that have no Supabase table (e.g., 'settings' is local-only)
+        const SKIP_ENTITY_TYPES = ['settings'];
+        if (SKIP_ENTITY_TYPES.includes(item.entityType)) {
+          console.log(`[SupabaseSyncManager] Removing unsupported entity type from queue: ${item.entityType}/${item.entityId}`);
+          await db.syncQueue.delete(item.id);
+          continue;
+        }
 
         const tableName = this._toSupabaseTableName(item.entityType);
         const supabaseRecord = this._toSupabaseFormat(item.data, item.entityType);

@@ -15,7 +15,9 @@ class SettingsRepository {
   constructor() {
     this.table = db.settings;
     this.tableName = 'settings';
-    this.trackSync = true;
+    // Disable sync queue — there is no 'settings' table in Supabase.
+    // Settings sync is handled directly in Settings.jsx via business_config/businesses table.
+    this.trackSync = false;
   }
 
   /**

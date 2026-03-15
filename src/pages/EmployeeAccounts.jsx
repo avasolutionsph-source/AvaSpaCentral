@@ -65,12 +65,6 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     loadBranches();
   }, []);
 
-  // Auto-assign branch when modal opens and there's only one branch
-  useEffect(() => {
-    if (showModal && !formData.branchId && activeBranches.length === 1) {
-      setFieldValue('branchId', activeBranches[0].id);
-    }
-  }, [showModal, activeBranches]);
 
   const loadEmployees = async () => {
     try {
@@ -177,6 +171,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const activeBranches = useMemo(() => branches.filter(b => b.is_active), [branches]);
   const hasMultipleBranches = activeBranches.length > 1;
   const hasSingleBranch = activeBranches.length === 1;
+
+  // Auto-assign branch when modal opens and there's only one branch
+  useEffect(() => {
+    if (showModal && !formData.branchId && hasSingleBranch) {
+      setFieldValue('branchId', activeBranches[0].id);
+    }
+  }, [showModal, hasSingleBranch]);
 
   // Handle role change - auto-select branch if only one branch
   const handleRoleChange = (e) => {

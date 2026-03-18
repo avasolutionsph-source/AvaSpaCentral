@@ -151,6 +151,11 @@ const SUPABASE_TABLE_COLUMNS = {
     'booking_date_time', 'status', 'services', 'total_amount',
     'payment_status', 'notes', 'sync_status', 'created_at', 'updated_at'
   ],
+  shift_schedules: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'employee_position',
+    'week_start', 'effective_date', 'is_active', 'schedule', 'weekly_schedule',
+    'notes', 'sync_status', 'created_by', 'created_at', 'updated_at'
+  ],
   // Add more tables as needed - if a table isn't listed, all fields pass through
 };
 

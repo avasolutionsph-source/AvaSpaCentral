@@ -17,7 +17,7 @@ import {
 } from '../components/shared';
 import { roomValidation, validateWithToast } from '../validation/schemas';
 
-const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
+const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderRef }) => {
   const { user, showToast, isTherapist, canEdit, getUserBranchId } = useApp();
 
   // Filter state (kept separate as it's page-specific)
@@ -193,6 +193,13 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       onOpenCreateRef.current = openCreate;
     }
   }, [onOpenCreateRef, openCreate]);
+
+  // Expose manage order to parent via ref callback
+  React.useEffect(() => {
+    if (onManageOrderRef) {
+      onManageOrderRef.current = () => setShowManageOrder(true);
+    }
+  }, [onManageOrderRef]);
 
   // Load upcoming bookings (separate from CRUD operations)
   const loadUpcomingBookings = async () => {

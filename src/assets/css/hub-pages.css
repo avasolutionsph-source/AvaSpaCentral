@@ -32,6 +32,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  flex: 1;
 }
 
 .hub-title h1 {

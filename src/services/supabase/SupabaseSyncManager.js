@@ -96,6 +96,7 @@ const TABLE_NAME_MAP = {
 // Valid Supabase columns per table (prevents sending non-existent columns)
 // This must match your actual Supabase table schemas
 const SUPABASE_TABLE_COLUMNS = {
+  // === Core Entities ===
   employees: [
     'id', 'business_id', 'first_name', 'last_name', 'email', 'phone',
     'department', 'position', 'status', 'hire_date', 'hourly_rate',
@@ -118,13 +119,97 @@ const SUPABASE_TABLE_COLUMNS = {
     'duration', 'active', 'stock_quantity', 'reorder_level', 'image_url',
     'hide_from_pos', 'items_used', 'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
-  service_rotation: [
-    'id', 'business_id', 'date', 'rotation_data', 'created_at', 'updated_at'
+  rooms: [
+    'id', 'business_id', 'name', 'type', 'capacity', 'description', 'status',
+    'amenities', 'advance_booking_id', 'service_duration', 'branch_id',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  suppliers: [
+    'id', 'business_id', 'name', 'contact_person', 'email', 'phone',
+    'address', 'payment_terms', 'notes', 'status',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+
+  // === Operations ===
+  transactions: [
+    'id', 'business_id', 'customer_id', 'employee_id', 'date',
+    'subtotal', 'discount', 'discount_type', 'tax', 'service_charge',
+    'total', 'payment_method', 'amount_paid', 'change_amount',
+    'amount_received', 'change_given', 'status', 'items', 'notes',
+    'receipt_number', 'gift_certificate_code', 'gift_certificate_amount',
+    'branch_id', 'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  appointments: [
+    'id', 'business_id', 'customer_id', 'employee_id', 'room_id',
+    'scheduled_date_time', 'duration', 'service_id', 'service_name',
+    'status', 'notes', 'branch_id',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  expenses: [
+    'id', 'business_id', 'date', 'category', 'expense_type', 'amount',
+    'description', 'vendor', 'receipt_url', 'status', 'approved_by',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  gift_certificates: [
+    'id', 'business_id', 'code', 'amount', 'balance',
+    'recipient_name', 'recipient_email', 'purchaser_name',
+    'status', 'expiry_date', 'no_expiry', 'usage_history', 'message',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+
+  // === Inventory ===
+  purchase_orders: [
+    'id', 'business_id', 'supplier_id', 'order_date', 'expected_date',
+    'status', 'items', 'total', 'notes',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  inventory_movements: [
+    'id', 'business_id', 'product_id', 'type', 'quantity', 'date',
+    'reference_id', 'notes',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+  stock_history: [
+    'id', 'business_id', 'product_id', 'date', 'type',
+    'quantity_before', 'quantity_after', 'reason', 'user_id',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+  product_consumption: [
+    'id', 'business_id', 'product_id', 'date', 'month',
+    'quantity_used', 'transaction_id', 'service_id', 'employee_id',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+
+  // === HR ===
+  attendance: [
+    'id', 'business_id', 'employee_id', 'date', 'clock_in', 'clock_out',
+    'status', 'hours_worked', 'overtime_hours', 'late_minutes', 'notes',
+    'clock_in_location', 'clock_out_location', 'clock_in_gps', 'clock_out_gps',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+  shift_schedules: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'employee_position',
+    'week_start', 'effective_date', 'is_active', 'schedule', 'weekly_schedule',
+    'notes', 'sync_status', 'created_by', 'created_at', 'updated_at'
   ],
   payroll_config: [
     'id', 'business_id', 'key', 'value', 'updated_at'
   ],
-  // HR Request tables
+  payroll_config_logs: [
+    'id', 'business_id', 'user_id', 'user_name', 'changes', 'timestamp',
+    'updated_at'
+  ],
+  payroll_requests: [
+    'id', 'business_id', 'employee_id', 'request_type', 'amount',
+    'status', 'requested_date', 'approved_by', 'approved_at', 'notes',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+  time_off_requests: [
+    'id', 'business_id', 'employee_id', 'start_date', 'end_date',
+    'type', 'status', 'reason', 'approved_by',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+
+  // === HR Requests ===
   ot_requests: [
     'id', 'business_id', 'employee_id', 'employee_name', 'date', 'start_time', 'end_time',
     'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason',
@@ -146,17 +231,47 @@ const SUPABASE_TABLE_COLUMNS = {
     'resolved_by', 'resolved_at', 'resolution', 'closed_by', 'closed_at', 'closing_notes',
     'created_at', 'updated_at'
   ],
+
+  // === Financial ===
+  cash_drawer_sessions: [
+    'id', 'business_id', 'user_id', 'open_time', 'close_time',
+    'opening_balance', 'closing_balance', 'expected_balance', 'difference',
+    'status', 'transactions', 'notes',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+
+  // === Services & Bookings ===
   advance_bookings: [
     'id', 'business_id', 'customer_id', 'customer_name', 'employee_id',
     'booking_date_time', 'status', 'services', 'total_amount',
     'payment_status', 'notes', 'sync_status', 'created_at', 'updated_at'
   ],
-  shift_schedules: [
-    'id', 'business_id', 'employee_id', 'employee_name', 'employee_position',
-    'week_start', 'effective_date', 'is_active', 'schedule', 'weekly_schedule',
-    'notes', 'sync_status', 'created_by', 'created_at', 'updated_at'
+  active_services: [
+    'id', 'business_id', 'room_id', 'advance_booking_id', 'customer_id',
+    'employee_id', 'service_id', 'status', 'start_time', 'end_time', 'duration',
+    'sync_status', 'created_at', 'updated_at'
   ],
-  // Add more tables as needed - if a table isn't listed, all fields pass through
+  home_services: [
+    'id', 'business_id', 'employee_id', 'transaction_id', 'customer_id',
+    'status', 'scheduled_time', 'address', 'notes', 'services',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+  service_rotation: [
+    'id', 'business_id', 'date', 'rotation_data', 'created_at', 'updated_at'
+  ],
+
+  // === Logs & History ===
+  activity_logs: [
+    'id', 'business_id', 'user_id', 'user_name', 'type', 'action',
+    'entity_type', 'entity_id', 'details', 'ip_address', 'timestamp',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+  loyalty_history: [
+    'id', 'business_id', 'customer_id', 'date', 'type', 'points',
+    'balance_after', 'reference_id', 'notes',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+  // All tables are now whitelisted - no more unfiltered pass-through
 };
 
 // Map camelCase field names to snake_case for Supabase
@@ -272,6 +387,30 @@ const FIELD_NAME_MAP = {
   closedAt: 'closed_at',
   closingNotes: 'closing_notes',
   rejectionReason: 'rejection_reason',
+  // Shift schedule fields
+  weeklySchedule: 'weekly_schedule',
+  effectiveDate: 'effective_date',
+  employeePosition: 'employee_position',
+  createdBy: 'created_by',
+  // Stock & inventory fields
+  quantityChange: 'quantity_change',
+  userName: 'user_name',
+  purchaseOrderId: 'purchase_order_id',
+  // Purchase order fields
+  poNumber: 'po_number',
+  receivedAt: 'received_at',
+  // Room fields
+  currentAppointmentId: 'current_appointment_id',
+  serviceDuration: 'service_duration',
+  branchId: 'branch_id',
+  // Transaction fields
+  amountReceived: 'amount_received',
+  changeGiven: 'change_given',
+  // Attendance GPS fields
+  clockInGps: 'clock_in_gps',
+  clockOutGps: 'clock_out_gps',
+  // Misc
+  syncStatus: 'sync_status',
 };
 
 class SupabaseSyncManager {

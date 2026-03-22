@@ -3840,6 +3840,98 @@ select {
   .kpi-items {
     grid-template-columns: 1fr;
   }
+
+  /* Add bottom padding for bottom nav */
+  .page-content {
+    padding-bottom: calc(var(--spacing-md) + 64px);
+  }
+}
+
+/* ============================================================================
+   MOBILE BOTTOM NAVIGATION
+   ============================================================================ */
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--color-surface-elevated, #fff);
+    border-top: 1px solid var(--color-border, #e5e7eb);
+    z-index: 1001;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 4px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 2px;
+    padding: 6px 0;
+    color: var(--color-text-secondary, #6b7280);
+    text-decoration: none;
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    min-width: 0;
+  }
+
+  .bottom-nav-item.active {
+    color: var(--color-primary, #6B1C23);
+  }
+
+  .bottom-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    transition: background-color 0.15s ease;
+  }
+
+  .bottom-nav-item.active .bottom-nav-icon {
+    background: var(--color-primary-light, rgba(107, 28, 35, 0.1));
+  }
+
+  .bottom-nav-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .bottom-nav-label {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 64px;
+  }
+
+  .bottom-nav-item.active .bottom-nav-label {
+    font-weight: 600;
+  }
+
+  /* Hide hamburger in header when bottom nav is present */
+  .mobile-menu-btn {
+    display: none;
+  }
 }
 
 /* ============================================================================

@@ -1460,7 +1460,15 @@ class SupabaseSyncManager {
   async forcePull() {
     console.log('[SupabaseSyncManager] Force pulling all data');
     await db.syncMetadata.clear();
-    return this._pullChanges();
+    const result = await this._pullChanges();
+    // Notify listeners so pages reload with pulled data
+    this._notifyListeners({
+      type: 'sync_complete',
+      pushed: 0,
+      pulled: result.pulled,
+      failed: result.failed,
+    });
+    return result;
   }
 
   /**

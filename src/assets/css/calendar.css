@@ -9,6 +9,11 @@
   padding: var(--spacing-lg);
 }
 
+.calendar-page .hub-header-actions {
+  margin-left: auto;
+  align-self: flex-end;
+}
+
 /* View Switcher */
 .calendar-controls {
   display: flex;

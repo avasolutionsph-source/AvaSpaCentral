@@ -116,8 +116,10 @@ const SUPABASE_TABLE_COLUMNS = {
   ],
   products: [
     'id', 'business_id', 'name', 'type', 'category', 'description', 'price',
-    'duration', 'active', 'stock_quantity', 'reorder_level', 'image_url',
-    'hide_from_pos', 'items_used', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+    'cost', 'duration', 'active', 'stock_quantity', 'reorder_level', 'sku',
+    'services_since_last_adjustment', 'image_url', 'hide_from_pos', 'items_used',
+    'metadata', 'sync_status', 'branch_id',
+    'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   rooms: [
     'id', 'business_id', 'name', 'type', 'capacity', 'description', 'status',

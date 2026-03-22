@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 
 /**
  * useCrudOperations - Unified hook for CRUD operations with modal, form, and delete management
@@ -103,6 +104,20 @@ const useCrudOperations = ({
       loadData();
     }
   }, [loadOnMount, loadData]);
+
+  // Reload data when sync pulls new items from Supabase
+  useEffect(() => {
+    const unsubscribe = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status.type === 'sync_complete' || status.type === 'pull_complete') &&
+        status.pulled > 0 &&
+        isMounted.current
+      ) {
+        loadData();
+      }
+    });
+    return unsubscribe;
+  }, [loadData]);
 
   // Refresh data (alias for loadData)
   const refresh = loadData;

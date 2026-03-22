@@ -581,15 +581,84 @@
 @media (max-width: 768px) {
   .pos-container {
     flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 120px);
+  }
+
+  .pos-products-section {
+    flex: 1;
+    min-height: 0;
   }
 
   .pos-cart-panel {
     width: 100%;
-    max-height: 50vh;
+    max-height: 45vh;
+    border-left: none;
+    border-top: 2px solid var(--color-border);
+    position: sticky;
+    bottom: 60px;
   }
 
   .pos-products-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .product-card {
+    padding: var(--spacing-sm);
+    min-height: 44px;
+  }
+
+  .product-card .product-name {
+    font-size: 0.8125rem;
+  }
+
+  .product-card .product-price {
+    font-size: 0.875rem;
+  }
+
+  /* Bigger touch targets for quantity buttons */
+  .cart-item-actions .qty-btn,
+  .cart-quantity-controls button {
+    min-width: 36px;
+    min-height: 36px;
+    font-size: 1rem;
+  }
+
+  /* Cart header compact */
+  .pos-cart-header {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  /* Checkout button bigger */
+  .pos-checkout-btn,
+  .checkout-btn {
+    padding: var(--spacing-md);
+    font-size: 1rem;
+    min-height: 48px;
+  }
+
+  /* Filter/category tabs scrollable */
+  .pos-category-tabs,
+  .pos-filters {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    padding-bottom: var(--spacing-xs);
+  }
+
+  .pos-category-tabs::-webkit-scrollbar,
+  .pos-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pos-category-tab,
+  .category-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: var(--spacing-xs) var(--spacing-md);
+    min-height: 36px;
   }
 }
 
@@ -828,14 +897,36 @@
 @media (max-width: 480px) {
   .pos-products-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
   }
 
   .product-card {
     padding: var(--spacing-xs);
+    border-radius: var(--radius-md);
   }
 
   .pos-cart-panel {
-    max-height: 70vh;
+    max-height: 60vh;
+  }
+
+  /* Search bar full width */
+  .pos-search-container,
+  .pos-search {
+    width: 100%;
+  }
+
+  .pos-search input {
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  /* Compact cart items */
+  .cart-item {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    gap: var(--spacing-xs);
+  }
+
+  .cart-item-name {
+    font-size: 0.8125rem;
   }
 }
 

@@ -9910,15 +9910,179 @@ a:focus:not(:focus-visible),
     padding: 0 var(--spacing-md);
   }
 
+  /* ---- Mobile Card Layout for DataTable ---- */
   .data-table {
-    min-width: 600px;
+    min-width: 0;
+    border: none;
   }
 
-  .data-table th,
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .data-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-elevated);
+    gap: var(--spacing-xs) var(--spacing-md);
+    align-items: center;
+  }
+
+  .data-table tbody tr:hover {
+    background: var(--color-surface-hover, #f9fafb);
+  }
+
   .data-table td {
-    padding: var(--spacing-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 2px 0;
     font-size: 0.8125rem;
+    white-space: normal;
+    border: none;
+    min-width: 0;
+  }
+
+  .data-table td::before {
+    content: attr(data-label);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+  }
+
+  /* First cell (usually name/title) - full width, prominent */
+  .data-table td:first-child {
+    width: 100%;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--color-border-light, #f3f4f6);
+    margin-bottom: 2px;
+  }
+
+  /* Actions cell - full width, right-aligned */
+  .data-table td:last-child {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: var(--spacing-xs);
+    border-top: 1px solid var(--color-border-light, #f3f4f6);
+    margin-top: 2px;
+  }
+
+  .data-table .actions-cell {
+    justify-content: flex-end;
+  }
+
+  /* Table container - remove overflow scroll since we use cards now */
+  .table-container {
+    overflow-x: visible;
+  }
+
+  /* ---- Hub Pages - Scrollable Tabs ---- */
+  .sales-tabs,
+  .hub-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  .sales-tabs::-webkit-scrollbar,
+  .hub-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sales-tabs .tab-btn,
+  .hub-tabs .tab-btn,
+  .tab-btn {
     white-space: nowrap;
+    flex-shrink: 0;
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-height: 40px;
+    font-size: 0.8125rem;
+  }
+
+  /* ---- Filter Bars - Stack on Mobile ---- */
+  .filter-bar,
+  .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .filter-bar .filter-group,
+  .filter-bar input,
+  .filter-bar select,
+  .filters-row input,
+  .filters-row select {
+    width: 100%;
+    min-height: 40px;
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  /* ---- Page Headers - Stack title and actions ---- */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .page-header-actions {
+    width: 100%;
+    display: flex;
+    gap: var(--spacing-xs);
+  }
+
+  .page-header-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* ---- KPI/Stats Cards - 2 columns on mobile ---- */
+  .hub-stats,
+  .stats-row,
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+
+  .hub-stats .stat-card,
+  .stats-row .stat-card,
+  .summary-cards .stat-card {
+    padding: var(--spacing-sm);
+  }
+
+  .hub-stats .stat-value,
+  .stats-row .stat-value {
+    font-size: 1.25rem;
+  }
+
+  .hub-stats .stat-label,
+  .stats-row .stat-label {
+    font-size: 0.6875rem;
+  }
+
+  /* ---- General Mobile Spacing ---- */
+  .card {
+    padding: var(--spacing-md);
+  }
+
+  .section-header h2,
+  .section-header h3 {
+    font-size: 1rem;
   }
 
   /* Forms */

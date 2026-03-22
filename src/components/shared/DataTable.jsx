@@ -99,6 +99,7 @@ const DataTable = memo(function DataTable({
               {columns.map((column) => (
                 <td
                   key={column.key}
+                  data-label={column.label}
                   className={`${getAlignClass(column.align)} ${column.className || ''}`.trim()}
                 >
                   {getCellValue(row, column)}

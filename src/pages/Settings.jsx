@@ -1432,6 +1432,25 @@ const Settings = () => {
     }
   };
 
+  // Force re-push all local data to Supabase
+  const handleForceRepush = async () => {
+    if (syncOperation) return;
+    setSyncOperation('repush');
+    try {
+      const result = await SyncManager.forceRepush();
+      if (result.success) {
+        showToast(`Re-push complete: ${result.queued} items queued, ${result.pushed || 0} pushed`, 'success');
+      } else {
+        showToast(result.message || 'Re-push failed', 'error');
+      }
+    } catch (error) {
+      showToast('Re-push failed: ' + error.message, 'error');
+    } finally {
+      setSyncOperation(null);
+      loadSyncStatus();
+    }
+  };
+
   // Load parked sync items
   const loadParkedItems = async () => {
     setParkedLoading(true);
@@ -2795,6 +2814,58 @@ const Settings = () => {
               <div className="backup-warning-notice">
                 ⚠️ <strong>Warning:</strong> Importing a backup will replace all existing data. Make sure to export your current data first if needed.
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Data Sync Actions - Owner/Manager only */}
+        {hasManagementAccess() && (
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">🔄</div>
+              <div className="settings-section-title">
+                <h2>Data Sync</h2>
+                <p>Sync data between devices. Use "Re-push All" to recover data that failed to sync.</p>
+              </div>
+            </div>
+            <div className="settings-section-body">
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSync}
+                  disabled={!!syncOperation}
+                >
+                  {syncOperation === 'sync' ? 'Syncing...' : 'Sync Now'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleForcePull}
+                  disabled={!!syncOperation}
+                >
+                  {syncOperation === 'pull' ? 'Pulling...' : 'Pull from Cloud'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleForcePush}
+                  disabled={!!syncOperation}
+                >
+                  {syncOperation === 'push' ? 'Pushing...' : 'Push to Cloud'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-warning"
+                  onClick={handleForceRepush}
+                  disabled={!!syncOperation}
+                >
+                  {syncOperation === 'repush' ? 'Re-pushing...' : 'Re-push All Data'}
+                </button>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '8px' }}>
+                "Re-push All Data" finds records stuck in this device and pushes them to the cloud so other devices can see them.
+              </p>
             </div>
           </div>
         )}

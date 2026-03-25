@@ -1329,6 +1329,92 @@ class SupabaseSyncManager {
   }
 
   /**
+   * Force re-push ALL local data to Supabase
+   * This recovers data that was created when sync was broken
+   */
+  async forceRepush() {
+    if (!isSupabaseConfigured() || !authService.currentUser) {
+      return { success: false, message: 'Not configured or not authenticated' };
+    }
+
+    const businessId = authService.currentUser.businessId;
+    if (!businessId) return { success: false, message: 'No business ID' };
+
+    console.log('[SupabaseSyncManager] Force re-push: re-queuing all local data...');
+
+    let totalQueued = 0;
+
+    // Clear any failed/parked items from sync queue
+    const stuckItems = await db.syncQueue
+      .filter(item => item.status === 'failed' || item.status === 'parked' || item.status === 'processing')
+      .toArray();
+    for (const item of stuckItems) {
+      await db.syncQueue.update(item.id, { status: 'pending', retryCount: 0, nextRetryAt: null });
+      totalQueued++;
+    }
+
+    // For each entity type, find records that aren't in Supabase yet
+    for (const entityType of SYNCABLE_ENTITIES) {
+      try {
+        const dexieTableName = entityType;
+        if (!db[dexieTableName]) continue;
+
+        const tableName = this._toSupabaseTableName(entityType);
+
+        // Get all local records for this business
+        const localRecords = await db[dexieTableName]
+          .filter(item => item.businessId === businessId)
+          .toArray();
+
+        if (localRecords.length === 0) continue;
+
+        // Get all IDs from Supabase for this entity
+        const { data: remoteRecords } = await supabase
+          .from(tableName)
+          .select('id')
+          .eq('business_id', businessId);
+
+        const remoteIds = new Set((remoteRecords || []).map(r => r.id));
+
+        // Find records that exist locally but not in Supabase
+        const missingRecords = localRecords.filter(r => !remoteIds.has(r._id));
+
+        if (missingRecords.length > 0) {
+          console.log(`[SupabaseSyncManager] ${entityType}: ${missingRecords.length} records missing from Supabase`);
+
+          for (const record of missingRecords) {
+            // Check if already in queue
+            const existingQueueItem = await db.syncQueue
+              .filter(q => q.entityId === record._id && q.entityType === entityType)
+              .first();
+
+            if (!existingQueueItem) {
+              await db.syncQueue.add({
+                entityType,
+                entityId: record._id,
+                operation: 'create',
+                data: record,
+                status: 'pending',
+                retryCount: 0,
+                createdAt: new Date().toISOString(),
+              });
+              totalQueued++;
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[SupabaseSyncManager] Error re-queuing ${entityType}:`, err);
+      }
+    }
+
+    console.log(`[SupabaseSyncManager] Force re-push: queued ${totalQueued} items. Starting sync...`);
+
+    // Now run the actual sync
+    const result = await this.sync();
+    return { success: true, queued: totalQueued, ...result };
+  }
+
+  /**
    * Pull changes from Supabase
    */
   async _pullChanges() {

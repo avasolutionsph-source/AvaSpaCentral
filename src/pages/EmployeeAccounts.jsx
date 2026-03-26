@@ -476,8 +476,8 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       // Provide more specific error messages
       let errorMessage = error.message || 'Failed to create account';
 
-      if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
-        errorMessage = 'An account with this email or username already exists';
+      if (errorMessage.includes('duplicate') || errorMessage.includes('already exists') || errorMessage.includes('already registered')) {
+        errorMessage = 'An account with this email already exists in the system. The employee may have a previous account — check Supabase Auth or use a different email.';
       } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
         errorMessage = 'Network error. Please check your internet connection.';
       } else if (errorMessage.includes('timeout')) {

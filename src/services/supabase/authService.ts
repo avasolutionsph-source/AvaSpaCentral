@@ -360,19 +360,52 @@ class AuthService {
         },
       });
 
-      if (authError) {
-        throw new Error(authError.message);
-      }
+      let authUserId: string;
 
-      if (!authData.user) {
+      if (authError) {
+        // If user already registered in Auth, try to recover by finding their auth ID
+        // This handles cases where auth was created but profile insert failed
+        if (authError.message.includes('already registered')) {
+          // Check if a profile already exists for this email
+          const { data: existingProfile } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email.toLowerCase())
+            .single();
+
+          if (existingProfile) {
+            throw new Error('User already registered with a complete account');
+          }
+
+          // No profile exists — get auth user ID via admin or sign-in attempt
+          // Try signing in to get the user ID so we can create the missing profile
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (signInError || !signInData.user) {
+            throw new Error('This email is already registered. If you forgot the password, please contact the admin.');
+          }
+
+          authUserId = signInData.user.id;
+
+          // Sign out immediately — we only needed the ID
+          await supabase.auth.signOut();
+        } else {
+          throw new Error(authError.message);
+        }
+      } else if (!authData.user) {
         throw new Error('Failed to create auth account');
+      } else {
+        authUserId = authData.user.id;
       }
 
       // Create user profile in users table
       const { data: profileData, error: profileError } = await supabase
         .from('users')
         .insert({
-          auth_id: authData.user.id,
+          auth_id: authUserId,
           email: email.toLowerCase(),
           username: username.toLowerCase(),
           first_name: firstName,

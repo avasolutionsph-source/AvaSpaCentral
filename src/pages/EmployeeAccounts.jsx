@@ -141,13 +141,24 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
           return;
         }
 
-        // Then check Supabase if configured
+        // Then check Supabase if configured (with timeout to prevent hanging)
         if (isSupabaseConfigured()) {
-          const isAvailable = await authService.isUsernameAvailable(username);
-          if (isAvailable) {
-            setUsernameStatus({ checking: false, available: true, message: 'Username available' });
-          } else {
-            setUsernameStatus({ checking: false, available: false, message: 'Username already taken' });
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 5000)
+          );
+          try {
+            const isAvailable = await Promise.race([
+              authService.isUsernameAvailable(username),
+              timeoutPromise
+            ]);
+            if (isAvailable) {
+              setUsernameStatus({ checking: false, available: true, message: 'Username available' });
+            } else {
+              setUsernameStatus({ checking: false, available: false, message: 'Username already taken' });
+            }
+          } catch (e) {
+            // Timeout or Supabase error — fall back to local check result (available)
+            setUsernameStatus({ checking: false, available: true, message: 'Username available (offline check)' });
           }
         } else {
           // Offline mode - only local check was done

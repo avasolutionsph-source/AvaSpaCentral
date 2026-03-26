@@ -269,7 +269,9 @@ const ShiftSchedules = () => {
   const handleSaveShiftConfig = async () => {
     try {
       await mockApi.shiftSchedules.updateShiftConfig(configForm);
-      setShiftConfig(prev => ({ ...prev, ...configForm }));
+      // Reload from storage to verify persistence
+      const freshConfig = await mockApi.shiftSchedules.getShiftConfig();
+      setShiftConfig(freshConfig);
       showToast('Shift configuration saved!', 'success');
       setShowConfigModal(false);
     } catch (error) {
@@ -844,7 +846,7 @@ const ShiftSchedules = () => {
                 <div className="shift-config-times">
                   <input
                     type="time"
-                    value={configForm.dayShift?.startTime || '09:00'}
+                    value={configForm.dayShift?.startTime ?? ''}
                     onChange={(e) => setConfigForm(prev => ({
                       ...prev,
                       dayShift: { ...prev.dayShift, startTime: e.target.value }
@@ -854,7 +856,7 @@ const ShiftSchedules = () => {
                   <span className="time-separator">to</span>
                   <input
                     type="time"
-                    value={configForm.dayShift?.endTime || '17:00'}
+                    value={configForm.dayShift?.endTime ?? ''}
                     onChange={(e) => setConfigForm(prev => ({
                       ...prev,
                       dayShift: { ...prev.dayShift, endTime: e.target.value }
@@ -873,7 +875,7 @@ const ShiftSchedules = () => {
                 <div className="shift-config-times">
                   <input
                     type="time"
-                    value={configForm.nightShift?.startTime || '13:00'}
+                    value={configForm.nightShift?.startTime ?? ''}
                     onChange={(e) => setConfigForm(prev => ({
                       ...prev,
                       nightShift: { ...prev.nightShift, startTime: e.target.value }
@@ -883,7 +885,7 @@ const ShiftSchedules = () => {
                   <span className="time-separator">to</span>
                   <input
                     type="time"
-                    value={configForm.nightShift?.endTime || '21:00'}
+                    value={configForm.nightShift?.endTime ?? ''}
                     onChange={(e) => setConfigForm(prev => ({
                       ...prev,
                       nightShift: { ...prev.nightShift, endTime: e.target.value }
@@ -902,7 +904,7 @@ const ShiftSchedules = () => {
                 <div className="shift-config-times">
                   <input
                     type="time"
-                    value={configForm.wholeDayShift?.startTime || '09:00'}
+                    value={configForm.wholeDayShift?.startTime ?? ''}
                     onChange={(e) => setConfigForm(prev => ({
                       ...prev,
                       wholeDayShift: { ...prev.wholeDayShift, startTime: e.target.value }
@@ -912,7 +914,7 @@ const ShiftSchedules = () => {
                   <span className="time-separator">to</span>
                   <input
                     type="time"
-                    value={configForm.wholeDayShift?.endTime || '21:00'}
+                    value={configForm.wholeDayShift?.endTime ?? ''}
                     onChange={(e) => setConfigForm(prev => ({
                       ...prev,
                       wholeDayShift: { ...prev.wholeDayShift, endTime: e.target.value }

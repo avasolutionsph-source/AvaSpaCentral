@@ -1527,9 +1527,35 @@ export const shiftSchedulesAdapter = {
   // Get shift configuration
   async getShiftConfig() {
     await delay();
-    // Try to get from settings repository first (event-driven sync)
-    const savedConfig = await SettingsRepository.get('shiftConfig');
+    // Try to get from settings repository first (local Dexie)
+    let savedConfig = await SettingsRepository.get('shiftConfig');
+
+    // If no local config, try to pull from Supabase (cross-device sync)
+    if (!savedConfig) {
+      try {
+        const businessId = getCurrentBusinessId();
+        if (businessId && isSupabaseConfigured && supabase) {
+          const { data, error } = await supabase
+            .from('settings')
+            .select('value')
+            .eq('business_id', businessId)
+            .eq('key', 'shiftConfig')
+            .single();
+
+          if (!error && data?.value) {
+            savedConfig = data.value;
+            // Cache locally for offline access
+            await SettingsRepository.set('shiftConfig', savedConfig);
+          }
+        }
+      } catch (e) {
+        // Cloud fetch is best-effort
+      }
+    }
+
     if (savedConfig) {
+      // Keep mockDatabase in sync so other code using it directly gets saved values
+      mockDatabase.shiftConfig = clone(savedConfig);
       return clone(savedConfig);
     }
     // Fall back to default from mockDatabase
@@ -1539,12 +1565,40 @@ export const shiftSchedulesAdapter = {
   // Update shift configuration
   async updateShiftConfig(config) {
     await delay();
-    // Get current config
-    const currentConfig = await this.getShiftConfig();
+    // Get current config from local storage directly (avoid this-binding issues)
+    const savedConfig = await SettingsRepository.get('shiftConfig');
+    const currentConfig = savedConfig || clone(mockDatabase.shiftConfig);
     const updatedConfig = { ...currentConfig, ...config };
 
-    // Save using settings repository (event-driven sync)
+    // Save locally (Dexie)
     await SettingsRepository.set('shiftConfig', updatedConfig);
+
+    // Sync to Supabase for cross-device access
+    try {
+      const businessId = getCurrentBusinessId();
+      if (businessId && isSupabaseConfigured && supabase) {
+        const now = new Date().toISOString();
+        // Upsert: delete then insert (same pattern as Settings.jsx)
+        await supabase
+          .from('settings')
+          .delete()
+          .eq('business_id', businessId)
+          .eq('key', 'shiftConfig');
+
+        await supabase
+          .from('settings')
+          .insert({
+            id: crypto.randomUUID(),
+            business_id: businessId,
+            key: 'shiftConfig',
+            value: updatedConfig,
+            updated_at: now
+          });
+      }
+    } catch (e) {
+      // Cloud sync is best-effort — local save already succeeded
+      console.warn('[ShiftConfig] Cloud sync failed:', e.message);
+    }
 
     // Also update mockDatabase for consistency
     mockDatabase.shiftConfig = updatedConfig;
@@ -1638,8 +1692,9 @@ export const shiftSchedulesAdapter = {
     const employee = await storageService.employees.getById(employeeId);
     if (!employee) throw new Error('Employee not found');
 
-    // Get shift times from config
-    const config = mockDatabase.shiftConfig;
+    // Get shift times from saved config (not mockDatabase defaults)
+    const savedConfig = await SettingsRepository.get('shiftConfig');
+    const config = savedConfig || mockDatabase.shiftConfig;
     const weeklySchedule = {};
 
     Object.keys(template.weeklySchedule).forEach(day => {
@@ -1647,11 +1702,11 @@ export const shiftSchedulesAdapter = {
       if (shiftType === 'off') {
         weeklySchedule[day] = { shift: 'off', startTime: null, endTime: null };
       } else {
-        const shiftConfig = config[shiftType];
+        const shiftConf = config[shiftType];
         weeklySchedule[day] = {
           shift: shiftType,
-          startTime: shiftConfig?.startTime || '09:00',
-          endTime: shiftConfig?.endTime || '17:00'
+          startTime: shiftConf?.startTime || '09:00',
+          endTime: shiftConf?.endTime || '17:00'
         };
       }
     });

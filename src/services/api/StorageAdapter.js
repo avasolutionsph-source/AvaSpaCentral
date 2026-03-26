@@ -1490,7 +1490,30 @@ export const usersAdapter = {
 
   async deleteUser(id) {
     await delay();
+
+    // Get user info before deleting (need auth_id for Supabase Auth cleanup)
+    const user = await storageService.users.getById(id);
+
+    // Delete from local Dexie
     await storageService.users.delete(id);
+
+    // Delete from Supabase users table and auth
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        // Delete profile from users table
+        await supabase.from('users').delete().eq('id', id);
+
+        // Delete from Supabase Auth (requires a database function since frontend can't use admin API)
+        if (user?.authId) {
+          await supabase.rpc('delete_auth_user', { user_auth_id: user.authId }).catch(() => {
+            console.warn('[usersAdapter] Could not delete auth user - may need manual cleanup in Supabase dashboard');
+          });
+        }
+      } catch (e) {
+        console.warn('[usersAdapter] Supabase delete failed:', e.message);
+      }
+    }
+
     return { success: true };
   },
 

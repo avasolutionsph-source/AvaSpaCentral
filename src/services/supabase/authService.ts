@@ -5,6 +5,7 @@
  * Requires Supabase to be configured for production use.
  */
 
+import { createClient } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import type {
   UserProfile,
@@ -346,12 +347,16 @@ class AuthService {
         throw new Error('Username is already taken');
       }
 
-      // Save current session BEFORE signUp (signUp changes the active session)
-      const { data: currentSessionData } = await supabase.auth.getSession();
-      const currentSession = currentSessionData?.session;
+      // Use a SEPARATE Supabase client for signUp to avoid disrupting the current session
+      // The main client's session (manager/owner) stays untouched
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      const isolatedClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
 
-      // Create Supabase Auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Create Supabase Auth user via isolated client
+      const { data: authData, error: authError } = await isolatedClient.auth.signUp({
         email,
         password,
         options: {
@@ -363,14 +368,6 @@ class AuthService {
           emailRedirectTo: undefined,
         },
       });
-
-      // Restore the original session immediately so the manager/owner stays logged in
-      if (currentSession) {
-        await supabase.auth.setSession({
-          access_token: currentSession.access_token,
-          refresh_token: currentSession.refresh_token,
-        });
-      }
 
       let authUserId: string;
 

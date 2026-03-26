@@ -382,23 +382,19 @@ class AuthService {
         authUserId = authData.user.id;
       }
 
-      // Create user profile in users table (using restored manager session with proper RLS permissions)
+      // Create user profile via RPC (SECURITY DEFINER bypasses RLS)
       const { data: profileData, error: profileError } = await supabase
-        .from('users')
-        .insert({
-          auth_id: authUserId,
-          email: email.toLowerCase(),
-          username: username.toLowerCase(),
-          first_name: firstName,
-          last_name: lastName,
-          role: role || 'Therapist',
-          business_id: businessId,
-          branch_id: branchId || null,
-          employee_id: employeeId,
-          status: 'active',
-        })
-        .select()
-        .single();
+        .rpc('create_user_profile', {
+          p_auth_id: authUserId,
+          p_email: email.toLowerCase(),
+          p_username: username.toLowerCase(),
+          p_first_name: firstName,
+          p_last_name: lastName,
+          p_role: role || 'Therapist',
+          p_business_id: businessId,
+          p_branch_id: branchId || null,
+          p_employee_id: employeeId || null,
+        });
 
       if (profileError) {
         console.error('[AuthService] Failed to create profile:', profileError);

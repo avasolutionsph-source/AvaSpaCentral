@@ -186,6 +186,7 @@ const SUPABASE_TABLE_COLUMNS = {
     'id', 'business_id', 'employee_id', 'date', 'clock_in', 'clock_out',
     'status', 'hours_worked', 'overtime_hours', 'late_minutes', 'notes',
     'clock_in_location', 'clock_out_location', 'clock_in_gps', 'clock_out_gps',
+    'clock_in_photo', 'clock_out_photo', 'is_out_of_range', 'branch_id',
     'sync_status', 'created_at', 'updated_at'
   ],
   shift_schedules: [
@@ -410,9 +411,14 @@ const FIELD_NAME_MAP = {
   // Transaction fields
   amountReceived: 'amount_received',
   changeGiven: 'change_given',
-  // Attendance GPS fields
+  // Attendance fields
   clockInGps: 'clock_in_gps',
   clockOutGps: 'clock_out_gps',
+  clockInPhoto: 'clock_in_photo',
+  clockOutPhoto: 'clock_out_photo',
+  isOutOfRange: 'is_out_of_range',
+  clockIn: 'clock_in',
+  clockOut: 'clock_out',
   // Misc
   syncStatus: 'sync_status',
 };

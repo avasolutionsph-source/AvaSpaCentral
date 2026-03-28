@@ -69,14 +69,13 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       }
       setEmployees(activeEmps);
 
-      // Calculate stats
-      const activeEmployees = emps.filter(e => e.status === 'active');
+      // Calculate stats - use branch-filtered activeEmps, not unfiltered emps
       const present = todayRecords.filter(a => a.status === 'present' || a.status === 'late').length;
       const late = todayRecords.filter(a => a.status === 'late').length;
-      const absent = activeEmployees.length - present;
+      const absent = activeEmps.length - present;
 
       setStats({
-        total: activeEmployees.length,
+        total: activeEmps.length,
         present: present - late, // Present on time
         late,
         absent
@@ -294,7 +293,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   };
 
   const getEmployeeRecord = (employeeId) => {
-    return todayAttendance.find(a => a.employee._id === employeeId);
+    return todayAttendance.find(a => a.employee && a.employee._id === employeeId);
   };
 
   const hasPhotos = (record) => {

@@ -2642,7 +2642,9 @@ select {
   max-width: 500px;
   width: 100%;
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   animation: slideUp 0.3s ease;
 }
 
@@ -2657,12 +2659,21 @@ select {
   }
 }
 
+.modal > form {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-lg);
   border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -2692,6 +2703,8 @@ select {
 
 .modal-body {
   padding: var(--spacing-lg);
+  overflow-y: auto;
+  flex: 1;
 }
 
 .modal-footer {
@@ -2701,6 +2714,7 @@ select {
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
   border-top: 1px solid var(--gray-200);
+  flex-shrink: 0;
 }
 
 /* Transaction Detail Modal */
@@ -10128,8 +10142,6 @@ a:focus:not(:focus-visible),
 
   .modal-body {
     padding: var(--spacing-md);
-    max-height: calc(90vh - 140px);
-    overflow-y: auto;
   }
 
   .modal-footer {

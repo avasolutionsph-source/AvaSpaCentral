@@ -411,14 +411,17 @@ const BranchesTab = () => {
 
             // Deactivate old Branch Owner
             if (formData.ownerUserId) {
-              await fetch(
+              const deactivateRes = await fetch(
                 `${supabaseUrl}/rest/v1/users?id=eq.${formData.ownerUserId}`,
                 {
                   method: 'PATCH',
                   headers,
-                  body: JSON.stringify({ status: 'inactive', branch_id: null })
+                  body: JSON.stringify({ status: 'inactive', branch_id: null, role: 'Deactivated' })
                 }
               );
+              if (!deactivateRes.ok) {
+                console.error('Failed to deactivate old owner:', await deactivateRes.json().catch(() => ({})));
+              }
             }
           } catch (replaceErr) {
             console.error('Failed to replace Branch Owner:', replaceErr);
@@ -465,6 +468,7 @@ const BranchesTab = () => {
 
       setShowModal(false);
       loadBranches();
+      loadStaff();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {

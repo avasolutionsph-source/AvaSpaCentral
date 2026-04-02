@@ -616,38 +616,7 @@ const BookingPage = () => {
 
       {/* Hero removed — go straight to branch selection / booking */}
 
-      {/* Branch Dropdown — shown if multiple branches */}
-      {branches.length > 1 && (
-        <div id="branch-selection" style={{ maxWidth: '900px', margin: '0 auto', padding: '1.25rem 2rem 0' }}>
-          <select
-            value={selectedBranch?.id || ''}
-            onChange={(e) => {
-              const branch = branches.find(b => b.id === e.target.value);
-              if (branch) {
-                setSelectedBranch(branch);
-                setShowBranchSelector(false);
-              }
-            }}
-            style={{
-              width: '100%',
-              padding: '0.75rem 1rem',
-              fontSize: '1rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              background: '#fff',
-              cursor: 'pointer',
-              color: selectedBranch ? '#1a1a1a' : '#888'
-            }}
-          >
-            <option value="" disabled>Select a branch...</option>
-            {branches.map(branch => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}{branch.city ? ` — ${branch.city}` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* Branch dropdown moved inside booking-services section */}
 
       {/* Progress Indicator */}
       <div id="booking-form" className="booking-progress">
@@ -682,7 +651,31 @@ const BookingPage = () => {
       <div className="booking-container">
         {/* Left side: Services */}
         <div className="booking-services">
-          {/* Branch dropdown is now above the progress indicator */}
+          {/* Branch Dropdown */}
+          {branches.length > 1 && (
+            <div className="booking-section">
+              <h2>Select Branch</h2>
+              <select
+                value={selectedBranch?.id || ''}
+                onChange={(e) => {
+                  const branch = branches.find(b => b.id === e.target.value);
+                  if (branch) {
+                    setSelectedBranch(branch);
+                    setShowBranchSelector(false);
+                  }
+                }}
+                className="form-control"
+                style={{ fontSize: '1rem', padding: '0.75rem 1rem' }}
+              >
+                <option value="" disabled>Select a branch...</option>
+                {branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}{branch.city ? ` — ${branch.city}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="booking-section">
             <h2>1. Select Services</h2>

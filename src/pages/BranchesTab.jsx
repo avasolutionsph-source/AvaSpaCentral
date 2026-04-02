@@ -11,6 +11,7 @@ const BranchesTab = () => {
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [replacingOwner, setReplacingOwner] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -152,6 +153,7 @@ const BranchesTab = () => {
   const openEdit = async (branch) => {
     setModalMode('edit');
     setSelectedBranch(branch);
+    setReplacingOwner(false);
 
     // Load Branch Owner account for this branch
     let ownerData = { ownerFirstName: '', ownerLastName: '', ownerEmail: '', ownerUsername: '', ownerUserId: null };
@@ -200,9 +202,13 @@ const BranchesTab = () => {
       return;
     }
 
-    // Validate Branch Owner fields on create
-    if (modalMode === 'create') {
-      if (!formData.ownerEmail.trim()) {
+    // Validate Branch Owner fields on create or replace
+    const needsNewOwner = modalMode === 'create' || replacingOwner;
+    if (needsNewOwner) {
+      const email = replacingOwner ? (formData.newOwnerEmail || '') : formData.ownerEmail;
+      const firstName = replacingOwner ? (formData.newOwnerFirstName || '') : formData.ownerFirstName;
+      const lastName = replacingOwner ? (formData.newOwnerLastName || '') : formData.ownerLastName;
+      if (!email.trim()) {
         showToast('Branch Owner email is required', 'error');
         return;
       }
@@ -210,7 +216,7 @@ const BranchesTab = () => {
         showToast('Password must be at least 6 characters', 'error');
         return;
       }
-      if (!formData.ownerFirstName.trim() || !formData.ownerLastName.trim()) {
+      if (!firstName.trim() || !lastName.trim()) {
         showToast('Branch Owner name is required', 'error');
         return;
       }
@@ -338,8 +344,93 @@ const BranchesTab = () => {
           throw new Error(errData.message || 'Failed to save branch');
         }
 
-        // Update Branch Owner profile if we have one
-        if (formData.ownerUserId && formData.ownerFirstName.trim() && formData.ownerLastName.trim()) {
+        if (replacingOwner) {
+          // Replace Branch Owner: create new account, deactivate old one
+          const newEmail = (formData.newOwnerEmail || '').trim();
+          const newFirstName = (formData.newOwnerFirstName || '').trim();
+          const newLastName = (formData.newOwnerLastName || '').trim();
+          const newUsername = (formData.newOwnerUsername || '').trim() || newEmail.split('@')[0];
+
+          try {
+            // Check if email already exists
+            const emailCheckRes = await fetch(
+              `${supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(newEmail.toLowerCase())}&select=id&limit=1`,
+              { headers }
+            );
+            if (emailCheckRes.ok) {
+              const existingUsers = await emailCheckRes.json();
+              if (existingUsers.length > 0) {
+                throw new Error('An account with this email already exists');
+              }
+            }
+
+            // Create new Supabase Auth account
+            let authUser = null;
+            const signupRes = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+              method: 'POST',
+              headers: { 'apikey': supabaseKey, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: newEmail,
+                password: formData.ownerPassword,
+                data: {
+                  first_name: newFirstName,
+                  last_name: newLastName
+                }
+              })
+            });
+            if (signupRes.ok) {
+              authUser = await signupRes.json();
+            } else {
+              const errData = await signupRes.json().catch(() => ({}));
+              throw new Error(errData.msg || errData.error_description || 'Failed to create auth account');
+            }
+
+            const authId = authUser?.user?.id || authUser?.id;
+            if (!authId) throw new Error('Auth account created but no user ID returned');
+
+            // Create new user profile
+            const profileRes = await fetch(`${supabaseUrl}/rest/v1/users`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                auth_id: authId,
+                email: newEmail.toLowerCase(),
+                username: newUsername.toLowerCase(),
+                first_name: newFirstName,
+                last_name: newLastName,
+                role: 'Branch Owner',
+                business_id: user.businessId,
+                branch_id: selectedBranch.id,
+                status: 'active'
+              })
+            });
+            if (!profileRes.ok) {
+              const errData = await profileRes.json().catch(() => ({}));
+              throw new Error(errData.message || 'Failed to create new owner profile');
+            }
+
+            // Deactivate old Branch Owner
+            if (formData.ownerUserId) {
+              await fetch(
+                `${supabaseUrl}/rest/v1/users?id=eq.${formData.ownerUserId}`,
+                {
+                  method: 'PATCH',
+                  headers,
+                  body: JSON.stringify({ status: 'inactive', branch_id: null })
+                }
+              );
+            }
+          } catch (replaceErr) {
+            console.error('Failed to replace Branch Owner:', replaceErr);
+            showToast('Branch updated but failed to replace owner: ' + replaceErr.message, 'error');
+            setShowModal(false);
+            loadBranches();
+            loadStaff();
+            return;
+          }
+          showToast('Branch updated and owner replaced!', 'success');
+        } else if (formData.ownerUserId && formData.ownerFirstName.trim() && formData.ownerLastName.trim()) {
+          // Just update existing Branch Owner profile
           try {
             const ownerPayload = {
               first_name: formData.ownerFirstName.trim(),
@@ -366,9 +457,10 @@ const BranchesTab = () => {
             loadBranches();
             return;
           }
+          showToast('Branch and owner account updated!', 'success');
+        } else {
+          showToast('Branch updated!', 'success');
         }
-
-        showToast('Branch and owner account updated!', 'success');
       }
 
       setShowModal(false);
@@ -660,80 +752,133 @@ const BranchesTab = () => {
                 {/* Branch Owner Account */}
                 <>
                   <h4 style={{ margin: '1.25rem 0 0.75rem', fontSize: '0.95rem', color: '#333' }}>Branch Owner Account</h4>
-                  <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.75rem' }}>
-                    {modalMode === 'create'
-                      ? 'This will create a login account for the Branch Owner to access the POS system.'
-                      : formData.ownerUserId
-                        ? 'Update the Branch Owner\'s account details.'
-                        : 'No Branch Owner account found for this branch.'}
-                  </p>
-                  {(modalMode === 'create' || formData.ownerUserId) && (
+
+                  {/* Edit mode: show current owner + replace option */}
+                  {modalMode === 'edit' && formData.ownerUserId && !replacingOwner && (
                     <>
+                      <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '0.85rem', color: '#555', fontWeight: '600' }}>Current Owner</span>
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: '#333' }}>
+                          <div><strong>{formData.ownerFirstName} {formData.ownerLastName}</strong></div>
+                          <div style={{ color: '#666', fontSize: '0.8rem' }}>{formData.ownerEmail}</div>
+                          <div style={{ color: '#888', fontSize: '0.8rem' }}>Username: {formData.ownerUsername}</div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-warning"
+                        onClick={() => {
+                          setReplacingOwner(true);
+                          setFormData(prev => ({
+                            ...prev,
+                            newOwnerFirstName: '',
+                            newOwnerLastName: '',
+                            newOwnerEmail: '',
+                            newOwnerUsername: '',
+                            ownerPassword: ''
+                          }));
+                        }}
+                        style={{ marginBottom: '0.5rem' }}
+                      >
+                        Replace Branch Owner
+                      </button>
+                      <p style={{ fontSize: '0.75rem', color: '#999' }}>
+                        This will create a new account and deactivate the current owner's access.
+                      </p>
+                    </>
+                  )}
+
+                  {/* Edit mode: no owner found */}
+                  {modalMode === 'edit' && !formData.ownerUserId && !replacingOwner && (
+                    <>
+                      <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.75rem' }}>
+                        No Branch Owner account found for this branch.
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        onClick={() => setReplacingOwner(true)}
+                        style={{ marginBottom: '0.5rem' }}
+                      >
+                        Create Branch Owner Account
+                      </button>
+                    </>
+                  )}
+
+                  {/* Replacing owner form (edit mode) */}
+                  {modalMode === 'edit' && replacingOwner && (
+                    <>
+                      <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#92400e' }}>
+                        {formData.ownerUserId
+                          ? <>Creating a new owner account. <strong>{formData.ownerFirstName} {formData.ownerLastName}</strong>'s access will be deactivated.</>
+                          : 'Create a new Branch Owner account for this branch.'}
+                      </div>
                       <div className="form-row">
                         <div className="form-group">
                           <label>First Name *</label>
-                          <input
-                            type="text"
-                            name="ownerFirstName"
-                            value={formData.ownerFirstName}
-                            onChange={handleChange}
-                            className="form-control"
-                            placeholder="First name"
-                            required
-                          />
+                          <input type="text" name="ownerFirstName" value={formData.newOwnerFirstName || ''} onChange={(e) => setFormData(prev => ({ ...prev, newOwnerFirstName: e.target.value }))} className="form-control" placeholder="First name" required />
                         </div>
                         <div className="form-group">
                           <label>Last Name *</label>
-                          <input
-                            type="text"
-                            name="ownerLastName"
-                            value={formData.ownerLastName}
-                            onChange={handleChange}
-                            className="form-control"
-                            placeholder="Last name"
-                            required
-                          />
+                          <input type="text" name="ownerLastName" value={formData.newOwnerLastName || ''} onChange={(e) => setFormData(prev => ({ ...prev, newOwnerLastName: e.target.value }))} className="form-control" placeholder="Last name" required />
                         </div>
                       </div>
                       <div className="form-group">
                         <label>Email *</label>
-                        <input
-                          type="email"
-                          name="ownerEmail"
-                          value={formData.ownerEmail}
-                          onChange={handleChange}
-                          className="form-control"
-                          placeholder="owner@example.com"
-                          required
-                        />
+                        <input type="email" name="ownerEmail" value={formData.newOwnerEmail || ''} onChange={(e) => setFormData(prev => ({ ...prev, newOwnerEmail: e.target.value }))} className="form-control" placeholder="owner@example.com" required />
                       </div>
                       <div className="form-row">
                         <div className="form-group">
                           <label>Username</label>
-                          <input
-                            type="text"
-                            name="ownerUsername"
-                            value={formData.ownerUsername}
-                            onChange={handleChange}
-                            className="form-control"
-                            placeholder="Optional (uses email prefix)"
-                          />
+                          <input type="text" name="ownerUsername" value={formData.newOwnerUsername || ''} onChange={(e) => setFormData(prev => ({ ...prev, newOwnerUsername: e.target.value }))} className="form-control" placeholder="Optional (uses email prefix)" />
                         </div>
-                        {modalMode === 'create' && (
-                          <div className="form-group">
-                            <label>Password *</label>
-                            <input
-                              type="password"
-                              name="ownerPassword"
-                              value={formData.ownerPassword}
-                              onChange={handleChange}
-                              className="form-control"
-                              placeholder="Min 6 characters"
-                              minLength={6}
-                              required
-                            />
-                          </div>
-                        )}
+                        <div className="form-group">
+                          <label>Password *</label>
+                          <input type="password" name="ownerPassword" value={formData.ownerPassword || ''} onChange={handleChange} className="form-control" placeholder="Min 6 characters" minLength={6} required />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => setReplacingOwner(false)}
+                        style={{ marginTop: '0.25rem' }}
+                      >
+                        Cancel Replace
+                      </button>
+                    </>
+                  )}
+
+                  {/* Create mode: new owner fields */}
+                  {modalMode === 'create' && (
+                    <>
+                      <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.75rem' }}>
+                        This will create a login account for the Branch Owner to access the POS system.
+                      </p>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>First Name *</label>
+                          <input type="text" name="ownerFirstName" value={formData.ownerFirstName} onChange={handleChange} className="form-control" placeholder="First name" required />
+                        </div>
+                        <div className="form-group">
+                          <label>Last Name *</label>
+                          <input type="text" name="ownerLastName" value={formData.ownerLastName} onChange={handleChange} className="form-control" placeholder="Last name" required />
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label>Email *</label>
+                        <input type="email" name="ownerEmail" value={formData.ownerEmail} onChange={handleChange} className="form-control" placeholder="owner@example.com" required />
+                      </div>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Username</label>
+                          <input type="text" name="ownerUsername" value={formData.ownerUsername} onChange={handleChange} className="form-control" placeholder="Optional (uses email prefix)" />
+                        </div>
+                        <div className="form-group">
+                          <label>Password *</label>
+                          <input type="password" name="ownerPassword" value={formData.ownerPassword} onChange={handleChange} className="form-control" placeholder="Min 6 characters" minLength={6} required />
+                        </div>
                       </div>
                     </>
                   )}

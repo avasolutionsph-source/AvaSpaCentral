@@ -613,34 +613,7 @@ const BookingPage = () => {
         </div>
       </header>
 
-      {/* Landing Hero — shown when no branch selected yet (or single branch) */}
-      <div
-        className="booking-hero-landing"
-        style={{ backgroundImage: business?.cover_photo_url ? `url(${business.cover_photo_url})` : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }}
-      >
-        <div className="booking-hero-landing-overlay">
-          <div className="booking-hero-landing-content">
-            <h1 className="booking-hero-landing-title">
-              Relaxation<br /><em>starts here</em>
-            </h1>
-            <p className="booking-hero-landing-subtitle">
-              {business?.tagline || 'Book your escape in seconds'}
-            </p>
-            <div className="booking-hero-landing-rating">
-              <span>&#9733; 4.9</span> rated by 1,200+ happy clients
-            </div>
-            <button
-              className="booking-hero-landing-cta"
-              onClick={() => {
-                const target = document.getElementById('branch-selection') || document.getElementById('booking-form');
-                target?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            >
-              Book Your Escape &rarr;
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Hero removed — go straight to branch selection / booking */}
 
       {/* Branch Selection Section — always visible if multiple branches */}
       {branches.length > 1 && (

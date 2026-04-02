@@ -1131,7 +1131,24 @@ export const attendanceAdapter = {
     // Get employee info
     const employee = await storageService.employees.getById(employeeId);
 
-    const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
+    // Determine if late based on shift schedule (fallback to 9AM if no schedule)
+    let isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
+    try {
+      const schedule = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
+      if (schedule?.weeklySchedule) {
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const todayDay = dayNames[now.getDay()];
+        const dayShift = schedule.weeklySchedule[todayDay];
+        if (dayShift?.startTime && dayShift.shift !== 'off') {
+          const [startH, startM] = dayShift.startTime.split(':').map(Number);
+          const shiftStartMinutes = startH * 60 + startM;
+          const nowMinutes = now.getHours() * 60 + now.getMinutes();
+          isLate = nowMinutes > shiftStartMinutes;
+        }
+      }
+    } catch (e) {
+      // Fall back to default 9AM threshold
+    }
 
     const record = await storageService.attendance.create({
       employeeId,

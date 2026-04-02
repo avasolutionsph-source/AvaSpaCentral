@@ -43,24 +43,64 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     return () => clearInterval(timer);
   }, []);
 
+  // Check if an overnight shift is still active based on shift schedule endTime
+  const isOvernightShiftActive = (record, scheduleMap) => {
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const schedule = scheduleMap[String(record.employeeId)];
+
+    if (schedule?.weeklySchedule) {
+      // The record date is yesterday - get yesterday's day of week for the shift
+      const recordDate = new Date(record.date + 'T12:00:00');
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayOfWeek = dayNames[recordDate.getDay()];
+      const dayShift = schedule.weeklySchedule[dayOfWeek];
+
+      if (dayShift?.endTime) {
+        const [endH, endM] = dayShift.endTime.split(':').map(Number);
+        const endMinutes = endH * 60 + endM;
+        const [startH, startM] = (dayShift.startTime || '09:00').split(':').map(Number);
+        const startMinutes = startH * 60 + startM;
+
+        // Overnight shift: endTime < startTime (e.g., start 20:00, end 06:00)
+        if (endMinutes < startMinutes) {
+          // Shift ends today - add 2 hour grace period
+          const graceEndMinutes = endMinutes + 120;
+          return nowMinutes <= graceEndMinutes;
+        }
+      }
+    }
+
+    // No schedule found - use default: consider active if before 8AM
+    return nowMinutes < 480;
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [attendance, emps] = await Promise.all([
+      const [attendance, emps, schedules] = await Promise.all([
         mockApi.attendance.getAttendance(),
-        mockApi.employees.getEmployees()
+        mockApi.employees.getEmployees(),
+        mockApi.shiftSchedules.getAllSchedules()
       ]);
+
+      // Build schedule lookup map (employeeId -> active schedule)
+      const scheduleMap = {};
+      schedules.filter(s => s.isActive).forEach(s => {
+        scheduleMap[String(s.employeeId)] = s;
+      });
 
       // Filter today's attendance
       const today = format(new Date(), 'yyyy-MM-dd');
       let todayRecords = attendance.filter(a => a.date === today);
 
       // Find overnight shift records (clocked in yesterday, not yet clocked out)
+      // Only include if their shift hasn't ended yet (based on schedule endTime)
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
       const overnightRecords = attendance.filter(
-        a => a.date === yesterdayStr && a.clockIn && !a.clockOut
+        a => a.date === yesterdayStr && a.clockIn && !a.clockOut && isOvernightShiftActive(a, scheduleMap)
       );
 
       const userBranchId = getUserBranchId();

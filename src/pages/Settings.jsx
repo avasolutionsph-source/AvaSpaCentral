@@ -1888,37 +1888,69 @@ const Settings = () => {
                 <span className="branding-color-hex">{brandingSettings.primaryColor}</span>
               </div>
 
-              {/* Live booking-form preview */}
-              <span className="branding-preview-label">Live Preview</span>
-              <div className="branding-booking-preview">
-                {/* Category pills */}
-                <div className="bbp-row">
-                  <span className="bbp-pill bbp-pill-active" style={{ background: brandingSettings.primaryColor }}>All</span>
-                  <span className="bbp-pill">Massage</span>
-                  <span className="bbp-pill">Facial</span>
+              {/* Live booking page preview */}
+              <span className="branding-preview-label">Booking Page Preview</span>
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', maxWidth: '500px', background: '#f9fafb' }}>
+                {/* Topbar */}
+                <div style={{
+                  padding: '0.5rem 1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: coverPreview ? 'rgba(0,0,0,0.3)' : '#fff',
+                  borderBottom: coverPreview ? 'none' : '1px solid #eee',
+                  position: coverPreview ? 'relative' : 'static',
+                  zIndex: 2
+                }}>
+                  {logoPreview
+                    ? <img src={logoPreview} alt="Logo" style={{ maxHeight: '24px', maxWidth: '100px', objectFit: 'contain' }} />
+                    : <span style={{ fontSize: '0.8rem', fontWeight: '700', color: coverPreview ? '#fff' : '#1a1a1a' }}>{brandingSettings.businessName || 'Your Business'}</span>
+                  }
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', border: '1px solid', borderColor: coverPreview ? '#fff' : '#ccc', borderRadius: '4px', color: coverPreview ? '#fff' : '#333' }}>Sign In</span>
+                    <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: brandingSettings.primaryColor, color: '#fff' }}>Register</span>
+                  </div>
                 </div>
-                {/* Selected card */}
-                <div className="bbp-card bbp-card-selected" style={{ borderColor: brandingSettings.primaryColor, background: `${brandingSettings.primaryColor}12` }}>
-                  <span className="bbp-card-label">No preference</span>
-                  <span className="bbp-card-sub" style={{ color: brandingSettings.primaryColor }}>✓ Selected</span>
+                {/* Cover Photo */}
+                <div style={{
+                  height: '120px',
+                  background: coverPreview ? `url(${coverPreview}) center/cover no-repeat` : 'linear-gradient(135deg, #1a1a2e, #0f3460)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  marginTop: coverPreview ? '-36px' : '0'
+                }}>
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
+                  <div style={{ position: 'relative', textAlign: 'center', color: '#fff' }}>
+                    <div style={{ fontSize: '1rem', fontWeight: '700' }}>{brandingSettings.businessName || 'Your Business'}</div>
+                    <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>{brandingSettings.heroTagline || 'Book your relaxation experience'}</div>
+                  </div>
                 </div>
-                {/* Unselected card */}
-                <div className="bbp-card">
-                  <span className="bbp-card-label">Maria Santos</span>
-                  <span className="bbp-card-sub">Therapist</span>
+                {/* Service cards preview */}
+                <div style={{ padding: '0.75rem' }}>
+                  <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', borderRadius: '12px', background: brandingSettings.primaryColor, color: '#fff' }}>All</span>
+                    <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', borderRadius: '12px', background: '#f3f4f6', color: '#666' }}>Massage</span>
+                    <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', borderRadius: '12px', background: '#f3f4f6', color: '#666' }}>Nails</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                    {[1, 2].map(i => (
+                      <div key={i} style={{ background: '#fff', border: `1px solid ${i === 1 ? brandingSettings.primaryColor : '#e5e7eb'}`, borderRadius: '8px', padding: '0.5rem', fontSize: '0.65rem' }}>
+                        <div style={{ color: brandingSettings.primaryColor, fontSize: '0.55rem', fontWeight: '600', textTransform: 'uppercase', marginBottom: '2px' }}>Massage</div>
+                        <div style={{ fontWeight: '600', marginBottom: '4px' }}>{i === 1 ? 'Hot Oil Massage' : 'Dry Massage'}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: brandingSettings.primaryColor, fontWeight: '700' }}>₱650</span>
+                          <span style={{ color: '#888', fontSize: '0.55rem' }}>60 min</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                {/* Progress step */}
-                <div className="bbp-row" style={{ marginTop: '0.5rem', gap: '0.5rem' }}>
-                  <span className="bbp-step bbp-step-active" style={{ background: brandingSettings.primaryColor }}>1</span>
-                  <span className="bbp-step-label" style={{ color: brandingSettings.primaryColor }}>Services</span>
-                  <span className="bbp-divider" />
-                  <span className="bbp-step">2</span>
-                  <span className="bbp-step-label">Therapist</span>
+                {/* Footer preview */}
+                <div style={{ padding: '0.4rem 0.75rem', background: '#1a1a1a', color: 'rgba(255,255,255,0.6)', fontSize: '0.5rem', textAlign: 'center' }}>
+                  © 2026 {brandingSettings.businessName || 'Your Business'}. All rights reserved.
                 </div>
-                {/* CTA */}
-                <button className="bbp-cta" style={{ background: brandingSettings.primaryColor }} disabled>
-                  Book Now
-                </button>
               </div>
             </div>
 

@@ -998,7 +998,7 @@ select {
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
+  overflow-y: hidden;
   overflow-x: hidden;
 }
 
@@ -1294,7 +1294,8 @@ select {
 .sidebar-footer {
   padding: var(--spacing-lg);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-top: var(--spacing-xs);
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .user-info {

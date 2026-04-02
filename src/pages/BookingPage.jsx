@@ -271,7 +271,7 @@ const BookingPage = () => {
           // Apply initial branch filter if branch already selected
           if (activeBranch) {
             setServices((servicesData || []).filter(s => !s.branch_id || s.branch_id === activeBranch.id));
-            setTherapists(positionFiltered.filter(t => !t.branch_id || t.branch_id === activeBranch.id));
+            setTherapists(positionFiltered.filter(t => t.branch_id === activeBranch.id));
           } else {
             setServices(servicesData || []);
             setTherapists([]);  // No branch = no therapists until branch selected
@@ -306,7 +306,8 @@ const BookingPage = () => {
     if (allServices.length === 0 && allTherapists.length === 0) return;
     if (selectedBranch) {
       setServices(allServices.filter(s => !s.branch_id || s.branch_id === selectedBranch.id));
-      setTherapists(allTherapists.filter(t => !t.branch_id || t.branch_id === selectedBranch.id));
+      // Only show therapists assigned to this branch (strict: must have branch_id)
+      setTherapists(allTherapists.filter(t => t.branch_id === selectedBranch.id));
     } else {
       setServices(allServices);
       setTherapists([]);  // No branch selected = don't show therapists

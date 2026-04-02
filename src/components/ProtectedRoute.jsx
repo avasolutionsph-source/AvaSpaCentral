@@ -5,9 +5,9 @@ import { useApp } from '../context/AppContext';
 const ProtectedRoute = ({ children, page }) => {
   const { user, hasPermission, getFirstPage } = useApp();
 
-  // If user is not logged in, redirect to booking page (never auto-redirect to login)
+  // If user is not logged in, redirect to home (booking page)
   if (!user) {
-    return <Navigate to="/book" replace />;
+    return <Navigate to="/" replace />;
   }
 
   // If user doesn't have permission for this page, redirect to their first allowed page

@@ -110,7 +110,7 @@ const ProtectedLayout = ({ children }) => {
 };
 
 // Require both branch selection AND login before accessing main app
-// Auto-selects first branch for staff if none selected
+// Public users see BookingPage at "/", staff get auto-selected branch
 const RequireBranch = ({ children }) => {
   const { user, loading, selectedBranch, selectBranch } = useApp();
   const [autoSelecting, setAutoSelecting] = React.useState(false);
@@ -145,8 +145,14 @@ const RequireBranch = ({ children }) => {
     return <LoadingScreen />;
   }
 
+  // Public user at "/" → render BookingPage directly (no redirect)
   if (!user) {
-    return <Navigate to="/book" replace />;
+    const BookingPageLazy = React.lazy(() => import('./pages/BookingPage'));
+    return (
+      <React.Suspense fallback={<LoadingScreen />}>
+        <BookingPageLazy />
+      </React.Suspense>
+    );
   }
 
   return children;
@@ -172,34 +178,18 @@ const LoginFirst = ({ children }) => {
     if (selectedBranch) {
       return <Navigate to={getFirstPage()} replace />;
     }
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getFirstPage()} replace />;
   }
 
   return children;
 };
 
-// Smart root redirect: staff -> dashboard, public -> booking page
-const RootRedirect = () => {
-  const { user, loading, selectedBranch, getFirstPage } = useApp();
-
-  if (loading) return <LoadingScreen />;
-
-  // Logged-in staff with branch -> go to their dashboard/POS
-  if (user && selectedBranch) return <Navigate to={getFirstPage()} replace />;
-
-  // Logged-in staff without branch -> pick branch first
-  if (user && !selectedBranch) return <Navigate to="/select-branch" replace />;
-
-  // Public user -> show booking page (auto-detect business)
-  return <Navigate to="/book" replace />;
-};
-
-// Catch all redirect - booking page for public, dashboard for staff
+// Catch all redirect - dashboard for staff, home for public
 const CatchAllRedirect = () => {
   const { user, selectedBranch, getFirstPage } = useApp();
   if (user && selectedBranch) return <Navigate to={getFirstPage()} replace />;
-  if (user && !selectedBranch) return <Navigate to="/select-branch" replace />;
-  return <Navigate to="/book" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <Navigate to="/" replace />;
 };
 
 function AppRoutes() {
@@ -278,11 +268,8 @@ function AppRoutes() {
           }
         />
 
-        {/* Branch Selection - redirects to booking page */}
-        <Route
-          path="/select-branch"
-          element={<RootRedirect />}
-        />
+        {/* Legacy routes - redirect to root */}
+        <Route path="/select-branch" element={<Navigate to="/" replace />} />
 
         {/* Login-first flow: when RLS blocks anon from reading branches */}
         <Route
@@ -303,7 +290,7 @@ function AppRoutes() {
             </RequireBranch>
           }
         >
-          <Route index element={<RootRedirect />} />
+          <Route index element={<RedirectToFirstPage />} />
           {/* Eagerly loaded routes */}
           <Route path="dashboard" element={<ProtectedRoute page="dashboard"><Dashboard /></ProtectedRoute>} />
           <Route path="pos" element={<ProtectedRoute page="pos"><POS /></ProtectedRoute>} />

@@ -142,9 +142,10 @@ const BookingPage = () => {
         try {
           // Determine the query URL based on what we have
           let testUrl;
+          const defaultSlug = import.meta.env.VITE_DEFAULT_BUSINESS_SLUG || 'daet-spa';
           if (!businessIdOrSlug) {
-            // No businessId in URL — auto-detect first business
-            testUrl = `${supabaseUrl}/rest/v1/businesses?select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color&limit=1`;
+            // No businessId in URL — use default business slug for this domain
+            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${defaultSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
           } else if (isUUID(businessIdOrSlug)) {
             testUrl = `${supabaseUrl}/rest/v1/businesses?id=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
           } else {

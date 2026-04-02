@@ -16,6 +16,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   const [todayAttendance, setTodayAttendance] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
+  const [overdueClockOuts, setOverdueClockOuts] = useState([]);
 
   const [showClockModal, setShowClockModal] = useState(false);
   const [clockType, setClockType] = useState('in'); // 'in' or 'out'
@@ -139,6 +140,48 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         absent
       });
 
+      // Find overdue clock-outs (clocked in but shift endTime has passed)
+      const nowObj = new Date();
+      const nowMins = nowObj.getHours() * 60 + nowObj.getMinutes();
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const overdue = [];
+      allVisibleRecords.forEach(record => {
+        if (!record.clockIn || record.clockOut) return;
+        const schedule = scheduleMap[String(record.employeeId)];
+        if (!schedule?.weeklySchedule) return;
+        const recordDate = new Date(record.date + 'T12:00:00');
+        const dayOfWeek = dayNames[recordDate.getDay()];
+        const dayShift = schedule.weeklySchedule[dayOfWeek];
+        if (!dayShift?.endTime) return;
+
+        const [endH, endM] = dayShift.endTime.split(':').map(Number);
+        const endMins = endH * 60 + endM;
+        const [startH, startM] = (dayShift.startTime || '09:00').split(':').map(Number);
+        const startMins = startH * 60 + startM;
+
+        const isOvernight = endMins < startMins;
+        const isRecordFromYesterday = record.date === yesterdayStr;
+
+        let isOverdue = false;
+        if (isOvernight && isRecordFromYesterday) {
+          // Overnight shift from yesterday - overdue if past endTime today
+          isOverdue = nowMins > endMins + 30; // 30 min grace
+        } else if (!isOvernight && !isRecordFromYesterday) {
+          // Same-day shift - overdue if past endTime today
+          isOverdue = nowMins > endMins + 30;
+        }
+
+        if (isOverdue) {
+          const emp = activeEmps.find(e => String(e._id) === String(record.employeeId));
+          overdue.push({
+            ...record,
+            employeeName: emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown',
+            shiftEndTime: dayShift.endTime
+          });
+        }
+      });
+      setOverdueClockOuts(overdue);
+
       setLoading(false);
       if (onDataChange) onDataChange();
     } catch (error) {
@@ -237,9 +280,16 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       captureWithBranch.isOutOfRange = isOutOfRange;
 
       if (type === 'in') {
-        await mockApi.attendance.clockIn(employeeId, captureWithBranch);
+        const result = await mockApi.attendance.clockIn(employeeId, captureWithBranch);
         if (isOutOfRange) {
           showToast('Clocked in but you are outside the allowed area. Pending manager approval.', 'warning');
+        } else if (result?.shiftWarning) {
+          const [warnType, shiftTime] = result.shiftWarning.split('|');
+          if (warnType === 'early_clockin') {
+            showToast(`Clocked in but shift doesn't start until ${shiftTime}`, 'warning');
+          } else if (warnType === 'very_late') {
+            showToast(`Clocked in - very late! Shift started at ${shiftTime}`, 'warning');
+          }
         } else {
           showToast('Clocked in successfully with photo!', 'success');
         }
@@ -423,6 +473,28 @@ const Attendance = ({ embedded = false, onDataChange }) => {
             <div className="attendance-stat-value">{stats.absent}</div>
             <div className="attendance-stat-label">Absent</div>
           </div>
+        </div>
+      )}
+
+      {/* Overdue Clock-Out Reminders */}
+      {overdueClockOuts.length > 0 && hasManagementAccess() && (
+        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
+          <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', fontSize: '0.95rem' }}>
+            Overdue Clock-Outs ({overdueClockOuts.length})
+          </div>
+          <p style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: '0.75rem' }}>
+            These employees haven't clocked out yet and their shift has ended:
+          </p>
+          {overdueClockOuts.map((record, idx) => (
+            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < overdueClockOuts.length - 1 ? '1px solid #fcd34d' : 'none' }}>
+              <span style={{ fontSize: '0.85rem', color: '#78350f' }}>
+                <strong>{record.employeeName}</strong> — clocked in at {record.clockIn}
+              </span>
+              <span style={{ fontSize: '0.8rem', color: '#b45309' }}>
+                Shift ended at {record.shiftEndTime}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 

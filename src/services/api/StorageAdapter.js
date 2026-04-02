@@ -1131,22 +1131,41 @@ export const attendanceAdapter = {
     // Get employee info
     const employee = await storageService.employees.getById(employeeId);
 
-    // Determine if late based on shift schedule (fallback to 9AM if no schedule)
+    // Check shift schedule for validation
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const todayDay = dayNames[now.getDay()];
     let isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
+    let shiftWarning = null;
+
     try {
       const schedule = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
       if (schedule?.weeklySchedule) {
-        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const todayDay = dayNames[now.getDay()];
         const dayShift = schedule.weeklySchedule[todayDay];
-        if (dayShift?.startTime && dayShift.shift !== 'off') {
+
+        // Block clock-in on day off
+        if (dayShift?.shift === 'off' || !dayShift?.shift) {
+          throw new Error(`Cannot clock in - today (${todayDay}) is a scheduled day off`);
+        }
+
+        if (dayShift?.startTime) {
           const [startH, startM] = dayShift.startTime.split(':').map(Number);
           const shiftStartMinutes = startH * 60 + startM;
           const nowMinutes = now.getHours() * 60 + now.getMinutes();
           isLate = nowMinutes > shiftStartMinutes;
+
+          // Warn if clocking in too early (more than 2 hours before shift)
+          const earlyThreshold = shiftStartMinutes - 120;
+          if (nowMinutes < earlyThreshold) {
+            shiftWarning = `early_clockin|${dayShift.startTime}`;
+          }
+          // Warn if clocking in very late (more than 1 hour after shift start)
+          if (nowMinutes > shiftStartMinutes + 60) {
+            shiftWarning = `very_late|${dayShift.startTime}`;
+          }
         }
       }
     } catch (e) {
+      if (e.message.includes('day off')) throw e;
       // Fall back to default 9AM threshold
     }
 
@@ -1165,6 +1184,7 @@ export const attendanceAdapter = {
 
     return {
       success: true,
+      shiftWarning,
       attendance: clone({
         ...record,
         employee: employee || null

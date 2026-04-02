@@ -187,9 +187,16 @@ const MyPortal = () => {
       const employeeName = user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
 
       if (type === 'in') {
-        await mockApi.attendance.clockIn(employeeId, captureWithBranch);
+        const result = await mockApi.attendance.clockIn(employeeId, captureWithBranch);
         if (isOutOfRange) {
           showToast('Clocked in but you are outside the allowed area. Pending manager approval.', 'warning');
+        } else if (result?.shiftWarning) {
+          const [warnType, shiftTime] = result.shiftWarning.split('|');
+          if (warnType === 'early_clockin') {
+            showToast(`Clocked in but your shift doesn't start until ${shiftTime}`, 'warning');
+          } else if (warnType === 'very_late') {
+            showToast(`Clocked in - very late! Your shift started at ${shiftTime}`, 'warning');
+          }
         } else {
           showToast('Clocked in successfully!', 'success');
         }

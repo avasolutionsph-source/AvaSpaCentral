@@ -416,7 +416,7 @@ const BranchesTab = () => {
                 {
                   method: 'PATCH',
                   headers,
-                  body: JSON.stringify({ status: 'inactive', branch_id: null })
+                  body: JSON.stringify({ status: 'inactive', role: 'Receptionist', branch_id: null })
                 }
               );
               if (!deactivateRes.ok) {

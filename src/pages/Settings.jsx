@@ -1954,45 +1954,6 @@ const Settings = () => {
               </div>
             </div>
 
-            {/* Company Logo */}
-            <div className="branding-sub-section">
-              <h3 className="branding-sub-title">Company Logo</h3>
-              <p className="branding-sub-desc">Displayed on your booking page header and branch selection screen.</p>
-              <p className="branding-size-hint">Recommended: 300&times;100px &mdash; PNG with transparent background for best results</p>
-              <div className="branding-upload-area">
-                {logoPreview ? (
-                  <div className="branding-image-preview">
-                    <img src={logoPreview} alt="Logo preview" className="branding-preview-logo" />
-                    {canEdit() && (
-                      <button
-                        type="button"
-                        className="branding-remove-btn"
-                        onClick={() => { setLogoPreview(null); setLogoFile(null); setBrandingSettings(prev => ({ ...prev, logoUrl: null })); }}
-                      >
-                        &times; Remove
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="branding-placeholder">
-                    <span className="branding-placeholder-icon">🖼</span>
-                    <span>No logo uploaded</span>
-                  </div>
-                )}
-                {canEdit() && (
-                  <label className="branding-upload-btn">
-                    {logoFile ? 'Change Logo' : 'Upload Logo'}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={handleLogoFileChange}
-                      style={{ display: 'none' }}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-
             {/* Cover Photo */}
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Cover Photo</h3>

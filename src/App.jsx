@@ -103,7 +103,7 @@ const ProtectedLayout = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/select-branch" replace />;
+    return <Navigate to="/book/daet-spa" replace />;
   }
 
   return children;
@@ -117,11 +117,11 @@ const RequireBranch = ({ children }) => {
     return <LoadingScreen />;
   }
 
-  if (!selectedBranch) {
-    return <Navigate to="/select-branch" replace />;
+  if (!user) {
+    return <Navigate to="/book/daet-spa" replace />;
   }
 
-  if (!user) {
+  if (!selectedBranch) {
     return <Navigate to="/select-branch" replace />;
   }
 
@@ -154,12 +154,28 @@ const LoginFirst = ({ children }) => {
   return children;
 };
 
-// Catch all redirect - branch select -> app (never auto-redirect to login)
+// Smart root redirect: staff -> dashboard, public -> booking page
+const RootRedirect = () => {
+  const { user, loading, selectedBranch, getFirstPage } = useApp();
+
+  if (loading) return <LoadingScreen />;
+
+  // Logged-in staff with branch -> go to their dashboard/POS
+  if (user && selectedBranch) return <Navigate to={getFirstPage()} replace />;
+
+  // Logged-in staff without branch -> pick branch first
+  if (user && !selectedBranch) return <Navigate to="/select-branch" replace />;
+
+  // Public user -> show booking page (auto-detect business)
+  return <Navigate to="/book/daet-spa" replace />;
+};
+
+// Catch all redirect - booking page for public, dashboard for staff
 const CatchAllRedirect = () => {
   const { user, selectedBranch, getFirstPage } = useApp();
-  if (!user) return <Navigate to="/select-branch" replace />;
-  if (!selectedBranch) return <Navigate to="/select-branch" replace />;
-  return <Navigate to={getFirstPage()} replace />;
+  if (user && selectedBranch) return <Navigate to={getFirstPage()} replace />;
+  if (user && !selectedBranch) return <Navigate to="/select-branch" replace />;
+  return <Navigate to="/book/daet-spa" replace />;
 };
 
 function AppRoutes() {
@@ -230,10 +246,10 @@ function AppRoutes() {
           }
         />
 
-        {/* Branch Selection - Landing Page (public, first thing user sees) */}
+        {/* Branch Selection - redirects to booking page */}
         <Route
           path="/select-branch"
-          element={<BranchSelect />}
+          element={<RootRedirect />}
         />
 
         {/* Login-first flow: when RLS blocks anon from reading branches */}
@@ -255,7 +271,7 @@ function AppRoutes() {
             </RequireBranch>
           }
         >
-          <Route index element={<RedirectToFirstPage />} />
+          <Route index element={<RootRedirect />} />
           {/* Eagerly loaded routes */}
           <Route path="dashboard" element={<ProtectedRoute page="dashboard"><Dashboard /></ProtectedRoute>} />
           <Route path="pos" element={<ProtectedRoute page="pos"><POS /></ProtectedRoute>} />

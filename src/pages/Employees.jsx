@@ -32,14 +32,34 @@ const INITIAL_FORM_DATA = {
   monthlyRate: '',
   rateType: 'hourly', // 'hourly' or 'monthly'
   hireDate: '',
-  skills: []
+  skills: [],
+  branchId: ''
 };
 
 const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { showToast, canEdit, canManageEmployees, isManager, getUserBranchId } = useApp();
+  const { showToast, canEdit, canManageEmployees, isManager, getUserBranchId, user } = useApp();
 
   // Ref to hold current employees list for duplicate-email check inside validateEmployee
   const employeesRef = useRef([]);
+
+  // Branches for assignment dropdown (Owner/Manager only)
+  const [branchesList, setBranchesList] = useState([]);
+  useEffect(() => {
+    const loadBranches = async () => {
+      if (getUserBranchId()) return; // Branch Owner doesn't need dropdown
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (!supabaseUrl || !user?.businessId) return;
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order.asc,name.asc`,
+          { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } }
+        );
+        if (res.ok) setBranchesList(await res.json());
+      } catch (err) { console.error('Failed to load branches:', err); }
+    };
+    loadBranches();
+  }, [user?.businessId]);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -129,7 +149,8 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       monthlyRate: monthlyRate.toString(),
       rateType: employee.rateType || 'hourly',
       hireDate: employee.hireDate || '',
-      skills: employee.skills || []
+      skills: employee.skills || [],
+      branchId: employee.branchId || ''
     };
   }, []);
 
@@ -137,7 +158,8 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
   const transformForSubmit = useCallback((data) => {
     const hourlyRate = parseFloat(data.hourlyRate) || 0;
     const monthlyRate = parseFloat(data.monthlyRate) || 0;
-    const branchId = getUserBranchId();
+    // Branch Owner: auto-assign their branch. Owner/Manager: use selected branch from form.
+    const branchId = getUserBranchId() || data.branchId || null;
     return {
       firstName: data.firstName.trim(),
       lastName: data.lastName.trim(),
@@ -145,7 +167,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       phone: data.phone.trim(),
       position: data.position,
       department: data.department,
-      role: data.role, // role = position
+      role: data.role,
       commission: { type: data.commission.type, value: parseFloat(data.commission.value) || 0 },
       hourlyRate: hourlyRate,
       monthlyRate: monthlyRate,
@@ -584,6 +606,24 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
             />
           </div>
         </div>
+
+        {/* Branch Assignment — Owner/Manager only (Branch Owner auto-assigns) */}
+        {!getUserBranchId() && branchesList.length > 0 && (
+          <div className="form-group">
+            <label>Assign to Branch *</label>
+            <select
+              name="branchId"
+              value={formData.branchId}
+              onChange={handleFieldChange}
+              className="form-control"
+            >
+              <option value="">Select branch...</option>
+              {branchesList.map(b => (
+                <option key={b.id} value={b.id}>{b.name}{b.city ? ` — ${b.city}` : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="form-group">
           <label>Rate Type *</label>
           <div className="rate-type-toggle">

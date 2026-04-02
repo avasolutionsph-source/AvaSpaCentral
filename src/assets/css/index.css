@@ -3822,7 +3822,7 @@ select {
     position: fixed;
     z-index: 1002;
     transform: translateX(-100%);
-    padding-bottom: 70px;
+    height: calc(100vh - 60px);
   }
 
   .sidebar.open {
@@ -9758,7 +9758,7 @@ a:focus:not(:focus-visible),
     width: 280px;
     transform: translateX(-100%);
     box-shadow: var(--shadow-xl);
-    padding-bottom: 70px;
+    height: calc(100vh - 60px);
   }
 
   .sidebar.open {

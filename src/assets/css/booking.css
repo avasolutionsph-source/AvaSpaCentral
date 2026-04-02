@@ -550,12 +550,38 @@
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  padding: 1.25rem;
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
   min-height: 120px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
+
+.service-card-image {
+  width: 100%;
+  height: 150px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.service-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.service-card:hover .service-card-image img {
+  transform: scale(1.05);
+}
+
+.service-card .service-category { padding: 1rem 1.25rem 0; }
+.service-card .service-name { padding: 0 1.25rem; }
+.service-card .service-description { padding: 0 1.25rem; }
+.service-card .service-details { padding: 0.25rem 1.25rem; }
+.service-card .service-select-indicator { padding: 0.5rem 1.25rem 1rem; }
 
 .service-card:hover {
   border-color: var(--color-accent, #1B5E37);

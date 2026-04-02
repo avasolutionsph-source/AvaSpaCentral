@@ -58,6 +58,9 @@ const BookingPage = () => {
   // User selections
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedTherapist, setSelectedTherapist] = useState(null);
+  const [selectedTherapists, setSelectedTherapists] = useState([]); // Top 3 preferred
+  const [therapistMode, setTherapistMode] = useState('auto'); // 'auto' | 'choose'
+  const [genderFilter, setGenderFilter] = useState('all'); // 'all' | 'male' | 'female'
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
 
@@ -438,7 +441,9 @@ const BookingPage = () => {
         notes: customerNotes.trim() || null,
         preferred_date: selectedDate,
         preferred_time: selectedTime,
-        preferred_therapist_id: selectedTherapist || null,
+        preferred_therapist_id: therapistMode === 'choose' && selectedTherapists.length > 0 ? selectedTherapists[0] : null,
+        preferred_therapists: therapistMode === 'choose' ? selectedTherapists : [],
+        therapist_gender_preference: genderFilter !== 'all' ? genderFilter : null,
         services: selectedServices.map(s => ({
           id: s.id,
           name: s.name,
@@ -787,6 +792,11 @@ const BookingPage = () => {
                     className={`service-card ${isServiceSelected(service.id) ? 'selected' : ''}`}
                     onClick={() => toggleService(service)}
                   >
+                    {service.image_url && (
+                      <div className="service-card-image">
+                        <img src={service.image_url} alt={service.name} loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
+                      </div>
+                    )}
                     <div className="service-category">{service.category}</div>
                     <h3 className="service-name">{service.name}</h3>
                     {service.description && (
@@ -810,37 +820,125 @@ const BookingPage = () => {
           {/* Therapist Selection */}
           <div className="booking-section">
             <h2>2. Choose Therapist <span className="optional">(Optional)</span></h2>
-            <div className="therapist-options">
-              <label className={`therapist-option ${!selectedTherapist ? 'selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="therapist"
-                  checked={!selectedTherapist}
-                  onChange={() => setSelectedTherapist(null)}
-                />
-                <span className="therapist-info">
-                  <strong>No preference</strong>
-                  <small>Let us assign the best available therapist</small>
-                </span>
-              </label>
-              {therapists.map(therapist => (
-                <label
-                  key={therapist.id}
-                  className={`therapist-option ${selectedTherapist === therapist.id ? 'selected' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="therapist"
-                    checked={selectedTherapist === therapist.id}
-                    onChange={() => setSelectedTherapist(therapist.id)}
-                  />
-                  <span className="therapist-info">
-                    <strong>{therapist.first_name} {therapist.last_name}</strong>
-                    <small>{therapist.position}</small>
-                  </span>
-                </label>
-              ))}
+
+            {/* Mode Selection */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+              <button
+                className={`location-option ${therapistMode === 'auto' ? 'selected' : ''}`}
+                onClick={() => { setTherapistMode('auto'); setSelectedTherapist(null); setSelectedTherapists([]); }}
+                style={{ flex: 1, padding: '0.75rem' }}
+              >
+                <span className="location-label">Auto-Select</span>
+                <span className="location-desc" style={{ fontSize: '0.75rem' }}>We'll assign the best available</span>
+              </button>
+              <button
+                className={`location-option ${therapistMode === 'choose' ? 'selected' : ''}`}
+                onClick={() => setTherapistMode('choose')}
+                style={{ flex: 1, padding: '0.75rem' }}
+              >
+                <span className="location-label">Choose Preferred</span>
+                <span className="location-desc" style={{ fontSize: '0.75rem' }}>Pick up to 3 therapists</span>
+              </button>
             </div>
+
+            {therapistMode === 'auto' && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem', color: '#666', alignSelf: 'center' }}>Preferred gender:</span>
+                {['all', 'male', 'female'].map(g => (
+                  <button
+                    key={g}
+                    onClick={() => setGenderFilter(g)}
+                    style={{
+                      padding: '0.4rem 1rem',
+                      borderRadius: '20px',
+                      border: genderFilter === g ? '2px solid var(--color-accent, #1B5E37)' : '1px solid #ddd',
+                      background: genderFilter === g ? 'var(--color-accent, #1B5E37)' : 'white',
+                      color: genderFilter === g ? 'white' : '#333',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: genderFilter === g ? '600' : '400'
+                    }}
+                  >
+                    {g === 'all' ? 'Any' : g.charAt(0).toUpperCase() + g.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {therapistMode === 'choose' && (
+              <>
+                {/* Gender Filter */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#666', alignSelf: 'center' }}>Filter:</span>
+                  {['all', 'male', 'female'].map(g => (
+                    <button
+                      key={g}
+                      onClick={() => setGenderFilter(g)}
+                      style={{
+                        padding: '0.35rem 0.85rem',
+                        borderRadius: '20px',
+                        border: genderFilter === g ? '2px solid var(--color-accent, #1B5E37)' : '1px solid #ddd',
+                        background: genderFilter === g ? 'var(--color-accent, #1B5E37)' : 'white',
+                        color: genderFilter === g ? 'white' : '#333',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      {g === 'all' ? 'All' : g.charAt(0).toUpperCase() + g.slice(1)}
+                    </button>
+                  ))}
+                </div>
+
+                {selectedTherapists.length > 0 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-accent, #1B5E37)', marginBottom: '0.75rem', fontWeight: '600' }}>
+                    {selectedTherapists.length}/3 selected (ranked by preference)
+                  </p>
+                )}
+
+                <div className="therapist-options">
+                  {therapists
+                    .filter(t => genderFilter === 'all' || (t.gender || '').toLowerCase() === genderFilter)
+                    .map(therapist => {
+                      const rank = selectedTherapists.indexOf(therapist.id);
+                      const isSelected = rank !== -1;
+                      return (
+                        <label
+                          key={therapist.id}
+                          className={`therapist-option ${isSelected ? 'selected' : ''}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (isSelected) {
+                              setSelectedTherapists(prev => prev.filter(id => id !== therapist.id));
+                            } else if (selectedTherapists.length < 3) {
+                              setSelectedTherapists(prev => [...prev, therapist.id]);
+                            }
+                          }}
+                        >
+                          <span className="therapist-info" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            {isSelected && (
+                              <span style={{
+                                width: '24px', height: '24px', borderRadius: '50%',
+                                background: 'var(--color-accent, #1B5E37)', color: 'white',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.75rem', fontWeight: '700', flexShrink: 0
+                              }}>
+                                {rank + 1}
+                              </span>
+                            )}
+                            <span>
+                              <strong>{therapist.first_name} {therapist.last_name}</strong>
+                              <small style={{ display: 'block', color: '#888' }}>{therapist.position}</small>
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  {therapists.filter(t => genderFilter === 'all' || (t.gender || '').toLowerCase() === genderFilter).length === 0 && (
+                    <p style={{ color: '#999', fontSize: '0.85rem', padding: '1rem' }}>No therapists found for this filter.</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Service Location Selection */}

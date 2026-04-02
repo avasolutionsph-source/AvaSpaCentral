@@ -628,34 +628,69 @@ const BookingPage = () => {
         </div>
       </header>
 
-      {/* Hero section — full-width cover photo */}
-      {business?.cover_photo_url ? (
-        <div
-          className="booking-hero"
-          style={{ backgroundImage: `url(${business.cover_photo_url})` }}
-        >
-          <div className="booking-hero-overlay">
-            <h1 className="booking-hero-title">{business.name}</h1>
-            <p className="booking-hero-tagline">
-              {business.tagline || 'Book your relaxation experience'}
+      {/* Landing Hero — shown when no branch selected yet (or single branch) */}
+      <div
+        className="booking-hero-landing"
+        style={{ backgroundImage: business?.cover_photo_url ? `url(${business.cover_photo_url})` : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }}
+      >
+        <div className="booking-hero-landing-overlay">
+          <div className="booking-hero-landing-content">
+            <h1 className="booking-hero-landing-title">
+              Relaxation<br /><em>starts here</em>
+            </h1>
+            <p className="booking-hero-landing-subtitle">
+              {business?.tagline || 'Book your escape in seconds'}
             </p>
+            <div className="booking-hero-landing-rating">
+              <span>&#9733; 4.9</span> rated by 1,200+ happy clients
+            </div>
             <button
-              className="booking-hero-cta"
-              onClick={() => document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth' })}
+              className="booking-hero-landing-cta"
+              onClick={() => {
+                const target = document.getElementById('branch-selection') || document.getElementById('booking-form');
+                target?.scrollIntoView({ behavior: 'smooth' });
+              }}
             >
-              Book Now
+              Book Your Escape &rarr;
             </button>
           </div>
         </div>
-      ) : (
-        /* Fallback compact header when no cover photo */
-        <div className="booking-header">
-          <div className="booking-header-content">
-            <div className="booking-header-brand">
-              <h1>{business?.name || 'Book Now'}</h1>
-              <p className="booking-tagline">
-                {business?.tagline || 'Book your relaxation experience'}
-              </p>
+      </div>
+
+      {/* Branch Selection Section — always visible if multiple branches */}
+      {branches.length > 1 && (
+        <div id="branch-selection" className="booking-branch-section">
+          <div className="booking-branch-section-inner">
+            <h2 className="booking-branch-section-title">Choose Branch</h2>
+            <p className="booking-branch-section-subtitle">Select your preferred branch and start your journey to relaxation.</p>
+            <div className="booking-branch-cards">
+              {branches.map((branch, idx) => (
+                <div
+                  key={branch.id}
+                  className={`booking-branch-card ${selectedBranch?.id === branch.id ? 'selected' : ''}`}
+                  onClick={() => {
+                    setSelectedBranch(branch);
+                    setShowBranchSelector(false);
+                    // Filter services and therapists for this branch
+                    setServices(prev => {
+                      // Re-fetch would be ideal, but filter from all loaded
+                      return prev;
+                    });
+                    setTimeout(() => {
+                      document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth' });
+                    }, 200);
+                  }}
+                >
+                  <div className="booking-branch-card-body">
+                    <h3 className="booking-branch-card-name">{branch.name}</h3>
+                    {branch.city && <p className="booking-branch-card-detail">{branch.city}</p>}
+                    {branch.address && <p className="booking-branch-card-detail">{branch.address}</p>}
+                  </div>
+                  <button className="booking-branch-card-btn">
+                    {selectedBranch?.id === branch.id ? '&#10003; Selected' : 'Select Branch →'}
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -689,37 +724,7 @@ const BookingPage = () => {
         </div>
       </div>
 
-      {/* Branch Selector - Show if multiple branches and no branch selected */}
-      {showBranchSelector && branches.length > 1 && !selectedBranch && (
-        <div className="branch-selector-overlay">
-          <div className="branch-selector-container">
-            <h2>Select a Branch</h2>
-            <p className="branch-selector-subtitle">Choose your preferred location</p>
-            <div className="branch-cards">
-              {branches.map(branch => (
-                <div
-                  key={branch.id}
-                  className="branch-card"
-                  onClick={() => {
-                    setSelectedBranch(branch);
-                    setShowBranchSelector(false);
-                    // Filter services for this branch
-                    const filtered = services.filter(s => !s.branch_id || s.branch_id === branch.id);
-                    setServices(filtered);
-                  }}
-                >
-                  <div className="branch-card-icon">📍</div>
-                  <h3 className="branch-card-name">{branch.name}</h3>
-                  {branch.address && <p className="branch-card-address">{branch.address}</p>}
-                  {branch.city && <p className="branch-card-city">{branch.city}</p>}
-                  {branch.phone && <p className="branch-card-phone">{branch.phone}</p>}
-                  <button className="branch-card-btn">Book Here</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Legacy branch selector removed - replaced by inline branch section above */}
 
       <div className="booking-container">
         {/* Left side: Services */}

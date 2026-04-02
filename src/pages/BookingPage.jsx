@@ -274,7 +274,7 @@ const BookingPage = () => {
             setTherapists(positionFiltered.filter(t => !t.branch_id || t.branch_id === activeBranch.id));
           } else {
             setServices(servicesData || []);
-            setTherapists(positionFiltered);
+            setTherapists([]);  // No branch = no therapists until branch selected
           }
 
         } catch (fetchErr) {

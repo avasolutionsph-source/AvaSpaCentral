@@ -15,7 +15,7 @@ import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
 
 const Settings = () => {
-  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, getUserBranchId } = useApp();
+  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId } = useApp();
 
   // Tab state for switching between Settings and Activity Logs
   const [activeTab, setActiveTab] = useState('settings');
@@ -1733,7 +1733,7 @@ const Settings = () => {
         >
           Settings
         </button>
-        {hasManagementAccess() && (
+        {isOwnerOrManager() && (
           <button
             className={`settings-tab ${activeTab === 'branding' ? 'active' : ''}`}
             onClick={() => setActiveTab('branding')}

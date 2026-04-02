@@ -406,6 +406,11 @@ export const AppProvider = ({ children }) => {
     return ['Owner', 'Manager', 'Receptionist'].includes(user?.role);
   };
 
+  // Check if user is Owner or Manager (for branding/appearance access)
+  const isOwnerOrManager = () => {
+    return user?.role === 'Owner' || user?.role === 'Manager';
+  };
+
   // Check if user has management access (Owner, Manager, or Branch Owner)
   const hasManagementAccess = () => {
     return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
@@ -486,6 +491,7 @@ export const AppProvider = ({ children }) => {
     canManageEmployees,
     canViewAll,
     hasManagementAccess,
+    isOwnerOrManager,
     // Branch-related exports
     selectedBranch,
     selectBranch,

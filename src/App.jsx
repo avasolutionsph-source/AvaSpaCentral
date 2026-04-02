@@ -147,11 +147,10 @@ const RequireBranch = ({ children }) => {
 
   // Public user at "/" → render BookingPage directly (no redirect)
   if (!user) {
-    const BookingPageLazy = React.lazy(() => import('./pages/BookingPage'));
     return (
-      <React.Suspense fallback={<LoadingScreen />}>
-        <BookingPageLazy />
-      </React.Suspense>
+      <Suspense fallback={<LoadingScreen />}>
+        <BookingPage />
+      </Suspense>
     );
   }
 

@@ -51,7 +51,9 @@ const BookingPage = () => {
   const [serviceLandmark, setServiceLandmark] = useState('');
   const [serviceInstructions, setServiceInstructions] = useState('');
 
-  // Services & therapists from Supabase
+  // Services & therapists from Supabase (allX = unfiltered, X = branch-filtered)
+  const [allServices, setAllServices] = useState([]);
+  const [allTherapists, setAllTherapists] = useState([]);
   const [services, setServices] = useState([]);
   const [therapists, setTherapists] = useState([]);
 
@@ -237,15 +239,8 @@ const BookingPage = () => {
             setShowBranchSelector(true);
           }
 
-          // Filter services by selected branch (if branch system is active)
-          let filteredServicesData = servicesData || [];
-          if (activeBranch) {
-            // Show services for this branch + shared services (null branch_id)
-            filteredServicesData = filteredServicesData.filter(s =>
-              !s.branch_id || s.branch_id === activeBranch.id
-            );
-          }
-          setServices(filteredServicesData);
+          // Store all services (branch filtering done reactively via selectedBranch)
+          setAllServices(servicesData || []);
 
           // Fetch active therapists for this business using direct REST API
           console.log('[BookingPage] Fetching therapists...');
@@ -261,22 +256,26 @@ const BookingPage = () => {
           const therapistsData = await therapistsResponse.json();
           console.log('[BookingPage] Therapists result:', { count: therapistsData?.length });
           // Filter therapists by position (massage/facial related)
-          let filteredTherapists = (therapistsData || []).filter(t =>
+          let positionFiltered = (therapistsData || []).filter(t =>
             t.position?.toLowerCase().includes('therapist') ||
             t.position?.toLowerCase().includes('specialist') ||
             t.department === 'Massage' ||
             t.department === 'Facial'
           );
-          if (filteredTherapists.length === 0) {
-            filteredTherapists = therapistsData || [];
+          if (positionFiltered.length === 0) {
+            positionFiltered = therapistsData || [];
           }
-          // Filter by branch if active
+          // Store all therapists (branch filtering done reactively)
+          setAllTherapists(positionFiltered);
+
+          // Apply initial branch filter if branch already selected
           if (activeBranch) {
-            filteredTherapists = filteredTherapists.filter(t =>
-              !t.branch_id || t.branch_id === activeBranch.id
-            );
+            setServices((servicesData || []).filter(s => !s.branch_id || s.branch_id === activeBranch.id));
+            setTherapists(positionFiltered.filter(t => !t.branch_id || t.branch_id === activeBranch.id));
+          } else {
+            setServices(servicesData || []);
+            setTherapists(positionFiltered);
           }
-          setTherapists(filteredTherapists);
 
         } catch (fetchErr) {
           console.error('[BookingPage] Direct fetch error:', fetchErr);
@@ -302,6 +301,22 @@ const BookingPage = () => {
   }, [businessIdOrSlug]);
 
   // Get unique categories from services
+  // Re-filter services and therapists when branch changes
+  useEffect(() => {
+    if (allServices.length === 0 && allTherapists.length === 0) return;
+    if (selectedBranch) {
+      setServices(allServices.filter(s => !s.branch_id || s.branch_id === selectedBranch.id));
+      setTherapists(allTherapists.filter(t => !t.branch_id || t.branch_id === selectedBranch.id));
+    } else {
+      setServices(allServices);
+      setTherapists([]);  // No branch selected = don't show therapists
+    }
+    // Clear selections when branch changes
+    setSelectedServices([]);
+    setSelectedTherapists([]);
+    setSelectedTherapist(null);
+  }, [selectedBranch]);
+
   const categories = useMemo(() => {
     const cats = [...new Set(services.map(s => s.category))];
     return cats.filter(Boolean).sort();
@@ -766,7 +781,8 @@ const BookingPage = () => {
             </div>
           </div>
 
-          {/* Therapist Selection */}
+          {/* Therapist Selection — only show when branch is selected and has therapists */}
+          {therapists.length > 0 && (
           <div className="booking-section">
             <h2>2. Choose Therapist <span className="optional">(Optional)</span></h2>
 
@@ -889,6 +905,7 @@ const BookingPage = () => {
               </>
             )}
           </div>
+          )}
 
           {/* Service Location Selection */}
           <div className="booking-section">

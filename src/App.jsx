@@ -81,15 +81,10 @@ const PageLoader = () => (
 
 // Public Route Component (redirect to first allowed page if already logged in)
 const PublicRoute = ({ children }) => {
-  const { user, loading, selectedBranch, getFirstPage } = useApp();
+  const { user, loading, getFirstPage } = useApp();
 
   if (loading) {
     return <LoadingScreen />;
-  }
-
-  // Must select a branch before accessing login/register
-  if (!selectedBranch) {
-    return <Navigate to="/select-branch" replace />;
   }
 
   if (user) {
@@ -108,7 +103,7 @@ const ProtectedLayout = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/select-branch" replace />;
   }
 
   return children;
@@ -127,7 +122,7 @@ const RequireBranch = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/select-branch" replace />;
   }
 
   return children;
@@ -159,11 +154,11 @@ const LoginFirst = ({ children }) => {
   return children;
 };
 
-// Catch all redirect - branch select -> login -> app
+// Catch all redirect - branch select -> app (never auto-redirect to login)
 const CatchAllRedirect = () => {
   const { user, selectedBranch, getFirstPage } = useApp();
+  if (!user) return <Navigate to="/select-branch" replace />;
   if (!selectedBranch) return <Navigate to="/select-branch" replace />;
-  if (!user) return <Navigate to="/login" replace />;
   return <Navigate to={getFirstPage()} replace />;
 };
 

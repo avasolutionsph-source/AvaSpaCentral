@@ -149,9 +149,35 @@ const BranchesTab = () => {
     setShowModal(true);
   };
 
-  const openEdit = (branch) => {
+  const openEdit = async (branch) => {
     setModalMode('edit');
     setSelectedBranch(branch);
+
+    // Load Branch Owner account for this branch
+    let ownerData = { ownerFirstName: '', ownerLastName: '', ownerEmail: '', ownerUsername: '', ownerUserId: null };
+    try {
+      const headers = await getHeaders();
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/users?branch_id=eq.${branch.id}&role=eq.Branch Owner&status=eq.active&select=id,first_name,last_name,email,username&limit=1`,
+        { headers }
+      );
+      if (res.ok) {
+        const owners = await res.json();
+        if (owners.length > 0) {
+          const owner = owners[0];
+          ownerData = {
+            ownerFirstName: owner.first_name || '',
+            ownerLastName: owner.last_name || '',
+            ownerEmail: owner.email || '',
+            ownerUsername: owner.username || '',
+            ownerUserId: owner.id
+          };
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load branch owner:', err);
+    }
+
     setFormData({
       name: branch.name || '',
       slug: branch.slug || '',
@@ -161,7 +187,8 @@ const BranchesTab = () => {
       is_active: branch.is_active !== false,
       display_order: branch.display_order || 1,
       home_service_fee: branch.home_service_fee || 0,
-      hotel_service_fee: branch.hotel_service_fee || 0
+      hotel_service_fee: branch.hotel_service_fee || 0,
+      ...ownerData
     });
     setShowModal(true);
   };
@@ -222,8 +249,20 @@ const BranchesTab = () => {
         const branchData = await res.json();
         const newBranchId = branchData?.[0]?.id;
 
-        // 2. Create Supabase Auth account for Branch Owner
+        // 2. Check if email already exists before creating account
         try {
+          const emailCheckRes = await fetch(
+            `${supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(formData.ownerEmail.trim().toLowerCase())}&select=id&limit=1`,
+            { headers }
+          );
+          if (emailCheckRes.ok) {
+            const existingUsers = await emailCheckRes.json();
+            if (existingUsers.length > 0) {
+              throw new Error('An account with this email already exists');
+            }
+          }
+
+          // Create Supabase Auth account for Branch Owner
           // Use fetch directly to /auth/v1/signup so current session stays intact
           let authUser = null;
           const signupRes = await fetch(`${supabaseUrl}/auth/v1/signup`, {
@@ -287,7 +326,7 @@ const BranchesTab = () => {
 
         showToast('Branch and owner account created!', 'success');
       } else {
-        // Edit mode - just update branch
+        // Edit mode - update branch
         res = await fetch(`${supabaseUrl}/rest/v1/branches?id=eq.${selectedBranch.id}`, {
           method: 'PATCH',
           headers,
@@ -299,7 +338,37 @@ const BranchesTab = () => {
           throw new Error(errData.message || 'Failed to save branch');
         }
 
-        showToast('Branch updated!', 'success');
+        // Update Branch Owner profile if we have one
+        if (formData.ownerUserId && formData.ownerFirstName.trim() && formData.ownerLastName.trim()) {
+          try {
+            const ownerPayload = {
+              first_name: formData.ownerFirstName.trim(),
+              last_name: formData.ownerLastName.trim(),
+              email: formData.ownerEmail.trim().toLowerCase(),
+              username: (formData.ownerUsername.trim() || formData.ownerEmail.split('@')[0]).toLowerCase()
+            };
+            const ownerRes = await fetch(
+              `${supabaseUrl}/rest/v1/users?id=eq.${formData.ownerUserId}`,
+              { method: 'PATCH', headers, body: JSON.stringify(ownerPayload) }
+            );
+            if (!ownerRes.ok) {
+              const errData = await ownerRes.json().catch(() => ({}));
+              console.error('Failed to update owner profile:', errData);
+              showToast('Branch updated but failed to update owner account', 'error');
+              setShowModal(false);
+              loadBranches();
+              return;
+            }
+          } catch (ownerErr) {
+            console.error('Failed to update Branch Owner:', ownerErr);
+            showToast('Branch updated but failed to update owner: ' + ownerErr.message, 'error');
+            setShowModal(false);
+            loadBranches();
+            return;
+          }
+        }
+
+        showToast('Branch and owner account updated!', 'success');
       }
 
       setShowModal(false);
@@ -588,79 +657,87 @@ const BranchesTab = () => {
                   </div>
                 </div>
 
-                {/* Branch Owner Account (create mode only) */}
-                {modalMode === 'create' && (
-                  <>
-                    <h4 style={{ margin: '1.25rem 0 0.75rem', fontSize: '0.95rem', color: '#333' }}>Branch Owner Account</h4>
-                    <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.75rem' }}>
-                      This will create a login account for the Branch Owner to access the POS system.
-                    </p>
-                    <div className="form-row">
+                {/* Branch Owner Account */}
+                <>
+                  <h4 style={{ margin: '1.25rem 0 0.75rem', fontSize: '0.95rem', color: '#333' }}>Branch Owner Account</h4>
+                  <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.75rem' }}>
+                    {modalMode === 'create'
+                      ? 'This will create a login account for the Branch Owner to access the POS system.'
+                      : formData.ownerUserId
+                        ? 'Update the Branch Owner\'s account details.'
+                        : 'No Branch Owner account found for this branch.'}
+                  </p>
+                  {(modalMode === 'create' || formData.ownerUserId) && (
+                    <>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>First Name *</label>
+                          <input
+                            type="text"
+                            name="ownerFirstName"
+                            value={formData.ownerFirstName}
+                            onChange={handleChange}
+                            className="form-control"
+                            placeholder="First name"
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Last Name *</label>
+                          <input
+                            type="text"
+                            name="ownerLastName"
+                            value={formData.ownerLastName}
+                            onChange={handleChange}
+                            className="form-control"
+                            placeholder="Last name"
+                            required
+                          />
+                        </div>
+                      </div>
                       <div className="form-group">
-                        <label>First Name *</label>
+                        <label>Email *</label>
                         <input
-                          type="text"
-                          name="ownerFirstName"
-                          value={formData.ownerFirstName}
+                          type="email"
+                          name="ownerEmail"
+                          value={formData.ownerEmail}
                           onChange={handleChange}
                           className="form-control"
-                          placeholder="First name"
+                          placeholder="owner@example.com"
                           required
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Last Name *</label>
-                        <input
-                          type="text"
-                          name="ownerLastName"
-                          value={formData.ownerLastName}
-                          onChange={handleChange}
-                          className="form-control"
-                          placeholder="Last name"
-                          required
-                        />
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Username</label>
+                          <input
+                            type="text"
+                            name="ownerUsername"
+                            value={formData.ownerUsername}
+                            onChange={handleChange}
+                            className="form-control"
+                            placeholder="Optional (uses email prefix)"
+                          />
+                        </div>
+                        {modalMode === 'create' && (
+                          <div className="form-group">
+                            <label>Password *</label>
+                            <input
+                              type="password"
+                              name="ownerPassword"
+                              value={formData.ownerPassword}
+                              onChange={handleChange}
+                              className="form-control"
+                              placeholder="Min 6 characters"
+                              minLength={6}
+                              required
+                            />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="form-group">
-                      <label>Email *</label>
-                      <input
-                        type="email"
-                        name="ownerEmail"
-                        value={formData.ownerEmail}
-                        onChange={handleChange}
-                        className="form-control"
-                        placeholder="owner@example.com"
-                        required
-                      />
-                    </div>
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Username</label>
-                        <input
-                          type="text"
-                          name="ownerUsername"
-                          value={formData.ownerUsername}
-                          onChange={handleChange}
-                          className="form-control"
-                          placeholder="Optional (uses email prefix)"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Password *</label>
-                        <input
-                          type="password"
-                          name="ownerPassword"
-                          value={formData.ownerPassword}
-                          onChange={handleChange}
-                          className="form-control"
-                          placeholder="Min 6 characters"
-                          minLength={6}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
+                </>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>

@@ -83,14 +83,25 @@ class AttendanceRepository extends BaseRepository {
    */
   async clockOut(employeeId) {
     const today = toLocalDate(new Date());
-    const attendance = await this.getEmployeeAttendance(employeeId, today);
+    let attendance = await this.getEmployeeAttendance(employeeId, today);
+
+    // If not found today, check yesterday (overnight shift)
+    if (!attendance || attendance.clockOut) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = toLocalDate(yesterday);
+      const yesterdayRecord = await this.getEmployeeAttendance(employeeId, yesterdayStr);
+      if (yesterdayRecord && yesterdayRecord.clockIn && !yesterdayRecord.clockOut) {
+        attendance = yesterdayRecord;
+      }
+    }
 
     if (!attendance) {
-      throw new Error('No clock-in record found for today');
+      throw new Error('No clock-in record found');
     }
 
     if (attendance.clockOut) {
-      throw new Error('Already clocked out today');
+      throw new Error('Already clocked out');
     }
 
     const nowTime = new Date().toTimeString().slice(0, 5); // HH:mm format

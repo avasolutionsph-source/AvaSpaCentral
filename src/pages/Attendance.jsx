@@ -55,13 +55,31 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const today = format(new Date(), 'yyyy-MM-dd');
       let todayRecords = attendance.filter(a => a.date === today);
 
+      // Find overnight shift records (clocked in yesterday, not yet clocked out)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
+      const overnightRecords = attendance.filter(
+        a => a.date === yesterdayStr && a.clockIn && !a.clockOut
+      );
+
       const userBranchId = getUserBranchId();
       if (userBranchId) {
         todayRecords = todayRecords.filter(a => !a.branchId || a.branchId === userBranchId);
       }
 
-      setTodayAttendance(todayRecords);
-      const pending = todayRecords.filter(a => a.status === 'pending_approval');
+      // Combine today's records with active overnight records for display
+      let overnightFiltered = overnightRecords;
+      if (userBranchId) {
+        overnightFiltered = overnightRecords.filter(a => !a.branchId || a.branchId === userBranchId);
+      }
+      // Only include overnight records for employees who don't already have a today record
+      const todayEmpIds = new Set(todayRecords.map(a => String(a.employeeId)));
+      const uniqueOvernightRecords = overnightFiltered.filter(a => !todayEmpIds.has(String(a.employeeId)));
+      const allVisibleRecords = [...todayRecords, ...uniqueOvernightRecords];
+
+      setTodayAttendance(allVisibleRecords);
+      const pending = allVisibleRecords.filter(a => a.status === 'pending_approval');
       setPendingApprovals(pending);
       let activeEmps = emps.filter(e => e.status === 'active');
       if (userBranchId) {
@@ -69,9 +87,9 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       }
       setEmployees(activeEmps);
 
-      // Calculate stats - use branch-filtered activeEmps, not unfiltered emps
-      const present = todayRecords.filter(a => a.status === 'present' || a.status === 'late').length;
-      const late = todayRecords.filter(a => a.status === 'late').length;
+      // Calculate stats - include overnight workers as present
+      const present = allVisibleRecords.filter(a => a.status === 'present' || a.status === 'late').length;
+      const late = allVisibleRecords.filter(a => a.status === 'late').length;
       const absent = activeEmps.length - present;
 
       setStats({
@@ -282,7 +300,11 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     if (!record.clockIn || !record.clockOut) return 0;
 
     const clockIn = parseISO(`${record.date}T${record.clockIn}`);
-    const clockOut = parseISO(`${record.date}T${record.clockOut}`);
+    let clockOut = parseISO(`${record.date}T${record.clockOut}`);
+    // If clockOut is before clockIn, it's an overnight shift - add 1 day
+    if (clockOut <= clockIn) {
+      clockOut = new Date(clockOut.getTime() + 24 * 60 * 60 * 1000);
+    }
     const workedMinutes = differenceInMinutes(clockOut, clockIn);
     const expectedMinutes = 8 * 60; // 8 hours
 
@@ -455,12 +477,13 @@ const Attendance = ({ embedded = false, onDataChange }) => {
               const record = getEmployeeRecord(employee._id);
               const status = record ? getAttendanceStatus(record) : 'absent';
               const overtime = record ? calculateOvertimeHours(record) : 0;
-              const hoursWorked = record && record.clockIn && record.clockOut
-                ? Math.round(differenceInMinutes(
-                    parseISO(`${record.date}T${record.clockOut}`),
-                    parseISO(`${record.date}T${record.clockIn}`)
-                  ) / 60 * 10) / 10
-                : 0;
+              const hoursWorked = (() => {
+                if (!record?.clockIn || !record?.clockOut) return 0;
+                const cin = parseISO(`${record.date}T${record.clockIn}`);
+                let cout = parseISO(`${record.date}T${record.clockOut}`);
+                if (cout <= cin) cout = new Date(cout.getTime() + 24 * 60 * 60 * 1000);
+                return Math.round(differenceInMinutes(cout, cin) / 60 * 10) / 10;
+              })();
 
               return (
                 <tr key={employee._id}>

@@ -57,9 +57,20 @@ const MyPortal = () => {
     try {
       const allAttendance = await mockApi.attendance.getAttendance();
       const today = format(new Date(), 'yyyy-MM-dd');
-      const myToday = allAttendance.find(
+      let myToday = allAttendance.find(
         a => a.employeeId === user.employeeId && a.date === today
       );
+
+      // If no today record, check for active overnight shift from yesterday
+      if (!myToday) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
+        myToday = allAttendance.find(
+          a => a.employeeId === user.employeeId && a.date === yesterdayStr && a.clockIn && !a.clockOut
+        );
+      }
+
       setTodayRecord(myToday || null);
     } catch (e) {
       // Silent fail

@@ -614,7 +614,20 @@ const BookingPage = () => {
         </div>
       </header>
 
-      {/* Hero removed — go straight to branch selection / booking */}
+      {/* Hero section with cover photo */}
+      {business?.cover_photo_url && (
+        <div
+          className="booking-hero"
+          style={{ backgroundImage: `url(${business.cover_photo_url})` }}
+        >
+          <div className="booking-hero-overlay">
+            <h1 className="booking-hero-title">{business.name}</h1>
+            <p className="booking-hero-tagline">
+              {business.tagline || 'Book your relaxation experience'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Branch dropdown moved inside booking-services section */}
 

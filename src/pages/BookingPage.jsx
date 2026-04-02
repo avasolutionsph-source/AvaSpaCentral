@@ -616,42 +616,36 @@ const BookingPage = () => {
 
       {/* Hero removed — go straight to branch selection / booking */}
 
-      {/* Branch Selection Section — always visible if multiple branches */}
+      {/* Branch Dropdown — shown if multiple branches */}
       {branches.length > 1 && (
-        <div id="branch-selection" className="booking-branch-section">
-          <div className="booking-branch-section-inner">
-            <h2 className="booking-branch-section-title">Choose Branch</h2>
-            <p className="booking-branch-section-subtitle">Select your preferred branch and start your journey to relaxation.</p>
-            <div className="booking-branch-cards">
-              {branches.map((branch, idx) => (
-                <div
-                  key={branch.id}
-                  className={`booking-branch-card ${selectedBranch?.id === branch.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    setSelectedBranch(branch);
-                    setShowBranchSelector(false);
-                    // Filter services and therapists for this branch
-                    setServices(prev => {
-                      // Re-fetch would be ideal, but filter from all loaded
-                      return prev;
-                    });
-                    setTimeout(() => {
-                      document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth' });
-                    }, 200);
-                  }}
-                >
-                  <div className="booking-branch-card-body">
-                    <h3 className="booking-branch-card-name">{branch.name}</h3>
-                    {branch.city && <p className="booking-branch-card-detail">{branch.city}</p>}
-                    {branch.address && <p className="booking-branch-card-detail">{branch.address}</p>}
-                  </div>
-                  <button className="booking-branch-card-btn">
-                    {selectedBranch?.id === branch.id ? '&#10003; Selected' : 'Select Branch →'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div id="branch-selection" style={{ maxWidth: '900px', margin: '0 auto', padding: '1.25rem 2rem 0' }}>
+          <select
+            value={selectedBranch?.id || ''}
+            onChange={(e) => {
+              const branch = branches.find(b => b.id === e.target.value);
+              if (branch) {
+                setSelectedBranch(branch);
+                setShowBranchSelector(false);
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '0.75rem 1rem',
+              fontSize: '1rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              background: '#fff',
+              cursor: 'pointer',
+              color: selectedBranch ? '#1a1a1a' : '#888'
+            }}
+          >
+            <option value="" disabled>Select a branch...</option>
+            {branches.map(branch => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}{branch.city ? ` — ${branch.city}` : ''}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -688,22 +682,7 @@ const BookingPage = () => {
       <div className="booking-container">
         {/* Left side: Services */}
         <div className="booking-services">
-          {/* Show selected branch if applicable */}
-          {selectedBranch && branches.length > 1 && (
-            <div className="selected-branch-banner">
-              <span className="selected-branch-icon">📍</span>
-              <span className="selected-branch-name">{selectedBranch.name}</span>
-              <button
-                className="change-branch-btn"
-                onClick={() => {
-                  setSelectedBranch(null);
-                  setShowBranchSelector(true);
-                }}
-              >
-                Change
-              </button>
-            </div>
-          )}
+          {/* Branch dropdown is now above the progress indicator */}
 
           <div className="booking-section">
             <h2>1. Select Services</h2>

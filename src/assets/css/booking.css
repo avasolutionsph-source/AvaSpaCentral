@@ -319,15 +319,26 @@
 /* Header */
 /* ── Top bar (logo + auth) ───────────────────────────────── */
 .booking-topbar {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
   padding: 0.75rem 2rem;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.booking-topbar .booking-topbar-name,
+.booking-topbar .auth-btn.login-btn {
+  color: #fff;
+}
+
+.booking-topbar .auth-btn.register-btn {
+  background: #fff;
+  color: #1a1a1a;
 }
 
 .booking-topbar-content {
@@ -359,8 +370,7 @@
 /* ── Hero section (cover photo) ─────────────────────────── */
 .booking-hero {
   width: 100%;
-  height: calc(100vh - 61px); /* fill the screen below the topbar */
-  min-height: 480px;
+  height: 350px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -1306,8 +1316,7 @@
   }
 
   .booking-hero {
-    height: calc(100vh - 53px);
-    min-height: 360px;
+    height: 250px;
   }
 
   .booking-hero-title {

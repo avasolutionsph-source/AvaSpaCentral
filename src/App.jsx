@@ -110,19 +110,43 @@ const ProtectedLayout = ({ children }) => {
 };
 
 // Require both branch selection AND login before accessing main app
+// Auto-selects first branch for staff if none selected
 const RequireBranch = ({ children }) => {
-  const { user, loading, selectedBranch } = useApp();
+  const { user, loading, selectedBranch, selectBranch } = useApp();
+  const [autoSelecting, setAutoSelecting] = React.useState(false);
 
-  if (loading) {
+  React.useEffect(() => {
+    const autoSelectBranch = async () => {
+      if (user && !selectedBranch && !autoSelecting) {
+        setAutoSelecting(true);
+        try {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+          if (!supabaseUrl || !supabaseKey || !user.businessId) return;
+          const res = await fetch(
+            `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order.asc&limit=1`,
+            { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } }
+          );
+          if (res.ok) {
+            const branches = await res.json();
+            if (branches.length > 0) {
+              selectBranch(branches[0]);
+            }
+          }
+        } catch (err) {
+          console.error('Auto-select branch failed:', err);
+        }
+      }
+    };
+    autoSelectBranch();
+  }, [user, selectedBranch, autoSelecting, selectBranch]);
+
+  if (loading || (user && !selectedBranch)) {
     return <LoadingScreen />;
   }
 
   if (!user) {
     return <Navigate to="/book" replace />;
-  }
-
-  if (!selectedBranch) {
-    return <Navigate to="/select-branch" replace />;
   }
 
   return children;
@@ -134,8 +158,8 @@ const RedirectToFirstPage = () => {
   return <Navigate to={getFirstPage()} replace />;
 };
 
-// Login-first flow: allows login without a branch selected (for RLS-restricted setups)
-// After login, redirects back to branch select
+// Login-first flow: allows login without a branch selected
+// After login, redirects to dashboard (branch auto-selected by RequireBranch)
 const LoginFirst = ({ children }) => {
   const { user, loading, selectedBranch, getFirstPage } = useApp();
 
@@ -143,12 +167,12 @@ const LoginFirst = ({ children }) => {
     return <LoadingScreen />;
   }
 
-  // Already logged in - go pick a branch (or straight to app if branch already selected)
+  // Already logged in - go to app (RequireBranch will auto-select branch)
   if (user) {
     if (selectedBranch) {
       return <Navigate to={getFirstPage()} replace />;
     }
-    return <Navigate to="/select-branch" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

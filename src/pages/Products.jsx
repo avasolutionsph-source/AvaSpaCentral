@@ -28,7 +28,9 @@ const initialFormData = {
   lowStockAlert: '',
   description: '',
   itemsUsed: [],
-  hideFromPOS: false
+  hideFromPOS: false,
+  imageUrl: '',
+  _imageFile: null
 };
 
 const categories = ['Massage', 'Facial', 'Body Treatment', 'Spa Package', 'Nails', 'Retail Products', 'Add-ons'];
@@ -47,8 +49,27 @@ const unitOptions = [
   { value: 'lb', label: 'lb' }
 ];
 
+const uploadProductImage = async (file, businessId, productName) => {
+  try {
+    const { supabase } = await import('../services/supabase/supabaseClient');
+    if (!supabase) throw new Error('Supabase not configured');
+    const ext = file.name.split('.').pop().toLowerCase();
+    const safeName = productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
+    const path = `${businessId}/products/${safeName}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('branding')
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (error) throw error;
+    const { data } = supabase.storage.from('branding').getPublicUrl(path);
+    return `${data.publicUrl}?t=${Date.now()}`;
+  } catch (err) {
+    console.error('Failed to upload product image:', err);
+    throw err;
+  }
+};
+
 const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { showToast, canEdit, canEditProducts, isBranchOwner, getUserBranchId } = useApp();
+  const { user, showToast, canEdit, canEditProducts, isBranchOwner, getUserBranchId } = useApp();
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,7 +154,9 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       lowStockAlert: product.lowStockAlert?.toString() || '',
       description: product.description || '',
       itemsUsed: product.itemsUsed || [],
-      hideFromPOS: product.hideFromPOS || false
+      hideFromPOS: product.hideFromPOS || false,
+      imageUrl: product.imageUrl || '',
+      _imageFile: null
     }),
     transformForSubmit: (data) => ({
       name: data.name.trim(),
@@ -148,6 +171,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       description: data.description.trim(),
       itemsUsed: data.type === 'service' ? data.itemsUsed : [],
       hideFromPOS: data.hideFromPOS || false,
+      imageUrl: data.imageUrl || undefined,
       // Auto-assign branchId when Branch Owner creates a product
       branchId: isBranchOwner() ? getUserBranchId() : undefined
     }),
@@ -163,6 +187,32 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       onOpenCreateRef.current = openCreate;
     }
   }, [onOpenCreateRef, openCreate]);
+
+  // Image upload state
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Wrapped submit to handle image upload before save
+  const handleSubmitWithImage = async () => {
+    let imageUrl = formData.imageUrl;
+    if (formData._imageFile) {
+      try {
+        setUploadingImage(true);
+        imageUrl = await uploadProductImage(formData._imageFile, user?.businessId, formData.name);
+        setFieldValue('imageUrl', imageUrl);
+        setFieldValue('_imageFile', null);
+      } catch (err) {
+        showToast('Failed to upload image: ' + err.message, 'error');
+        setUploadingImage(false);
+        return;
+      }
+      setUploadingImage(false);
+    }
+    // Set imageUrl before submit
+    if (imageUrl !== formData.imageUrl) {
+      formData.imageUrl = imageUrl;
+    }
+    handleSubmit();
+  };
 
   // Get retail products for items used dropdown
   const retailProducts = useMemo(() =>
@@ -401,8 +451,8 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
         onClose={closeModal}
         mode={modalMode}
         title={{ create: 'Add Product/Service', edit: 'Edit Product/Service' }}
-        onSubmit={handleSubmit}
-        isSubmitting={isSubmitting}
+        onSubmit={handleSubmitWithImage}
+        isSubmitting={isSubmitting || uploadingImage}
         className="product-modal"
       >
         <div className="form-group">
@@ -598,6 +648,42 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
             </div>
           </>
         )}
+
+        <div className="form-group">
+          <label>Product Image</label>
+          {(formData.imageUrl || formData._imageFile) && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <img
+                src={formData._imageFile ? URL.createObjectURL(formData._imageFile) : formData.imageUrl}
+                alt="Preview"
+                style={{ width: '100%', maxWidth: '200px', height: '120px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e5e7eb' }}
+              />
+              <button
+                type="button"
+                onClick={() => { setFieldValue('imageUrl', ''); setFieldValue('_imageFile', null); }}
+                style={{ display: 'block', marginTop: '4px', fontSize: '0.75rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                Remove image
+              </button>
+            </div>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                  showToast('Image must be less than 5MB', 'error');
+                  return;
+                }
+                setFieldValue('_imageFile', file);
+              }
+            }}
+            className="form-control"
+          />
+          <p className="form-hint">Upload an image for this product/service (shown in booking page). Max 5MB.</p>
+        </div>
 
         <div className="form-group">
           <label>Description</label>

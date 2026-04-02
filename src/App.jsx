@@ -103,7 +103,7 @@ const ProtectedLayout = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/book/daet-spa" replace />;
+    return <Navigate to="/book" replace />;
   }
 
   return children;
@@ -118,7 +118,7 @@ const RequireBranch = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/book/daet-spa" replace />;
+    return <Navigate to="/book" replace />;
   }
 
   if (!selectedBranch) {
@@ -167,7 +167,7 @@ const RootRedirect = () => {
   if (user && !selectedBranch) return <Navigate to="/select-branch" replace />;
 
   // Public user -> show booking page (auto-detect business)
-  return <Navigate to="/book/daet-spa" replace />;
+  return <Navigate to="/book" replace />;
 };
 
 // Catch all redirect - booking page for public, dashboard for staff
@@ -175,7 +175,7 @@ const CatchAllRedirect = () => {
   const { user, selectedBranch, getFirstPage } = useApp();
   if (user && selectedBranch) return <Navigate to={getFirstPage()} replace />;
   if (user && !selectedBranch) return <Navigate to="/select-branch" replace />;
-  return <Navigate to="/book/daet-spa" replace />;
+  return <Navigate to="/book" replace />;
 };
 
 function AppRoutes() {
@@ -202,6 +202,14 @@ function AppRoutes() {
         />
 
         {/* Customer Booking Page (Public - no auth required) */}
+        <Route
+          path="/book"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <BookingPage />
+            </Suspense>
+          }
+        />
         <Route
           path="/book/:businessId"
           element={

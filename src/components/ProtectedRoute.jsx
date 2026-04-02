@@ -7,7 +7,7 @@ const ProtectedRoute = ({ children, page }) => {
 
   // If user is not logged in, redirect to booking page (never auto-redirect to login)
   if (!user) {
-    return <Navigate to="/book/daet-spa" replace />;
+    return <Navigate to="/book" replace />;
   }
 
   // If user doesn't have permission for this page, redirect to their first allowed page

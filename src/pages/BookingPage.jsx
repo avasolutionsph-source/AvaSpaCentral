@@ -128,13 +128,6 @@ const BookingPage = () => {
 
         console.log('[BookingPage] Starting to fetch data for:', businessIdOrSlug);
 
-        // Validate businessId/slug
-        if (!businessIdOrSlug) {
-          setError('Invalid booking link. Please contact the business for a valid link.');
-          setLoading(false);
-          return;
-        }
-
         // Check if Supabase is configured
         if (!supabase) {
           console.error('[BookingPage] Supabase client not configured');
@@ -143,28 +136,20 @@ const BookingPage = () => {
           return;
         }
 
-        // Fetch business info
-        console.log('[BookingPage] Fetching business info...');
-        console.log('[BookingPage] Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-
-        // Simple direct fetch to test connectivity
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-        // Try a direct REST API call first to test connectivity
-        // Support both UUID and custom slug lookups
         try {
-          console.log('[BookingPage] Testing direct REST API call...');
-
-          // Determine if this is a UUID or custom slug
+          // Determine the query URL based on what we have
           let testUrl;
-          if (isUUID(businessIdOrSlug)) {
+          if (!businessIdOrSlug) {
+            // No businessId in URL — auto-detect first business
+            testUrl = `${supabaseUrl}/rest/v1/businesses?select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color&limit=1`;
+          } else if (isUUID(businessIdOrSlug)) {
             testUrl = `${supabaseUrl}/rest/v1/businesses?id=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
           } else {
-            // It's a custom slug
             testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
           }
-          console.log('[BookingPage] Test URL:', testUrl);
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10000);

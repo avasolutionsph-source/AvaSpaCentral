@@ -3820,8 +3820,9 @@ select {
 @media (max-width: 768px) {
   .sidebar {
     position: fixed;
-    z-index: 1000;
+    z-index: 1002;
     transform: translateX(-100%);
+    padding-bottom: 70px;
   }
 
   .sidebar.open {
@@ -9753,10 +9754,11 @@ a:focus:not(:focus-visible),
   /* Sidebar as overlay on tablets */
   .sidebar {
     position: fixed;
-    z-index: 1000;
+    z-index: 1002;
     width: 280px;
     transform: translateX(-100%);
     box-shadow: var(--shadow-xl);
+    padding-bottom: 70px;
   }
 
   .sidebar.open {

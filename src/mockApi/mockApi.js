@@ -459,9 +459,25 @@ export const serviceRotationApi = {
     const rotation = await initServiceRotation();
     const today = getTodayDateString();
 
-    // Get today's attendance from Dexie
-    const attendanceRecords = await db.attendance.where('date').equals(today).toArray();
-    const todayAttendance = attendanceRecords.filter(a => a.clockIn && !a.clockOut);
+    // Get today's attendance from Dexie - use toArray + filter for reliability
+    // (indexed query can miss records if date format varies)
+    const allAttendance = await db.attendance.toArray();
+    const todayAttendance = allAttendance.filter(a => a.date === today && a.clockIn && !a.clockOut);
+
+    // Also include overnight shift workers (clocked in yesterday, still working)
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = getTodayDateString.call ? (() => {
+      const y = yesterday;
+      return `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+    })() : '';
+    const overnightWorkers = allAttendance.filter(a => a.date === yesterdayStr && a.clockIn && !a.clockOut);
+    const todayEmpIds = new Set(todayAttendance.map(a => String(a.employeeId)));
+    overnightWorkers.forEach(a => {
+      if (!todayEmpIds.has(String(a.employeeId))) {
+        todayAttendance.push(a);
+      }
+    });
 
     // Get all employees to join with attendance (attendance records only store employeeId)
     const employees = await db.employees.toArray();

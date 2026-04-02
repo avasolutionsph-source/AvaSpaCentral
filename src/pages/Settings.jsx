@@ -1001,30 +1001,43 @@ const Settings = () => {
         const { supabase } = await import('../services/supabase/supabaseClient');
         if (supabase && user?.businessId) {
           const now = new Date().toISOString();
-          const records = Object.entries(settingsData).map(([key, value]) => ({
-            id: crypto.randomUUID(),
-            business_id: user.businessId,
-            key,
-            value,
-            updated_at: now
-          }));
 
-          // Delete existing settings for this business, then insert fresh
-          await supabase
-            .from('settings')
-            .delete()
-            .eq('business_id', user.businessId)
-            .in('key', Object.keys(settingsData));
+          // Upsert each setting individually to avoid delete+insert race condition
+          let allSuccess = true;
+          for (const [key, value] of Object.entries(settingsData)) {
+            // Check if setting exists
+            const { data: existing } = await supabase
+              .from('settings')
+              .select('id')
+              .eq('business_id', user.businessId)
+              .eq('key', key)
+              .limit(1);
 
-          const { error } = await supabase
-            .from('settings')
-            .insert(records);
-
-          if (!error) {
-            cloudSynced = true;
-          } else {
-            console.warn('[Settings] Cloud sync failed:', error.message);
+            let error;
+            if (existing && existing.length > 0) {
+              // Update existing
+              ({ error } = await supabase
+                .from('settings')
+                .update({ value, updated_at: now })
+                .eq('id', existing[0].id));
+            } else {
+              // Insert new
+              ({ error } = await supabase
+                .from('settings')
+                .insert({
+                  id: crypto.randomUUID(),
+                  business_id: user.businessId,
+                  key,
+                  value,
+                  updated_at: now
+                }));
+            }
+            if (error) {
+              console.warn(`[Settings] Cloud sync failed for ${key}:`, error.message);
+              allSuccess = false;
+            }
           }
+          cloudSynced = allSuccess;
         }
       } catch (syncError) {
         console.warn('[Settings] Cloud sync failed:', syncError.message);

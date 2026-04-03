@@ -335,6 +335,25 @@ const ShiftSchedules = () => {
             </button>
           )}
           <button
+            className="btn btn-success"
+            onClick={async () => {
+              try {
+                showToast('Syncing all schedules...', 'info');
+                for (const schedule of schedules) {
+                  await mockApi.shiftSchedules.updateSchedule(schedule._id, {
+                    weeklySchedule: schedule.weeklySchedule,
+                    notes: schedule.notes
+                  });
+                }
+                showToast(`All ${schedules.length} schedules synced!`, 'success');
+              } catch (err) {
+                showToast('Failed to sync: ' + err.message, 'error');
+              }
+            }}
+          >
+            Sync All to Cloud
+          </button>
+          <button
             className="btn btn-secondary"
             onClick={() => {
               setConfigForm({

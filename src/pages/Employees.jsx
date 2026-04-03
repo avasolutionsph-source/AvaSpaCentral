@@ -33,7 +33,9 @@ const INITIAL_FORM_DATA = {
   rateType: 'hourly', // 'hourly' or 'monthly'
   hireDate: '',
   skills: [],
-  branchId: ''
+  branchId: '',
+  photoUrl: '',
+  _photoFile: null
 };
 
 const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
@@ -150,7 +152,9 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       rateType: employee.rateType || 'hourly',
       hireDate: employee.hireDate || '',
       skills: employee.skills || [],
-      branchId: employee.branchId || ''
+      branchId: employee.branchId || '',
+      photoUrl: employee.photoUrl || '',
+      _photoFile: null
     };
   }, []);
 
@@ -174,7 +178,8 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       rateType: data.rateType,
       hireDate: data.hireDate,
       skills: data.skills,
-      ...(branchId && { branchId })
+      ...(branchId && { branchId }),
+      ...(data.photoUrl && { photoUrl: data.photoUrl })
     };
   }, [getUserBranchId]);
 
@@ -205,6 +210,34 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     transformForSubmit,
     validateForm: validateEmployee
   });
+
+  // Photo upload handler
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const handleSubmitWithPhoto = async () => {
+    if (formData._photoFile) {
+      try {
+        setUploadingPhoto(true);
+        const { supabase } = await import('../services/supabase/supabaseClient');
+        if (!supabase) throw new Error('Supabase not configured');
+        const file = formData._photoFile;
+        const ext = file.name.split('.').pop().toLowerCase();
+        const safeName = `${formData.firstName}-${formData.lastName}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const path = `${user.businessId}/employees/${safeName}-${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from('branding').upload(path, file, { upsert: true, contentType: file.type });
+        if (error) throw error;
+        const { data } = supabase.storage.from('branding').getPublicUrl(path);
+        const photoUrl = `${data.publicUrl}?t=${Date.now()}`;
+        formData.photoUrl = photoUrl;
+        setFormData(prev => ({ ...prev, photoUrl, _photoFile: null }));
+      } catch (err) {
+        showToast('Failed to upload photo: ' + err.message, 'error');
+        setUploadingPhoto(false);
+        return;
+      }
+      setUploadingPhoto(false);
+    }
+    handleSubmit();
+  };
 
   // Keep employeesRef in sync for duplicate email validation
   useEffect(() => {
@@ -519,10 +552,50 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
         onClose={closeModal}
         mode={modalMode}
         title="Employee"
-        onSubmit={handleSubmit}
-        isSubmitting={isSubmitting}
+        onSubmit={handleSubmitWithPhoto}
+        isSubmitting={isSubmitting || uploadingPhoto}
         size="large"
       >
+        {/* Employee Photo */}
+        <div className="form-group">
+          <label>Employee Photo</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+            {(formData.photoUrl || formData._photoFile) ? (
+              <div style={{ position: 'relative' }}>
+                <img
+                  src={formData._photoFile ? URL.createObjectURL(formData._photoFile) : formData.photoUrl}
+                  alt="Preview"
+                  style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '50%', border: '2px solid #e5e7eb' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, photoUrl: '', _photoFile: null }))}
+                  style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >✕</button>
+              </div>
+            ) : (
+              <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#f3f4f6', border: '2px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.7rem' }}>
+                No photo
+              </div>
+            )}
+            <label style={{ cursor: 'pointer', padding: '0.4rem 0.8rem', background: '#f3f4f6', borderRadius: '6px', fontSize: '0.8rem', color: '#333', border: '1px solid #d1d5db' }}>
+              {formData.photoUrl || formData._photoFile ? 'Change' : 'Upload'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    if (file.size > 5 * 1024 * 1024) { showToast('Image must be less than 5MB', 'error'); return; }
+                    setFormData(prev => ({ ...prev, _photoFile: file }));
+                  }
+                }}
+                style={{ display: 'none' }}
+              />
+            </label>
+          </div>
+        </div>
+
         <div className="form-row">
           <div className="form-group">
             <label>First Name *</label>

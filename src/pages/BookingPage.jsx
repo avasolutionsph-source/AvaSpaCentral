@@ -881,14 +881,25 @@ const BookingPage = () => {
                           }}
                         >
                           <span className="therapist-info" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            {isSelected && (
+                            {isSelected ? (
                               <span style={{
-                                width: '24px', height: '24px', borderRadius: '50%',
+                                width: '44px', height: '44px', borderRadius: '50%',
                                 background: 'var(--color-accent, #1B5E37)', color: 'white',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.75rem', fontWeight: '700', flexShrink: 0
+                                fontSize: '1rem', fontWeight: '700', flexShrink: 0
                               }}>
                                 {rank + 1}
+                              </span>
+                            ) : therapist.photo_url ? (
+                              <img src={therapist.photo_url} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                            ) : (
+                              <span style={{
+                                width: '44px', height: '44px', borderRadius: '50%',
+                                background: '#f3f4f6', color: '#888',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '1rem', fontWeight: '600', flexShrink: 0
+                              }}>
+                                {therapist.first_name?.charAt(0)}{therapist.last_name?.charAt(0)}
                               </span>
                             )}
                             <span>

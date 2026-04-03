@@ -554,6 +554,14 @@ class SupabaseSyncManager {
       converted.updated_at = new Date().toISOString();
     }
 
+    // Special handling for shift_schedules: put weeklySchedule into schedule JSONB column
+    if (tableName === 'shift_schedules') {
+      if (converted.weekly_schedule) {
+        converted.schedule = { weeklySchedule: converted.weekly_schedule };
+        delete converted.weekly_schedule;
+      }
+    }
+
     // Special handling for service_rotation: wrap rotation fields into rotation_data JSONB
     if (tableName === 'service_rotation') {
       const rotationFields = ['queue', 'serviceCount', 'service_count',

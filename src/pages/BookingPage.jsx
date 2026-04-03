@@ -336,7 +336,10 @@ const BookingPage = () => {
             const schedRes = await fetch(schedUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
             if (schedRes.ok) {
               const schedData = await schedRes.json();
+              console.log('[BookingPage] Shift schedules:', schedData?.length, schedData?.slice(0, 2));
               setShiftSchedules(schedData || []);
+            } else {
+              console.warn('[BookingPage] Shift schedules fetch status:', schedRes.status);
             }
           } catch (err) { console.warn('Failed to fetch shift schedules:', err); }
 
@@ -1072,6 +1075,7 @@ const BookingPage = () => {
                       const isSelected = rank !== -1;
                       // Get shift hours for selected date
                       const schedule = shiftSchedules.find(s => s.employee_id === therapist.id);
+                      if (!schedule && shiftSchedules.length > 0) console.log('[BookingPage] No schedule for therapist:', therapist.id, therapist.first_name, 'schedules have:', shiftSchedules.slice(0,2).map(s => s.employee_id));
                       const weeklySchedule = schedule?.schedule?.weeklySchedule || schedule?.schedule;
                       const dayKey = selectedDate ? dayNames[new Date(selectedDate + 'T12:00:00').getDay()].toLowerCase() : null;
                       const dayShift = dayKey && weeklySchedule ? weeklySchedule[dayKey] : null;

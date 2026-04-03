@@ -625,10 +625,12 @@ const BookingPage = () => {
 
     return therapists.filter(t => {
       const schedule = shiftSchedules.find(s => s.employee_id === t.id);
-      if (!schedule?.schedule) return true; // No schedule = assume available
+      if (!schedule?.schedule || Object.keys(schedule.schedule).length === 0) return true; // No schedule or empty = assume available
       const weeklySchedule = schedule.schedule.weeklySchedule || schedule.schedule;
+      if (!weeklySchedule || Object.keys(weeklySchedule).length === 0) return true; // Empty weekly schedule = assume available
       const dayShift = weeklySchedule[dayKey];
-      if (!dayShift || dayShift.shift === 'off') return false; // Day off
+      if (!dayShift) return true; // No shift defined for this day = assume available
+      if (dayShift.shift === 'off') return false; // Explicitly set as day off
 
       // If time is selected, check if it falls within shift
       if (selectedTime && dayShift.startTime && dayShift.endTime) {

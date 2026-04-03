@@ -339,13 +339,30 @@ const ShiftSchedules = () => {
             onClick={async () => {
               try {
                 showToast('Syncing all schedules...', 'info');
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+                let synced = 0;
                 for (const schedule of schedules) {
+                  // Update local first
                   await mockApi.shiftSchedules.updateSchedule(schedule._id, {
                     weeklySchedule: schedule.weeklySchedule,
                     notes: schedule.notes
                   });
+                  // Direct push to Supabase
+                  if (supabaseUrl && supabaseKey && schedule.weeklySchedule) {
+                    try {
+                      const { supabase } = await import('../services/supabase/supabaseClient');
+                      if (supabase) {
+                        await supabase
+                          .from('shift_schedules')
+                          .update({ schedule: { weeklySchedule: schedule.weeklySchedule } })
+                          .eq('employee_id', schedule.employeeId);
+                        synced++;
+                      }
+                    } catch (e) { console.warn('Sync failed for', schedule.employeeName, e); }
+                  }
                 }
-                showToast(`All ${schedules.length} schedules synced!`, 'success');
+                showToast(`${synced}/${schedules.length} schedules synced to cloud!`, 'success');
               } catch (err) {
                 showToast('Failed to sync: ' + err.message, 'error');
               }

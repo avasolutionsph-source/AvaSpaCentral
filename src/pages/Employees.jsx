@@ -32,6 +32,7 @@ const INITIAL_FORM_DATA = {
   monthlyRate: '',
   rateType: 'hourly', // 'hourly' or 'monthly'
   hireDate: '',
+  gender: '',
   skills: [],
   branchId: '',
   photoUrl: '',
@@ -151,6 +152,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       monthlyRate: monthlyRate.toString(),
       rateType: employee.rateType || 'hourly',
       hireDate: employee.hireDate || '',
+      gender: employee.gender || '',
       skills: employee.skills || [],
       branchId: employee.branchId || '',
       photoUrl: employee.photoUrl || '',
@@ -177,6 +179,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       monthlyRate: monthlyRate,
       rateType: data.rateType,
       hireDate: data.hireDate,
+      gender: data.gender || null,
       skills: data.skills,
       ...(branchId && { branchId }),
       ...(data.photoUrl && { photoUrl: data.photoUrl })
@@ -680,23 +683,38 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
           </div>
         </div>
 
-        {/* Branch Assignment — Owner/Manager only (Branch Owner auto-assigns) */}
-        {!getUserBranchId() && branchesList.length > 0 && (
+        <div className="form-row">
+          {/* Branch Assignment — Owner/Manager only (Branch Owner auto-assigns) */}
+          {!getUserBranchId() && branchesList.length > 0 && (
+            <div className="form-group">
+              <label>Assign to Branch *</label>
+              <select
+                name="branchId"
+                value={formData.branchId}
+                onChange={handleFieldChange}
+                className="form-control"
+              >
+                <option value="">Select branch...</option>
+                {branchesList.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}{b.city ? ` — ${b.city}` : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="form-group">
-            <label>Assign to Branch *</label>
+            <label>Gender</label>
             <select
-              name="branchId"
-              value={formData.branchId}
+              name="gender"
+              value={formData.gender}
               onChange={handleFieldChange}
               className="form-control"
             >
-              <option value="">Select branch...</option>
-              {branchesList.map(b => (
-                <option key={b.id} value={b.id}>{b.name}{b.city ? ` — ${b.city}` : ''}</option>
-              ))}
+              <option value="">Select...</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
             </select>
           </div>
-        )}
+        </div>
         <div className="form-group">
           <label>Rate Type *</label>
           <div className="rate-type-toggle">

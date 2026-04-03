@@ -629,6 +629,10 @@ const Settings = () => {
         heroTagline: brandingSettings.heroTagline || undefined,
       });
 
+      // Save font settings to settings table
+      await SettingsRepository.set('footerFont', brandingSettings.footerFont || 'default');
+      await SettingsRepository.set('footerFontSize', brandingSettings.footerFontSize || '14');
+
       showToast('Branding saved successfully!', 'success');
     } catch (err) {
       console.error('Error saving branding:', err);
@@ -1877,7 +1881,7 @@ const Settings = () => {
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Color Theme</h3>
               <p className="branding-sub-desc">Choose the primary accent color for your booking pages and admin interface.</p>
-              <div className="branding-color-input-row" style={{ marginBottom: '1.25rem' }}>
+              <div className="branding-color-input-row" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <input
                   type="color"
                   value={brandingSettings.primaryColor}
@@ -1885,7 +1889,22 @@ const Settings = () => {
                   className="branding-color-input"
                   disabled={!canEdit()}
                 />
-                <span className="branding-color-hex">{brandingSettings.primaryColor}</span>
+                <input
+                  type="text"
+                  value={brandingSettings.primaryColor}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (!val.startsWith('#')) val = '#' + val;
+                    if (/^#[0-9A-Fa-f]{0,6}$/.test(val)) {
+                      setBrandingSettings(prev => ({ ...prev, primaryColor: val }));
+                      if (/^#[0-9A-Fa-f]{6}$/.test(val)) applyColorTheme(val);
+                    }
+                  }}
+                  placeholder="#5F1C1C"
+                  maxLength={7}
+                  disabled={!canEdit()}
+                  style={{ width: '100px', padding: '0.4rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.9rem', fontFamily: 'monospace' }}
+                />
               </div>
 
               {/* Live booking page preview */}
@@ -2019,9 +2038,43 @@ const Settings = () => {
                   />
                 </div>
               </div>
+              <div className="settings-row" style={{ marginTop: '0.75rem' }}>
+                <div className="settings-form-group">
+                  <label>Font</label>
+                  <select
+                    value={brandingSettings.footerFont || 'default'}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, footerFont: e.target.value }))}
+                    disabled={!canEdit()}
+                  >
+                    <option value="default">Default (System)</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Lora">Lora</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Raleway">Raleway</option>
+                    <option value="Poppins">Poppins</option>
+                  </select>
+                </div>
+                <div className="settings-form-group">
+                  <label>Font Size</label>
+                  <select
+                    value={brandingSettings.footerFontSize || '14'}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, footerFontSize: e.target.value }))}
+                    disabled={!canEdit()}
+                  >
+                    <option value="12">Small (12px)</option>
+                    <option value="14">Medium (14px)</option>
+                    <option value="16">Large (16px)</option>
+                    <option value="18">Extra Large (18px)</option>
+                  </select>
+                </div>
+              </div>
               <div className="branding-footer-preview">
                 <span className="branding-preview-label">Preview</span>
-                <div className="branding-footer-preview-box">
+                <div className="branding-footer-preview-box" style={{
+                  fontFamily: brandingSettings.footerFont && brandingSettings.footerFont !== 'default' ? `'${brandingSettings.footerFont}', sans-serif` : 'inherit',
+                  fontSize: `${brandingSettings.footerFontSize || 14}px`
+                }}>
                   <p>© {new Date().getFullYear()} {brandingSettings.businessName || 'Your Business Name'}. All rights reserved.</p>
                   {brandingSettings.contactPhone && <p>Contact: {brandingSettings.contactPhone}</p>}
                 </div>

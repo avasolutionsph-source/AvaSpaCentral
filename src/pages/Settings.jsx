@@ -1993,22 +1993,6 @@ const Settings = () => {
               </div>
             </div>
 
-            {/* Hero Text */}
-            <div className="branding-sub-section">
-              <h3 className="branding-sub-title">Hero Section Text</h3>
-              <p className="branding-sub-desc">Text shown over the cover photo. Business name is also editable in the Footer section below.</p>
-              <div className="settings-form-group">
-                <label>Tagline</label>
-                <input
-                  type="text"
-                  value={brandingSettings.heroTagline}
-                  onChange={e => setBrandingSettings(prev => ({ ...prev, heroTagline: e.target.value }))}
-                  placeholder="e.g. Book your relaxation experience"
-                  disabled={!canEdit()}
-                />
-              </div>
-            </div>
-
             {/* Footer */}
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Footer</h3>

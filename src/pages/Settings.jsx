@@ -626,12 +626,15 @@ const Settings = () => {
         primaryColor: brandingSettings.primaryColor,
         businessName: brandingSettings.businessName || undefined,
         contactPhone: brandingSettings.contactPhone || undefined,
-        heroTagline: brandingSettings.heroTagline || undefined,
       });
 
-      // Save font settings to settings table
-      await SettingsRepository.set('footerFont', brandingSettings.footerFont || 'default');
-      await SettingsRepository.set('footerFontSize', brandingSettings.footerFontSize || '14');
+      // Save font settings to settings table (best effort)
+      try {
+        await SettingsRepository.set('footerFont', brandingSettings.footerFont || 'default');
+        await SettingsRepository.set('footerFontSize', brandingSettings.footerFontSize || '14');
+      } catch (fontErr) {
+        console.warn('Font settings save failed:', fontErr);
+      }
 
       showToast('Branding saved successfully!', 'success');
     } catch (err) {

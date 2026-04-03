@@ -57,6 +57,10 @@ const BookingPage = () => {
   const [services, setServices] = useState([]);
   const [therapists, setTherapists] = useState([]);
 
+  // Business hours and shift schedules for availability
+  const [businessHours, setBusinessHours] = useState([]);
+  const [shiftSchedules, setShiftSchedules] = useState([]);
+
   // User selections
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedTherapist, setSelectedTherapist] = useState(null);
@@ -311,6 +315,26 @@ const BookingPage = () => {
           // Store all therapists (branch filtering done reactively)
           setAllTherapists(positionFiltered);
 
+          // Fetch business hours from settings table
+          try {
+            const hoursUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=eq.businessHours&select=value`;
+            const hoursRes = await fetch(hoursUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
+            if (hoursRes.ok) {
+              const hoursData = await hoursRes.json();
+              if (hoursData?.[0]?.value) setBusinessHours(hoursData[0].value);
+            }
+          } catch (err) { console.warn('Failed to fetch business hours:', err); }
+
+          // Fetch shift schedules for therapist availability
+          try {
+            const schedUrl = `${supabaseUrl}/rest/v1/shift_schedules?business_id=eq.${actualBusinessId}&is_active=eq.true&select=employee_id,schedule`;
+            const schedRes = await fetch(schedUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
+            if (schedRes.ok) {
+              const schedData = await schedRes.json();
+              setShiftSchedules(schedData || []);
+            }
+          } catch (err) { console.warn('Failed to fetch shift schedules:', err); }
+
           // Apply initial branch filter if branch already selected
           if (activeBranch) {
             setServices((servicesData || []).filter(s => !s.branch_id || s.branch_id === activeBranch.id));
@@ -551,14 +575,69 @@ const BookingPage = () => {
   };
 
   // Time slots
-  const timeSlots = [
-    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
-    '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
-    '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM',
-    '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
-    '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM',
-    '07:00 PM', '07:30 PM', '08:00 PM'
-  ];
+  // Generate time slots based on business hours for selected date
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const selectedDayHours = useMemo(() => {
+    if (!selectedDate || businessHours.length === 0) return null;
+    const date = new Date(selectedDate + 'T12:00:00');
+    const dayName = dayNames[date.getDay()];
+    return businessHours.find(h => h.day === dayName) || null;
+  }, [selectedDate, businessHours]);
+
+  const isDayClosed = selectedDayHours && !selectedDayHours.enabled;
+
+  const timeSlots = useMemo(() => {
+    let openTime = '09:00';
+    let closeTime = '20:00';
+    if (selectedDayHours && selectedDayHours.enabled) {
+      openTime = selectedDayHours.open || '09:00';
+      closeTime = selectedDayHours.close || '20:00';
+    }
+    const [openH, openM] = openTime.split(':').map(Number);
+    const [closeH, closeM] = closeTime.split(':').map(Number);
+    const slots = [];
+    let h = openH, m = openM;
+    while (h * 60 + m < closeH * 60 + closeM) {
+      const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      slots.push(`${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`);
+      m += 30;
+      if (m >= 60) { h++; m = 0; }
+    }
+    return slots;
+  }, [selectedDayHours]);
+
+  // Filter therapists by availability on selected date/time
+  const availableTherapists = useMemo(() => {
+    if (!selectedDate || therapists.length === 0) return therapists;
+    const date = new Date(selectedDate + 'T12:00:00');
+    const dayKey = dayNames[date.getDay()].toLowerCase();
+
+    return therapists.filter(t => {
+      const schedule = shiftSchedules.find(s => s.employee_id === t.id);
+      if (!schedule?.schedule) return true; // No schedule = assume available
+      const weeklySchedule = schedule.schedule.weeklySchedule || schedule.schedule;
+      const dayShift = weeklySchedule[dayKey];
+      if (!dayShift || dayShift.shift === 'off') return false; // Day off
+
+      // If time is selected, check if it falls within shift
+      if (selectedTime && dayShift.startTime && dayShift.endTime) {
+        const timeParts = selectedTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        if (timeParts) {
+          let hr = parseInt(timeParts[1]);
+          const min = parseInt(timeParts[2]);
+          const ampm = timeParts[3].toUpperCase();
+          if (ampm === 'PM' && hr !== 12) hr += 12;
+          if (ampm === 'AM' && hr === 12) hr = 0;
+          const selectedMins = hr * 60 + min;
+          const [sH, sM] = dayShift.startTime.split(':').map(Number);
+          const [eH, eM] = dayShift.endTime.split(':').map(Number);
+          if (selectedMins < sH * 60 + sM || selectedMins >= eH * 60 + eM) return false;
+        }
+      }
+      return true;
+    });
+  }, [therapists, selectedDate, selectedTime, shiftSchedules]);
 
   // Loading state
   if (loading) {
@@ -683,29 +762,29 @@ const BookingPage = () => {
 
       {/* Branch dropdown moved inside booking-services section */}
 
-      {/* Progress Indicator */}
+      {/* Progress Indicator — new order: Services → Date/Time → Therapist → Location → Details */}
       <div id="booking-form" className="booking-progress">
-        <div className={`progress-step ${currentProgressStep >= 1 ? 'active' : ''} ${selectedServices.length > 0 ? 'completed' : ''}`}>
+        <div className={`progress-step active ${selectedServices.length > 0 ? 'completed' : ''}`}>
           <span className="progress-step-number">{selectedServices.length > 0 ? '✓' : '1'}</span>
           <span>Services</span>
         </div>
         <div className={`progress-divider ${selectedServices.length > 0 ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${currentProgressStep >= 2 ? 'active' : ''} ${selectedTherapist ? 'completed' : ''}`}>
-          <span className="progress-step-number">{selectedTherapist ? '✓' : '2'}</span>
-          <span>Therapist</span>
-        </div>
-        <div className={`progress-divider ${selectedTherapist ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${currentProgressStep >= 3 ? 'active' : ''} ${serviceLocation === 'in_store' || (serviceLocation && serviceAddress) ? 'completed' : ''}`}>
-          <span className="progress-step-number">{serviceLocation === 'in_store' || (serviceLocation && serviceAddress) ? '✓' : '3'}</span>
-          <span>Location</span>
-        </div>
-        <div className={`progress-divider ${serviceLocation ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${currentProgressStep >= 4 ? 'active' : ''} ${selectedDate && selectedTime ? 'completed' : ''}`}>
-          <span className="progress-step-number">{selectedDate && selectedTime ? '✓' : '4'}</span>
+        <div className={`progress-step ${selectedServices.length > 0 ? 'active' : ''} ${selectedDate && selectedTime ? 'completed' : ''}`}>
+          <span className="progress-step-number">{selectedDate && selectedTime ? '✓' : '2'}</span>
           <span>Date & Time</span>
         </div>
         <div className={`progress-divider ${selectedDate && selectedTime ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${currentProgressStep >= 5 ? 'active' : ''} ${customerName && customerPhone ? 'completed' : ''}`}>
+        <div className={`progress-step ${selectedDate ? 'active' : ''} ${selectedTherapists.length > 0 || therapistMode === 'auto' ? 'completed' : ''}`}>
+          <span className="progress-step-number">{selectedTherapists.length > 0 || therapistMode === 'auto' ? '✓' : '3'}</span>
+          <span>Therapist</span>
+        </div>
+        <div className={`progress-divider ${therapistMode === 'auto' || selectedTherapists.length > 0 ? 'completed' : ''}`}></div>
+        <div className={`progress-step ${selectedDate ? 'active' : ''} ${serviceLocation ? 'completed' : ''}`}>
+          <span className="progress-step-number">{serviceLocation ? '✓' : '4'}</span>
+          <span>Location</span>
+        </div>
+        <div className={`progress-divider ${serviceLocation ? 'completed' : ''}`}></div>
+        <div className={`progress-step ${serviceLocation ? 'active' : ''} ${customerName && customerPhone ? 'completed' : ''}`}>
           <span className="progress-step-number">{customerName && customerPhone ? '✓' : '5'}</span>
           <span>Details</span>
         </div>
@@ -853,10 +932,51 @@ const BookingPage = () => {
             )}
           </div>
 
-          {/* Therapist Selection — only show when branch is selected and has therapists */}
-          {therapists.length > 0 && (
+          {/* Date & Time Selection — step 2 */}
           <div className="booking-section">
-            <h2>2. Choose Therapist <span className="optional">(Optional)</span></h2>
+            <h2>2. Select Date & Time</h2>
+            <div className="datetime-picker">
+              <div className="date-picker">
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => { setSelectedDate(e.target.value); setSelectedTime(''); }}
+                  min={getMinDate()}
+                  max={getMaxDate()}
+                />
+              </div>
+              {isDayClosed ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', color: '#ef4444', fontWeight: '600', fontSize: '1rem' }}>
+                  Closed on {selectedDayHours?.day}. Please select another date.
+                </div>
+              ) : (
+                <div className="time-picker">
+                  <label>Time</label>
+                  {!selectedDate ? (
+                    <p style={{ color: '#888', fontSize: '0.85rem', padding: '0.5rem 0' }}>Select a date first</p>
+                  ) : (
+                    <div className="time-slots">
+                      {timeSlots.map(time => (
+                        <button
+                          key={time}
+                          className={`time-slot ${selectedTime === time ? 'selected' : ''}`}
+                          onClick={() => setSelectedTime(time)}
+                        >
+                          {time}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Therapist Selection — step 3, filtered by date/time availability */}
+          {availableTherapists.length > 0 && selectedDate && !isDayClosed && (
+          <div className="booking-section">
+            <h2>3. Choose Therapist <span className="optional">(Optional)</span></h2>
 
             {/* Mode Selection */}
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -933,7 +1053,7 @@ const BookingPage = () => {
                 )}
 
                 <div className="therapist-options">
-                  {therapists
+                  {availableTherapists
                     .filter(t => genderFilter === 'all' || (t.gender || '').toLowerCase() === genderFilter)
                     .map(therapist => {
                       const rank = selectedTherapists.indexOf(therapist.id);
@@ -990,7 +1110,7 @@ const BookingPage = () => {
                         </label>
                       );
                     })}
-                  {therapists.filter(t => genderFilter === 'all' || (t.gender || '').toLowerCase() === genderFilter).length === 0 && (
+                  {availableTherapists.filter(t => genderFilter === 'all' || (t.gender || '').toLowerCase() === genderFilter).length === 0 && (
                     <p style={{ color: '#999', fontSize: '0.85rem', padding: '1rem' }}>No therapists found for this filter.</p>
                   )}
                 </div>
@@ -1001,7 +1121,7 @@ const BookingPage = () => {
 
           {/* Service Location Selection */}
           <div className="booking-section">
-            <h2>3. Service Location</h2>
+            <h2>4. Service Location</h2>
             <div className="service-location-options">
               <button
                 className={`location-option ${serviceLocation === 'in_store' ? 'selected' : ''}`}
@@ -1091,40 +1211,12 @@ const BookingPage = () => {
             )}
           </div>
 
-          {/* Date & Time Selection */}
-          <div className="booking-section">
-            <h2>4. Select Date & Time</h2>
-            <div className="datetime-picker">
-              <div className="date-picker">
-                <label>Date</label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  min={getMinDate()}
-                  max={getMaxDate()}
-                />
-              </div>
-              <div className="time-picker">
-                <label>Time</label>
-                <div className="time-slots">
-                  {timeSlots.map(time => (
-                    <button
-                      key={time}
-                      className={`time-slot ${selectedTime === time ? 'selected' : ''}`}
-                      onClick={() => setSelectedTime(time)}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Date & Time moved to step 2 above therapist */}
 
           {/* Customer Details */}
           <div className="booking-section">
             <h2>5. Your Details</h2>
+
             <div className="customer-form">
               <div className="form-group">
                 <label>Name *</label>

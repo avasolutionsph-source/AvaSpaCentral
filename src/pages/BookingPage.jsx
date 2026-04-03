@@ -595,14 +595,19 @@ const BookingPage = () => {
     }
     const [openH, openM] = openTime.split(':').map(Number);
     const [closeH, closeM] = closeTime.split(':').map(Number);
+    let closeMins = closeH * 60 + closeM;
+    const openMins = openH * 60 + openM;
+    // Handle overnight hours (e.g., 12:00 PM to 12:00 AM)
+    if (closeMins <= openMins) closeMins += 24 * 60;
     const slots = [];
-    let h = openH, m = openM;
-    while (h * 60 + m < closeH * 60 + closeM) {
+    let totalMins = openMins;
+    while (totalMins < closeMins) {
+      const h = (Math.floor(totalMins / 60)) % 24;
+      const m = totalMins % 60;
       const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
       const ampm = h >= 12 ? 'PM' : 'AM';
       slots.push(`${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`);
-      m += 30;
-      if (m >= 60) { h++; m = 0; }
+      totalMins += 30;
     }
     return slots;
   }, [selectedDayHours]);

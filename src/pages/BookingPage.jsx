@@ -60,6 +60,8 @@ const BookingPage = () => {
   // Business hours and shift schedules for availability
   const [businessHours, setBusinessHours] = useState([]);
   const [shiftSchedules, setShiftSchedules] = useState([]);
+  const [existingBookings, setExistingBookings] = useState([]);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   // User selections
   const [selectedServices, setSelectedServices] = useState([]);
@@ -329,6 +331,13 @@ const BookingPage = () => {
               console.warn('[BookingPage] Business hours fetch status:', hoursRes.status);
             }
           } catch (err) { console.warn('Failed to fetch business hours:', err); }
+
+          // Fetch existing bookings for availability check
+          try {
+            const bookingsUrl = `${supabaseUrl}/rest/v1/online_bookings?business_id=eq.${actualBusinessId}&status=neq.cancelled&select=preferred_date,preferred_time,branch_id`;
+            const bookingsRes = await fetch(bookingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
+            if (bookingsRes.ok) setExistingBookings(await bookingsRes.json());
+          } catch (err) { console.warn('Failed to fetch bookings:', err); }
 
           // Fetch shift schedules for therapist availability
           try {
@@ -619,6 +628,75 @@ const BookingPage = () => {
     }
     return slots;
   }, [selectedDayHours]);
+
+  // Count bookings per time slot for selected date
+  const slotBookingCounts = useMemo(() => {
+    if (!selectedDate) return {};
+    const counts = {};
+    existingBookings
+      .filter(b => b.preferred_date === selectedDate && (!selectedBranch || !b.branch_id || b.branch_id === selectedBranch.id))
+      .forEach(b => { if (b.preferred_time) counts[b.preferred_time] = (counts[b.preferred_time] || 0) + 1; });
+    return counts;
+  }, [selectedDate, existingBookings, selectedBranch]);
+
+  // Count therapists available per slot to determine capacity
+  const therapistCountForDate = useMemo(() => {
+    if (!selectedDate) return 0;
+    return therapists.length || 5; // fallback
+  }, [selectedDate, therapists]);
+
+  // Determine slot status
+  const getSlotStatus = (time) => {
+    const booked = slotBookingCounts[time] || 0;
+    const capacity = therapistCountForDate;
+    if (booked >= capacity) return 'full';
+    if (booked >= capacity * 0.7) return 'peak';
+    return 'available';
+  };
+
+  // Best time suggestion
+  const bestTimeSlot = useMemo(() => {
+    if (!selectedDate || timeSlots.length === 0) return null;
+    let minBookings = Infinity;
+    let bestTime = null;
+    for (const slot of timeSlots) {
+      const count = slotBookingCounts[slot] || 0;
+      if (count < minBookings) { minBookings = count; bestTime = slot; }
+    }
+    return bestTime;
+  }, [selectedDate, timeSlots, slotBookingCounts]);
+
+  // Calendar days for current month
+  const calendarDays = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startPad = firstDay.getDay();
+    const days = [];
+    for (let i = 0; i < startPad; i++) days.push(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d));
+    return days;
+  }, [calendarMonth]);
+
+  const isDateAvailable = (date) => {
+    if (!date) return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (date < today) return false;
+    const maxDate = new Date(); maxDate.setDate(maxDate.getDate() + 30);
+    if (date > maxDate) return false;
+    if (businessHours.length > 0) {
+      const dayName = dayNames[date.getDay()];
+      const dayHours = businessHours.find(h => h.day === dayName);
+      if (dayHours && !dayHours.enabled) return false;
+    }
+    return true;
+  };
+
+  const formatDateStr = (date) => {
+    if (!date) return '';
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  };
 
   // Filter therapists by availability on selected date/time
   const availableTherapists = useMemo(() => {
@@ -950,42 +1028,125 @@ const BookingPage = () => {
           {/* Date & Time Selection — step 2 */}
           <div className="booking-section">
             <h2>2. Select Date & Time</h2>
-            <div className="datetime-picker">
-              <div className="date-picker">
-                <label>Date</label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => { setSelectedDate(e.target.value); setSelectedTime(''); }}
-                  min={getMinDate()}
-                  max={getMaxDate()}
-                />
+
+            {/* Calendar */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '0.5rem', color: '#555' }}>&#8249;</button>
+                <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>
+                  {calendarMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </span>
+                <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '0.5rem', color: '#555' }}>&#8250;</button>
               </div>
-              {isDayClosed ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', color: '#ef4444', fontWeight: '600', fontSize: '1rem' }}>
-                  Closed on {selectedDayHours?.day}. Please select another date.
-                </div>
-              ) : (
-                <div className="time-picker">
-                  <label>Time</label>
-                  {!selectedDate ? (
-                    <p style={{ color: '#888', fontSize: '0.85rem', padding: '0.5rem 0' }}>Select a date first</p>
-                  ) : (
-                    <div className="time-slots">
-                      {timeSlots.map(time => (
-                        <button
-                          key={time}
-                          className={`time-slot ${selectedTime === time ? 'selected' : ''}`}
-                          onClick={() => setSelectedTime(time)}
-                        >
-                          {time}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center' }}>
+                {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                  <div key={d} style={{ fontSize: '0.75rem', color: '#888', padding: '0.3rem', fontWeight: '600' }}>{d}</div>
+                ))}
+                {calendarDays.map((date, i) => {
+                  if (!date) return <div key={`pad-${i}`} />;
+                  const dateStr = formatDateStr(date);
+                  const available = isDateAvailable(date);
+                  const isSelected = selectedDate === dateStr;
+                  const isToday = formatDateStr(new Date()) === dateStr;
+                  return (
+                    <button
+                      key={dateStr}
+                      onClick={() => { if (available) { setSelectedDate(dateStr); setSelectedTime(''); } }}
+                      disabled={!available}
+                      style={{
+                        padding: '0.5rem 0',
+                        borderRadius: '8px',
+                        border: isSelected ? '2px solid var(--color-accent, #1B5E37)' : isToday ? '1px solid #d1d5db' : '1px solid transparent',
+                        background: isSelected ? 'var(--color-accent, #1B5E37)' : available ? '#fff' : '#f9fafb',
+                        color: isSelected ? '#fff' : available ? '#1a1a1a' : '#ccc',
+                        cursor: available ? 'pointer' : 'default',
+                        fontWeight: isSelected || isToday ? '700' : '400',
+                        fontSize: '0.9rem',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {date.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Legend */}
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.75rem', color: '#888' }}>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: 'var(--color-accent, #1B5E37)', marginRight: '4px' }}></span>Selected</span>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#fff', border: '1px solid #d1d5db', marginRight: '4px' }}></span>Available</span>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#f3f4f6', marginRight: '4px' }}></span>Closed</span>
+              </div>
             </div>
+
+            {/* Time Slots */}
+            {isDayClosed ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: '#ef4444', fontWeight: '600', background: '#fef2f2', borderRadius: '8px' }}>
+                Closed on {selectedDayHours?.day}. Please select another date.
+              </div>
+            ) : !selectedDate ? (
+              <p style={{ color: '#888', fontSize: '0.9rem', textAlign: 'center', padding: '1rem' }}>Select a date from the calendar above</p>
+            ) : (
+              <>
+                {/* Best time suggestion */}
+                {bestTimeSlot && (
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '1.1rem' }}>&#9889;</span>
+                    <span style={{ fontSize: '0.85rem', color: '#166534' }}>
+                      <strong>Best time available:</strong> {bestTimeSlot} — fewest bookings
+                    </span>
+                    <button
+                      onClick={() => setSelectedTime(bestTimeSlot)}
+                      style={{ marginLeft: 'auto', padding: '0.3rem 0.8rem', borderRadius: '6px', border: '1px solid #16a34a', background: '#fff', color: '#16a34a', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}
+                    >
+                      Select
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                  {timeSlots.map(time => {
+                    const status = getSlotStatus(time);
+                    const isFull = status === 'full';
+                    const isPeak = status === 'peak';
+                    const isSelected = selectedTime === time;
+                    return (
+                      <button
+                        key={time}
+                        onClick={() => { if (!isFull) setSelectedTime(time); }}
+                        disabled={isFull}
+                        style={{
+                          padding: '0.6rem 0.25rem',
+                          borderRadius: '8px',
+                          border: isSelected ? '2px solid var(--color-accent, #1B5E37)' : '1px solid #e5e7eb',
+                          background: isSelected ? 'var(--color-accent, #1B5E37)' : isFull ? '#f3f4f6' : '#fff',
+                          color: isSelected ? '#fff' : isFull ? '#bbb' : '#1a1a1a',
+                          cursor: isFull ? 'not-allowed' : 'pointer',
+                          fontSize: '0.85rem',
+                          fontWeight: isSelected ? '600' : '400',
+                          position: 'relative',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        {time}
+                        {isPeak && !isSelected && (
+                          <span style={{ display: 'block', fontSize: '0.6rem', color: '#f59e0b', fontWeight: '600', marginTop: '2px' }}>Peak</span>
+                        )}
+                        {isFull && (
+                          <span style={{ display: 'block', fontSize: '0.6rem', color: '#999', marginTop: '2px' }}>Full</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Slot legend */}
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.75rem', color: '#888' }}>
+                  <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '3px', background: '#fff', border: '1px solid #e5e7eb', marginRight: '4px' }}></span>Available</span>
+                  <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '3px', background: '#fff', border: '1px solid #f59e0b', marginRight: '4px' }}></span>Peak Hours</span>
+                  <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '3px', background: '#f3f4f6', marginRight: '4px' }}></span>Full</span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Therapist Selection — step 3, filtered by date/time availability */}

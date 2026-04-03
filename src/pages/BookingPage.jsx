@@ -75,6 +75,7 @@ const BookingPage = () => {
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showAllServices, setShowAllServices] = useState(false);
 
   // Current step (for mobile wizard view)
   const [currentStep, setCurrentStep] = useState(1);
@@ -239,8 +240,28 @@ const BookingPage = () => {
             setShowBranchSelector(true);
           }
 
-          // Store all services (branch filtering done reactively via selectedBranch)
-          setAllServices(servicesData || []);
+          // Fetch sales counts per service to sort by best sellers
+          let enrichedServices = servicesData || [];
+          try {
+            const txUrl = `${supabaseUrl}/rest/v1/transactions?business_id=eq.${actualBusinessId}&select=items`;
+            const txRes = await fetch(txUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
+            if (txRes.ok) {
+              const txData = await txRes.json();
+              const salesCount = {};
+              txData.forEach(tx => {
+                if (tx.items && Array.isArray(tx.items)) {
+                  tx.items.forEach(item => {
+                    const id = item.productId || item.product_id || item.id;
+                    if (id) salesCount[id] = (salesCount[id] || 0) + (item.quantity || 1);
+                  });
+                }
+              });
+              enrichedServices = enrichedServices.map(s => ({ ...s, _salesCount: salesCount[s.id] || 0 }));
+              enrichedServices.sort((a, b) => b._salesCount - a._salesCount);
+            }
+          } catch (err) { console.warn('Failed to fetch service sales:', err); }
+
+          setAllServices(enrichedServices);
 
           // Fetch active therapists for this business using direct REST API
           console.log('[BookingPage] Fetching therapists...');
@@ -766,7 +787,7 @@ const BookingPage = () => {
                   <small>Try a different search term or category.</small>
                 </div>
               ) : (
-                filteredServices.map(service => (
+                (showAllServices || searchTerm.trim() ? filteredServices : filteredServices.slice(0, 9)).map(service => (
                   <div
                     key={service.id}
                     className={`service-card ${isServiceSelected(service.id) ? 'selected' : ''}`}
@@ -776,6 +797,11 @@ const BookingPage = () => {
                       <div className="service-card-image">
                         <img src={service.image_url} alt={service.name} loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
                       </div>
+                    )}
+                    {service._salesCount > 0 && (
+                      <span style={{ position: 'absolute', top: service.image_url ? '8px' : '8px', right: '8px', background: 'var(--color-accent, #1B5E37)', color: '#fff', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                        Best Seller
+                      </span>
                     )}
                     <div className="service-category">{service.category}</div>
                     <h3 className="service-name">{service.name}</h3>
@@ -795,6 +821,36 @@ const BookingPage = () => {
                 ))
               )}
             </div>
+            {/* See More button */}
+            {!searchTerm.trim() && filteredServices.length > 9 && !showAllServices && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <button
+                  onClick={() => setShowAllServices(true)}
+                  style={{
+                    background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
+                    padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem',
+                    fontWeight: '500', transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => { e.target.style.borderColor = 'var(--color-accent, #1B5E37)'; e.target.style.color = 'var(--color-accent, #1B5E37)'; }}
+                  onMouseOut={e => { e.target.style.borderColor = '#d1d5db'; e.target.style.color = '#555'; }}
+                >
+                  See More Services ({filteredServices.length - 9} more)
+                </button>
+              </div>
+            )}
+            {showAllServices && filteredServices.length > 9 && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <button
+                  onClick={() => setShowAllServices(false)}
+                  style={{
+                    background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
+                    padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem'
+                  }}
+                >
+                  Show Less
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Therapist Selection — only show when branch is selected and has therapists */}

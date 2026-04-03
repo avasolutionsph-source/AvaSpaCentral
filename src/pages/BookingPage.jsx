@@ -1058,6 +1058,12 @@ const BookingPage = () => {
                     .map(therapist => {
                       const rank = selectedTherapists.indexOf(therapist.id);
                       const isSelected = rank !== -1;
+                      // Get shift hours for selected date
+                      const schedule = shiftSchedules.find(s => s.employee_id === therapist.id);
+                      const weeklySchedule = schedule?.schedule?.weeklySchedule || schedule?.schedule;
+                      const dayKey = selectedDate ? dayNames[new Date(selectedDate + 'T12:00:00').getDay()].toLowerCase() : null;
+                      const dayShift = dayKey && weeklySchedule ? weeklySchedule[dayKey] : null;
+                      const formatShiftTime = (t) => { if (!t) return ''; const [h, m] = t.split(':').map(Number); const hr = h === 0 ? 12 : h > 12 ? h - 12 : h; return `${hr}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`; };
                       return (
                         <label
                           key={therapist.id}
@@ -1099,10 +1105,16 @@ const BookingPage = () => {
                             {/* Details */}
                             <div style={{ flex: 1 }}>
                               <strong style={{ fontSize: '0.95rem' }}>{therapist.first_name} {therapist.last_name}</strong>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '2px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '2px', flexWrap: 'wrap' }}>
                                 <span style={{ color: '#f59e0b', fontSize: '0.8rem' }}>★ {therapist.avg_rating || '5.0'}</span>
                                 <span style={{ color: '#ccc' }}>·</span>
                                 <span style={{ color: '#888', fontSize: '0.8rem' }}>{therapist.services_completed || 0} services</span>
+                                {dayShift?.startTime && dayShift?.endTime && (
+                                  <>
+                                    <span style={{ color: '#ccc' }}>·</span>
+                                    <span style={{ color: '#16a34a', fontSize: '0.8rem' }}>{formatShiftTime(dayShift.startTime)} – {formatShiftTime(dayShift.endTime)}</span>
+                                  </>
+                                )}
                               </div>
                               <small style={{ color: '#aaa', fontSize: '0.75rem' }}>{therapist.position}</small>
                             </div>

@@ -321,7 +321,12 @@ const BookingPage = () => {
             const hoursRes = await fetch(hoursUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
             if (hoursRes.ok) {
               const hoursData = await hoursRes.json();
-              if (hoursData?.[0]?.value) setBusinessHours(hoursData[0].value);
+              console.log('[BookingPage] Business hours data:', hoursData);
+              if (hoursData?.[0]?.value) {
+                setBusinessHours(hoursData[0].value);
+              }
+            } else {
+              console.warn('[BookingPage] Business hours fetch status:', hoursRes.status);
             }
           } catch (err) { console.warn('Failed to fetch business hours:', err); }
 

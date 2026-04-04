@@ -81,6 +81,7 @@ const BookingPage = () => {
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [sortBy, setSortBy] = useState('best-sellers');
   const [showAllServices, setShowAllServices] = useState(false);
 
   // Current step (for mobile wizard view)
@@ -407,7 +408,7 @@ const BookingPage = () => {
     return cats.filter(Boolean).sort();
   }, [services]);
 
-  // Filter services based on search and category
+  // Filter services based on search, category, and sort
   const filteredServices = useMemo(() => {
     let filtered = services;
 
@@ -424,8 +425,24 @@ const BookingPage = () => {
       );
     }
 
+    // Sort
+    filtered = [...filtered];
+    switch (sortBy) {
+      case 'best-sellers':
+        filtered.sort((a, b) => (b._salesCount || 0) - (a._salesCount || 0));
+        break;
+      case 'price-low':
+        filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+        break;
+      case 'price-high':
+        filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+        break;
+      default:
+        break;
+    }
+
     return filtered;
-  }, [services, selectedCategory, searchTerm]);
+  }, [services, selectedCategory, searchTerm, sortBy]);
 
   // Calculate transport fee based on service location
   const transportFee = useMemo(() => {
@@ -919,13 +936,24 @@ const BookingPage = () => {
 
             {/* Search & Filter */}
             <div className="booking-filters">
-              <input
-                type="text"
-                placeholder="Search services..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="booking-search"
-              />
+              <div className="booking-search-row">
+                <input
+                  type="text"
+                  placeholder="Search services..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="booking-search"
+                />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="booking-sort-select"
+                >
+                  <option value="best-sellers">⭐ Best Sellers</option>
+                  <option value="price-low">₱ Price: Low to High</option>
+                  <option value="price-high">₱ Price: High to Low</option>
+                </select>
+              </div>
               <div className="booking-categories">
                 <button
                   className={`category-btn ${selectedCategory === 'all' ? 'active' : ''}`}

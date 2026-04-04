@@ -696,8 +696,15 @@
   margin-bottom: 1.5rem;
 }
 
+.booking-search-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
 .booking-search {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 0.75rem 1rem;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -708,6 +715,47 @@
 .booking-search:focus {
   outline: none;
   border-color: var(--color-accent, #1B5E37);
+}
+
+.booking-sort-select {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  white-space: nowrap;
+  color: #333;
+  min-width: 180px;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 2rem;
+}
+
+.booking-sort-select:focus {
+  outline: none;
+  border-color: var(--color-accent, #1B5E37);
+}
+
+.booking-sort-select:hover {
+  border-color: var(--color-accent, #1B5E37);
+}
+
+@media (max-width: 480px) {
+  .booking-search-row {
+    flex-direction: column;
+  }
+
+  .booking-sort-select {
+    min-width: unset;
+    width: 100%;
+  }
 }
 
 .booking-categories {

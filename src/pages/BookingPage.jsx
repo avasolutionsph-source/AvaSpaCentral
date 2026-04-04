@@ -936,40 +936,46 @@ const BookingPage = () => {
 
             {/* Search & Filter */}
             <div className="booking-filters">
-              <div className="booking-search-row">
-                <input
-                  type="text"
-                  placeholder="Search services..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="booking-search"
-                />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="booking-sort-select"
-                >
-                  <option value="best-sellers">⭐ Best Sellers</option>
-                  <option value="price-low">₱ Price: Low to High</option>
-                  <option value="price-high">₱ Price: High to Low</option>
-                </select>
-              </div>
-              <div className="booking-categories">
-                <button
-                  className={`category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory('all')}
-                >
-                  All
-                </button>
-                {categories.map(cat => (
+              <input
+                type="text"
+                placeholder="Search services..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="booking-search"
+              />
+              <div className="booking-filter-row">
+                <div className="booking-categories">
                   <button
-                    key={cat}
-                    className={`category-btn ${selectedCategory === cat ? 'active' : ''}`}
-                    onClick={() => setSelectedCategory(cat)}
+                    className={`category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
+                    onClick={() => setSelectedCategory('all')}
                   >
-                    {cat}
+                    All
                   </button>
-                ))}
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      className={`category-btn ${selectedCategory === cat ? 'active' : ''}`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <div className="booking-sort-pills">
+                  {[
+                    { value: 'best-sellers', label: 'Best Sellers' },
+                    { value: 'price-low', label: '₱ Low-High' },
+                    { value: 'price-high', label: '₱ High-Low' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      className={`sort-pill ${sortBy === opt.value ? 'active' : ''}`}
+                      onClick={() => setSortBy(opt.value)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

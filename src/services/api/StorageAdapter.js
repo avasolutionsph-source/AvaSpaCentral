@@ -1142,8 +1142,8 @@ export const attendanceAdapter = {
       if (schedule?.weeklySchedule) {
         const dayShift = schedule.weeklySchedule[todayDay];
 
-        // Block clock-in on day off
-        if (dayShift?.shift === 'off' || !dayShift?.shift) {
+        // Block clock-in only on explicitly marked day off
+        if (dayShift?.shift === 'off') {
           throw new Error(`Cannot clock in - today (${todayDay}) is a scheduled day off`);
         }
 

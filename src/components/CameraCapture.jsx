@@ -34,40 +34,72 @@ const CameraCapture = ({ onCapture, onCancel, isOpen }) => {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: new Date().toISOString()
-        });
-        setIsLoadingLocation(false);
-      },
-      (error) => {
-        let errorMessage = 'Unable to get location';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location permission denied. Please enable location access.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information unavailable';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out';
-            break;
-          default:
-            errorMessage = 'An unknown error occurred';
-        }
-        setLocationError(errorMessage);
-        setIsLoadingLocation(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+    // Try high accuracy first, then fallback to low accuracy if it fails
+    const onSuccess = (position) => {
+      setLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: new Date().toISOString()
+      });
+      setIsLoadingLocation(false);
+    };
+
+    const onError = (error) => {
+      // If high accuracy failed, try again with low accuracy (network-based)
+      if (error.code === error.TIMEOUT || error.code === error.POSITION_UNAVAILABLE) {
+        navigator.geolocation.getCurrentPosition(
+          onSuccess,
+          (fallbackError) => {
+            let errorMessage = 'Unable to get location';
+            switch (fallbackError.code) {
+              case fallbackError.PERMISSION_DENIED:
+                errorMessage = 'Location permission denied. Please enable location access in your browser AND device settings.';
+                break;
+              case fallbackError.POSITION_UNAVAILABLE:
+                errorMessage = 'Location information unavailable. Please check if location/GPS is enabled on your device.';
+                break;
+              case fallbackError.TIMEOUT:
+                errorMessage = 'Location request timed out. Please check your internet connection and try again.';
+                break;
+              default:
+                errorMessage = 'An unknown error occurred';
+            }
+            setLocationError(errorMessage);
+            setIsLoadingLocation(false);
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 15000,
+            maximumAge: 60000 // Allow cached location up to 1 minute old
+          }
+        );
+        return;
       }
-    );
+
+      let errorMessage = 'Unable to get location';
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage = 'Location permission denied. Please enable location access in your browser AND device settings.';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = 'Location information unavailable. Please check if location/GPS is enabled on your device.';
+          break;
+        case error.TIMEOUT:
+          errorMessage = 'Location request timed out. Please check your internet connection and try again.';
+          break;
+        default:
+          errorMessage = 'An unknown error occurred';
+      }
+      setLocationError(errorMessage);
+      setIsLoadingLocation(false);
+    };
+
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 30000 // Allow cached location up to 30 seconds old
+    });
   }, [isOpen]);
 
   // Start camera

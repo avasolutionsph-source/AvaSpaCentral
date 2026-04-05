@@ -58,7 +58,7 @@ export const mockDatabase = {
 
   // Shift Configuration - Keep defaults for functionality
   shiftConfig: {
-    dayShift: { startTime: '09:00', endTime: '17:00', label: 'Day Shift', color: '#10b981' },
+    dayShift: { startTime: '09:00', endTime: '20:00', label: 'Day Shift', color: '#10b981' },
     nightShift: { startTime: '13:00', endTime: '21:00', label: 'Night Shift', color: '#6366f1' },
     wholeDayShift: { startTime: '09:00', endTime: '21:00', label: 'Whole Day', color: '#f59e0b' },
     off: { startTime: null, endTime: null, label: 'Day Off', color: '#6b7280' }

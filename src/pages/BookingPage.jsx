@@ -621,12 +621,11 @@ const BookingPage = () => {
   const isDayClosed = selectedDayHours && !selectedDayHours.enabled;
 
   const timeSlots = useMemo(() => {
-    let openTime = '09:00';
-    let closeTime = '20:00';
-    if (selectedDayHours && selectedDayHours.enabled) {
-      openTime = selectedDayHours.open || '09:00';
-      closeTime = selectedDayHours.close || '20:00';
+    if (!selectedDayHours || !selectedDayHours.enabled || !selectedDayHours.open || !selectedDayHours.close) {
+      return [];
     }
+    let openTime = selectedDayHours.open;
+    let closeTime = selectedDayHours.close;
     const [openH, openM] = openTime.split(':').map(Number);
     const [closeH, closeM] = closeTime.split(':').map(Number);
     let closeMins = closeH * 60 + closeM;

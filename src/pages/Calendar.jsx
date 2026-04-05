@@ -226,8 +226,8 @@ const Calendar = () => {
                     employeeName,
                     date: format(shiftDate, 'yyyy-MM-dd'),
                     shiftType: shift.type || shift,
-                    startTime: shift.start || (shift === 'D' || shift.type === 'day' ? '09:00' : '13:00'),
-                    endTime: shift.end || (shift === 'D' || shift.type === 'day' ? '17:00' : '21:00'),
+                    startTime: shift.start || shift.startTime || null,
+                    endTime: shift.end || shift.endTime || null,
                     status: 'scheduled'
                   });
                 }
@@ -242,8 +242,8 @@ const Calendar = () => {
               employeeName,
               date: schedule.date,
               shiftType: schedule.shiftType || 'day',
-              startTime: schedule.startTime || '09:00',
-              endTime: schedule.endTime || '17:00',
+              startTime: schedule.startTime || null,
+              endTime: schedule.endTime || null,
               status: schedule.status || 'scheduled'
             });
           }

@@ -152,13 +152,10 @@ const MainLayout = () => {
           const attendance = await mockApi.attendance.getAttendance();
           const employees = await mockApi.employees.getEmployees();
 
-          // Late arrivals today
+          // Late arrivals today - use stored status from attendance record
           const lateArrivals = attendance.filter(a => {
             if (new Date(a.date).toDateString() !== todayStr) return false;
-            if (!a.clockIn) return false;
-            const clockInTime = a.clockIn.split(':');
-            const clockInMinutes = parseInt(clockInTime[0]) * 60 + parseInt(clockInTime[1]);
-            return clockInMinutes > 9 * 60; // After 9:00 AM
+            return a.status === 'late';
           });
 
           if (lateArrivals.length > 0) {

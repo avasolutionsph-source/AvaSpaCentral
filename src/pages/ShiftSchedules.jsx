@@ -212,13 +212,17 @@ const ShiftSchedules = () => {
   // Add employee to schedule
   const handleAddEmployeeToSchedule = async (employee) => {
     try {
-      // Create default weekly schedule (all day shifts)
+      // Create default weekly schedule (all day shifts) - requires shift config to be set up
+      if (!shiftConfig?.dayShift?.startTime || !shiftConfig?.dayShift?.endTime) {
+        showToast('Day shift times are not configured. Please set up shift times in Settings first.', 'error');
+        return;
+      }
       const defaultWeeklySchedule = {};
       DAYS.forEach(day => {
         defaultWeeklySchedule[day] = {
           shift: day === 'sunday' ? 'off' : 'day',
-          startTime: day === 'sunday' ? null : (shiftConfig?.dayShift?.startTime || '09:00'),
-          endTime: day === 'sunday' ? null : (shiftConfig?.dayShift?.endTime || '17:00')
+          startTime: day === 'sunday' ? null : shiftConfig.dayShift.startTime,
+          endTime: day === 'sunday' ? null : shiftConfig.dayShift.endTime
         };
       });
 
@@ -252,10 +256,14 @@ const ShiftSchedules = () => {
         const config = shiftType === 'day' ? shiftConfig?.dayShift :
                        shiftType === 'night' ? shiftConfig?.nightShift :
                        shiftConfig?.wholeDayShift;
+        if (!config?.startTime || !config?.endTime) {
+          showToast(`${shiftType} shift times are not configured. Please set up shift times in Settings first.`, 'error');
+          return;
+        }
         newWeeklySchedule[day] = {
           shift: shiftType,
-          startTime: config?.startTime || '09:00',
-          endTime: config?.endTime || '17:00'
+          startTime: config.startTime,
+          endTime: config.endTime
         };
       }
     });

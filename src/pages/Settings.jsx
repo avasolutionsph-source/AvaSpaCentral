@@ -287,7 +287,7 @@ const Settings = () => {
               ...(prev.branches?.[branchId] || {}),
               latitude,
               longitude,
-              radius: prev.branches?.[branchId]?.radius || 100,
+              radius: prev.branches?.[branchId]?.radius || 0,
               name: branchName
             }
           }
@@ -323,6 +323,15 @@ const Settings = () => {
   };
 
   const handleSaveGpsConfig = async () => {
+    // Validate that configured branches have all required fields
+    if (gpsConfig.branches) {
+      for (const [branchId, config] of Object.entries(gpsConfig.branches)) {
+        if (config.latitude && config.longitude && !config.radius) {
+          showToast(`Please set a radius for branch "${config.name || branchId}". Radius is required for GPS geofencing.`, 'error');
+          return;
+        }
+      }
+    }
     setGpsSaving(true);
     try {
       await SettingsRepository.set('gpsConfig', gpsConfig);
@@ -1830,8 +1839,9 @@ const Settings = () => {
                             </label>
                             <input
                               type="number"
-                              value={config.radius || 100}
-                              onChange={(e) => handleRadiusChange(branch.id, parseInt(e.target.value) || 100)}
+                              value={config.radius || ''}
+                              onChange={(e) => handleRadiusChange(branch.id, parseInt(e.target.value) || 0)}
+                              placeholder="Set radius..."
                               min="50"
                               max="1000"
                               step="10"

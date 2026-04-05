@@ -17,6 +17,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   const [employees, setEmployees] = useState([]);
   const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
   const [overdueClockOuts, setOverdueClockOuts] = useState([]);
+  const [scheduleMap, setScheduleMap] = useState({});
 
   const [showClockModal, setShowClockModal] = useState(false);
   const [clockType, setClockType] = useState('in'); // 'in' or 'out'
@@ -57,10 +58,10 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const dayOfWeek = dayNames[recordDate.getDay()];
       const dayShift = schedule.weeklySchedule[dayOfWeek];
 
-      if (dayShift?.endTime) {
+      if (dayShift?.endTime && dayShift?.startTime) {
         const [endH, endM] = dayShift.endTime.split(':').map(Number);
         const endMinutes = endH * 60 + endM;
-        const [startH, startM] = (dayShift.startTime || '09:00').split(':').map(Number);
+        const [startH, startM] = dayShift.startTime.split(':').map(Number);
         const startMinutes = startH * 60 + startM;
 
         // Overnight shift: endTime < startTime (e.g., start 20:00, end 06:00)
@@ -72,8 +73,8 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       }
     }
 
-    // No schedule found - use default: consider active if before 8AM
-    return nowMinutes < 480;
+    // No schedule found - not active
+    return false;
   };
 
   const loadData = async () => {
@@ -86,10 +87,11 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       ]);
 
       // Build schedule lookup map (employeeId -> active schedule)
-      const scheduleMap = {};
+      const scheduleMapLocal = {};
       schedules.filter(s => s.isActive).forEach(s => {
-        scheduleMap[String(s.employeeId)] = s;
+        scheduleMapLocal[String(s.employeeId)] = s;
       });
+      setScheduleMap(scheduleMapLocal);
 
       // Filter today's attendance
       const today = format(new Date(), 'yyyy-MM-dd');
@@ -101,7 +103,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
       const overnightRecords = attendance.filter(
-        a => a.date === yesterdayStr && a.clockIn && !a.clockOut && isOvernightShiftActive(a, scheduleMap)
+        a => a.date === yesterdayStr && a.clockIn && !a.clockOut && isOvernightShiftActive(a, scheduleMapLocal)
       );
 
       const userBranchId = getUserBranchId();
@@ -147,16 +149,16 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const overdue = [];
       allVisibleRecords.forEach(record => {
         if (!record.clockIn || record.clockOut) return;
-        const schedule = scheduleMap[String(record.employeeId)];
+        const schedule = scheduleMapLocal[String(record.employeeId)];
         if (!schedule?.weeklySchedule) return;
         const recordDate = new Date(record.date + 'T12:00:00');
         const dayOfWeek = dayNames[recordDate.getDay()];
         const dayShift = schedule.weeklySchedule[dayOfWeek];
-        if (!dayShift?.endTime) return;
+        if (!dayShift?.endTime || !dayShift?.startTime) return;
 
         const [endH, endM] = dayShift.endTime.split(':').map(Number);
         const endMins = endH * 60 + endM;
-        const [startH, startM] = (dayShift.startTime || '09:00').split(':').map(Number);
+        const [startH, startM] = dayShift.startTime.split(':').map(Number);
         const startMins = startH * 60 + startM;
 
         const isOvernight = endMins < startMins;
@@ -245,35 +247,37 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const branchId = getUserBranchId();
       const captureWithBranch = { ...captureData, ...(branchId && { branchId }) };
 
-      // 2. Check GPS geofencing
+      // 2. Check GPS geofencing - requires proper setup
       let isOutOfRange = false;
+      const activeBranchId = branchId || user?.branchId;
+
       try {
         const gpsConfig = await SettingsRepository.get('gpsConfig');
-        if (gpsConfig && gpsConfig.branches) {
-          // Find the branch config - use user's branchId or selectedBranch
-          const activeBranchId = branchId || user?.branchId;
-          // Try to find by branchId
-          let branchGps = null;
-          if (activeBranchId && gpsConfig.branches[activeBranchId]) {
-            branchGps = gpsConfig.branches[activeBranchId];
-          }
-
-          if (branchGps && branchGps.latitude && branchGps.longitude) {
+        if (!gpsConfig || !gpsConfig.branches) {
+          showToast('GPS geofencing is not configured. Please set up GPS settings in the Settings page first.', 'warning');
+        } else if (!activeBranchId) {
+          showToast('No branch assigned. GPS geofencing cannot be validated.', 'warning');
+        } else {
+          const branchGps = gpsConfig.branches[activeBranchId];
+          if (!branchGps || !branchGps.latitude || !branchGps.longitude) {
+            showToast('Branch GPS location is not set up. Please configure the branch location in Settings > GPS Geofencing.', 'warning');
+          } else if (!branchGps.radius) {
+            showToast('GPS radius is not configured for this branch. Please set the allowed radius in Settings > GPS Geofencing.', 'warning');
+          } else {
             const distance = calculateDistance(
               captureData.location.latitude,
               captureData.location.longitude,
               branchGps.latitude,
               branchGps.longitude
             );
-            const radius = branchGps.radius || 100;
-            if (distance > radius) {
+            if (distance > branchGps.radius) {
               isOutOfRange = true;
             }
           }
-          // If no branch GPS configured, allow freely
         }
       } catch (err) {
-        console.warn('GPS config check failed, allowing attendance:', err);
+        console.warn('GPS config check failed:', err);
+        showToast('Failed to check GPS config. Please verify GPS settings are configured.', 'warning');
       }
 
       // Add out of range flag to capture data
@@ -332,7 +336,25 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const clockInParts = record.clockIn.split(':');
       const clockInHour = parseInt(clockInParts[0]);
       const clockInMin = parseInt(clockInParts[1]);
-      const isLate = clockInHour > 9 || (clockInHour === 9 && clockInMin > 0);
+      const clockInMinutes = clockInHour * 60 + clockInMin;
+
+      // Use actual shift schedule start time - schedule is required
+      const schedule = scheduleMap[String(record.employeeId)];
+      if (!schedule?.weeklySchedule) {
+        showToast('Cannot approve - employee has no shift schedule set up.', 'error');
+        return;
+      }
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const recordDate = new Date(record.date + 'T12:00:00');
+      const dayOfWeek = dayNames[recordDate.getDay()];
+      const dayShift = schedule.weeklySchedule[dayOfWeek];
+      if (!dayShift?.startTime) {
+        showToast('Cannot approve - shift start time is not configured for this day.', 'error');
+        return;
+      }
+      const [startH, startM] = dayShift.startTime.split(':').map(Number);
+      const shiftStartMinutes = startH * 60 + startM;
+      const isLate = clockInMinutes > shiftStartMinutes;
 
       await mockApi.attendance.updateAttendance(record._id, {
         status: isLate ? 'late' : 'present',
@@ -377,12 +399,25 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   const getAttendanceStatus = (record) => {
     if (!record.clockIn) return 'absent';
 
-    const clockInTime = parseISO(`${record.date}T${record.clockIn}`);
-    const expectedTime = parseISO(`${record.date}T09:00:00`); // 9 AM expected time
-
-    if (isAfter(clockInTime, expectedTime)) {
-      return 'late';
+    // Use the status already calculated during clock-in (based on actual shift schedule)
+    if (record.status === 'late' || record.status === 'present' || record.status === 'pending_approval') {
+      return record.status;
     }
+
+    // Fallback: use schedule data if status not set
+    const schedule = scheduleMap[String(record.employeeId)];
+    if (schedule?.weeklySchedule) {
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const recordDate = new Date(record.date + 'T12:00:00');
+      const dayOfWeek = dayNames[recordDate.getDay()];
+      const dayShift = schedule.weeklySchedule[dayOfWeek];
+      if (dayShift?.startTime) {
+        const clockInTime = parseISO(`${record.date}T${record.clockIn}`);
+        const expectedTime = parseISO(`${record.date}T${dayShift.startTime}:00`);
+        return isAfter(clockInTime, expectedTime) ? 'late' : 'present';
+      }
+    }
+
     return 'present';
   };
 
@@ -405,7 +440,10 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   };
 
   const getEmployeeRecord = (employeeId) => {
-    return todayAttendance.find(a => a.employee && a.employee._id === employeeId);
+    return todayAttendance.find(a =>
+      (a.employee && String(a.employee._id) === String(employeeId)) ||
+      String(a.employeeId) === String(employeeId)
+    );
   };
 
   const hasPhotos = (record) => {

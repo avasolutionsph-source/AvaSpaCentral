@@ -157,30 +157,35 @@ const MyPortal = () => {
         captureWithBranch.branchId = activeBranchId;
       }
 
-      // GPS geofencing check
+      // GPS geofencing check - requires proper setup
       let isOutOfRange = false;
       try {
         const gpsConfig = await SettingsRepository.get('gpsConfig');
-        if (gpsConfig && captureData.location) {
-          let branchGps = null;
-          if (activeBranchId && gpsConfig.branches[activeBranchId]) {
-            branchGps = gpsConfig.branches[activeBranchId];
-          }
-          if (branchGps && branchGps.latitude && branchGps.longitude) {
+        if (!gpsConfig || !gpsConfig.branches) {
+          showToast('GPS geofencing is not configured. Please ask your manager to set up GPS settings.', 'warning');
+        } else if (!activeBranchId) {
+          showToast('No branch assigned. GPS geofencing cannot be validated.', 'warning');
+        } else {
+          const branchGps = gpsConfig.branches[activeBranchId];
+          if (!branchGps || !branchGps.latitude || !branchGps.longitude) {
+            showToast('Branch GPS location is not set up. Please ask your manager to configure it in Settings.', 'warning');
+          } else if (!branchGps.radius) {
+            showToast('GPS radius is not configured for this branch. Please ask your manager to set it up.', 'warning');
+          } else if (captureData.location) {
             const distance = calculateDistance(
               captureData.location.latitude,
               captureData.location.longitude,
               branchGps.latitude,
               branchGps.longitude
             );
-            const radius = branchGps.radius || 100;
-            if (distance > radius) {
+            if (distance > branchGps.radius) {
               isOutOfRange = true;
             }
           }
         }
       } catch (err) {
-        console.warn('GPS config check failed, allowing attendance:', err);
+        console.warn('GPS config check failed:', err);
+        showToast('Failed to check GPS config. Please contact your manager.', 'warning');
       }
 
       captureWithBranch.isOutOfRange = isOutOfRange;

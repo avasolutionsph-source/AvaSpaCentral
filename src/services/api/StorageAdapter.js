@@ -1131,42 +1131,41 @@ export const attendanceAdapter = {
     // Get employee info
     const employee = await storageService.employees.getById(employeeId);
 
-    // Check shift schedule for validation
+    // Check shift schedule for validation - schedule MUST exist
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const todayDay = dayNames[now.getDay()];
-    let isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
+    let isLate = false;
     let shiftWarning = null;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-    try {
-      const schedule = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
-      if (schedule?.weeklySchedule) {
-        const dayShift = schedule.weeklySchedule[todayDay];
+    const schedule = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
+    if (!schedule?.weeklySchedule) {
+      throw new Error('No shift schedule set up for this employee. Please set up a shift schedule first in the Shift Schedules page.');
+    }
 
-        // Block clock-in only on explicitly marked day off
-        if (dayShift?.shift === 'off') {
-          throw new Error(`Cannot clock in - today (${todayDay}) is a scheduled day off`);
-        }
+    const dayShift = schedule.weeklySchedule[todayDay];
 
-        if (dayShift?.startTime) {
-          const [startH, startM] = dayShift.startTime.split(':').map(Number);
-          const shiftStartMinutes = startH * 60 + startM;
-          const nowMinutes = now.getHours() * 60 + now.getMinutes();
-          isLate = nowMinutes > shiftStartMinutes;
+    // Block clock-in on day off
+    if (!dayShift || dayShift.shift === 'off') {
+      throw new Error(`Cannot clock in - today (${todayDay}) is a scheduled day off`);
+    }
 
-          // Warn if clocking in too early (more than 2 hours before shift)
-          const earlyThreshold = shiftStartMinutes - 120;
-          if (nowMinutes < earlyThreshold) {
-            shiftWarning = `early_clockin|${dayShift.startTime}`;
-          }
-          // Warn if clocking in very late (more than 1 hour after shift start)
-          if (nowMinutes > shiftStartMinutes + 60) {
-            shiftWarning = `very_late|${dayShift.startTime}`;
-          }
-        }
-      }
-    } catch (e) {
-      if (e.message.includes('day off')) throw e;
-      // Fall back to default 9AM threshold
+    if (!dayShift.startTime) {
+      throw new Error('Shift start time is not configured for today. Please update the shift schedule.');
+    }
+
+    const [startH, startM] = dayShift.startTime.split(':').map(Number);
+    const shiftStartMinutes = startH * 60 + startM;
+    isLate = nowMinutes > shiftStartMinutes;
+
+    // Warn if clocking in too early (more than 2 hours before shift)
+    const earlyThreshold = shiftStartMinutes - 120;
+    if (nowMinutes < earlyThreshold) {
+      shiftWarning = `early_clockin|${dayShift.startTime}`;
+    }
+    // Warn if clocking in very late (more than 1 hour after shift start)
+    if (nowMinutes > shiftStartMinutes + 60) {
+      shiftWarning = `very_late|${dayShift.startTime}`;
     }
 
     const record = await storageService.attendance.create({
@@ -1205,6 +1204,12 @@ export const attendanceAdapter = {
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const nowTime = now.toTimeString().slice(0, 5); // HH:mm format
     const empId = String(employeeId);
+
+    // Validate shift schedule exists
+    const schedule = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
+    if (!schedule?.weeklySchedule) {
+      throw new Error('No shift schedule set up for this employee. Please set up a shift schedule first in the Shift Schedules page.');
+    }
 
     // First try today's records
     let existing = await storageService.attendance.find(
@@ -1767,7 +1772,7 @@ export const shiftSchedulesAdapter = {
     const employee = await storageService.employees.getById(employeeId);
     if (!employee) throw new Error('Employee not found');
 
-    // Get shift times from saved config (not mockDatabase defaults)
+    // Get shift times from saved config
     const savedConfig = await SettingsRepository.get('shiftConfig');
     const config = savedConfig || mockDatabase.shiftConfig;
     const weeklySchedule = {};
@@ -1778,10 +1783,13 @@ export const shiftSchedulesAdapter = {
         weeklySchedule[day] = { shift: 'off', startTime: null, endTime: null };
       } else {
         const shiftConf = config[shiftType];
+        if (!shiftConf?.startTime || !shiftConf?.endTime) {
+          throw new Error(`Shift type "${shiftType}" is not configured. Please set up shift times in Settings first.`);
+        }
         weeklySchedule[day] = {
           shift: shiftType,
-          startTime: shiftConf?.startTime || '09:00',
-          endTime: shiftConf?.endTime || '17:00'
+          startTime: shiftConf.startTime,
+          endTime: shiftConf.endTime
         };
       }
     });

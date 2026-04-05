@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import OfflineIndicator from './OfflineIndicator';
+import { formatTime12Hour } from '../utils/dateUtils';
 
 const MainLayout = () => {
   const { user, logout, hasPermission, selectedBranch, clearBranch } = useApp();
@@ -166,7 +167,7 @@ const MainLayout = () => {
               message: `${lateArrivals.length} employee${lateArrivals.length > 1 ? 's' : ''} arrived late`,
               details: lateArrivals.slice(0, 3).map(a => {
                 const emp = employees.find(e => e.id === a.employeeId);
-                return emp ? `${emp.firstName} ${emp.lastName} at ${a.clockIn}` : `Employee at ${a.clockIn}`;
+                return emp ? `${emp.firstName} ${emp.lastName} at ${formatTime12Hour(a.clockIn)}` : `Employee at ${formatTime12Hour(a.clockIn)}`;
               }),
               action: '/attendance',
               actionLabel: 'View Attendance',

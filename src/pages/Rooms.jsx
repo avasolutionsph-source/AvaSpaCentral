@@ -1180,7 +1180,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                   <p className="booking-datetime">
                     📅 {format(parseISO(booking.bookingDateTime), 'MMM dd, yyyy')}
                     <br />
-                    ⏰ {format(parseISO(booking.bookingDateTime), 'HH:mm')}
+                    ⏰ {format(parseISO(booking.bookingDateTime), 'h:mm a')}
                   </p>
                   {booking.specialRequests && (
                     <p className="special-note">💬 {booking.specialRequests}</p>

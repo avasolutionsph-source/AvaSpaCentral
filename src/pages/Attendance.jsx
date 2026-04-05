@@ -7,6 +7,7 @@ import CameraCapture from '../components/CameraCapture';
 import { LazyImage } from '../components/OptimizedImage';
 import { logClockIn, logClockOut } from '../utils/activityLogger';
 import { SettingsRepository } from '../services/storage/repositories';
+import { formatTime12Hour, formatTimeRange } from '../utils/dateUtils';
 
 const Attendance = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
@@ -450,6 +451,18 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     return record && (record.clockInPhoto || record.clockOutPhoto);
   };
 
+  // Get employee's shift for today
+  const getEmployeeShift = (employeeId) => {
+    const schedule = scheduleMap[String(employeeId)];
+    if (!schedule?.weeklySchedule) return null;
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const today = new Date();
+    const dayOfWeek = dayNames[today.getDay()];
+    const dayShift = schedule.weeklySchedule[dayOfWeek];
+    if (!dayShift || dayShift.shift === 'off') return { label: 'Off', startTime: null, endTime: null };
+    return dayShift;
+  };
+
   const openPhotoViewer = (record) => {
     setSelectedRecord(record);
     setShowPhotoModal(true);
@@ -526,10 +539,10 @@ const Attendance = ({ embedded = false, onDataChange }) => {
           {overdueClockOuts.map((record, idx) => (
             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < overdueClockOuts.length - 1 ? '1px solid #fcd34d' : 'none' }}>
               <span style={{ fontSize: '0.85rem', color: '#78350f' }}>
-                <strong>{record.employeeName}</strong> — clocked in at {record.clockIn}
+                <strong>{record.employeeName}</strong> — clocked in at {formatTime12Hour(record.clockIn)}
               </span>
               <span style={{ fontSize: '0.8rem', color: '#b45309' }}>
-                Shift ended at {record.shiftEndTime}
+                Shift ended at {formatTime12Hour(record.shiftEndTime)}
               </span>
             </div>
           ))}
@@ -607,6 +620,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
           <thead>
             <tr>
               <th>Employee</th>
+              <th>Shift</th>
               <th>Status</th>
               <th>Clock In</th>
               <th>Clock Out</th>
@@ -648,16 +662,24 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                       </div>
                     </div>
                   </td>
+                  <td style={{ fontSize: '0.8rem', color: '#666' }}>
+                    {(() => {
+                      const shift = getEmployeeShift(employee._id);
+                      if (!shift) return '-';
+                      if (shift.label === 'Off') return 'Off';
+                      return shift.startTime && shift.endTime ? formatTimeRange(shift.startTime, shift.endTime) : '-';
+                    })()}
+                  </td>
                   <td>
                     <span className={`status-badge ${status}`}>
                       {status}
                     </span>
                   </td>
                   <td className={`time-cell ${status}`}>
-                    {record?.clockIn || '-'}
+                    {record?.clockIn ? formatTime12Hour(record.clockIn) : '-'}
                   </td>
                   <td className="time-cell">
-                    {record?.clockOut || '-'}
+                    {record?.clockOut ? formatTime12Hour(record.clockOut) : '-'}
                   </td>
                   <td>
                     {hoursWorked > 0 ? `${hoursWorked}h` : '-'}
@@ -737,8 +759,8 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                     <td>
                       {record.employee ? `${record.employee.firstName} ${record.employee.lastName}` : 'Unknown'}
                     </td>
-                    <td>{record.clockIn || '-'}</td>
-                    <td>{record.clockOut || '-'}</td>
+                    <td>{record.clockIn ? formatTime12Hour(record.clockIn) : '-'}</td>
+                    <td>{record.clockOut ? formatTime12Hour(record.clockOut) : '-'}</td>
                     <td>
                       <span className="status-badge" style={{ background: '#fef3c7', color: '#92400e' }}>
                         Pending Approval
@@ -779,7 +801,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
             </div>
             <div className="modal-body">
               <div className="clock-time-display">
-                <div className="clock-time">{format(currentTime, 'HH:mm:ss')}</div>
+                <div className="clock-time">{format(currentTime, 'h:mm:ss a')}</div>
                 <div className="clock-date">{format(currentTime, 'EEEE, MMMM dd, yyyy')}</div>
               </div>
               <div className="form-group">
@@ -862,7 +884,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                       <div className="photo-meta">
                         <div className="photo-timestamp">
                           <span className="meta-label">Time:</span>
-                          <span className="meta-value">{selectedRecord.clockIn || 'N/A'}</span>
+                          <span className="meta-value">{selectedRecord.clockIn ? formatTime12Hour(selectedRecord.clockIn) : 'N/A'}</span>
                         </div>
                         {selectedRecord.clockInGps && (
                           <div className="photo-location">
@@ -906,7 +928,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                       <div className="photo-meta">
                         <div className="photo-timestamp">
                           <span className="meta-label">Time:</span>
-                          <span className="meta-value">{selectedRecord.clockOut || 'N/A'}</span>
+                          <span className="meta-value">{selectedRecord.clockOut ? formatTime12Hour(selectedRecord.clockOut) : 'N/A'}</span>
                         </div>
                         {selectedRecord.clockOutGps && (
                           <div className="photo-location">

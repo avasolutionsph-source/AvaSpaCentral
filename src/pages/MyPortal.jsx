@@ -13,6 +13,7 @@ import CashAdvanceRequestRepository from '../services/storage/repositories/CashA
 import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
 import { SettingsRepository } from '../services/storage/repositories';
 import { logClockIn, logClockOut } from '../utils/activityLogger';
+import { formatTime12Hour } from '../utils/dateUtils';
 import { format } from 'date-fns';
 import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
@@ -320,7 +321,7 @@ const MyPortal = () => {
                 {todayStatus.label}
                 {todayRecord?.clockIn && (
                   <span style={{ color: '#666', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
-                    (In: {todayRecord.clockIn}{todayRecord.clockOut ? ` - Out: ${todayRecord.clockOut}` : ''})
+                    (In: {formatTime12Hour(todayRecord.clockIn)}{todayRecord.clockOut ? ` - Out: ${formatTime12Hour(todayRecord.clockOut)}` : ''})
                   </span>
                 )}
               </div>

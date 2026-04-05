@@ -208,7 +208,7 @@ const Appointments = () => {
       employeeId: appointment.employeeId || appointment.employee?._id || '',
       roomId: appointment.roomId || appointment.room?._id || '',
       date: format(apptDate, 'yyyy-MM-dd'),
-      time: format(apptDate, 'HH:mm'),
+      time: format(apptDate, 'h:mm a'),
       duration: appointment.duration || 60,
       bookingSource: appointment.bookingSource || 'walk-in',
       notes: appointment.notes || ''
@@ -453,7 +453,7 @@ const Appointments = () => {
                 <div className="calendar-appointments">
                   {dayAppts.slice(0, 3).map(appt => (
                     <div key={appt._id} className={`calendar-appointment-dot ${appt.status}`}>
-                      {format(parseISO(appt.scheduledDateTime), 'HH:mm')} {appt.customer?.name || 'Walk-in'}
+                      {format(parseISO(appt.scheduledDateTime), 'h:mm a')} {appt.customer?.name || 'Walk-in'}
                     </div>
                   ))}
                   {dayAppts.length > 3 && (
@@ -489,7 +489,7 @@ const Appointments = () => {
           return (
             <div key={appointment._id} className="appointment-card">
               <div className={`appointment-time-block ${appointment.status}`}>
-                <div className="appointment-time">{format(apptDate, 'HH:mm')}</div>
+                <div className="appointment-time">{format(apptDate, 'h:mm a')}</div>
                 <div className="appointment-date">{format(apptDate, 'MMM dd, yyyy')}</div>
               </div>
               <div className="appointment-details">

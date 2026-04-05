@@ -482,12 +482,16 @@ export const serviceRotationApi = {
     // Get all employees to join with attendance (attendance records only store employeeId)
     const employees = await db.employees.toArray();
     const employeeMap = {};
-    employees.forEach(e => { employeeMap[e._id] = e; });
+    employees.forEach(e => {
+      employeeMap[String(e._id)] = e;
+      // Also map by id for Supabase records
+      if (e.id) employeeMap[String(e.id)] = e;
+    });
 
-    // Join employee data to attendance records
+    // Join employee data to attendance records (use String comparison for type safety)
     const attendanceWithEmployees = todayAttendance.map(att => ({
       ...att,
-      employee: employeeMap[att.employeeId] || null
+      employee: employeeMap[String(att.employeeId)] || null
     }));
 
     // Sort by clock-in time (earliest first)
@@ -498,15 +502,18 @@ export const serviceRotationApi = {
     });
 
     // Build queue with employee details and service count
-    const queue = attendanceWithEmployees.map((att, index) => ({
-      employeeId: att.employee?._id || att.employeeId,
-      employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
-      position: att.employee?.position || '',
-      clockInTime: att.clockIn,
-      servicesCompleted: rotation.serviceCount[att.employee?._id || att.employeeId] || 0,
-      queuePosition: index + 1,
-      isNext: index === 0 && rotation.lastServed !== (att.employee?._id || att.employeeId)
-    }));
+    const queue = attendanceWithEmployees.map((att, index) => {
+      const empId = String(att.employee?._id || att.employeeId);
+      return {
+        employeeId: empId,
+        employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
+        position: att.employee?.position || '',
+        clockInTime: att.clockIn,
+        servicesCompleted: rotation.serviceCount[empId] || 0,
+        queuePosition: index + 1,
+        isNext: index === 0 && rotation.lastServed !== empId
+      };
+    });
 
     // Determine who should be next based on rotation
     if (queue.length > 0) {

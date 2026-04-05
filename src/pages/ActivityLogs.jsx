@@ -407,7 +407,7 @@ const ActivityLogs = () => {
                         <div className="log-description">{log.description}</div>
                       </div>
                       <div className="log-timestamp">
-                        <div className="log-time">{format(parseISO(log.timestamp), 'HH:mm:ss')}</div>
+                        <div className="log-time">{format(parseISO(log.timestamp), 'h:mm:ss a')}</div>
                         <div className="log-date">{format(parseISO(log.timestamp), 'MMM dd, yyyy')}</div>
                         <span className={`log-severity-badge ${log.severity}`}>{log.severity}</span>
                       </div>
@@ -488,13 +488,13 @@ const ActivityLogs = () => {
                                 {log.details.startTime && (
                                   <div className="service-detail-row">
                                     <span className="service-detail-label">Start Time:</span>
-                                    <span>{format(parseISO(log.details.startTime), 'HH:mm:ss')}</span>
+                                    <span>{format(parseISO(log.details.startTime), 'h:mm:ss a')}</span>
                                   </div>
                                 )}
                                 {log.details.endTime && (
                                   <div className="service-detail-row">
                                     <span className="service-detail-label">End Time:</span>
-                                    <span>{format(parseISO(log.details.endTime), 'HH:mm:ss')}</span>
+                                    <span>{format(parseISO(log.details.endTime), 'h:mm:ss a')}</span>
                                   </div>
                                 )}
                               </div>

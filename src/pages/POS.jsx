@@ -5,7 +5,7 @@ import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
 import { getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog, ManageOrder } from '../components/shared';
 import { logTransaction } from '../utils/activityLogger';
-import { formatTimeRange } from '../utils/dateUtils';
+import { formatTimeRange, formatTime12Hour } from '../utils/dateUtils';
 import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
 import CashDrawerHistoryTab from './CashDrawerHistory';
@@ -230,12 +230,12 @@ const POS = () => {
   const busyEmployeeIds = useMemo(() => {
     return rooms
       .filter(room => (room.status === 'occupied' || room.status === 'pending') && room.assignedEmployeeId)
-      .map(room => room.assignedEmployeeId);
+      .map(room => String(room.assignedEmployeeId));
   }, [rooms]);
 
   // Filter rotation queue to exclude busy employees
   const availableRotationQueue = useMemo(() => {
-    return rotationQueue.filter(emp => !busyEmployeeIds.includes(emp.employeeId));
+    return rotationQueue.filter(emp => !busyEmployeeIds.includes(String(emp.employeeId)));
   }, [rotationQueue, busyEmployeeIds]);
 
   // Select employee from rotation queue
@@ -1235,7 +1235,7 @@ const POS = () => {
                           <div className="rotation-queue-info">
                             <div className="rotation-queue-name">{emp.employeeName}</div>
                             <div className="rotation-queue-details">
-                              <span className="rotation-clock-in">⏰ {emp.clockInTime}</span>
+                              <span className="rotation-clock-in">⏰ {formatTime12Hour(emp.clockInTime)}</span>
                               <span className="rotation-services">🎯 {emp.servicesCompleted} services</span>
                             </div>
                           </div>
@@ -1255,7 +1255,7 @@ const POS = () => {
                         </div>
                       ))}
                     </div>
-                    {nextEmployee && !busyEmployeeIds.includes(nextEmployee.employeeId) && (
+                    {nextEmployee && !busyEmployeeIds.includes(String(nextEmployee.employeeId)) && (
                       <div className="rotation-next-indicator">
                         <strong>Next to serve:</strong> {nextEmployee.employeeName}
                       </div>
@@ -1330,9 +1330,9 @@ const POS = () => {
                     }
 
                     // For regular POS: check if therapist is clocked in and not busy
-                    const inQueue = rotationQueue.find(q => q.employeeId === emp._id);
+                    const inQueue = rotationQueue.find(q => String(q.employeeId) === String(emp._id));
                     const isClockedIn = !!inQueue;
-                    const isBusy = busyEmployeeIds.includes(emp._id);
+                    const isBusy = busyEmployeeIds.includes(String(emp._id));
                     const canSelect = isClockedIn && !isBusy;
                     return (
                       <option

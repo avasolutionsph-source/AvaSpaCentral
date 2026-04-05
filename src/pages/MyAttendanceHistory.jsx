@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, subDays, startOfMonth, endOfMonth, parseISO, differenceInMinutes } from 'date-fns';
 import { LazyImage } from '../components/OptimizedImage';
+import { formatTime12Hour } from '../utils/dateUtils';
 
 const MyAttendanceHistory = ({ embedded = false }) => {
   const { user, showToast } = useApp();
@@ -97,7 +98,7 @@ const MyAttendanceHistory = ({ embedded = false }) => {
 
   const formatTime = (time) => {
     if (!time) return '-';
-    return time;
+    return formatTime12Hour(time);
   };
 
   const calculateHoursWorked = (record) => {
@@ -284,13 +285,13 @@ const MyAttendanceHistory = ({ embedded = false }) => {
                 {selectedRecord.clockInPhoto && (
                   <div className="photo-item">
                     <LazyImage src={selectedRecord.clockInPhoto} alt="Clock In" />
-                    <span className="photo-label">Clock In - {selectedRecord.clockIn}</span>
+                    <span className="photo-label">Clock In - {formatTime12Hour(selectedRecord.clockIn)}</span>
                   </div>
                 )}
                 {selectedRecord.clockOutPhoto && (
                   <div className="photo-item">
                     <LazyImage src={selectedRecord.clockOutPhoto} alt="Clock Out" />
-                    <span className="photo-label">Clock Out - {selectedRecord.clockOut}</span>
+                    <span className="photo-label">Clock Out - {formatTime12Hour(selectedRecord.clockOut)}</span>
                   </div>
                 )}
               </div>

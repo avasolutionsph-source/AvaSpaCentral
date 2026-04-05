@@ -16,6 +16,7 @@ import {
 } from 'date-fns';
 import { advanceBookingApi } from '../mockApi/advanceBookingApi';
 import mockApi from '../mockApi';
+import { formatTime12Hour } from '../utils/dateUtils';
 
 const Calendar = () => {
   const navigate = useNavigate();
@@ -114,9 +115,9 @@ const Calendar = () => {
 
       const transformedAppointments = bookings.map(booking => {
         const bookingDate = new Date(booking.bookingDateTime);
-        const startTime = format(bookingDate, 'HH:mm');
+        const startTime = format(bookingDate, 'h:mm a');
         const endDate = new Date(bookingDate.getTime() + (booking.estimatedDuration || 60) * 60000);
-        const endTime = format(endDate, 'HH:mm');
+        const endTime = format(endDate, 'h:mm a');
 
         return {
           id: booking._id || booking.id,
@@ -832,11 +833,11 @@ const Calendar = () => {
             </div>
             <div className="detail-group">
               <span className="detail-label">Clock In</span>
-              <span className="detail-value">{selectedEvent.clockIn || '-'}</span>
+              <span className="detail-value">{selectedEvent.clockIn ? formatTime12Hour(selectedEvent.clockIn) : '-'}</span>
             </div>
             <div className="detail-group">
               <span className="detail-label">Clock Out</span>
-              <span className="detail-value">{selectedEvent.clockOut || '-'}</span>
+              <span className="detail-value">{selectedEvent.clockOut ? formatTime12Hour(selectedEvent.clockOut) : '-'}</span>
             </div>
             <div className="detail-group">
               <span className="detail-label">Hours Worked</span>

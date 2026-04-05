@@ -331,6 +331,7 @@ const FIELD_NAME_MAP = {
   reorderLevel: 'reorder_level',
   servicesSinceLastAdjustment: 'services_since_last_adjustment',
   imageUrl: 'image_url',
+  displayOrder: 'display_order',
   receiptNumber: 'receipt_number',
   paymentMethod: 'payment_method',
   receiptUrl: 'receipt_url',

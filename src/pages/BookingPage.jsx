@@ -81,7 +81,7 @@ const BookingPage = () => {
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [sortBy, setSortBy] = useState('best-sellers');
+  const [sortBy, setSortBy] = useState('default');
   const [showAllServices, setShowAllServices] = useState(false);
 
   // Current step (for mobile wizard view)
@@ -201,7 +201,7 @@ const BookingPage = () => {
 
           // Fetch active services for this business using direct REST API
           console.log('[BookingPage] Fetching services...');
-          const servicesUrl = `${supabaseUrl}/rest/v1/products?business_id=eq.${actualBusinessId}&type=eq.service&active=eq.true&deleted=eq.false&order=category.asc,name.asc`;
+          const servicesUrl = `${supabaseUrl}/rest/v1/products?business_id=eq.${actualBusinessId}&type=eq.service&active=eq.true&deleted=eq.false&order=display_order.asc.nullslast,category.asc,name.asc`;
           const servicesResponse = await fetch(servicesUrl, {
             method: 'GET',
             headers: {
@@ -428,6 +428,14 @@ const BookingPage = () => {
     // Sort
     filtered = [...filtered];
     switch (sortBy) {
+      case 'default':
+        // Use saved display order (from Manage Order in Products & Services)
+        filtered.sort((a, b) => {
+          const orderA = a.display_order ?? a.displayOrder ?? 9999;
+          const orderB = b.display_order ?? b.displayOrder ?? 9999;
+          return orderA - orderB;
+        });
+        break;
       case 'best-sellers':
         filtered.sort((a, b) => (b._salesCount || 0) - (a._salesCount || 0));
         break;
@@ -962,6 +970,7 @@ const BookingPage = () => {
                 </div>
                 <div className="booking-sort-pills">
                   {[
+                    { value: 'default', label: 'Our Picks' },
                     { value: 'best-sellers', label: 'Best Sellers' },
                     { value: 'price-low', label: '₱ Low-High' },
                     { value: 'price-high', label: '₱ High-Low' },

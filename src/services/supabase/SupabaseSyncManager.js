@@ -118,7 +118,7 @@ const SUPABASE_TABLE_COLUMNS = {
     'id', 'business_id', 'name', 'type', 'category', 'description', 'price',
     'cost', 'duration', 'active', 'stock_quantity', 'reorder_level', 'sku',
     'services_since_last_adjustment', 'image_url', 'hide_from_pos', 'items_used',
-    'metadata', 'sync_status', 'branch_id',
+    'metadata', 'sync_status', 'branch_id', 'display_order',
     'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   rooms: [

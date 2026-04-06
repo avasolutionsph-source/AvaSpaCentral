@@ -805,7 +805,11 @@ const POS = () => {
 
         // Record service in rotation queue
         if (selectedEmployee) {
-          await mockApi.serviceRotation.recordService(selectedEmployee);
+          try {
+            await mockApi.serviceRotation.recordService(selectedEmployee);
+          } catch (error) {
+            console.error('Failed to record service rotation:', error);
+          }
         }
 
         // Mark room as pending (waiting for therapist to start service)
@@ -918,7 +922,8 @@ const POS = () => {
       loadRotationQueue();
 
     } catch (error) {
-      showToast('Failed to process transaction', 'error');
+      console.error('Transaction processing failed:', error);
+      showToast(error?.message || 'Failed to process transaction', 'error');
     } finally {
       setCheckoutLoading(false);
     }

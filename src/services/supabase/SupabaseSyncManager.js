@@ -136,9 +136,12 @@ const SUPABASE_TABLE_COLUMNS = {
   transactions: [
     'id', 'business_id', 'customer_id', 'employee_id', 'date',
     'subtotal', 'discount', 'discount_type', 'tax', 'service_charge',
-    'total', 'payment_method', 'amount_paid', 'change_amount',
+    'total', 'total_amount', 'payment_method', 'amount_paid', 'change_amount',
     'amount_received', 'change_given', 'status', 'items', 'notes',
     'receipt_number', 'gift_certificate_code', 'gift_certificate_amount',
+    'card_transaction_id', 'gcash_reference', 'booking_source',
+    'room_id', 'room_name', 'is_home_service', 'home_service_address',
+    'employee', 'customer',
     'branch_id', 'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   appointments: [
@@ -373,6 +376,14 @@ const FIELD_NAME_MAP = {
   serviceName: 'service_name',
   customerName: 'customer_name',
   totalAmount: 'total_amount',
+  amountReceived: 'amount_received',
+  cardTransactionId: 'card_transaction_id',
+  gcashReference: 'gcash_reference',
+  bookingSource: 'booking_source',
+  roomId: 'room_id',
+  roomName: 'room_name',
+  isHomeService: 'is_home_service',
+  homeServiceAddress: 'home_service_address',
   paymentStatus: 'payment_status',
   overtimeHours: 'overtime_hours',
   lateMinutes: 'late_minutes',

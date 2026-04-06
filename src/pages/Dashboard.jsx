@@ -58,7 +58,7 @@ const Dashboard = () => {
         // Get business settings
         const business = await mockApi.business.getSettings();
         if (!isMounted) return;
-        setDailyGoal(business.settings.dailyGoal);
+        setDailyGoal(business?.settings?.dailyGoal ?? 15000);
 
         // Get today's date (local timezone)
         const now = new Date();
@@ -196,7 +196,7 @@ const Dashboard = () => {
 
       // Get business settings
       const business = await mockApi.business.getSettings();
-      setDailyGoal(business.settings.dailyGoal);
+      setDailyGoal(business?.settings?.dailyGoal ?? 15000);
 
       // Get today's date (local timezone)
       const now = new Date();

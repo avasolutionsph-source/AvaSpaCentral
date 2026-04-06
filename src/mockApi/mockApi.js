@@ -529,6 +529,27 @@ export const serviceRotationApi = {
     };
   },
 
+  // Undo a recorded service (when service is cancelled before completion)
+  async undoService(employeeId) {
+    await delay();
+
+    const today = getTodayDateString();
+    const rotation = await initServiceRotation();
+
+    // Decrement service count (minimum 0)
+    if (rotation.serviceCount[employeeId] > 0) {
+      rotation.serviceCount[employeeId] -= 1;
+    }
+
+    await ServiceRotationRepository.setRotation(today, rotation);
+
+    return {
+      success: true,
+      employeeId,
+      newServiceCount: rotation.serviceCount[employeeId] || 0
+    };
+  },
+
   // Get suggested next employee (for POS auto-selection)
   async getNextEmployee() {
     const queueData = await this.getRotationQueue();

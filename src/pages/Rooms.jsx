@@ -807,6 +807,15 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
           }
         }
 
+        // If cancelled (not ended early), undo the service rotation count
+        if (status === 'cancelled' && room.assignedEmployeeId) {
+          try {
+            await mockApi.serviceRotation.undoService(room.assignedEmployeeId);
+          } catch (err) {
+            console.error('Failed to undo service rotation:', err);
+          }
+        }
+
         // Update room to available
         await mockApi.rooms.updateRoomStatus(room._id, 'available');
         showToast(`Service stopped: ${stopReason}`, 'info');

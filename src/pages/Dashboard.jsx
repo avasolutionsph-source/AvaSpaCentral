@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [showAiInsights, setShowAiInsights] = useState(true);
   const [salaryHealth, setSalaryHealth] = useState(null);
   const [insightsData, setInsightsData] = useState({ products: [], rooms: [] });
+  const [chartData, setChartData] = useState(null);
   const [bookingSlug, setBookingSlug] = useState(null);
   const [branches, setBranches] = useState([]);
 
@@ -81,7 +82,7 @@ const Dashboard = () => {
 
         const val = (i, fallback) => results[i].status === 'fulfilled' ? results[i].value : fallback;
         const todaySummary = val(0, { totalRevenue: 0, averageTransaction: 0, totalTransactions: 0 });
-        const weekSummary = val(1, { totalRevenue: 0 });
+        const weekSummary = val(1, { totalRevenue: 0, byDay: [], byPaymentMethod: {}, byService: [], byBookingSource: {} });
         const monthSummary = val(2, { totalRevenue: 0 });
         let transactions = val(3, []);
         let appointments = val(4, []);
@@ -134,6 +135,12 @@ const Dashboard = () => {
         };
 
         setKpis(kpiData);
+        setChartData({
+          byDay: weekSummary.byDay || [],
+          byPaymentMethod: weekSummary.byPaymentMethod || {},
+          byService: weekSummary.byService || [],
+          byBookingSource: weekSummary.byBookingSource || {}
+        });
         setRecentTransactions(transactions);
         setPendingRevenue(pendingRevenueData.total);
         setTodaysBookings(todaysBookingsCount);
@@ -218,7 +225,7 @@ const Dashboard = () => {
 
       const val = (i, fallback) => results[i].status === 'fulfilled' ? results[i].value : fallback;
       let todaySummary = val(0, { totalRevenue: 0, averageTransaction: 0, totalTransactions: 0 });
-      let weekSummary = val(1, { totalRevenue: 0 });
+      let weekSummary = val(1, { totalRevenue: 0, byDay: [], byPaymentMethod: {}, byService: [], byBookingSource: {} });
       let monthSummary = val(2, { totalRevenue: 0 });
       let transactions = val(3, []);
       let appointments = val(4, []);
@@ -267,6 +274,12 @@ const Dashboard = () => {
       };
 
       setKpis(kpiData);
+      setChartData({
+        byDay: weekSummary.byDay || [],
+        byPaymentMethod: weekSummary.byPaymentMethod || {},
+        byService: weekSummary.byService || [],
+        byBookingSource: weekSummary.byBookingSource || {}
+      });
       setRecentTransactions(transactions);
       setPendingRevenue(pendingRevenueData.total);
       setTodaysBookings(todaysBookingsCount);
@@ -679,51 +692,72 @@ const Dashboard = () => {
     setAlerts(prev => prev.filter(a => a.id !== alertId));
   }, []);
 
-  // Memoized chart data - must be before conditional returns (Rules of Hooks)
-  // Using strict color palette: Primary green #1B5E37, shades of gray
-  const revenueChartData = useMemo(() => ({
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    datasets: [
-      {
+  // Memoized chart data from real transaction data
+  const revenueChartData = useMemo(() => {
+    const byDay = chartData?.byDay || [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    // Build last 7 days labels and data
+    const labels = [];
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      labels.push(dayNames[d.getDay()]);
+      const dayData = byDay.find(day => day.date === dateStr);
+      data.push(dayData ? dayData.revenue : 0);
+    }
+    return {
+      labels,
+      datasets: [{
         label: 'Revenue (₱)',
-        data: [8500, 12000, 10500, 15000, 13500, 18000, 16000],
+        data,
         borderColor: '#1B5E37',
         backgroundColor: 'rgba(27, 94, 55, 0.1)',
-        tension: 0.4
-      }
-    ]
-  }), []);
+        tension: 0.4,
+        fill: true
+      }]
+    };
+  }, [chartData]);
 
-  const bookingSourcesData = useMemo(() => ({
-    labels: ['Walk-in', 'Phone', 'Facebook', 'Instagram', 'Website'],
-    datasets: [
-      {
-        data: [35, 25, 20, 15, 5],
-        backgroundColor: ['#1B5E37', '#145A2C', '#666666', '#999999', '#E0E0E0']
-      }
-    ]
-  }), []);
+  const bookingSourcesData = useMemo(() => {
+    const sources = chartData?.byBookingSource || {};
+    const labels = Object.keys(sources).length > 0 ? Object.keys(sources) : ['No data'];
+    const data = Object.keys(sources).length > 0 ? Object.values(sources) : [1];
+    const colors = ['#1B5E37', '#145A2C', '#666666', '#999999', '#E0E0E0', '#BDBDBD'];
+    return {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors.slice(0, labels.length)
+      }]
+    };
+  }, [chartData]);
 
-  const topServicesData = useMemo(() => ({
-    labels: ['Swedish Massage', 'Hot Stone', 'Facial', 'Body Scrub', 'Thai Massage'],
-    datasets: [
-      {
+  const topServicesData = useMemo(() => {
+    const services = (chartData?.byService || []).slice(0, 5);
+    return {
+      labels: services.length > 0 ? services.map(s => s.name) : ['No data'],
+      datasets: [{
         label: 'Revenue (₱)',
-        data: [96000, 72000, 48600, 35000, 32400],
+        data: services.length > 0 ? services.map(s => s.revenue) : [0],
         backgroundColor: '#1B5E37'
-      }
-    ]
-  }), []);
+      }]
+    };
+  }, [chartData]);
 
-  const paymentMethodsData = useMemo(() => ({
-    labels: ['Cash', 'Card', 'GCash'],
-    datasets: [
-      {
-        data: [50, 30, 20],
+  const paymentMethodsData = useMemo(() => {
+    const methods = chartData?.byPaymentMethod || {};
+    const labels = Object.keys(methods).length > 0 ? Object.keys(methods) : ['No data'];
+    const data = Object.keys(methods).length > 0 ? Object.values(methods) : [1];
+    return {
+      labels,
+      datasets: [{
+        data,
         backgroundColor: ['#1B5E37', '#666666', '#999999']
-      }
-    ]
-  }), []);
+      }]
+    };
+  }, [chartData]);
 
   // Memoized chart options
   const chartOptions = useMemo(() => ({

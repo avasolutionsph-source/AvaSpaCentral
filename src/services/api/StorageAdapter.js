@@ -732,6 +732,16 @@ export const transactionsAdapter = {
       });
     });
 
+    // Group by booking source
+    const byBookingSource = {};
+    transactions.forEach(t => {
+      const source = t.bookingSource || 'Walk-in';
+      if (!byBookingSource[source]) {
+        byBookingSource[source] = 0;
+      }
+      byBookingSource[source]++;
+    });
+
     return {
       period,
       startDate: startDate.toISOString(),
@@ -741,6 +751,7 @@ export const transactionsAdapter = {
       averageTransaction,
       byDay: Object.values(byDay),
       byPaymentMethod,
+      byBookingSource,
       byEmployee: Object.values(byEmployee).sort((a, b) => b.revenue - a.revenue),
       byService: Object.values(byService).sort((a, b) => b.revenue - a.revenue)
     };

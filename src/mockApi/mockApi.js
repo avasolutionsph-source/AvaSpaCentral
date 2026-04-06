@@ -15,6 +15,7 @@
 import mockDatabase from './mockData';
 import { db } from '../db';
 import storageService from '../services/storage';
+import { attendanceAdapter } from '../services/api/StorageAdapter';
 import BusinessConfigRepository from '../services/storage/repositories/BusinessConfigRepository';
 import { PayrollConfigRepository, PayrollConfigLogRepository, ServiceRotationRepository, ProductConsumptionRepository } from '../services/storage/repositories';
 
@@ -459,49 +460,14 @@ export const serviceRotationApi = {
     const rotation = await initServiceRotation();
     const today = getTodayDateString();
 
-    // Use storageService (same as Attendance page) for consistent businessId filtering
-    const allAttendance = await storageService.attendance.getAll();
-    console.log('[RotationQueue] today string:', today, '| allAttendance count:', allAttendance.length);
-    if (allAttendance.length > 0) {
-      const sample = allAttendance[allAttendance.length - 1];
-      console.log('[RotationQueue] Last record:', { _id: sample._id, date: sample.date, dateType: typeof sample.date, clockIn: sample.clockIn, clockOut: sample.clockOut, employeeId: sample.employeeId, businessId: sample.businessId });
-    }
-    // Normalize date comparison - handle both string and Date object from Supabase
+    // Use attendanceAdapter.getAttendance() — exact same path as Attendance page
+    const allAttendance = await attendanceAdapter.getAttendance();
+    // Filter today's clocked-in employees (already enriched with employee data)
     const todayAttendance = allAttendance.filter(a => {
-      const recordDate = typeof a.date === 'string' ? a.date : (a.date instanceof Date ? a.date.toISOString().split('T')[0] : String(a.date));
+      const recordDate = typeof a.date === 'string' ? a.date : String(a.date).split('T')[0];
       return recordDate === today && a.clockIn && !a.clockOut;
     });
-    console.log('[RotationQueue] Matched today + clocked in:', todayAttendance.length);
-
-    // Also include overnight shift workers (clocked in yesterday, still working)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = getTodayDateString.call ? (() => {
-      const y = yesterday;
-      return `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
-    })() : '';
-    const overnightWorkers = allAttendance.filter(a => a.date === yesterdayStr && a.clockIn && !a.clockOut);
-    const todayEmpIds = new Set(todayAttendance.map(a => String(a.employeeId)));
-    overnightWorkers.forEach(a => {
-      if (!todayEmpIds.has(String(a.employeeId))) {
-        todayAttendance.push(a);
-      }
-    });
-
-    // Get all employees to join with attendance (attendance records only store employeeId)
-    const employees = await storageService.employees.getAll();
-    const employeeMap = {};
-    employees.forEach(e => {
-      employeeMap[String(e._id)] = e;
-      // Also map by id for Supabase records
-      if (e.id) employeeMap[String(e.id)] = e;
-    });
-
-    // Join employee data to attendance records (use String comparison for type safety)
-    const attendanceWithEmployees = todayAttendance.map(att => ({
-      ...att,
-      employee: employeeMap[String(att.employeeId)] || null
-    }));
+    const attendanceWithEmployees = todayAttendance;
 
     // Sort by clock-in time (earliest first)
     attendanceWithEmployees.sort((a, b) => {

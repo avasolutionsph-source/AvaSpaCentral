@@ -201,7 +201,7 @@ const BookingPage = () => {
 
           // Fetch active services for this business using direct REST API
           console.log('[BookingPage] Fetching services...');
-          const servicesUrl = `${supabaseUrl}/rest/v1/products?business_id=eq.${actualBusinessId}&type=eq.service&active=eq.true&deleted=eq.false&order=display_order.asc.nullslast,category.asc,name.asc`;
+          const servicesUrl = `${supabaseUrl}/rest/v1/products?business_id=eq.${actualBusinessId}&type=eq.service&active=eq.true&deleted=eq.false&order=display_order.asc,category.asc,name.asc`;
           const servicesResponse = await fetch(servicesUrl, {
             method: 'GET',
             headers: {
@@ -629,11 +629,11 @@ const BookingPage = () => {
   const isDayClosed = selectedDayHours && !selectedDayHours.enabled;
 
   const timeSlots = useMemo(() => {
-    if (!selectedDayHours || !selectedDayHours.enabled || !selectedDayHours.open || !selectedDayHours.close) {
+    if (!selectedDayHours || !selectedDayHours.enabled) {
       return [];
     }
-    let openTime = selectedDayHours.open;
-    let closeTime = selectedDayHours.close;
+    let openTime = selectedDayHours.open || '09:00';
+    let closeTime = selectedDayHours.close || '21:00';
     const [openH, openM] = openTime.split(':').map(Number);
     const [closeH, closeM] = closeTime.split(':').map(Number);
     let closeMins = closeH * 60 + closeM;

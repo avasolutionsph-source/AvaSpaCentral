@@ -1777,12 +1777,20 @@ export const shiftSchedulesAdapter = {
     const config = savedConfig || mockDatabase.shiftConfig;
     const weeklySchedule = {};
 
+    // Map shift type names to config keys
+    const shiftTypeToConfigKey = {
+      day: 'dayShift',
+      night: 'nightShift',
+      wholeDay: 'wholeDayShift'
+    };
+
     Object.keys(template.weeklySchedule).forEach(day => {
       const shiftType = template.weeklySchedule[day].shift;
       if (shiftType === 'off') {
         weeklySchedule[day] = { shift: 'off', startTime: null, endTime: null };
       } else {
-        const shiftConf = config[shiftType];
+        const configKey = shiftTypeToConfigKey[shiftType] || shiftType;
+        const shiftConf = config[configKey];
         if (!shiftConf?.startTime || !shiftConf?.endTime) {
           throw new Error(`Shift type "${shiftType}" is not configured. Please set up shift times in Settings first.`);
         }

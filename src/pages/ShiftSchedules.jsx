@@ -248,18 +248,18 @@ const ShiftSchedules = () => {
 
   // Set all days to a specific shift type (Sunday stays off)
   const setAllDaysToShift = (shiftType) => {
+    const config = shiftType === 'day' ? shiftConfig?.dayShift :
+                   shiftType === 'night' ? shiftConfig?.nightShift :
+                   shiftConfig?.wholeDayShift;
+    if (!config?.startTime || !config?.endTime) {
+      showToast(`${shiftType} shift times are not configured. Please set up shift times in Settings first.`, 'error');
+      return;
+    }
     const newWeeklySchedule = {};
     DAYS.forEach(day => {
       if (day === 'sunday') {
         newWeeklySchedule[day] = { shift: 'off', startTime: null, endTime: null };
       } else {
-        const config = shiftType === 'day' ? shiftConfig?.dayShift :
-                       shiftType === 'night' ? shiftConfig?.nightShift :
-                       shiftConfig?.wholeDayShift;
-        if (!config?.startTime || !config?.endTime) {
-          showToast(`${shiftType} shift times are not configured. Please set up shift times in Settings first.`, 'error');
-          return;
-        }
         newWeeklySchedule[day] = {
           shift: shiftType,
           startTime: config.startTime,
@@ -563,19 +563,19 @@ const ShiftSchedules = () => {
         <span className="legend-title">Legend:</span>
         <div className="legend-items">
           <div className="legend-item">
-            <span className="legend-badge" style={{ backgroundColor: shiftConfig?.dayShift.color }}>D</span>
-            Day ({formatTimeRange(shiftConfig?.dayShift.startTime, shiftConfig?.dayShift.endTime)})
+            <span className="legend-badge" style={{ backgroundColor: shiftConfig?.dayShift?.color }}>D</span>
+            Day ({formatTimeRange(shiftConfig?.dayShift?.startTime, shiftConfig?.dayShift?.endTime)})
           </div>
           <div className="legend-item">
-            <span className="legend-badge" style={{ backgroundColor: shiftConfig?.nightShift.color }}>N</span>
-            Night ({formatTimeRange(shiftConfig?.nightShift.startTime, shiftConfig?.nightShift.endTime)})
+            <span className="legend-badge" style={{ backgroundColor: shiftConfig?.nightShift?.color }}>N</span>
+            Night ({formatTimeRange(shiftConfig?.nightShift?.startTime, shiftConfig?.nightShift?.endTime)})
           </div>
           <div className="legend-item">
-            <span className="legend-badge" style={{ backgroundColor: shiftConfig?.wholeDayShift.color }}>F</span>
-            Whole Day ({formatTimeRange(shiftConfig?.wholeDayShift.startTime, shiftConfig?.wholeDayShift.endTime)})
+            <span className="legend-badge" style={{ backgroundColor: shiftConfig?.wholeDayShift?.color }}>F</span>
+            Whole Day ({formatTimeRange(shiftConfig?.wholeDayShift?.startTime, shiftConfig?.wholeDayShift?.endTime)})
           </div>
           <div className="legend-item">
-            <span className="legend-badge" style={{ backgroundColor: shiftConfig?.off.color }}>OFF</span>
+            <span className="legend-badge" style={{ backgroundColor: shiftConfig?.off?.color }}>OFF</span>
             Day Off
           </div>
         </div>

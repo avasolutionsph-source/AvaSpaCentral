@@ -361,6 +361,19 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       )}
 
 
+      {/* Manage Order button for embedded view */}
+      {embedded && canEditProducts() && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowManageOrder(true)}
+            style={{ fontSize: '0.85rem' }}
+          >
+            ↕ Manage Order
+          </button>
+        </div>
+      )}
+
       {/* Filters */}
       <FilterBar
         searchValue={searchTerm}

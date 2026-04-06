@@ -1028,7 +1028,7 @@ const Dashboard = () => {
           <div className="kpi-items">
             <div className="kpi-item clickable" onClick={() => navigate('/appointments')}>
               <span className="kpi-label">Pay-After Bookings</span>
-              <span className="kpi-value kpi-warning">₱{pendingRevenue.toLocaleString()}</span>
+              <span className="kpi-value kpi-warning">₱{(pendingRevenue ?? 0).toLocaleString()}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Description</span>
@@ -1150,7 +1150,7 @@ const Dashboard = () => {
                     <td>{t.receiptNumber}</td>
                     <td>{new Date(t.date).toLocaleTimeString()}</td>
                     <td>{t.customer?.name || 'Walk-in'}</td>
-                    <td className="amount">₱{t.totalAmount.toLocaleString()}</td>
+                    <td className="amount">₱{(t.totalAmount ?? 0).toLocaleString()}</td>
                     <td><span className="badge">{t.paymentMethod}</span></td>
                   </tr>
                 ))}

@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
 import { LazyImage } from '../components/OptimizedImage';
 import { SettingsRepository } from '../services/storage/repositories';
-import { SyncManager, NetworkDetector } from '../services/sync';
+import { NetworkDetector } from '../services/sync';
 import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
 import db from '../db';
 import ActivityLogsTab from './ActivityLogs';
@@ -1198,7 +1198,7 @@ const Settings = () => {
 
     // Subscribe to sync status changes (debounced to avoid re-renders while typing)
     let syncDebounceTimer = null;
-    const unsubscribeSync = SyncManager.subscribe((status) => {
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
       if (status.type === 'sync_complete' || status.type === 'push_complete' || status.type === 'pull_complete') {
         clearTimeout(syncDebounceTimer);
         syncDebounceTimer = setTimeout(() => {
@@ -1367,7 +1367,7 @@ const Settings = () => {
   // Load current sync status
   const loadSyncStatus = async () => {
     try {
-      const status = await SyncManager.getStatus();
+      const status = await supabaseSyncManager.getStatus();
       setSyncConfig(prev => ({
         ...prev,
         isOnline: status.isOnline,
@@ -1420,7 +1420,7 @@ const Settings = () => {
     if (syncOperation) return;
     setSyncOperation('sync');
     try {
-      const result = await SyncManager.sync();
+      const result = await supabaseSyncManager.sync();
       if (result.success) {
         showToast(`Sync complete: ${result.synced} items synced`, 'success');
       } else {
@@ -1439,7 +1439,7 @@ const Settings = () => {
     if (syncOperation) return;
     setSyncOperation('push');
     try {
-      const result = await SyncManager.forcePush();
+      const result = await supabaseSyncManager.forcePush();
       if (result.success) {
         showToast(`Push complete: ${result.pushed} items pushed`, 'success');
       } else {
@@ -1458,7 +1458,7 @@ const Settings = () => {
     if (syncOperation) return;
     setSyncOperation('pull');
     try {
-      const result = await SyncManager.forcePull(true); // Full sync
+      const result = await supabaseSyncManager.forcePull(); // Full sync
       if (result.success) {
         showToast(`Pull complete: ${result.pulled} items pulled`, 'success');
       } else {
@@ -1477,7 +1477,7 @@ const Settings = () => {
     if (syncOperation) return;
     setSyncOperation('repush');
     try {
-      const result = await SyncManager.forceRepush();
+      const result = await supabaseSyncManager.forceRepush();
       if (result.success) {
         showToast(`Re-push complete: ${result.queued} items queued, ${result.pushed || 0} pushed`, 'success');
       } else {

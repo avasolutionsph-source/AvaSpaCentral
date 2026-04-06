@@ -1067,6 +1067,15 @@ class SupabaseSyncManager {
         case 'INSERT':
         case 'UPDATE':
           const dexieRecord = this._toDexieFormat(newRecord, entityType);
+          // Skip overwrite if there are pending local changes for this entity (same check as _pullChanges)
+          const hasPendingLocal = await db.syncQueue
+            .where('entityType').equals(entityType)
+            .filter(item => item.entityId === dexieRecord._id && (item.status === 'pending' || item.status === 'processing'))
+            .first();
+          if (hasPendingLocal) {
+            console.log(`[SupabaseSyncManager] Skipping realtime update - pending local changes for ${entityType}/${dexieRecord._id}`);
+            break;
+          }
           // Handle soft-deleted records: remove from local instead of re-adding
           if (newRecord.deleted) {
             console.log(`[SupabaseSyncManager] Removing soft-deleted record from Dexie ${dexieTableName}: ${dexieRecord._id}`);

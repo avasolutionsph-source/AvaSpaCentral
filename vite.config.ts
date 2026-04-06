@@ -60,7 +60,7 @@ export default defineConfig(({ mode }) => ({
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
               },
-              networkTimeoutSeconds: 3
+              networkTimeoutSeconds: 10
             }
           },
           {
@@ -73,7 +73,7 @@ export default defineConfig(({ mode }) => ({
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
               },
-              networkTimeoutSeconds: 3
+              networkTimeoutSeconds: 10
             }
           },
           {
@@ -126,9 +126,10 @@ export default defineConfig(({ mode }) => ({
     port: 3000,
     open: true
   },
-  // Strip console.log and debugger in production builds
+  // Strip console.log/debug and debugger in production builds (keep console.error/warn for debugging)
   esbuild: {
-    drop: mode === 'production' ? ['console', 'debugger'] : []
+    drop: mode === 'production' ? ['debugger'] : [],
+    pure: mode === 'production' ? ['console.log', 'console.debug'] : []
   },
   // Bundle analysis - generates stats.html after build
   build: {

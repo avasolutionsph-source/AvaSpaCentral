@@ -11,6 +11,7 @@
  */
 
 import { db, syncQueue } from '../../db';
+import SyncQueue from '../sync/SyncQueue';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
 import type { Table } from 'dexie';
 import type {
@@ -444,15 +445,7 @@ class BaseRepository<T extends BaseEntity> {
     operation: SyncOperation,
     data: Record<string, unknown>
   ): Promise<void> {
-    await syncQueue.add({
-      entityType: this.tableName,
-      entityId,
-      operation,
-      data,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      retryCount: 0,
-    });
+    await SyncQueue.add(this.tableName, entityId, operation, data);
   }
 
   /**

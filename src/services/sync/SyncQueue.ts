@@ -183,7 +183,7 @@ class SyncQueue {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - olderThanDays);
 
-    const old = await syncQueue.filter((item) => new Date(item.createdAt) < cutoff).toArray();
+    const old = await syncQueue.filter((item) => new Date(item.createdAt) < cutoff && item.status !== 'failed').toArray();
 
     for (const item of old) {
       if (item.id !== undefined) {

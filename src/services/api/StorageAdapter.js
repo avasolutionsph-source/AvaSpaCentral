@@ -15,6 +15,7 @@ import { mockDatabase } from '../../mockApi/mockData';
 import { TimeOffRequestRepository, HomeServiceRepository, SettingsRepository } from '../storage/repositories';
 import { authService, supabase, isSupabaseConfigured, supabaseSyncManager } from '../supabase';
 import { db } from '../../db';
+import dataChangeEmitter from '../sync/DataChangeEmitter';
 
 // No artificial delay - Dexie is already async and fast
 const delay = () => Promise.resolve();
@@ -648,6 +649,20 @@ export const transactionsAdapter = {
           // Batch-write all product updates at once
           if (updates.size > 0) {
             await db.products.bulkPut([...updates.values()]);
+
+            // Add syncQueue entries for each updated product so stock changes sync to Supabase
+            for (const [productId, updatedProduct] of updates) {
+              await db.syncQueue.add({
+                entityType: 'products',
+                entityId: productId,
+                operation: 'update',
+                data: updatedProduct,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                retryCount: 0,
+              });
+            }
+            dataChangeEmitter.emit({ entityType: 'products', operation: 'update' });
           }
         }
       }

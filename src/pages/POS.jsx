@@ -137,12 +137,6 @@ const POS = () => {
           return d === todayStr && a.clockIn && !a.clockOut;
         });
 
-        console.warn(`[POS Queue] today=${todayStr}, total=${allAttendance.length}, todayAll=${allAttendance.filter(a=>a.date===todayStr).length}, clockedIn=${todayClockedIn.length}`);
-        if (allAttendance.length > 0) {
-          const s = allAttendance[allAttendance.length - 1];
-          console.warn(`[POS Queue] Sample: date="${s.date}" type=${typeof s.date}, clockIn="${s.clockIn}", clockOut="${s.clockOut}", empId="${s.employeeId}"`);
-        }
-
         // Sort by clock-in time
         todayClockedIn.sort((a, b) => (a.clockIn || '').localeCompare(b.clockIn || ''));
 
@@ -180,12 +174,16 @@ const POS = () => {
     };
 
     loadData();
-    loadQueue();
     loadTaxSettings();
+    // Load queue after a short delay to ensure attendance data is synced
+    loadQueue();
+    // Retry queue load after sync has time to complete
+    const queueRetry = setTimeout(() => { if (isMounted) loadQueue(); }, 3000);
 
     // Cleanup function to prevent memory leaks
     return () => {
       isMounted = false;
+      clearTimeout(queueRetry);
     };
   }, []);
 

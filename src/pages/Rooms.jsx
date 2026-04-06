@@ -21,7 +21,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   const { user, showToast, isTherapist, canEdit, getUserBranchId } = useApp();
 
   // Filter state (kept separate as it's page-specific)
-  const [filterStatus, setFilterStatus] = useState('available');
+  const [filterStatus, setFilterStatus] = useState('show_all');
   const [upcomingBookings, setUpcomingBookings] = useState([]);
 
   // Timer state for countdown on occupied rooms
@@ -352,8 +352,10 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
 
     // First filter: Only show rooms with active services by default (pending/occupied)
     // Unless explicitly filtering for available or maintenance
-    if (filterStatus === 'all') {
-      // Default view: only pending and occupied rooms
+    if (filterStatus === 'show_all') {
+      // Show all rooms (no filter)
+    } else if (filterStatus === 'all') {
+      // Active services: only pending and occupied rooms
       filtered = filtered.filter(r => r.status === 'pending' || r.status === 'occupied');
     } else {
       // Apply specific status filter
@@ -837,6 +839,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       key: 'status',
       value: filterStatus,
       options: [
+        { value: 'show_all', label: 'All Rooms' },
         { value: 'all', label: 'Active Services' },
         { value: 'available', label: 'Available Rooms' },
         { value: 'pending', label: 'Pending' },
@@ -880,7 +883,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       {filteredRooms.length === 0 && homeServices.length === 0 ? (
         <EmptyState
           icon="🚪"
-          title={filterStatus === 'all' ? 'No active services' : 'No rooms found'}
+          title={filterStatus === 'all' ? 'No active services' : filterStatus === 'show_all' ? 'No rooms found' : 'No rooms found'}
           description={filterStatus === 'all' ? 'No rooms are currently occupied or pending. Services will appear here when assigned via POS.' : 'Try adjusting your filters'}
           action={canEdit() ? { label: 'Add Room', onClick: openCreate } : null}
         />

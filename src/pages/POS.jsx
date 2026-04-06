@@ -813,7 +813,6 @@ const POS = () => {
         }
 
         // Mark room as pending (waiting for therapist to start service)
-        console.log('[POS] Room update check - selectedRoom:', selectedRoom, 'isHomeService:', isHomeService);
         if (selectedRoom) {
           try {
             // Calculate total service duration from cart (services only)
@@ -846,7 +845,6 @@ const POS = () => {
             }
 
             // Set room to pending - therapist will start the timer
-            console.log('[POS] Updating room status to pending for room:', selectedRoom);
             await mockApi.rooms.updateRoomStatus(selectedRoom, 'pending', {
               serviceDuration: totalDuration,
               transactionId: receiptNumber,

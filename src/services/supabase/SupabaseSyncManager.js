@@ -124,6 +124,9 @@ const SUPABASE_TABLE_COLUMNS = {
   rooms: [
     'id', 'business_id', 'name', 'type', 'capacity', 'description', 'status',
     'amenities', 'advance_booking_id', 'service_duration', 'branch_id',
+    'assigned_employee_id', 'assigned_employee_name', 'customer_name',
+    'customer_phone', 'customer_email', 'service_names', 'transaction_id',
+    'start_time', 'payment_timing', 'display_order',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   suppliers: [
@@ -384,6 +387,13 @@ const FIELD_NAME_MAP = {
   roomName: 'room_name',
   isHomeService: 'is_home_service',
   homeServiceAddress: 'home_service_address',
+  assignedEmployeeId: 'assigned_employee_id',
+  assignedEmployeeName: 'assigned_employee_name',
+  customerPhone: 'customer_phone',
+  customerEmail: 'customer_email',
+  serviceNames: 'service_names',
+  transactionId: 'transaction_id',
+  paymentTiming: 'payment_timing',
   paymentStatus: 'payment_status',
   overtimeHours: 'overtime_hours',
   lateMinutes: 'late_minutes',

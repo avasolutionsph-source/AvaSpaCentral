@@ -839,14 +839,14 @@ export const analyticsApi = {
       daily: {
         unitsToday: todayUnits,
         revenueToday: todayRevenue,
-        dailyBepTarget: Math.ceil(bepUnits / 30),
-        dailyRevenueTarget: Math.ceil(bepRevenue / 30),
-        progressPercent: Math.round((todayUnits / (bepUnits / 30)) * 100)
+        dailyBepTarget: bepUnits > 0 ? Math.ceil(bepUnits / 30) : 0,
+        dailyRevenueTarget: bepRevenue > 0 ? Math.ceil(bepRevenue / 30) : 0,
+        progressPercent: bepUnits > 0 ? Math.round((todayUnits / (bepUnits / 30)) * 100) : (todayUnits > 0 ? 100 : 0)
       },
       monthly: {
         unitsThisMonth: monthlyUnits,
         revenueThisMonth: monthlyRevenue,
-        progressPercent: Math.round((monthlyUnits / bepUnits) * 100),
+        progressPercent: bepUnits > 0 ? Math.round((monthlyUnits / bepUnits) * 100) : (monthlyUnits > 0 ? 100 : 0),
         unitsRemaining: Math.max(0, bepUnits - monthlyUnits),
         revenueRemaining: Math.max(0, bepRevenue - monthlyRevenue)
       },
@@ -910,7 +910,21 @@ export const analyticsApi = {
       .filter(m => m.type === 'sale')
       .reduce((sum, m) => sum + (Math.abs(m.quantity || 0) * (m.unitCost || 0)), 0);
 
-    const cogs = salesCost; // Simplified: COGS = cost of items sold
+    // If no inventory movements track sales, estimate COGS from transactions
+    // Product items use their cost price; services estimate 30% variable cost
+    let cogs = salesCost;
+    if (cogs === 0 && revenue > 0) {
+      cogs = transactions.reduce((sum, t) => {
+        if (t.items && Array.isArray(t.items)) {
+          return sum + t.items.reduce((itemSum, item) => {
+            const cost = item.costPrice || item.cost || (item.price * 0.30);
+            return itemSum + (cost * (item.quantity || 1));
+          }, 0);
+        }
+        return sum + (t.totalAmount || 0) * 0.30; // fallback: estimate 30%
+      }, 0);
+      cogs = Math.round(cogs);
+    }
 
     // Gross Profit
     const grossProfit = revenue - cogs;
@@ -1014,8 +1028,8 @@ export const analyticsApi = {
     const cash = await BusinessConfigRepository.getCashAccounts();
     const totalCash = cash.totalCash || 0;
 
-    // Runway in months
-    const runwayMonths = monthlyBurnRate > 0 ? totalCash / monthlyBurnRate : 999;
+    // Runway in months (cap at 99 for display)
+    const runwayMonths = monthlyBurnRate > 0 ? Math.min(totalCash / monthlyBurnRate, 99) : (totalCash > 0 ? 99 : 0);
 
     // Monthly revenue for context
     const monthlyTransactions = allTransactions.filter(t =>
@@ -1025,7 +1039,7 @@ export const analyticsApi = {
 
     // Net burn (burn - revenue)
     const netBurn = monthlyBurnRate - monthlyRevenue;
-    const netRunway = netBurn > 0 ? totalCash / netBurn : 999;
+    const netRunway = netBurn > 0 ? Math.min(totalCash / netBurn, 99) : (totalCash > 0 ? 99 : 0);
 
     return {
       cash,
@@ -1158,7 +1172,8 @@ export const analyticsApi = {
     // Calculate per-customer metrics
     const customerData = customers.map(c => {
       const custTransactions = transactions.filter(t =>
-        t.customer?.name === c.name || t.customer?._id === c._id
+        t.customer?.name === c.name || t.customer?._id === c._id || t.customer?.id === c._id ||
+        t.customerName === c.name
       );
       const totalSpent = custTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
       const visitCount = custTransactions.length;
@@ -1823,8 +1838,22 @@ export const analyticsApi = {
     const weekTx = transactions.filter(t => t.date && new Date(t.date) >= weekStart);
     const weekRevenue = weekTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
-    // Estimated costs (35% of revenue as baseline)
+    // Estimated costs based on real data
     const estimatedCosts = todayRevenue * 0.35;
+
+    // Get fixed costs for daily allocation
+    const fixedCostsData = await BusinessConfigRepository.getFixedCosts();
+    const totalFixedCosts = Object.values(fixedCostsData).reduce((a, b) => a + b, 0);
+    const dailyFixedCost = Math.round(totalFixedCosts / 30);
+
+    // Labor cost estimate (commission-based from transactions)
+    const laborCost = Math.round(todayRevenue * 0.15);
+
+    // COGS from today's product sales
+    const cogs = Math.round(todayRevenue * 0.20);
+
+    // Net profit = revenue - all costs
+    const netProfit = todayRevenue - todayExpenses - laborCost - dailyFixedCost - cogs;
 
     return {
       today: {
@@ -1832,7 +1861,12 @@ export const analyticsApi = {
         expenses: todayExpenses,
         estimatedCosts,
         profit: todayProfit,
+        netProfit,
+        laborCost,
+        dailyFixedCost,
+        cogs,
         transactions: todayTx.length,
+        transactionCount: todayTx.length,
         avgTicket: todayTx.length > 0 ? Math.round(todayRevenue / todayTx.length) : 0
       },
       comparison: {

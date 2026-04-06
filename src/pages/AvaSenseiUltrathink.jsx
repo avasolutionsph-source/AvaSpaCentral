@@ -414,16 +414,19 @@ const AvaSenseiUltrathink = () => {
   };
 
   const formatCurrency = (amount) => {
+    const num = Number(amount);
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(isNaN(num) ? 0 : num);
   };
 
   const formatPercent = (value) => {
-    return `${parseFloat(value).toFixed(1)}%`;
+    const num = parseFloat(value);
+    if (isNaN(num) || !isFinite(num)) return '0.0%';
+    return `${num.toFixed(1)}%`;
   };
 
   const getInsightIcon = (type) => {

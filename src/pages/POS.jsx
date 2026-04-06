@@ -30,6 +30,7 @@ const POS = () => {
   const [showCheckout, setShowCheckout] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
+  const [receiptEnabled, setReceiptEnabled] = useState(false);
 
   // Checkout state
   const [employees, setEmployees] = useState([]);
@@ -175,8 +176,16 @@ const POS = () => {
       }
     };
 
+    const loadReceiptSetting = async () => {
+      try {
+        const saved = await SettingsRepository.get('showReceiptAfterCheckout');
+        if (isMounted && saved !== undefined) setReceiptEnabled(saved);
+      } catch {}
+    };
+
     loadData();
     loadTaxSettings();
+    loadReceiptSetting();
     // Load queue after a short delay to ensure attendance data is synced
     loadQueue();
     // Retry queue load after sync has time to complete
@@ -935,7 +944,7 @@ const POS = () => {
       setCart([]);
       setShowCheckout(false);
       resetCheckoutForm();
-      setShowReceipt(true);
+      if (receiptEnabled) setShowReceipt(true);
 
       // Reload products (for updated stock) and rotation queue
       loadPOSData();

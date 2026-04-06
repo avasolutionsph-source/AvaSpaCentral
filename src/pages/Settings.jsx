@@ -40,6 +40,9 @@ const Settings = () => {
     { day: 'Sunday', open: '10:00', close: '16:00', enabled: false }
   ]);
 
+  // POS Settings
+  const [showReceiptAfterCheckout, setShowReceiptAfterCheckout] = useState(false);
+
   // Tax Settings
   const [taxSettings, setTaxSettings] = useState([
     { id: 'vat', name: 'VAT', description: 'Value Added Tax', rate: 12, enabled: true },
@@ -1005,7 +1008,8 @@ const Settings = () => {
         businessInfo: businessInfo,
         businessHours: businessHours,
         taxSettings: taxSettings,
-        theme: theme
+        theme: theme,
+        showReceiptAfterCheckout: showReceiptAfterCheckout
       };
 
       // Save settings to Dexie (local)
@@ -1131,6 +1135,9 @@ const Settings = () => {
         if (savedSecuritySettings) setSecuritySettings(savedSecuritySettings);
         if (saved2FA !== undefined) setTwoFactorEnabled(saved2FA);
 
+        const savedReceiptSetting = await SettingsRepository.get('showReceiptAfterCheckout');
+        if (savedReceiptSetting !== undefined) setShowReceiptAfterCheckout(savedReceiptSetting);
+
         // Then try to load from Supabase 'settings' table for cross-device sync
         try {
           const { supabase } = await import('../services/supabase/supabaseClient');
@@ -1162,6 +1169,10 @@ const Settings = () => {
               if (cloudSettings.theme) {
                 setTheme(cloudSettings.theme);
                 await SettingsRepository.set('theme', cloudSettings.theme);
+              }
+              if (cloudSettings.showReceiptAfterCheckout !== undefined) {
+                setShowReceiptAfterCheckout(cloudSettings.showReceiptAfterCheckout);
+                await SettingsRepository.set('showReceiptAfterCheckout', cloudSettings.showReceiptAfterCheckout);
               }
             }
           }
@@ -2352,6 +2363,40 @@ const Settings = () => {
                 onClick={handleSaveSettings}
               >
                 Save Tax Settings
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* POS Settings */}
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <div className="settings-section-icon">🧾</div>
+            <div className="settings-section-title">
+              <h2>POS Settings</h2>
+              <p>Configure point of sale behavior</p>
+            </div>
+          </div>
+          <div className="settings-section-body">
+            <div className="tax-setting-row">
+              <div className="tax-setting-info">
+                <div className="tax-setting-name">Show Receipt After Checkout</div>
+                <div className="tax-setting-desc">Automatically display receipt after completing a transaction</div>
+              </div>
+              <div className="business-hour-toggle">
+                <div
+                  className={`toggle-switch ${showReceiptAfterCheckout ? 'active' : ''}`}
+                  onClick={() => setShowReceiptAfterCheckout(!showReceiptAfterCheckout)}
+                />
+              </div>
+            </div>
+            <div className="settings-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveSettings}
+              >
+                Save POS Settings
               </button>
             </div>
           </div>

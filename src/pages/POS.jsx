@@ -128,12 +128,52 @@ const POS = () => {
 
     const loadQueue = async () => {
       try {
-        const rotationData = await mockApi.serviceRotation.getRotationQueue();
+        // Build rotation queue directly from attendance data (same source as Attendance page)
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const allAttendance = await mockApi.attendance.getAttendance();
+        const todayClockedIn = allAttendance.filter(a => {
+          const d = typeof a.date === 'string' ? a.date : String(a.date).split('T')[0];
+          return d === todayStr && a.clockIn && !a.clockOut;
+        });
+
+        // Sort by clock-in time
+        todayClockedIn.sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+
+        // Build queue
+        const queue = todayClockedIn.map((att, index) => {
+          const empId = String(att.employee?._id || att.employeeId);
+          return {
+            employeeId: empId,
+            employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
+            position: att.employee?.position || '',
+            clockInTime: att.clockIn,
+            servicesCompleted: 0,
+            queuePosition: index + 1,
+            isNext: index === 0
+          };
+        });
+
         if (!isMounted) return;
-        setRotationQueue(rotationData.queue);
-        setNextEmployee(rotationData.nextEmployee);
+        setRotationQueue(queue);
+        setNextEmployee(queue[0] || null);
+
+        // Also try to load service counts from rotation API
+        try {
+          const rotationData = await mockApi.serviceRotation.getRotationQueue();
+          if (!isMounted) return;
+          // Merge service counts into our queue
+          if (rotationData.queue.length > 0) {
+            setRotationQueue(prev => prev.map(q => {
+              const match = rotationData.queue.find(r => String(r.employeeId) === String(q.employeeId));
+              return match ? { ...q, servicesCompleted: match.servicesCompleted } : q;
+            }));
+          }
+        } catch (e) {
+          // Service counts unavailable, queue still works
+        }
       } catch (error) {
-        // Silent fail for rotation queue
+        console.error('[POS] Failed to load rotation queue:', error);
       }
     };
 
@@ -191,19 +231,39 @@ const POS = () => {
     }
   }, [showToast]);
 
-  // Load service rotation queue
+  // Load service rotation queue directly from attendance data
   const loadRotationQueue = useCallback(async () => {
     try {
-      const rotationData = await mockApi.serviceRotation.getRotationQueue();
-      setRotationQueue(rotationData.queue);
-      setNextEmployee(rotationData.nextEmployee);
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const allAttendance = await mockApi.attendance.getAttendance();
+      const todayClockedIn = allAttendance.filter(a => {
+        const d = typeof a.date === 'string' ? a.date : String(a.date).split('T')[0];
+        return d === todayStr && a.clockIn && !a.clockOut;
+      });
+      todayClockedIn.sort((a, b) => a.clockIn.localeCompare(b.clockIn));
 
-      // Auto-select next employee if none selected
-      if (!selectedEmployee && rotationData.nextEmployee) {
-        setSelectedEmployee(rotationData.nextEmployee.employeeId);
+      const queue = todayClockedIn.map((att, index) => {
+        const empId = String(att.employee?._id || att.employeeId);
+        return {
+          employeeId: empId,
+          employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
+          position: att.employee?.position || '',
+          clockInTime: att.clockIn,
+          servicesCompleted: 0,
+          queuePosition: index + 1,
+          isNext: index === 0
+        };
+      });
+
+      setRotationQueue(queue);
+      setNextEmployee(queue[0] || null);
+
+      if (!selectedEmployee && queue[0]) {
+        setSelectedEmployee(queue[0].employeeId);
       }
     } catch (error) {
-      // Silent fail for rotation queue
+      console.error('[POS] Failed to load rotation queue:', error);
     }
   }, []);
 

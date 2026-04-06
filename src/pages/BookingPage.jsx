@@ -798,7 +798,7 @@ const BookingPage = () => {
             </ul>
             <p><strong>Date:</strong> {selectedDate}</p>
             <p><strong>Time:</strong> {selectedTime}</p>
-            <p><strong>Total:</strong> ₱{cartTotal.toLocaleString()}</p>
+            <p><strong>Total:</strong> ₱{(cartTotal ?? 0).toLocaleString()}</p>
           </div>
           <div className="success-note">
             <p>We will contact you at <strong>{customerPhone}</strong> to confirm your appointment.</p>
@@ -1375,7 +1375,7 @@ const BookingPage = () => {
                   <span className="location-label">Home Service</span>
                   <span className="location-desc">
                     {selectedBranch?.home_service_fee > 0
-                      ? `+₱${selectedBranch.home_service_fee.toLocaleString()} fee`
+                      ? `+₱${(selectedBranch.home_service_fee ?? 0).toLocaleString()} fee`
                       : 'We come to you'}
                   </span>
                 </button>
@@ -1391,7 +1391,7 @@ const BookingPage = () => {
                   <span className="location-label">Hotel Service</span>
                   <span className="location-desc">
                     {selectedBranch?.hotel_service_fee > 0
-                      ? `+₱${selectedBranch.hotel_service_fee.toLocaleString()} fee`
+                      ? `+₱${(selectedBranch.hotel_service_fee ?? 0).toLocaleString()} fee`
                       : 'Service at your hotel'}
                   </span>
                 </button>

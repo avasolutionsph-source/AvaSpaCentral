@@ -432,8 +432,8 @@ const Inventory = ({ embedded = false, onDataChange }) => {
     let csv = 'Product Name,Category,Stock,Reorder Point,Cost,Total Value,Status\n';
     filteredInventory.forEach(p => {
       const status = getStockStatusLabel(p);
-      const totalValue = p.stock * p.cost;
-      csv += `"${p.name}","${p.category}","${p.stock}","${p.lowStockAlert}","₱${p.cost.toFixed(2)}","₱${totalValue.toFixed(2)}","${status}"\n`;
+      const totalValue = (p.stock || 0) * (p.cost || 0);
+      csv += `"${p.name}","${p.category}","${p.stock || 0}","${p.lowStockAlert || 0}","₱${(p.cost || 0).toFixed(2)}","₱${totalValue.toFixed(2)}","${status}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });

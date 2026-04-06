@@ -470,7 +470,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
 
   const formatGpsCoords = (gps) => {
     if (!gps || !gps.latitude || !gps.longitude) return null;
-    return `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}`;
+    return `${Number(gps.latitude).toFixed(6)}, ${Number(gps.longitude).toFixed(6)}`;
   };
 
   const getGoogleMapsUrl = (gps) => {

@@ -459,9 +459,17 @@ export const serviceRotationApi = {
     const rotation = await initServiceRotation();
     const today = getTodayDateString();
 
-    // Get today's attendance from Dexie - use toArray + filter for reliability
-    // Handle both camelCase (local) and snake_case (from Supabase sync) field names
+    // Get today's attendance from Dexie
     const allAttendance = await db.attendance.toArray();
+    console.log('[RotationQueue] Today:', today, '| Total attendance records:', allAttendance.length);
+    console.log('[RotationQueue] Today records dates:', allAttendance.filter(a => a.date === today).length);
+    if (allAttendance.length > 0) {
+      const sample = allAttendance[allAttendance.length - 1];
+      console.log('[RotationQueue] Sample record fields:', Object.keys(sample).join(', '));
+      console.log('[RotationQueue] Sample record:', { date: sample.date, clockIn: sample.clockIn, clock_in: sample.clock_in, employeeId: sample.employeeId, employee_id: sample.employee_id, clockOut: sample.clockOut, clock_out: sample.clock_out });
+    }
+
+    // Handle both camelCase (local) and snake_case (from Supabase sync) field names
     const todayAttendance = allAttendance.filter(a => {
       const date = a.date;
       const clockIn = a.clockIn || a.clock_in;
@@ -474,6 +482,7 @@ export const serviceRotationApi = {
       if (!a.clockOut && a.clock_out) a.clockOut = a.clock_out;
       if (!a.employeeId && a.employee_id) a.employeeId = a.employee_id;
     });
+    console.log('[RotationQueue] Clocked in today (no clock out):', todayAttendance.length);
 
     // Also include overnight shift workers (clocked in yesterday, still working)
     const yesterday = new Date();

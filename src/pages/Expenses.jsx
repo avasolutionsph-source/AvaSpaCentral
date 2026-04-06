@@ -501,7 +501,7 @@ const Expenses = ({ embedded = false, onDataChange }) => {
                     )}
                   </td>
                   <td className="expense-vendor-cell">{expense.vendor}</td>
-                  <td className="expense-amount-cell">₱{expense.amount.toLocaleString()}</td>
+                  <td className="expense-amount-cell">₱{(expense.amount ?? 0).toLocaleString()}</td>
                   <td>
                     <span className="expense-payment-badge">{expense.paymentMethod}</span>
                   </td>

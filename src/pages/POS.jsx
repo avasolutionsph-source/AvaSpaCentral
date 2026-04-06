@@ -1056,7 +1056,7 @@ const POS = () => {
                 >
                   <div className="product-category-badge">{product.category}</div>
                   <h4 className="product-name">{product.name}</h4>
-                  <p className="product-price">₱{product.price.toLocaleString()}</p>
+                  <p className="product-price">₱{(product.price ?? 0).toLocaleString()}</p>
                   {product.type === 'service' && product.duration && (
                     <p className="product-duration">{product.duration} min</p>
                   )}
@@ -1093,7 +1093,7 @@ const POS = () => {
                 <div key={index} className="cart-item">
                   <div className="cart-item-details">
                     <h4>{item.name}</h4>
-                    <p className="cart-item-price">₱{item.price.toLocaleString()}</p>
+                    <p className="cart-item-price">₱{(item.price ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="cart-item-controls">
                     <button
@@ -1111,7 +1111,7 @@ const POS = () => {
                     </button>
                   </div>
                   <div className="cart-item-total">
-                    <p>₱{item.subtotal.toLocaleString()}</p>
+                    <p>₱{(item.subtotal ?? 0).toLocaleString()}</p>
                     <button
                       className="remove-btn"
                       onClick={() => removeFromCart(index)}

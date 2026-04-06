@@ -240,9 +240,9 @@ const AIInsights = () => {
       const customerTxns = txns.filter(t => t.customer?.id === c._id);
       const totalSpent = customerTxns.reduce((s, t) => s + (t.totalAmount || t.total || 0), 0);
       return sum + totalSpent;
-    }, 0) / totalCustomers;
+    }, 0) / (totalCustomers || 1);
 
-    const retentionRate = (activeCustomers / totalCustomers) * 100;
+    const retentionRate = (activeCustomers / (totalCustomers || 1)) * 100;
 
     // Top 3 customers
     const topCustomers = custs.map(c => {
@@ -291,7 +291,7 @@ const AIInsights = () => {
 
     const performance = Object.values(serviceStats).map(s => ({
       ...s,
-      avgRating: s.ratings.reduce((sum, r) => sum + r, 0) / s.ratings.length,
+      avgRating: s.ratings.reduce((sum, r) => sum + r, 0) / (s.ratings.length || 1),
       performance: s.revenue > 10000 ? 'Excellent' : s.revenue > 5000 ? 'Good' : 'Average'
     }));
 
@@ -1356,11 +1356,12 @@ const AIInsights = () => {
                       tooltip: {
                         callbacks: {
                           label: function(context) {
-                            const customer = customerInsights.topCustomers[context.dataIndex];
+                            const customer = customerInsights.topCustomers?.[context.dataIndex];
+                            if (!customer) return [];
                             return [
                               `Total Spent: ₱${context.parsed.y.toLocaleString()}`,
-                              `Visits: ${customer.visits}`,
-                              `Avg per visit: ₱${(customer.totalSpent / customer.visits).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                              `Visits: ${customer.visits || 0}`,
+                              `Avg per visit: ₱${(customer.totalSpent / (customer.visits || 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                             ];
                           }
                         }

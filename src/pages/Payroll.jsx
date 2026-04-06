@@ -736,26 +736,26 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
                 <div className="payslip-section">
                   <div className="payslip-section-title">EARNINGS</div>
                   <div className="payslip-line">
-                    <span>Regular Pay ({selectedPayslip.regularHours}h @ ₱{(selectedPayslip.employee.dailyRate / 8).toFixed(2)}/hr)</span>
-                    <span>₱{selectedPayslip.regularPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>Regular Pay ({selectedPayslip.regularHours}h @ ₱{((selectedPayslip.employee?.dailyRate ?? 0) / 8).toFixed(2)}/hr)</span>
+                    <span>₱{(selectedPayslip.regularPay ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="payslip-line">
                     <span>Overtime Pay ({selectedPayslip.overtimeHours}h @ {((selectedPayslip.appliedRates?.overtime || 1.25) * 100).toFixed(0)}%)</span>
-                    <span>₱{selectedPayslip.overtimePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>₱{(selectedPayslip.overtimePay ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   {selectedPayslip.nightDiffPay > 0 && (
                     <div className="payslip-line">
                       <span>Night Differential ({selectedPayslip.nightDiffHours}h @ +{((selectedPayslip.appliedRates?.nightDiff || 0.10) * 100).toFixed(0)}%)</span>
-                      <span>₱{selectedPayslip.nightDiffPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span>₱{(selectedPayslip.nightDiffPay ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   <div className="payslip-line">
                     <span>Commissions</span>
-                    <span>₱{selectedPayslip.commissions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>₱{(selectedPayslip.commissions ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="payslip-line total">
                     <span>GROSS PAY</span>
-                    <span>₱{selectedPayslip.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>₱{(selectedPayslip.grossPay ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 

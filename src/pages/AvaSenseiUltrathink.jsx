@@ -334,9 +334,9 @@ const AvaSenseiUltrathink = () => {
       const customerTxns = txns.filter(t => t.customer?.id === c._id);
       const totalSpent = customerTxns.reduce((s, t) => s + (t.totalAmount || t.total || 0), 0);
       return sum + totalSpent;
-    }, 0) / totalCustomers;
+    }, 0) / (totalCustomers || 1);
 
-    const retentionRate = (activeCustomers / totalCustomers) * 100;
+    const retentionRate = (activeCustomers / (totalCustomers || 1)) * 100;
 
     const topCustomers = custs.map(c => {
       const customerTxns = txns.filter(t => t.customer?.id === c._id);
@@ -374,7 +374,7 @@ const AvaSenseiUltrathink = () => {
 
     const performance = Object.values(serviceStats).map(s => ({
       ...s,
-      avgRating: s.ratings.reduce((sum, r) => sum + r, 0) / s.ratings.length,
+      avgRating: s.ratings.reduce((sum, r) => sum + r, 0) / (s.ratings.length || 1),
       performance: s.revenue > 10000 ? 'Excellent' : s.revenue > 5000 ? 'Good' : 'Average'
     }));
 

@@ -461,7 +461,17 @@ export const serviceRotationApi = {
 
     // Use storageService (same as Attendance page) for consistent businessId filtering
     const allAttendance = await storageService.attendance.getAll();
-    const todayAttendance = allAttendance.filter(a => a.date === today && a.clockIn && !a.clockOut);
+    console.log('[RotationQueue] today string:', today, '| allAttendance count:', allAttendance.length);
+    if (allAttendance.length > 0) {
+      const sample = allAttendance[allAttendance.length - 1];
+      console.log('[RotationQueue] Last record:', { _id: sample._id, date: sample.date, dateType: typeof sample.date, clockIn: sample.clockIn, clockOut: sample.clockOut, employeeId: sample.employeeId, businessId: sample.businessId });
+    }
+    // Normalize date comparison - handle both string and Date object from Supabase
+    const todayAttendance = allAttendance.filter(a => {
+      const recordDate = typeof a.date === 'string' ? a.date : (a.date instanceof Date ? a.date.toISOString().split('T')[0] : String(a.date));
+      return recordDate === today && a.clockIn && !a.clockOut;
+    });
+    console.log('[RotationQueue] Matched today + clocked in:', todayAttendance.length);
 
     // Also include overnight shift workers (clocked in yesterday, still working)
     const yesterday = new Date();

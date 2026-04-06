@@ -94,8 +94,9 @@ const ShiftSchedules = () => {
 
   // Filter schedules
   const filteredSchedules = schedules.filter(schedule => {
-    const matchesSearch = schedule.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         schedule.employeePosition?.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!schedule.weeklySchedule) return false; // Skip invalid schedules
+    const matchesSearch = (schedule.employeeName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (schedule.employeePosition || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const employee = employees.find(e => e._id === schedule.employeeId);
     const matchesDept = filterDepartment === 'all' || employee?.department === filterDepartment;
@@ -503,18 +504,18 @@ const ShiftSchedules = () => {
                   <td className="employee-cell">
                     <div className="employee-info">
                       <div className="employee-avatar">
-                        {schedule.employeeName.charAt(0)}
+                        {(schedule.employeeName || '?').charAt(0)}
                       </div>
                       <div className="employee-details">
-                        <span className="employee-name">{schedule.employeeName}</span>
-                        <span className="employee-position">{schedule.employeePosition}</span>
+                        <span className="employee-name">{schedule.employeeName || 'Unknown'}</span>
+                        <span className="employee-position">{schedule.employeePosition || ''}</span>
                       </div>
                     </div>
                   </td>
                   {DAYS.map(day => {
-                    const daySchedule = schedule.weeklySchedule[day];
+                    const daySchedule = schedule.weeklySchedule?.[day];
                     const shiftInfo = getShiftInfo(daySchedule?.shift);
-                    const isOff = daySchedule?.shift === 'off';
+                    const isOff = !daySchedule || daySchedule?.shift === 'off';
 
                     return (
                       <td key={day} className={`shift-cell ${isOff ? 'off' : ''}`}>

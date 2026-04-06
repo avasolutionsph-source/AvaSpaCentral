@@ -99,14 +99,16 @@ const SUPABASE_TABLE_COLUMNS = {
   // === Core Entities ===
   employees: [
     'id', 'business_id', 'first_name', 'last_name', 'email', 'phone',
-    'department', 'position', 'status', 'hire_date', 'hourly_rate',
-    'commission_rate', 'photo_url', 'address', 'emergency_contact',
-    'skills', 'metadata', 'notes', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+    'department', 'position', 'status', 'hire_date', 'hourly_rate', 'daily_rate',
+    'commission_rate', 'commission', 'monthly_rate', 'photo_url', 'address',
+    'emergency_contact', 'skills', 'metadata', 'notes', 'gender', 'branch_id',
+    'sync_status', 'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   users: [
     'id', 'auth_id', 'email', 'username', 'first_name', 'last_name',
     'role', 'business_id', 'employee_id', 'status', 'last_login',
-    'created_at', 'updated_at', 'deleted', 'deleted_at'
+    'password', 'branch_id', 'sync_status',
+    'created_at', 'updated_at', 'deleted'
   ],
   customers: [
     'id', 'business_id', 'name', 'first_name', 'last_name', 'email', 'phone',
@@ -156,6 +158,7 @@ const SUPABASE_TABLE_COLUMNS = {
   expenses: [
     'id', 'business_id', 'date', 'category', 'expense_type', 'amount',
     'description', 'vendor', 'receipt_url', 'status', 'approved_by',
+    'payment_method', 'branch_id',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   gift_certificates: [
@@ -167,8 +170,8 @@ const SUPABASE_TABLE_COLUMNS = {
 
   // === Inventory ===
   purchase_orders: [
-    'id', 'business_id', 'supplier_id', 'order_date', 'expected_date',
-    'status', 'items', 'total', 'notes',
+    'id', 'business_id', 'supplier_id', 'supplier_name', 'order_date', 'expected_date',
+    'status', 'items', 'total', 'notes', 'branch_id',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   inventory_movements: [
@@ -252,8 +255,14 @@ const SUPABASE_TABLE_COLUMNS = {
   // === Services & Bookings ===
   advance_bookings: [
     'id', 'business_id', 'customer_id', 'customer_name', 'employee_id',
-    'booking_date_time', 'status', 'services', 'total_amount',
-    'payment_status', 'notes', 'sync_status', 'created_at', 'updated_at'
+    'employee_name', 'booking_date_time', 'status', 'services', 'total_amount',
+    'service_name', 'estimated_duration', 'service_price',
+    'room_id', 'room_name', 'is_home_service',
+    'client_name', 'client_phone', 'client_email', 'client_address',
+    'payment_method', 'payment_timing', 'payment_status', 'transaction_id',
+    'special_requests', 'client_notes', 'cancel_reason', 'cancelled_at',
+    'notes', 'branch_id', 'sync_status', 'deleted', 'deleted_at',
+    'created_at', 'updated_at'
   ],
   active_services: [
     'id', 'business_id', 'room_id', 'advance_booking_id', 'customer_id',
@@ -261,9 +270,11 @@ const SUPABASE_TABLE_COLUMNS = {
     'sync_status', 'created_at', 'updated_at'
   ],
   home_services: [
-    'id', 'business_id', 'employee_id', 'transaction_id', 'customer_id',
+    'id', 'business_id', 'employee_id', 'employee_name', 'transaction_id',
+    'customer_id', 'customer_name', 'customer_phone', 'customer_email',
     'status', 'scheduled_time', 'address', 'notes', 'services',
-    'sync_status', 'created_at', 'updated_at'
+    'service_names', 'service_duration', 'branch_id',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   service_rotation: [
     'id', 'business_id', 'date', 'rotation_data', 'created_at', 'updated_at'
@@ -394,6 +405,28 @@ const FIELD_NAME_MAP = {
   serviceNames: 'service_names',
   transactionId: 'transaction_id',
   paymentTiming: 'payment_timing',
+  dailyRate: 'daily_rate',
+  monthlyRate: 'monthly_rate',
+  commissionRate: 'commission_rate',
+  supplierName: 'supplier_name',
+  employeeName: 'employee_name',
+  estimatedDuration: 'estimated_duration',
+  servicePrice: 'service_price',
+  clientName: 'client_name',
+  clientPhone: 'client_phone',
+  clientEmail: 'client_email',
+  clientAddress: 'client_address',
+  clientNotes: 'client_notes',
+  specialRequests: 'special_requests',
+  cancelReason: 'cancel_reason',
+  cancelledAt: 'cancelled_at',
+  serviceDuration: 'service_duration',
+  employeePosition: 'employee_position',
+  isOutOfRange: 'is_out_of_range',
+  clockInGps: 'clock_in_gps',
+  clockOutGps: 'clock_out_gps',
+  clockInPhoto: 'clock_in_photo',
+  clockOutPhoto: 'clock_out_photo',
   paymentStatus: 'payment_status',
   overtimeHours: 'overtime_hours',
   lateMinutes: 'late_minutes',

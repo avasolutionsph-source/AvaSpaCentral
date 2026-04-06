@@ -671,6 +671,13 @@ class SupabaseSyncManager {
       }
     }
 
+    // Special handling for shift_schedules: unwrap weeklySchedule from schedule JSONB
+    if (entityType === 'shiftSchedules') {
+      if (converted.schedule && converted.schedule.weeklySchedule && !converted.weeklySchedule) {
+        converted.weeklySchedule = converted.schedule.weeklySchedule;
+      }
+    }
+
     // Special handling for employees: reconstruct commission object and extract metadata fields
     if (entityType === 'employees') {
       const metadata = converted.metadata || {};

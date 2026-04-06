@@ -459,30 +459,9 @@ export const serviceRotationApi = {
     const rotation = await initServiceRotation();
     const today = getTodayDateString();
 
-    // Get today's attendance from Dexie
-    const allAttendance = await db.attendance.toArray();
-    console.log('[RotationQueue] Today:', today, '| Total attendance records:', allAttendance.length);
-    console.log('[RotationQueue] Today records dates:', allAttendance.filter(a => a.date === today).length);
-    if (allAttendance.length > 0) {
-      const sample = allAttendance[allAttendance.length - 1];
-      console.log('[RotationQueue] Sample record fields:', Object.keys(sample).join(', '));
-      console.log('[RotationQueue] Sample record:', { date: sample.date, clockIn: sample.clockIn, clock_in: sample.clock_in, employeeId: sample.employeeId, employee_id: sample.employee_id, clockOut: sample.clockOut, clock_out: sample.clock_out });
-    }
-
-    // Handle both camelCase (local) and snake_case (from Supabase sync) field names
-    const todayAttendance = allAttendance.filter(a => {
-      const date = a.date;
-      const clockIn = a.clockIn || a.clock_in;
-      const clockOut = a.clockOut || a.clock_out;
-      return date === today && clockIn && !clockOut;
-    });
-    // Normalize field names for downstream use
-    todayAttendance.forEach(a => {
-      if (!a.clockIn && a.clock_in) a.clockIn = a.clock_in;
-      if (!a.clockOut && a.clock_out) a.clockOut = a.clock_out;
-      if (!a.employeeId && a.employee_id) a.employeeId = a.employee_id;
-    });
-    console.log('[RotationQueue] Clocked in today (no clock out):', todayAttendance.length);
+    // Use storageService (same as Attendance page) for consistent businessId filtering
+    const allAttendance = await storageService.attendance.getAll();
+    const todayAttendance = allAttendance.filter(a => a.date === today && a.clockIn && !a.clockOut);
 
     // Also include overnight shift workers (clocked in yesterday, still working)
     const yesterday = new Date();
@@ -491,15 +470,7 @@ export const serviceRotationApi = {
       const y = yesterday;
       return `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
     })() : '';
-    const overnightWorkers = allAttendance.filter(a => {
-      const clockIn = a.clockIn || a.clock_in;
-      const clockOut = a.clockOut || a.clock_out;
-      return a.date === yesterdayStr && clockIn && !clockOut;
-    });
-    overnightWorkers.forEach(a => {
-      if (!a.clockIn && a.clock_in) a.clockIn = a.clock_in;
-      if (!a.employeeId && a.employee_id) a.employeeId = a.employee_id;
-    });
+    const overnightWorkers = allAttendance.filter(a => a.date === yesterdayStr && a.clockIn && !a.clockOut);
     const todayEmpIds = new Set(todayAttendance.map(a => String(a.employeeId)));
     overnightWorkers.forEach(a => {
       if (!todayEmpIds.has(String(a.employeeId))) {
@@ -508,7 +479,7 @@ export const serviceRotationApi = {
     });
 
     // Get all employees to join with attendance (attendance records only store employeeId)
-    const employees = await db.employees.toArray();
+    const employees = await storageService.employees.getAll();
     const employeeMap = {};
     employees.forEach(e => {
       employeeMap[String(e._id)] = e;

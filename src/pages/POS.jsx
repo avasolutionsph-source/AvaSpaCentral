@@ -28,6 +28,8 @@ const POS = () => {
   const [showManageOrder, setShowManageOrder] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
 
   // Checkout state
   const [employees, setEmployees] = useState([]);
@@ -803,6 +805,23 @@ const POS = () => {
 
         showToast('Transaction completed successfully!', 'success');
 
+        // Save receipt data for display
+        setReceiptData({
+          receiptNumber,
+          date: new Date(),
+          items: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price, subtotal: item.subtotal })),
+          subtotal: getCartSubtotal(),
+          discount: getDiscount(),
+          discountType,
+          tax: taxAmount,
+          total: getTotal(),
+          paymentMethod,
+          amountReceived: paymentMethod === 'Cash' ? parseFloat(amountReceived) : getTotal(),
+          changeAmount: getChange(),
+          employee: employee ? `${employee.firstName} ${employee.lastName}` : 'Staff',
+          customer: customerType === 'walk-in' ? (walkInCustomerData.name || 'Walk-in') : (selectedCustomer?.name || 'Walk-in')
+        });
+
         // Record service in rotation queue
         if (selectedEmployee) {
           try {
@@ -916,6 +935,7 @@ const POS = () => {
       setCart([]);
       setShowCheckout(false);
       resetCheckoutForm();
+      setShowReceipt(true);
 
       // Reload products (for updated stock) and rotation queue
       loadPOSData();
@@ -1959,6 +1979,93 @@ const POS = () => {
         </div>
       )}
       </>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceipt && receiptData && (
+        <div className="modal-overlay" onClick={() => setShowReceipt(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h2>Receipt</h2>
+              <button className="modal-close" onClick={() => setShowReceipt(false)}>&times;</button>
+            </div>
+            <div className="modal-body" id="receipt-content">
+              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0 }}>{receiptData.receiptNumber}</h3>
+                <p style={{ margin: '4px 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  {receiptData.date.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })} {receiptData.date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+                <p style={{ margin: '2px 0', fontSize: '0.85rem' }}>Served by: {receiptData.employee}</p>
+                <p style={{ margin: '2px 0', fontSize: '0.85rem' }}>Customer: {receiptData.customer}</p>
+              </div>
+              <hr style={{ border: 'none', borderTop: '1px dashed var(--color-border)', margin: '0.75rem 0' }} />
+              <table style={{ width: '100%', fontSize: '0.9rem' }}>
+                <tbody>
+                  {receiptData.items.map((item, i) => (
+                    <tr key={i}>
+                      <td>{item.name} x{item.quantity}</td>
+                      <td style={{ textAlign: 'right' }}>₱{(item.subtotal ?? 0).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <hr style={{ border: 'none', borderTop: '1px dashed var(--color-border)', margin: '0.75rem 0' }} />
+              <div style={{ fontSize: '0.9rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal</span>
+                  <span>₱{(receiptData.subtotal ?? 0).toLocaleString()}</span>
+                </div>
+                {receiptData.discount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
+                    <span>Discount ({receiptData.discountType})</span>
+                    <span>-₱{(receiptData.discount ?? 0).toLocaleString()}</span>
+                  </div>
+                )}
+                {receiptData.tax > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Tax</span>
+                    <span>₱{(receiptData.tax ?? 0).toLocaleString()}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.1rem', marginTop: '0.5rem' }}>
+                  <span>Total</span>
+                  <span>₱{(receiptData.total ?? 0).toLocaleString()}</span>
+                </div>
+                <hr style={{ border: 'none', borderTop: '1px dashed var(--color-border)', margin: '0.75rem 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Payment</span>
+                  <span>{receiptData.paymentMethod}</span>
+                </div>
+                {receiptData.paymentMethod === 'Cash' && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Amount Received</span>
+                      <span>₱{(receiptData.amountReceived ?? 0).toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Change</span>
+                      <span>₱{(receiptData.changeAmount ?? 0).toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowReceipt(false)}>Close</button>
+              <button className="btn btn-primary" onClick={() => {
+                const content = document.getElementById('receipt-content');
+                const printWindow = window.open('', '_blank', 'width=400,height=600');
+                printWindow.document.write('<html><head><title>Receipt</title><style>body{font-family:monospace;padding:20px;font-size:14px}table{width:100%;border-collapse:collapse}td{padding:4px 0}hr{border:none;border-top:1px dashed #ccc;margin:12px 0}</style></head><body>');
+                printWindow.document.write(content.innerHTML);
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+                printWindow.print();
+              }}>
+                Print Receipt
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Manage Order Modal */}

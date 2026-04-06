@@ -49,18 +49,18 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
         receiptNumber: t.receiptNumber || `REC-${new Date(t.date).getFullYear()}-${String(index + 1).padStart(3, '0')}`,
         date: t.date,
         customer: t.customer || { name: 'Walk-in Customer', phone: '' },
-        items: t.items.map(item => ({
+        items: (t.items || []).map(item => ({
           name: item.name,
           quantity: item.quantity || 1,
-          price: item.price || item.subtotal,
+          price: item.price || item.subtotal || 0,
           employeeId: t.employee?._id || item.employeeId,
           employeeName: t.employee?.name || item.employeeName || 'Staff',
-          commission: item.commission || (item.price * 0.1)
+          commission: item.commission || ((item.price || 0) * 0.1)
         })),
-        subtotal: t.subtotal || t.items.reduce((sum, i) => sum + (i.subtotal || i.price), 0),
+        subtotal: t.subtotal || (t.items || []).reduce((sum, i) => sum + (i.subtotal || i.price || 0), 0),
         discount: t.discount || 0,
         tax: t.tax || 0,
-        total: t.totalAmount || t.total,
+        total: t.totalAmount || t.total || t.subtotal || 0,
         paymentMethod: t.paymentMethod || 'Cash',
         cashier: t.cashier || 'Staff'
       }));

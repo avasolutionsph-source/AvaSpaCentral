@@ -137,8 +137,14 @@ const POS = () => {
           return d === todayStr && a.clockIn && !a.clockOut;
         });
 
+        console.warn(`[POS Queue] today=${todayStr}, total=${allAttendance.length}, todayAll=${allAttendance.filter(a=>a.date===todayStr).length}, clockedIn=${todayClockedIn.length}`);
+        if (allAttendance.length > 0) {
+          const s = allAttendance[allAttendance.length - 1];
+          console.warn(`[POS Queue] Sample: date="${s.date}" type=${typeof s.date}, clockIn="${s.clockIn}", clockOut="${s.clockOut}", empId="${s.employeeId}"`);
+        }
+
         // Sort by clock-in time
-        todayClockedIn.sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+        todayClockedIn.sort((a, b) => (a.clockIn || '').localeCompare(b.clockIn || ''));
 
         // Build queue
         const queue = todayClockedIn.map((att, index) => {
@@ -157,21 +163,6 @@ const POS = () => {
         if (!isMounted) return;
         setRotationQueue(queue);
         setNextEmployee(queue[0] || null);
-
-        // Also try to load service counts from rotation API
-        try {
-          const rotationData = await mockApi.serviceRotation.getRotationQueue();
-          if (!isMounted) return;
-          // Merge service counts into our queue
-          if (rotationData.queue.length > 0) {
-            setRotationQueue(prev => prev.map(q => {
-              const match = rotationData.queue.find(r => String(r.employeeId) === String(q.employeeId));
-              return match ? { ...q, servicesCompleted: match.servicesCompleted } : q;
-            }));
-          }
-        } catch (e) {
-          // Service counts unavailable, queue still works
-        }
       } catch (error) {
         console.error('[POS] Failed to load rotation queue:', error);
       }

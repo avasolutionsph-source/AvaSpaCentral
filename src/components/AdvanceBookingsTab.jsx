@@ -165,7 +165,7 @@ const AdvanceBookingsTab = () => {
                   {booking.status.replace('-', ' ').toUpperCase()}
                 </span>
                 <span className="booking-datetime">
-                  {format(parseISO(booking.bookingDateTime), 'MMM dd, yyyy HH:mm')}
+                  {format(parseISO(booking.bookingDateTime), 'MMM dd, yyyy h:mm a')}
                 </span>
               </div>
 

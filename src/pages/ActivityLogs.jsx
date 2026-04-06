@@ -162,13 +162,13 @@ const ActivityLogs = () => {
 
     if (exportFormat === 'txt') {
       exportData = 'ACTIVITY LOGS REPORT\n\n';
-      exportData += `Generated: ${format(new Date(), 'MMMM dd, yyyy HH:mm:ss')}\n`;
+      exportData += `Generated: ${format(new Date(), 'MMMM dd, yyyy h:mm:ss a')}\n`;
       exportData += `Total Logs: ${filteredLogs.length}\n\n`;
       exportData += '='.repeat(80) + '\n\n';
 
       filteredLogs.forEach((log, index) => {
         exportData += `${index + 1}. ${log.action}\n`;
-        exportData += `   Time: ${format(parseISO(log.timestamp), 'MMM dd, yyyy HH:mm:ss')}\n`;
+        exportData += `   Time: ${format(parseISO(log.timestamp), 'MMM dd, yyyy h:mm:ss a')}\n`;
         exportData += `   User: ${getUserDisplayName(log)} (${getUserRole(log)})\n`;
         exportData += `   Description: ${log.description}\n`;
         exportData += `   Severity: ${log.severity.toUpperCase()}\n`;
@@ -181,7 +181,7 @@ const ActivityLogs = () => {
     } else if (exportFormat === 'csv') {
       exportData = 'ID,Action,Description,User,Role,Timestamp,Severity,IP Address\n';
       filteredLogs.forEach(log => {
-        exportData += `${log.id},"${log.action}","${log.description}","${getUserDisplayName(log)}","${getUserRole(log)}","${format(parseISO(log.timestamp), 'yyyy-MM-dd HH:mm:ss')}","${log.severity}","${log.ipAddress}"\n`;
+        exportData += `${log.id},"${log.action}","${log.description}","${getUserDisplayName(log)}","${getUserRole(log)}","${format(parseISO(log.timestamp), 'yyyy-MM-dd h:mm:ss a')}","${log.severity}","${log.ipAddress}"\n`;
       });
     } else if (exportFormat === 'json') {
       exportData = JSON.stringify(filteredLogs, null, 2);

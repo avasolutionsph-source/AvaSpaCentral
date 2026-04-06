@@ -110,7 +110,7 @@ NET PAY:                    ₱${payroll.netPay.toFixed(2)}
 ═══════════════════════════════════════════
 
 Status: ${payroll.status.toUpperCase()}
-Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
+Generated: ${format(new Date(), 'yyyy-MM-dd h:mm:ss a')}
 `;
 
     const blob = new Blob([payslipText], { type: 'text/plain' });

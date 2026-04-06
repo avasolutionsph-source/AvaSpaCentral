@@ -157,7 +157,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
     let csv = 'Receipt Number,Date,Customer,Phone,Items,Subtotal,Discount,Tax,Total,Payment Method,Cashier\n';
     filteredTransactions.forEach(t => {
       const itemsList = t.items.map(i => `${i.name} x${i.quantity}`).join('; ');
-      csv += `"${escapeCsv(t.receiptNumber)}","${format(parseISO(t.date), 'yyyy-MM-dd HH:mm')}","${escapeCsv(t.customer.name)}","${escapeCsv(t.customer.phone)}","${escapeCsv(itemsList)}","₱${t.subtotal.toFixed(2)}","₱${t.discount.toFixed(2)}","₱${t.tax.toFixed(2)}","₱${t.total.toFixed(2)}","${escapeCsv(t.paymentMethod)}","${escapeCsv(t.cashier)}"\n`;
+      csv += `"${escapeCsv(t.receiptNumber)}","${format(parseISO(t.date), 'yyyy-MM-dd h:mm a')}","${escapeCsv(t.customer.name)}","${escapeCsv(t.customer.phone)}","${escapeCsv(itemsList)}","₱${t.subtotal.toFixed(2)}","₱${t.discount.toFixed(2)}","₱${t.tax.toFixed(2)}","₱${t.total.toFixed(2)}","${escapeCsv(t.paymentMethod)}","${escapeCsv(t.cashier)}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -416,7 +416,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                     <td>
                       <span className="transaction-receipt">{transaction.receiptNumber}</span>
                     </td>
-                    <td>{format(parseISO(transaction.date), 'MMM dd, yyyy HH:mm')}</td>
+                    <td>{format(parseISO(transaction.date), 'MMM dd, yyyy h:mm a')}</td>
                     <td>
                       <div className="transaction-customer">
                         <span className="customer-name">{transaction.customer.name}</span>
@@ -488,7 +488,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
               </div>
               <div className="info-group">
                 <div className="info-label">Date & Time</div>
-                <div className="info-value">{format(parseISO(selectedTransaction.date), 'MMMM dd, yyyy HH:mm')}</div>
+                <div className="info-value">{format(parseISO(selectedTransaction.date), 'MMMM dd, yyyy h:mm a')}</div>
               </div>
               <div className="info-group">
                 <div className="info-label">Customer</div>

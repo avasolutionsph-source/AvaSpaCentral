@@ -460,9 +460,20 @@ export const serviceRotationApi = {
     const today = getTodayDateString();
 
     // Get today's attendance from Dexie - use toArray + filter for reliability
-    // (indexed query can miss records if date format varies)
+    // Handle both camelCase (local) and snake_case (from Supabase sync) field names
     const allAttendance = await db.attendance.toArray();
-    const todayAttendance = allAttendance.filter(a => a.date === today && a.clockIn && !a.clockOut);
+    const todayAttendance = allAttendance.filter(a => {
+      const date = a.date;
+      const clockIn = a.clockIn || a.clock_in;
+      const clockOut = a.clockOut || a.clock_out;
+      return date === today && clockIn && !clockOut;
+    });
+    // Normalize field names for downstream use
+    todayAttendance.forEach(a => {
+      if (!a.clockIn && a.clock_in) a.clockIn = a.clock_in;
+      if (!a.clockOut && a.clock_out) a.clockOut = a.clock_out;
+      if (!a.employeeId && a.employee_id) a.employeeId = a.employee_id;
+    });
 
     // Also include overnight shift workers (clocked in yesterday, still working)
     const yesterday = new Date();
@@ -471,7 +482,15 @@ export const serviceRotationApi = {
       const y = yesterday;
       return `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
     })() : '';
-    const overnightWorkers = allAttendance.filter(a => a.date === yesterdayStr && a.clockIn && !a.clockOut);
+    const overnightWorkers = allAttendance.filter(a => {
+      const clockIn = a.clockIn || a.clock_in;
+      const clockOut = a.clockOut || a.clock_out;
+      return a.date === yesterdayStr && clockIn && !clockOut;
+    });
+    overnightWorkers.forEach(a => {
+      if (!a.clockIn && a.clock_in) a.clockIn = a.clock_in;
+      if (!a.employeeId && a.employee_id) a.employeeId = a.employee_id;
+    });
     const todayEmpIds = new Set(todayAttendance.map(a => String(a.employeeId)));
     overnightWorkers.forEach(a => {
       if (!todayEmpIds.has(String(a.employeeId))) {

@@ -103,8 +103,8 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
   const handleExportSession = (session) => {
     const sessionText = `CASH DRAWER SESSION REPORT\n\n` +
       `Cashier: ${session.user.firstName} ${session.user.lastName}\n` +
-      `Opened: ${format(parseISO(session.openTime), 'MMM dd, yyyy HH:mm')}\n` +
-      `Closed: ${session.closeTime ? format(parseISO(session.closeTime), 'MMM dd, yyyy HH:mm') : 'Still Open'}\n\n` +
+      `Opened: ${format(parseISO(session.openTime), 'MMM dd, yyyy h:mm a')}\n` +
+      `Closed: ${session.closeTime ? format(parseISO(session.closeTime), 'MMM dd, yyyy h:mm a') : 'Still Open'}\n\n` +
       `Opening Float: ₱${session.openingFloat.toFixed(2)}\n` +
       `Expected Cash: ₱${session.expectedCash.toFixed(2)}\n` +
       `Actual Cash: ₱${session.actualCash ? session.actualCash.toFixed(2) : 'N/A'}\n` +
@@ -237,14 +237,14 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
                       <div className="session-meta-item">
                         <div className="session-meta-label">Opened</div>
                         <div className="session-meta-value">
-                          {format(parseISO(session.openTime), 'MMM dd, yyyy HH:mm')}
+                          {format(parseISO(session.openTime), 'MMM dd, yyyy h:mm a')}
                         </div>
                       </div>
                       {session.closeTime && (
                         <div className="session-meta-item">
                           <div className="session-meta-label">Closed</div>
                           <div className="session-meta-value">
-                            {format(parseISO(session.closeTime), 'MMM dd, yyyy HH:mm')}
+                            {format(parseISO(session.closeTime), 'MMM dd, yyyy h:mm a')}
                           </div>
                         </div>
                       )}

@@ -951,7 +951,7 @@ const Inventory = ({ embedded = false, onDataChange }) => {
                           {entry.type}
                         </span>
                         <span className="history-date">
-                          {format(parseISO(entry.date), 'MMM dd, yyyy HH:mm')}
+                          {format(parseISO(entry.date), 'MMM dd, yyyy h:mm a')}
                         </span>
                       </div>
                       <div className="history-details">

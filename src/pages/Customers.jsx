@@ -844,7 +844,7 @@ const Customers = () => {
                         </div>
                       </div>
                       <div className="purchase-amount">
-                        ₱{purchase.amount.toLocaleString()}
+                        ₱{(purchase.amount ?? 0).toLocaleString()}
                       </div>
                     </div>
                   ))

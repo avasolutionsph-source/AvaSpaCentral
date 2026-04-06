@@ -191,10 +191,15 @@ export const authApi = {
       throw new Error('No active session');
     }
 
-    return {
-      valid: true,
-      user: JSON.parse(user)
-    };
+    try {
+      return {
+        valid: true,
+        user: JSON.parse(user)
+      };
+    } catch {
+      localStorage.removeItem('user');
+      throw new Error('Corrupted session data. Please log in again.');
+    }
   },
 
   // Logout
@@ -262,7 +267,8 @@ const initPayrollConfig = async () => {
   // Check for localStorage migration first
   const storedLS = localStorage.getItem('payrollConfig');
   if (storedLS) {
-    const config = JSON.parse(storedLS);
+    let config;
+    try { config = JSON.parse(storedLS); } catch { localStorage.removeItem('payrollConfig'); return await PayrollConfigRepository.getAll(); }
     // Migrate using repository (triggers sync events)
     for (const [key, value] of Object.entries(config)) {
       await PayrollConfigRepository.set(key, value);
@@ -275,7 +281,8 @@ const initPayrollConfig = async () => {
   // Migrate logs if exist
   const storedLogs = localStorage.getItem('payrollConfigLogs');
   if (storedLogs) {
-    const logs = JSON.parse(storedLogs);
+    let logs;
+    try { logs = JSON.parse(storedLogs); } catch { localStorage.removeItem('payrollConfigLogs'); logs = []; }
     if (logs.length > 0) {
       for (const log of logs) {
         await PayrollConfigLogRepository.create(log);
@@ -429,7 +436,8 @@ const initServiceRotation = async () => {
   const oldKey = `serviceRotation_${today}`;
   const storedLS = localStorage.getItem(oldKey);
   if (storedLS) {
-    const data = JSON.parse(storedLS);
+    let data;
+    try { data = JSON.parse(storedLS); } catch { localStorage.removeItem(oldKey); return { serviceCount: {}, lastServed: null }; }
     await ServiceRotationRepository.setRotation(today, data);
     localStorage.removeItem(oldKey);
     console.log('[ServiceRotationApi] Migrated serviceRotation using repository');

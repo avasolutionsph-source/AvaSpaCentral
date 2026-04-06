@@ -43,11 +43,11 @@ class ErrorBoundary extends React.Component {
             <h1 id="error-title">Something went wrong</h1>
             <p id="error-description">We're sorry, but something unexpected happened. Please try again.</p>
 
-            {this.state.error && (
-              <details className="error-details" style={{ marginTop: '1rem', textAlign: 'left', maxWidth: '600px', margin: '1rem auto', fontSize: '0.8rem' }}>
-                <summary style={{ cursor: 'pointer', color: '#666' }}>Error Details</summary>
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#f5f5f5', padding: '1rem', borderRadius: '8px', marginTop: '0.5rem' }}>{this.state.error.toString()}</pre>
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#f5f5f5', padding: '1rem', borderRadius: '8px', marginTop: '0.5rem', maxHeight: '200px', overflow: 'auto' }}>{this.state.errorInfo?.componentStack}</pre>
+            {process.env.NODE_ENV === 'development' && this.state.error && (
+              <details className="error-details">
+                <summary>Error Details (Development Only)</summary>
+                <pre>{this.state.error.toString()}</pre>
+                <pre>{this.state.errorInfo?.componentStack}</pre>
               </details>
             )}
 

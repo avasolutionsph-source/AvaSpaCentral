@@ -1927,17 +1927,17 @@ const POS = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0' }}>
                         <span>Balance:</span>
                         <span style={{ fontWeight: 700, color: 'var(--success)' }}>
-                          ₱{gcValidation.giftCertificate.balance.toLocaleString()}
+                          ₱{(gcValidation.giftCertificate.balance ?? 0).toLocaleString()}
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0' }}>
                         <span>Original Amount:</span>
-                        <span>₱{gcValidation.giftCertificate.amount.toLocaleString()}</span>
+                        <span>₱{(gcValidation.giftCertificate.amount ?? 0).toLocaleString()}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0' }}>
                         <span>Discount to Apply:</span>
                         <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
-                          ₱{Math.min(gcValidation.giftCertificate.balance, getCartSubtotal()).toLocaleString()}
+                          ₱{Math.min(gcValidation.giftCertificate.balance ?? 0, getCartSubtotal()).toLocaleString()}
                         </span>
                       </div>
                     </div>

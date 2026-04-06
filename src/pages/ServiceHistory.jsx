@@ -185,7 +185,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
     const employeeStats = {};
 
     filteredTransactions.forEach(t => {
-      t.items.forEach(item => {
+      (t.items || []).forEach(item => {
         if (!employeeStats[item.employeeName]) {
           employeeStats[item.employeeName] = {
             services: 0,
@@ -214,6 +214,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
   const totalPages = Math.ceil(filteredTransactions.length / transactionsPerPage);
 
   const getInitials = (name) => {
+    if (!name) return '?';
     const names = name.split(' ');
     return names.map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2);
   };

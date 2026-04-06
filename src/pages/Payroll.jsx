@@ -653,7 +653,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
                   <td>
                     <div className="payroll-employee-cell">
                       <div className="payroll-employee-avatar">
-                        {payroll.employee.firstName.charAt(0)}{payroll.employee.lastName.charAt(0)}
+                        {payroll.employee?.firstName?.charAt(0)}{payroll.employee?.lastName?.charAt(0)}
                       </div>
                       <div className="payroll-employee-info">
                         <span className="payroll-employee-name">

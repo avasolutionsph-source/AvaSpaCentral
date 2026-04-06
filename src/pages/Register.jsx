@@ -289,8 +289,8 @@ const Register = () => {
                     className="strength-label"
                     style={{ color: passwordStrength.color }}
                   >
-                    {passwordStrength.level.charAt(0).toUpperCase() +
-                      passwordStrength.level.slice(1)}
+                    {(passwordStrength.level?.charAt(0)?.toUpperCase() || '') +
+                      (passwordStrength.level?.slice(1) || '')}
                   </span>
                 </div>
               )}

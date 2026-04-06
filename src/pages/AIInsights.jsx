@@ -78,7 +78,7 @@ const AIInsights = () => {
     const productConsumption = {};
 
     serviceTxns.forEach(txn => {
-      txn.items.forEach(item => {
+      (txn.items || []).forEach(item => {
         if (item.type === 'service') {
           const serviceName = item.name;
 

@@ -69,7 +69,7 @@ const AdvanceBookingsTab = () => {
       const now = new Date();
 
       if (now < bookingTime) {
-        showToast('Starting service earlier than scheduled (demo)', 'info');
+        showToast('Starting service earlier than scheduled', 'info');
       } else {
         showToast('Service started successfully', 'success');
       }

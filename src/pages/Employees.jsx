@@ -432,7 +432,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
             <div key={employee._id} className={`employee-card ${employee.status !== 'active' ? 'inactive' : ''}`}>
               <div className="employee-header">
                 <div className="employee-avatar">
-                  {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
+                  {employee.firstName?.charAt(0)}{employee.lastName?.charAt(0)}
                 </div>
                 <div className="employee-status-badge">
                   {employee.status === 'active' ? '✓ Active' : '✕ Inactive'}
@@ -516,7 +516,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                 <tr key={employee._id} className={employee.status !== 'active' ? 'inactive-row' : ''}>
                   <td className="employee-name-cell">
                     <div className="table-avatar">
-                      {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
+                      {employee.firstName?.charAt(0)}{employee.lastName?.charAt(0)}
                     </div>
                     <span>{employee.firstName} {employee.lastName}</span>
                   </td>

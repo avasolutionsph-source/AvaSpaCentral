@@ -750,7 +750,7 @@ const POS = () => {
           totalAmount: getTotal(),
           paymentMethod: paymentMethod,
           amountReceived: paymentMethod === 'Cash' ? parseFloat(amountReceived) : getTotal(),
-          change: getChange(),
+          changeAmount: getChange(),
           cardTransactionId: cardTransactionId || null,
           gcashReference: gcashReference || null,
           employee: {

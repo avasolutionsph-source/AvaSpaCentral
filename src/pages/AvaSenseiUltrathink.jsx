@@ -152,7 +152,7 @@ const AvaSenseiUltrathink = () => {
 
       const serviceTxns = txns.filter(t => t.items?.some(item => item.type === 'service'));
       const totalServices = serviceTxns.reduce((sum, txn) => {
-        return sum + txn.items.filter(i => i.type === 'service').reduce((s, i) => s + (i.quantity || 1), 0);
+        return sum + (txn.items || []).filter(i => i.type === 'service').reduce((s, i) => s + (i.quantity || 1), 0);
       }, 0);
       const avgServicesPerDay = Math.max(totalServices / 30, 5);
 

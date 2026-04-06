@@ -643,7 +643,7 @@ const Customers = () => {
               <div key={customer._id} className="customer-card">
               <div className="customer-header">
                 <div className="customer-avatar">
-                  {customer.name.split(' ').map(n => n.charAt(0)).join('').slice(0, 2)}
+                  {customer.name?.split(' ').map(n => n.charAt(0)).join('').slice(0, 2) || '?'}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   {/* Spend-based Tier Badge */}

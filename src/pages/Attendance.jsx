@@ -654,7 +654,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                   <td>
                     <div className="employee-cell">
                       <div className="employee-mini-avatar">
-                        {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
+                        {employee.firstName?.charAt(0)}{employee.lastName?.charAt(0)}
                       </div>
                       <div className="employee-info">
                         <span className="employee-name">{employee.firstName} {employee.lastName}</span>

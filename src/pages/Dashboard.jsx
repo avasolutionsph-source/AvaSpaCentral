@@ -887,40 +887,40 @@ const Dashboard = () => {
           <div className="kpi-items">
             <div className="kpi-item">
               <span className="kpi-label">Today's Revenue</span>
-              <span className="kpi-value">₱{kpis?.financial.todayRevenue.toLocaleString()}</span>
+              <span className="kpi-value">₱{(kpis?.financial?.todayRevenue ?? 0).toLocaleString()}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">This Week</span>
-              <span className="kpi-value">₱{kpis?.financial.weekRevenue.toLocaleString()}</span>
+              <span className="kpi-value">₱{(kpis?.financial?.weekRevenue ?? 0).toLocaleString()}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">This Month</span>
-              <span className="kpi-value">₱{kpis?.financial.monthRevenue.toLocaleString()}</span>
+              <span className="kpi-value">₱{(kpis?.financial?.monthRevenue ?? 0).toLocaleString()}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Avg Transaction</span>
-              <span className="kpi-value">₱{kpis?.financial.avgTransaction.toLocaleString()}</span>
+              <span className="kpi-value">₱{(kpis?.financial?.avgTransaction ?? 0).toLocaleString()}</span>
             </div>
           </div>
           {dailyGoal > 0 && (
             <div className="goal-progress">
               <div className="progress-info">
                 <span>Daily Goal Progress</span>
-                <span>{Math.round((kpis?.financial.todayRevenue / dailyGoal) * 100)}%</span>
+                <span>{Math.round(((kpis?.financial?.todayRevenue ?? 0) / dailyGoal) * 100)}%</span>
               </div>
               <div className="progress-bar">
                 <div
                   className="progress-fill"
                   style={{
-                    width: `${Math.min((kpis?.financial.todayRevenue / dailyGoal) * 100, 100)}%`,
+                    width: `${Math.min(((kpis?.financial?.todayRevenue ?? 0) / dailyGoal) * 100, 100)}%`,
                     backgroundColor:
-                      (kpis?.financial.todayRevenue / dailyGoal) >= 1 ? '#10b981' :
-                      (kpis?.financial.todayRevenue / dailyGoal) >= 0.5 ? '#f59e0b' : '#ef4444'
+                      ((kpis?.financial?.todayRevenue ?? 0) / dailyGoal) >= 1 ? '#10b981' :
+                      ((kpis?.financial?.todayRevenue ?? 0) / dailyGoal) >= 0.5 ? '#f59e0b' : '#ef4444'
                   }}
                 ></div>
               </div>
               <div className="progress-text">
-                ₱{kpis?.financial.todayRevenue.toLocaleString()} / ₱{dailyGoal.toLocaleString()}
+                ₱{(kpis?.financial?.todayRevenue ?? 0).toLocaleString()} / ₱{dailyGoal.toLocaleString()}
               </div>
             </div>
           )}
@@ -934,19 +934,19 @@ const Dashboard = () => {
           <div className="kpi-items">
             <div className="kpi-item">
               <span className="kpi-label">Pending Appointments</span>
-              <span className="kpi-value">{kpis?.operational.pendingAppointments}</span>
+              <span className="kpi-value">{kpis?.operational?.pendingAppointments ?? 0}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Confirmed Appointments</span>
-              <span className="kpi-value">{kpis?.operational.confirmedAppointments}</span>
+              <span className="kpi-value">{kpis?.operational?.confirmedAppointments ?? 0}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Completed Today</span>
-              <span className="kpi-value">{kpis?.operational.completedToday}</span>
+              <span className="kpi-value">{kpis?.operational?.completedToday ?? 0}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Room Utilization</span>
-              <span className="kpi-value">{kpis?.operational.roomUtilization}%</span>
+              <span className="kpi-value">{kpis?.operational?.roomUtilization ?? 0}%</span>
             </div>
           </div>
         </div>
@@ -959,25 +959,25 @@ const Dashboard = () => {
           <div className="kpi-items">
             <div className="kpi-item">
               <span className="kpi-label">Attendance Rate</span>
-              <span className="kpi-value">{kpis?.staff.attendanceRate}%</span>
+              <span className="kpi-value">{kpis?.staff?.attendanceRate ?? 0}%</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Total Overtime</span>
-              <span className="kpi-value">{kpis?.staff.totalOvertime}h</span>
+              <span className="kpi-value">{kpis?.staff?.totalOvertime ?? 0}h</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Late Arrivals Today</span>
-              <span className="kpi-value">{kpis?.staff.lateArrivals}</span>
+              <span className="kpi-value">{kpis?.staff?.lateArrivals ?? 0}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Active Employees</span>
-              <span className="kpi-value">{kpis?.staff.activeEmployees}</span>
+              <span className="kpi-value">{kpis?.staff?.activeEmployees ?? 0}</span>
             </div>
             {salaryHealth && (
               <div className="kpi-item" style={{ borderTop: '1px solid #eee', paddingTop: '8px', marginTop: '8px' }}>
                 <span className="kpi-label">Payroll Health</span>
                 <span className="kpi-value" style={{
-                  color: salaryHealth.health.color,
+                  color: salaryHealth?.health?.color,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
@@ -986,9 +986,9 @@ const Dashboard = () => {
                     width: '8px',
                     height: '8px',
                     borderRadius: '50%',
-                    background: salaryHealth.health.color
+                    background: salaryHealth?.health?.color
                   }}></span>
-                  {salaryHealth.currentMonth.payrollPercentage}%
+                  {salaryHealth?.currentMonth?.payrollPercentage ?? 0}%
                 </span>
               </div>
             )}
@@ -1003,19 +1003,19 @@ const Dashboard = () => {
           <div className="kpi-items">
             <div className="kpi-item clickable" onClick={() => navigate('/products')}>
               <span className="kpi-label">Critical Stock</span>
-              <span className="kpi-value kpi-critical">{kpis?.inventory.criticalStock}</span>
+              <span className="kpi-value kpi-critical">{kpis?.inventory?.criticalStock ?? 0}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Out of Stock</span>
-              <span className="kpi-value">{kpis?.inventory.outOfStock}</span>
+              <span className="kpi-value">{kpis?.inventory?.outOfStock ?? 0}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Total Value</span>
-              <span className="kpi-value">₱{kpis?.inventory.totalValue.toLocaleString()}</span>
+              <span className="kpi-value">₱{(kpis?.inventory?.totalValue ?? 0).toLocaleString()}</span>
             </div>
             <div className="kpi-item">
               <span className="kpi-label">Low Stock Alerts</span>
-              <span className="kpi-value kpi-warning">{kpis?.inventory.lowStockAlerts}</span>
+              <span className="kpi-value kpi-warning">{kpis?.inventory?.lowStockAlerts ?? 0}</span>
             </div>
           </div>
         </div>

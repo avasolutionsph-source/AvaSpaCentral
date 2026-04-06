@@ -904,21 +904,16 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                 <h3 className="room-name">{room.name}</h3>
                 <p className="room-type">{room.type}</p>
 
-                {/* Show assigned employee when room is pending or occupied */}
-                {(room.status === 'pending' || room.status === 'occupied') && room.assignedEmployeeName && (
-                  <div className="room-assigned-employee">
-                    <span className="employee-icon">👤</span>
-                    <span className="employee-name">{room.assignedEmployeeName}</span>
-                  </div>
-                )}
-
-                {/* Show customer info for pending/occupied rooms */}
-                {(room.status === 'pending' || room.status === 'occupied') && room.customerName && (
+                {/* Show service details for pending/occupied rooms */}
+                {(room.status === 'pending' || room.status === 'occupied') && (
                   <div className="room-customer-info">
-                    <div className="customer-info-header">Customer Info</div>
                     <div className="customer-info-row">
                       <span>👤</span>
-                      <span>{room.customerName}</span>
+                      <span><strong>Therapist:</strong> {room.assignedEmployeeName || 'Not assigned'}</span>
+                    </div>
+                    <div className="customer-info-row">
+                      <span>🧑</span>
+                      <span><strong>Customer:</strong> {room.customerName || 'Walk-in'}</span>
                     </div>
                     {room.customerPhone && (
                       <div className="customer-info-row">

@@ -68,7 +68,7 @@ const uploadProductImage = async (file, businessId, productName) => {
   }
 };
 
-const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
+const Products = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderRef }) => {
   const { user, showToast, canEdit, canEditProducts, isBranchOwner, getUserBranchId } = useApp();
 
   // Filter state
@@ -187,6 +187,13 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       onOpenCreateRef.current = openCreate;
     }
   }, [onOpenCreateRef, openCreate]);
+
+  // Expose manage order to parent via ref callback
+  React.useEffect(() => {
+    if (onManageOrderRef) {
+      onManageOrderRef.current = () => setShowManageOrder(true);
+    }
+  }, [onManageOrderRef]);
 
   // Image upload state
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -360,19 +367,6 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
         />
       )}
 
-
-      {/* Manage Order button for embedded view */}
-      {embedded && canEditProducts() && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowManageOrder(true)}
-            style={{ fontSize: '0.85rem' }}
-          >
-            ↕ Manage Order
-          </button>
-        </div>
-      )}
 
       {/* Filters */}
       <FilterBar

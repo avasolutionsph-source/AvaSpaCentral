@@ -22,6 +22,7 @@ const InventoryHub = () => {
   const productsOpenCreateRef = useRef(null);
   const roomsOpenCreateRef = useRef(null);
   const roomsManageOrderRef = useRef(null);
+  const productsManageOrderRef = useRef(null);
 
   // Quick stats for badges
   const [stats, setStats] = useState({
@@ -163,12 +164,20 @@ const InventoryHub = () => {
               </div>
             )}
             {activeTab === 'products' && canEditProducts() && (
-              <button
-                className="btn btn-primary"
-                onClick={() => productsOpenCreateRef.current?.()}
-              >
-                + Add Product/Service
-              </button>
+              <>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => productsManageOrderRef.current?.()}
+                >
+                  ↕ Manage Order
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => productsOpenCreateRef.current?.()}
+                >
+                  + Add Product/Service
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -196,7 +205,7 @@ const InventoryHub = () => {
       <div className="hub-content">
         {activeTab === 'rooms' && <Rooms embedded onDataChange={loadStats} onOpenCreateRef={roomsOpenCreateRef} onManageOrderRef={roomsManageOrderRef} />}
         {activeTab === 'history' && <ServiceHistory embedded />}
-        {activeTab === 'products' && <Products embedded onDataChange={loadStats} onOpenCreateRef={productsOpenCreateRef} />}
+        {activeTab === 'products' && <Products embedded onDataChange={loadStats} onOpenCreateRef={productsOpenCreateRef} onManageOrderRef={productsManageOrderRef} />}
         {activeTab === 'stock' && <Inventory embedded onDataChange={loadStats} />}
         {activeTab === 'suppliers' && <Suppliers embedded />}
         {activeTab === 'orders' && <PurchaseOrders embedded onDataChange={loadStats} />}

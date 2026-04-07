@@ -753,14 +753,6 @@ class SupabaseSyncManager {
       if (metadata.active !== undefined) converted.active = metadata.active;
     }
 
-    // Special handling for shiftSchedules: extract weeklySchedule from schedule JSONB column
-    if (entityType === 'shiftSchedules') {
-      if (converted.schedule && converted.schedule.weeklySchedule && !converted.weeklySchedule) {
-        converted.weeklySchedule = converted.schedule.weeklySchedule;
-      }
-      delete converted.schedule;
-    }
-
     return converted;
   }
 

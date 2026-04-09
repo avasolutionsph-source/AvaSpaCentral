@@ -613,7 +613,8 @@ class SupabaseSyncManager {
     if (tableName === 'shift_schedules') {
       if (converted.weekly_schedule) {
         converted.schedule = { weeklySchedule: converted.weekly_schedule };
-        delete converted.weekly_schedule;
+        // Explicitly null out weekly_schedule so Supabase clears the old column data
+        converted.weekly_schedule = null;
       }
     }
 
@@ -726,8 +727,9 @@ class SupabaseSyncManager {
     }
 
     // Special handling for shift_schedules: unwrap weeklySchedule from schedule JSONB
+    // Always prefer schedule.weeklySchedule (the canonical source) over weekly_schedule column
     if (entityType === 'shiftSchedules') {
-      if (converted.schedule && converted.schedule.weeklySchedule && !converted.weeklySchedule) {
+      if (converted.schedule && converted.schedule.weeklySchedule) {
         converted.weeklySchedule = converted.schedule.weeklySchedule;
       }
     }

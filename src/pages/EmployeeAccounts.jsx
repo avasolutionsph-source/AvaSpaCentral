@@ -529,6 +529,11 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       // Update local Dexie
       await usersApi.update(selectedItem._id, submitData);
 
+      // Update password if provided
+      if (formData.password && formData.password.trim()) {
+        await usersApi.updatePassword(selectedItem._id, formData.password);
+      }
+
       // Also sync to Supabase users table
       if (isSupabaseConfigured()) {
         try {
@@ -551,6 +556,18 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
             if (error) {
               console.error('[EmployeeAccounts] Supabase sync error:', error);
               showToast('Account updated locally but failed to sync to server. Changes will sync later.', 'warning');
+            }
+
+            // Update password in Supabase Auth if provided
+            if (formData.password && formData.password.trim() && selectedItem.authId) {
+              const { error: pwError } = await supabase.rpc('update_auth_user_password', {
+                user_auth_id: selectedItem.authId,
+                new_password: formData.password
+              });
+              if (pwError) {
+                console.error('[EmployeeAccounts] Supabase password update error:', pwError);
+                showToast('Account updated but password sync to server failed.', 'warning');
+              }
             }
           }
         } catch (syncErr) {

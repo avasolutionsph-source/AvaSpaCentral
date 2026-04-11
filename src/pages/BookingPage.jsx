@@ -578,9 +578,20 @@ const BookingPage = () => {
         created_at: new Date().toISOString()
       };
 
-      const { error: insertError } = await supabase
+      console.log('[BookingPage] Submitting booking data:', JSON.stringify(bookingData, null, 2));
+
+      // Add timeout to prevent infinite hang
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Booking request timed out after 15 seconds')), 15000)
+      );
+
+      const insertPromise = supabase
         .from('online_bookings')
         .insert([bookingData]);
+
+      const { error: insertError } = await Promise.race([insertPromise, timeoutPromise]);
+
+      console.log('[BookingPage] Insert result:', insertError ? `ERROR: ${insertError.message} (code: ${insertError.code})` : 'SUCCESS');
 
       if (insertError) {
         // If table doesn't exist, show error instead of false success
@@ -596,8 +607,8 @@ const BookingPage = () => {
         setBookingSuccess(true);
       }
     } catch (err) {
-      console.error('Error submitting booking:', err);
-      alert('Failed to submit booking. Please try again or contact the business directly.');
+      console.error('[BookingPage] Error submitting booking:', err);
+      alert(`Failed to submit booking: ${err.message}. Please try again or contact the business directly.`);
     } finally {
       setSubmitting(false);
     }

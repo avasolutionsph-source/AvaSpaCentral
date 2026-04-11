@@ -1078,20 +1078,20 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
 
                 {/* Action buttons for occupied rooms */}
                 {room.status === 'occupied' && (isMyRoom || !isTherapist()) && (
-                  <div className="service-action-buttons" style={{ marginTop: 'var(--spacing-sm)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'var(--spacing-sm)' }}>
                     <button
                       className="btn btn-primary"
                       onClick={() => openUpgradeModal(room)}
-                      style={{ flex: 1 }}
+                      style={{ width: '100%', fontSize: '0.85rem', padding: '6px 10px' }}
                     >
-                      ⬆️ Upgrade Service
+                      ⬆️ Upgrade
                     </button>
                     <button
-                      className="btn btn-error stop-service-btn"
+                      className="btn btn-error"
                       onClick={() => openStopServiceModal(room)}
-                      style={{ flex: 1 }}
+                      style={{ width: '100%', fontSize: '0.85rem', padding: '6px 10px' }}
                     >
-                      ⏹️ Stop Service
+                      ⏹️ Stop
                     </button>
                   </div>
                 )}

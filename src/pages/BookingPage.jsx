@@ -885,29 +885,25 @@ const BookingPage = () => {
 
       {/* Hero section with video or cover photo */}
       {business?.hero_video ? (
-        <div className="booking-hero" style={{ position: 'relative', overflow: 'hidden', height: '280px' }}>
+        <div className="booking-hero" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100vh', minHeight: '500px' }}>
           <video
             src={`/videos/${business.hero_video === 'candle' ? 'candle' : business.hero_video}.mp4`}
             autoPlay
             muted
-            loop
             playsInline
             style={{
               position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              minWidth: '100%',
-              minHeight: '100%',
-              width: 'auto',
-              height: 'auto',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
               objectFit: 'cover',
             }}
           />
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.7) 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -916,14 +912,47 @@ const BookingPage = () => {
             textAlign: 'center',
             padding: '20px',
           }}>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: 700, textShadow: '0 2px 8px rgba(0,0,0,0.5)', margin: 0 }}>
+            {business?.logo_url && (
+              <img src={business.logo_url} alt="" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', marginBottom: '16px', border: '3px solid rgba(255,255,255,0.3)' }} />
+            )}
+            <h2 style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: 700, textShadow: '0 2px 12px rgba(0,0,0,0.6)', margin: 0, letterSpacing: '1px' }}>
               {business?.name || 'Welcome'}
             </h2>
             {business?.tagline && (
-              <p style={{ fontSize: '1rem', opacity: 0.9, marginTop: '8px', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+              <p style={{ fontSize: 'clamp(1rem, 2.5vw, 1.4rem)', opacity: 0.9, marginTop: '12px', textShadow: '0 1px 6px rgba(0,0,0,0.5)', maxWidth: '600px' }}>
                 {business.tagline}
               </p>
             )}
+            <a
+              href="#booking-form"
+              style={{
+                marginTop: '32px',
+                padding: '14px 40px',
+                background: business?.primary_color || 'var(--primary-color, #8b1a2b)',
+                color: '#fff',
+                borderRadius: '50px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '1.1rem',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                transition: 'transform 0.2s',
+              }}
+            >
+              Book Now
+            </a>
+          </div>
+          {/* Scroll indicator */}
+          <div style={{
+            position: 'absolute',
+            bottom: '30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: 'rgba(255,255,255,0.7)',
+            fontSize: '0.85rem',
+            textAlign: 'center',
+            animation: 'bounce 2s infinite',
+          }}>
+            <div style={{ fontSize: '1.5rem' }}>&#8964;</div>
           </div>
         </div>
       ) : business?.cover_photo_url ? (

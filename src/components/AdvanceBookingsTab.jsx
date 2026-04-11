@@ -24,12 +24,17 @@ const AdvanceBookingsTab = () => {
     if (!supabaseUrl || !supabaseKey || !user?.businessId) return [];
 
     try {
+      // Use the authenticated user's token so RLS allows reading business bookings
+      const { supabase } = await import('../services/supabase/supabaseClient');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || supabaseKey;
+
       let url = `${supabaseUrl}/rest/v1/online_bookings?business_id=eq.${user.businessId}&deleted=eq.false&order=created_at.desc`;
 
       const response = await fetch(url, {
         headers: {
           'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });

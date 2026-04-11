@@ -5,6 +5,32 @@ import { getCustomerSession, logoutCustomer } from '../services/customerAuthServ
 import { applyColorTheme } from '../services/brandingService';
 import '../assets/css/booking.css';
 
+// Available hero fonts for booking page
+const HERO_FONTS = [
+  { value: "'Playfair Display', serif", label: 'Playfair Display', google: 'Playfair+Display:wght@400;700' },
+  { value: "'Great Vibes', cursive", label: 'Great Vibes', google: 'Great+Vibes' },
+  { value: "'Dancing Script', cursive", label: 'Dancing Script', google: 'Dancing+Script:wght@400;700' },
+  { value: "'Pacifico', cursive", label: 'Pacifico', google: 'Pacifico' },
+  { value: "'Sacramento', cursive", label: 'Sacramento', google: 'Sacramento' },
+  { value: "'Alex Brush', cursive", label: 'Alex Brush', google: 'Alex+Brush' },
+  { value: "'Allura', cursive", label: 'Allura', google: 'Allura' },
+  { value: "'Tangerine', cursive", label: 'Tangerine', google: 'Tangerine:wght@400;700' },
+  { value: "'Cormorant Garamond', serif", label: 'Cormorant Garamond', google: 'Cormorant+Garamond:wght@300;400;600' },
+  { value: "'Cinzel', serif", label: 'Cinzel', google: 'Cinzel:wght@400;700' },
+  { value: "'Libre Baskerville', serif", label: 'Libre Baskerville', google: 'Libre+Baskerville:wght@400;700' },
+  { value: "'Lora', serif", label: 'Lora', google: 'Lora:wght@400;700' },
+  { value: "'Pinyon Script', cursive", label: 'Pinyon Script', google: 'Pinyon+Script' },
+  { value: "'Satisfy', cursive", label: 'Satisfy', google: 'Satisfy' },
+  { value: "'Rouge Script', cursive", label: 'Rouge Script', google: 'Rouge+Script' },
+  { value: "'Italianno', cursive", label: 'Italianno', google: 'Italianno' },
+  { value: "'Montserrat', sans-serif", label: 'Montserrat', google: 'Montserrat:wght@300;400;700' },
+  { value: "'Raleway', sans-serif", label: 'Raleway', google: 'Raleway:wght@300;400;700' },
+  { value: "'Josefin Sans', sans-serif", label: 'Josefin Sans', google: 'Josefin+Sans:wght@300;400;700' },
+  { value: "'Quicksand', sans-serif", label: 'Quicksand', google: 'Quicksand:wght@300;400;700' },
+];
+
+export { HERO_FONTS };
+
 /**
  * BookingPage - Public customer booking page
  *
@@ -38,6 +64,8 @@ const BookingPage = () => {
 
   // Business info
   const [business, setBusiness] = useState(null);
+  const [heroFont, setHeroFont] = useState("'Playfair Display', serif");
+  const [heroFontColor, setHeroFontColor] = useState('#fff');
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -95,6 +123,22 @@ const BookingPage = () => {
   // Customer auth state
   const [customerSession, setCustomerSession] = useState(null);
   const [customerAccount, setCustomerAccount] = useState(null);
+
+  // Load Google Font for hero text
+  useEffect(() => {
+    const fontEntry = HERO_FONTS.find(f => f.value === heroFont);
+    if (fontEntry?.google) {
+      const linkId = 'hero-google-font';
+      let link = document.getElementById(linkId);
+      if (!link) {
+        link = document.createElement('link');
+        link.id = linkId;
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+      link.href = `https://fonts.googleapis.com/css2?family=${fontEntry.google}&display=swap`;
+    }
+  }, [heroFont]);
 
   // Check customer session and auto-fill details
   useEffect(() => {
@@ -197,6 +241,19 @@ const BookingPage = () => {
 
           // Use the actual UUID for subsequent queries (in case we looked up by slug)
           const actualBusinessId = businessData.id;
+
+          // Load hero font settings
+          try {
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor)&select=key,value`;
+            const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
+            if (fontRes.ok) {
+              const fontData = await fontRes.json();
+              fontData.forEach(s => {
+                if (s.key === 'heroFont' && s.value) setHeroFont(s.value);
+                if (s.key === 'heroFontColor' && s.value) setHeroFontColor(s.value);
+              });
+            }
+          } catch (e) { /* best effort */ }
 
           // Fetch active services for this business using direct REST API
           console.log('[BookingPage] Fetching services...');
@@ -849,15 +906,10 @@ const BookingPage = () => {
   // Main booking form
   return (
     <div className="booking-page">
-      {/* Top bar — logo + auth buttons */}
+      {/* Floating notch nav bar */}
       <header className="booking-topbar">
         <div className="booking-topbar-content">
-          <div className="booking-topbar-brand">
-            {business?.logo_url
-              ? <img src={business.logo_url} alt={business?.name} className="booking-topbar-logo" />
-              : <span className="booking-topbar-name">{business?.name || 'Book Now'}</span>
-            }
-          </div>
+          <span className="booking-topbar-name">{business?.name || 'Book Now'}</span>
           <div className="booking-header-auth">
             {customerSession ? (
               <div className="customer-logged-in">
@@ -903,7 +955,7 @@ const BookingPage = () => {
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.7) 100%)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.6) 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -912,34 +964,30 @@ const BookingPage = () => {
             textAlign: 'center',
             padding: '20px',
           }}>
-            {business?.logo_url && (
-              <img src={business.logo_url} alt="" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', marginBottom: '16px', border: '3px solid rgba(255,255,255,0.3)' }} />
-            )}
-            <h2 style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: 700, textShadow: '0 2px 12px rgba(0,0,0,0.6)', margin: 0, letterSpacing: '1px' }}>
+            <h2 style={{
+              fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+              fontWeight: 400,
+              textShadow: '0 2px 16px rgba(0,0,0,0.5)',
+              margin: 0,
+              letterSpacing: '2px',
+              fontFamily: heroFont || "'Playfair Display', serif",
+              color: heroFontColor || '#fff',
+            }}>
               {business?.name || 'Welcome'}
             </h2>
             {business?.tagline && (
-              <p style={{ fontSize: 'clamp(1rem, 2.5vw, 1.4rem)', opacity: 0.9, marginTop: '12px', textShadow: '0 1px 6px rgba(0,0,0,0.5)', maxWidth: '600px' }}>
+              <p style={{
+                fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
+                opacity: 0.85,
+                marginTop: '16px',
+                textShadow: '0 1px 8px rgba(0,0,0,0.5)',
+                maxWidth: '600px',
+                fontWeight: 300,
+                letterSpacing: '1px',
+              }}>
                 {business.tagline}
               </p>
             )}
-            <a
-              href="#booking-form"
-              style={{
-                marginTop: '32px',
-                padding: '14px 40px',
-                background: business?.primary_color || 'var(--primary-color, #8b1a2b)',
-                color: '#fff',
-                borderRadius: '50px',
-                textDecoration: 'none',
-                fontWeight: 600,
-                fontSize: '1.1rem',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                transition: 'transform 0.2s',
-              }}
-            >
-              Book Now
-            </a>
           </div>
           {/* Scroll indicator */}
           <div style={{
@@ -947,12 +995,10 @@ const BookingPage = () => {
             bottom: '30px',
             left: '50%',
             transform: 'translateX(-50%)',
-            color: 'rgba(255,255,255,0.7)',
-            fontSize: '0.85rem',
+            color: 'rgba(255,255,255,0.6)',
             textAlign: 'center',
-            animation: 'bounce 2s infinite',
           }}>
-            <div style={{ fontSize: '1.5rem' }}>&#8964;</div>
+            <div style={{ fontSize: '1.8rem', animation: 'bounce 2s infinite' }}>&#8964;</div>
           </div>
         </div>
       ) : business?.cover_photo_url ? (

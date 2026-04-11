@@ -575,6 +575,13 @@ const Settings = () => {
         setLogoPreview(data.logoUrl);
         setCoverPreview(data.coverPhotoUrl);
         if (data.primaryColor) applyColorTheme(data.primaryColor);
+        // Load hero font settings from settings repo
+        try {
+          const savedHeroFont = await SettingsRepository.get('heroFont');
+          const savedHeroFontColor = await SettingsRepository.get('heroFontColor');
+          if (savedHeroFont) setBrandingSettings(prev => ({ ...prev, heroFont: savedHeroFont }));
+          if (savedHeroFontColor) setBrandingSettings(prev => ({ ...prev, heroFontColor: savedHeroFontColor }));
+        } catch {}
       } catch (err) {
         console.error('Error loading branding:', err);
       }
@@ -647,6 +654,8 @@ const Settings = () => {
       try {
         await SettingsRepository.set('footerFont', brandingSettings.footerFont || 'default');
         await SettingsRepository.set('footerFontSize', brandingSettings.footerFontSize || '14');
+        await SettingsRepository.set('heroFont', brandingSettings.heroFont || "'Playfair Display', serif");
+        await SettingsRepository.set('heroFontColor', brandingSettings.heroFontColor || '#ffffff');
       } catch (fontErr) {
         console.warn('Font settings save failed:', fontErr);
       }
@@ -2076,6 +2085,86 @@ const Settings = () => {
                     {!brandingSettings.heroVideo && '✓ '}No Video
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Hero Text Style */}
+            <div className="branding-sub-section">
+              <h3 className="branding-sub-title">Hero Text Style</h3>
+              <p className="branding-sub-desc">Customize the business name font and color on your booking page hero.</p>
+              <div className="settings-row">
+                <div className="settings-form-group">
+                  <label>Font</label>
+                  <select
+                    className="form-control"
+                    value={brandingSettings.heroFont || "'Playfair Display', serif"}
+                    onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroFont: e.target.value }))}
+                    style={{ fontFamily: brandingSettings.heroFont || "'Playfair Display', serif" }}
+                    disabled={!canEdit()}
+                  >
+                    {[
+                      { value: "'Playfair Display', serif", label: 'Playfair Display' },
+                      { value: "'Great Vibes', cursive", label: 'Great Vibes' },
+                      { value: "'Dancing Script', cursive", label: 'Dancing Script' },
+                      { value: "'Pacifico', cursive", label: 'Pacifico' },
+                      { value: "'Sacramento', cursive", label: 'Sacramento' },
+                      { value: "'Alex Brush', cursive", label: 'Alex Brush' },
+                      { value: "'Allura', cursive", label: 'Allura' },
+                      { value: "'Tangerine', cursive", label: 'Tangerine' },
+                      { value: "'Cormorant Garamond', serif", label: 'Cormorant Garamond' },
+                      { value: "'Cinzel', serif", label: 'Cinzel' },
+                      { value: "'Libre Baskerville', serif", label: 'Libre Baskerville' },
+                      { value: "'Lora', serif", label: 'Lora' },
+                      { value: "'Pinyon Script', cursive", label: 'Pinyon Script' },
+                      { value: "'Satisfy', cursive", label: 'Satisfy' },
+                      { value: "'Rouge Script', cursive", label: 'Rouge Script' },
+                      { value: "'Italianno', cursive", label: 'Italianno' },
+                      { value: "'Montserrat', sans-serif", label: 'Montserrat' },
+                      { value: "'Raleway', sans-serif", label: 'Raleway' },
+                      { value: "'Josefin Sans', sans-serif", label: 'Josefin Sans' },
+                      { value: "'Quicksand', sans-serif", label: 'Quicksand' },
+                    ].map(f => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="settings-form-group">
+                  <label>Text Color</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="color"
+                      value={brandingSettings.heroFontColor || '#ffffff'}
+                      onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroFontColor: e.target.value }))}
+                      disabled={!canEdit()}
+                      style={{ width: '40px', height: '36px', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer' }}
+                    />
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={brandingSettings.heroFontColor || '#ffffff'}
+                      onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroFontColor: e.target.value }))}
+                      disabled={!canEdit()}
+                      style={{ width: '100px' }}
+                    />
+                  </div>
+                </div>
+              </div>
+              {/* Font preview */}
+              <div style={{
+                marginTop: '12px',
+                padding: '20px',
+                background: 'linear-gradient(135deg, #1a1a2e, #0f3460)',
+                borderRadius: '10px',
+                textAlign: 'center',
+              }}>
+                <span style={{
+                  fontFamily: brandingSettings.heroFont || "'Playfair Display', serif",
+                  color: brandingSettings.heroFontColor || '#fff',
+                  fontSize: '1.8rem',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                }}>
+                  {brandingSettings.businessName || 'Your Business Name'}
+                </span>
               </div>
             </div>
 

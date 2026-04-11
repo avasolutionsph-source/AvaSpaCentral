@@ -32,6 +32,12 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   const [stopReason, setStopReason] = useState('');
   const [isStoppingService, setIsStoppingService] = useState(false);
 
+  // Service upgrade modal state
+  const [upgradeModal, setUpgradeModal] = useState({ isOpen: false, room: null });
+  const [availableServices, setAvailableServices] = useState([]);
+  const [selectedUpgradeServices, setSelectedUpgradeServices] = useState([]);
+  const [upgradeDuration, setUpgradeDuration] = useState(0);
+
   // Home services state
   const [homeServices, setHomeServices] = useState([]);
 
@@ -434,6 +440,95 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       loadRooms();
     } catch (error) {
       showToast('Failed to start service', 'error');
+    }
+  };
+
+  // Open upgrade service modal for occupied rooms
+  const openUpgradeModal = async (room) => {
+    try {
+      const products = await mockApi.products.getProducts();
+      const services = products.filter(p => p.type === 'service' && p.active !== false);
+      setAvailableServices(services);
+      // Pre-select current services
+      const currentNames = room.serviceNames || [];
+      const preSelected = services.filter(s => currentNames.includes(s.name));
+      setSelectedUpgradeServices(preSelected);
+      setUpgradeDuration(room.serviceDuration || 60);
+      setUpgradeModal({ isOpen: true, room });
+    } catch (error) {
+      showToast('Failed to load services', 'error');
+    }
+  };
+
+  // Handle service upgrade - update room service details without stopping timer
+  const handleUpgradeService = async () => {
+    const room = upgradeModal.room;
+    if (!room || selectedUpgradeServices.length === 0) return;
+
+    try {
+      const newServiceNames = selectedUpgradeServices.map(s => s.name);
+      const newDuration = selectedUpgradeServices.reduce((sum, s) => sum + (s.duration || 60), 0);
+      const newPrice = selectedUpgradeServices.reduce((sum, s) => sum + (s.price || 0), 0);
+
+      // Update room with new service info, keep timer running (don't change startTime)
+      await mockApi.rooms.updateRoom(room._id, {
+        serviceNames: newServiceNames,
+        serviceDuration: upgradeDuration || newDuration,
+        servicePrice: newPrice
+      });
+
+      // Update the linked transaction if exists
+      if (room.transactionId) {
+        try {
+          const txn = await mockApi.transactions.getTransaction(room.transactionId);
+          if (txn) {
+            const updatedItems = selectedUpgradeServices.map(s => ({
+              id: s._id || s.id,
+              name: s.name,
+              type: 'service',
+              price: s.price || 0,
+              quantity: 1,
+              subtotal: s.price || 0,
+              itemsUsed: []
+            }));
+            await mockApi.transactions.updateTransaction(room.transactionId, {
+              items: updatedItems,
+              total: newPrice,
+              subtotal: newPrice
+            });
+          }
+        } catch (txErr) {
+          console.warn('Could not update transaction:', txErr);
+        }
+      }
+
+      await mockApi.activityLogs.createLog({
+        type: 'service',
+        action: 'Service Upgraded',
+        description: `Service upgraded in ${room.name}: ${newServiceNames.join(', ')}`,
+        user: {
+          firstName: user?.firstName || 'Unknown',
+          lastName: user?.lastName || '',
+          role: user?.role || 'staff'
+        },
+        ipAddress: 'localhost',
+        details: {
+          roomId: room._id,
+          roomName: room.name,
+          previousServices: room.serviceNames,
+          newServices: newServiceNames,
+          previousDuration: room.serviceDuration,
+          newDuration: upgradeDuration || newDuration,
+          newPrice
+        },
+        severity: 'info'
+      });
+
+      setUpgradeModal({ isOpen: false, room: null });
+      showToast(`Service upgraded to: ${newServiceNames.join(', ')}`, 'success');
+      loadRooms();
+    } catch (error) {
+      showToast('Failed to upgrade service', 'error');
     }
   };
 
@@ -981,15 +1076,24 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                   </div>
                 )}
 
-                {/* Stop Service button for occupied rooms */}
+                {/* Action buttons for occupied rooms */}
                 {room.status === 'occupied' && (isMyRoom || !isTherapist()) && (
-                  <button
-                    className="btn btn-error stop-service-btn"
-                    onClick={() => openStopServiceModal(room)}
-                    style={{ marginTop: 'var(--spacing-sm)' }}
-                  >
-                    ⏹️ Stop Service
-                  </button>
+                  <div className="service-action-buttons" style={{ marginTop: 'var(--spacing-sm)' }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => openUpgradeModal(room)}
+                      style={{ flex: 1 }}
+                    >
+                      ⬆️ Upgrade Service
+                    </button>
+                    <button
+                      className="btn btn-error stop-service-btn"
+                      onClick={() => openStopServiceModal(room)}
+                      style={{ flex: 1 }}
+                    >
+                      ⏹️ Stop Service
+                    </button>
+                  </div>
                 )}
 
                 {/* Countdown timer for occupied rooms */}
@@ -1373,6 +1477,99 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         renderSubLabel={(room) => `${room.type} - Capacity: ${room.capacity}`}
         saving={savingOrder}
       />
+
+      {/* Upgrade Service Modal */}
+      {upgradeModal.isOpen && (
+        <div className="modal-overlay" onClick={() => setUpgradeModal({ isOpen: false, room: null })}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3>Upgrade Service - {upgradeModal.room?.name}</h3>
+              <button className="modal-close" onClick={() => setUpgradeModal({ isOpen: false, room: null })}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              <p style={{ marginBottom: '12px', color: '#666', fontSize: '0.9rem' }}>
+                Select the new service(s). The timer will keep running.
+              </p>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>Select Services</label>
+                {availableServices.map(service => {
+                  const isSelected = selectedUpgradeServices.some(s => (s._id || s.id) === (service._id || service.id));
+                  return (
+                    <div
+                      key={service._id || service.id}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedUpgradeServices(prev => prev.filter(s => (s._id || s.id) !== (service._id || service.id)));
+                        } else {
+                          setSelectedUpgradeServices(prev => [...prev, service]);
+                        }
+                      }}
+                      style={{
+                        padding: '10px 12px',
+                        marginBottom: '6px',
+                        border: isSelected ? '2px solid var(--primary-color, #8b1a2b)' : '1px solid #ddd',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: isSelected ? '#fef2f4' : '#fff',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div>
+                        <strong>{service.name}</strong>
+                        <div style={{ fontSize: '0.8rem', color: '#888' }}>{service.duration || 60} min</div>
+                      </div>
+                      <span style={{ fontWeight: 600 }}>₱{(service.price || 0).toFixed(0)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {selectedUpgradeServices.length > 0 && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                    Adjust Duration (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    value={upgradeDuration}
+                    onChange={e => setUpgradeDuration(parseInt(e.target.value) || 0)}
+                    min={1}
+                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px' }}
+                  />
+                </div>
+              )}
+
+              <div style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span>Services:</span>
+                  <span>{selectedUpgradeServices.map(s => s.name).join(', ') || 'None selected'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span>Duration:</span>
+                  <span>{upgradeDuration} min</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.1rem' }}>
+                  <span>Total:</span>
+                  <span>₱{selectedUpgradeServices.reduce((sum, s) => sum + (s.price || 0), 0).toFixed(0)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button className="btn" onClick={() => setUpgradeModal({ isOpen: false, room: null })}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleUpgradeService}
+                disabled={selectedUpgradeServices.length === 0}
+              >
+                Confirm Upgrade
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

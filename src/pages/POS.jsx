@@ -79,6 +79,7 @@ const POS = () => {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [isHomeService, setIsHomeService] = useState(false);
   const [homeServiceAddress, setHomeServiceAddress] = useState('');
+  const [homeServiceFee, setHomeServiceFee] = useState(150);
 
   // Clear cart confirmation state
   const [clearCartConfirm, setClearCartConfirm] = useState(false);
@@ -475,8 +476,9 @@ const POS = () => {
   }, [cartSubtotal, discount, taxSettings]);
 
   const total = useMemo(() => {
-    return cartSubtotal - discount + taxAmount;
-  }, [cartSubtotal, discount, taxAmount]);
+    const fee = isHomeService ? (parseFloat(homeServiceFee) || 0) : 0;
+    return cartSubtotal - discount + taxAmount + fee;
+  }, [cartSubtotal, discount, taxAmount, isHomeService, homeServiceFee]);
 
   const change = useMemo(() => {
     if (paymentMethod !== 'Cash') return 0;
@@ -792,7 +794,8 @@ const POS = () => {
           roomId: selectedRoom || null,
           roomName: selectedRoom ? rooms.find(r => r._id === selectedRoom)?.name : null,
           isHomeService: isHomeService,
-          homeServiceAddress: isHomeService ? homeServiceAddress : null
+          homeServiceAddress: isHomeService ? homeServiceAddress : null,
+          homeServiceFee: isHomeService ? (parseFloat(homeServiceFee) || 0) : 0
         };
 
         // Save transaction
@@ -1280,17 +1283,34 @@ const POS = () => {
                   </p>
                 )}
                 {isHomeService && (
-                  <div className="form-group" style={{ marginTop: 'var(--spacing-md)' }}>
-                    <label>Client Address *</label>
-                    <textarea
-                      className="form-control"
-                      value={homeServiceAddress}
-                      onChange={(e) => setHomeServiceAddress(e.target.value)}
-                      placeholder="Enter complete address for home service"
-                      rows="2"
-                      required
-                    />
-                  </div>
+                  <>
+                    <div className="form-group" style={{ marginTop: 'var(--spacing-md)' }}>
+                      <label>Client Address *</label>
+                      <textarea
+                        className="form-control"
+                        value={homeServiceAddress}
+                        onChange={(e) => setHomeServiceAddress(e.target.value)}
+                        placeholder="Enter complete address for home service"
+                        rows="2"
+                        required
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginTop: 'var(--spacing-sm)' }}>
+                      <label>Home Service Fee (₱)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={homeServiceFee}
+                        onChange={(e) => setHomeServiceFee(e.target.value)}
+                        placeholder="e.g. 150"
+                        min="0"
+                        step="50"
+                      />
+                      <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '4px' }}>
+                        Additional fee based on distance
+                      </p>
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -1857,6 +1877,12 @@ const POS = () => {
                     <div className="checkout-total">
                       <span>Tax:</span>
                       <span>₱{taxAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {isHomeService && parseFloat(homeServiceFee) > 0 && (
+                    <div className="checkout-total">
+                      <span>Home Service Fee:</span>
+                      <span>₱{parseFloat(homeServiceFee).toLocaleString()}</span>
                     </div>
                   )}
                   <div className="checkout-total">

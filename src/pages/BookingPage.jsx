@@ -578,30 +578,16 @@ const BookingPage = () => {
         created_at: new Date().toISOString()
       };
 
-      console.log('[BookingPage] Submitting booking data:', JSON.stringify(bookingData, null, 2));
+      console.log('[BookingPage] Submitting booking via RPC...');
 
-      // Add timeout to prevent infinite hang
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Booking request timed out after 15 seconds')), 15000)
-      );
+      // Use RPC function to bypass RLS (anonymous users can't do direct INSERT)
+      const { data: rpcResult, error: rpcError } = await supabase
+        .rpc('create_public_booking', { booking_data: bookingData });
 
-      const insertPromise = supabase
-        .from('online_bookings')
-        .insert([bookingData]);
+      console.log('[BookingPage] RPC result:', rpcError ? `ERROR: ${rpcError.message}` : 'SUCCESS', rpcResult);
 
-      const { error: insertError } = await Promise.race([insertPromise, timeoutPromise]);
-
-      console.log('[BookingPage] Insert result:', insertError ? `ERROR: ${insertError.message} (code: ${insertError.code})` : 'SUCCESS');
-
-      if (insertError) {
-        // If table doesn't exist, show error instead of false success
-        if (insertError.code === '42P01') {
-          console.error('online_bookings table not found. Please create the table in Supabase.');
-          alert('Online booking is temporarily unavailable. Please contact the business directly to book your appointment.');
-          return;
-        } else {
-          throw insertError;
-        }
+      if (rpcError) {
+        throw rpcError;
       } else {
         setBookingReference(reference);
         setBookingSuccess(true);

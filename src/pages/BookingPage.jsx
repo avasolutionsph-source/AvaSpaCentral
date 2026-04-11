@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '../services/supabase/supabaseClient';
+
 import { getCustomerSession, logoutCustomer } from '../services/customerAuthService';
 import { applyColorTheme } from '../services/brandingService';
 import '../assets/css/booking.css';
@@ -139,15 +139,14 @@ const BookingPage = () => {
         console.log('[BookingPage] Starting to fetch data for:', businessIdOrSlug);
 
         // Check if Supabase is configured
-        if (!supabase) {
-          console.error('[BookingPage] Supabase client not configured');
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (!supabaseUrl || !supabaseKey) {
+          console.error('[BookingPage] Supabase not configured');
           setError('System configuration error. Please contact the business.');
           setLoading(false);
           return;
         }
-
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
         try {
           // Determine the query URL based on what we have
@@ -580,21 +579,39 @@ const BookingPage = () => {
 
       console.log('[BookingPage] Submitting booking via RPC...');
 
-      // Use RPC function to bypass RLS (anonymous users can't do direct INSERT)
-      const { data: rpcResult, error: rpcError } = await supabase
-        .rpc('create_public_booking', { booking_data: bookingData });
+      // Use direct fetch for RPC to avoid supabase client auth token issues
+      // (the client may hang trying to refresh a stale session from admin login)
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      console.log('[BookingPage] RPC result:', rpcError ? `ERROR: ${rpcError.message}` : 'SUCCESS', rpcResult);
+      const rpcResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/create_public_booking`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({ booking_data: bookingData }),
+        signal: controller.signal
+      });
 
-      if (rpcError) {
-        throw rpcError;
+      clearTimeout(timeoutId);
+
+      const rpcResult = await rpcResponse.json();
+      console.log('[BookingPage] RPC result:', rpcResponse.ok ? 'SUCCESS' : `ERROR: ${rpcResponse.status}`, rpcResult);
+
+      if (!rpcResponse.ok) {
+        throw new Error(rpcResult?.message || rpcResult?.error || `Server error (${rpcResponse.status})`);
       } else {
         setBookingReference(reference);
         setBookingSuccess(true);
       }
     } catch (err) {
       console.error('[BookingPage] Error submitting booking:', err);
-      alert(`Failed to submit booking: ${err.message}. Please try again or contact the business directly.`);
+      alert(`Failed to submit booking: ${err.message}`);
     } finally {
       setSubmitting(false);
     }

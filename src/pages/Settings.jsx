@@ -60,6 +60,7 @@ const Settings = () => {
     businessName: '',
     contactPhone: '',
     heroTagline: '',
+    heroVideo: null,
   });
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -569,6 +570,7 @@ const Settings = () => {
           businessName: data.businessName || '',
           contactPhone: data.contactPhone || '',
           heroTagline: data.heroTagline || '',
+          heroVideo: data.heroVideo || null,
         }));
         setLogoPreview(data.logoUrl);
         setCoverPreview(data.coverPhotoUrl);
@@ -638,6 +640,7 @@ const Settings = () => {
         primaryColor: brandingSettings.primaryColor,
         businessName: brandingSettings.businessName || undefined,
         contactPhone: brandingSettings.contactPhone || undefined,
+        heroVideo: brandingSettings.heroVideo || null,
       });
 
       // Save font settings to settings table (best effort)
@@ -1954,18 +1957,24 @@ const Settings = () => {
                     <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: brandingSettings.primaryColor, color: '#fff' }}>Register</span>
                   </div>
                 </div>
-                {/* Cover Photo */}
+                {/* Hero Preview - Video or Cover Photo */}
                 <div style={{
                   height: '120px',
-                  background: coverPreview ? `url(${coverPreview}) center/cover no-repeat` : 'linear-gradient(135deg, #1a1a2e, #0f3460)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                   position: 'relative',
-                  marginTop: coverPreview ? '-36px' : '0'
+                  overflow: 'hidden',
+                  background: !brandingSettings.heroVideo && !coverPreview ? 'linear-gradient(135deg, #1a1a2e, #0f3460)' : undefined,
                 }}>
+                  {brandingSettings.heroVideo ? (
+                    <video
+                      src={`/videos/${brandingSettings.heroVideo}.mp4`}
+                      autoPlay muted loop playsInline
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : coverPreview ? (
+                    <div style={{ position: 'absolute', inset: 0, background: `url(${coverPreview}) center/cover no-repeat` }} />
+                  ) : null}
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
-                  <div style={{ position: 'relative', textAlign: 'center', color: '#fff' }}>
+                  <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                     <div style={{ fontSize: '1rem', fontWeight: '700' }}>{brandingSettings.businessName || 'Your Business'}</div>
                     <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>{brandingSettings.heroTagline || 'Book your relaxation experience'}</div>
                   </div>
@@ -1997,42 +2006,76 @@ const Settings = () => {
               </div>
             </div>
 
-            {/* Cover Photo */}
+            {/* Hero Video Template */}
             <div className="branding-sub-section">
-              <h3 className="branding-sub-title">Cover Photo</h3>
-              <p className="branding-sub-desc">Hero/banner image displayed at the top of the branch selection and booking pages.</p>
-              <p className="branding-size-hint">Recommended: 1200&times;400px &mdash; JPG or PNG for best quality</p>
-              <div className="branding-upload-area">
-                {coverPreview ? (
-                  <div className="branding-image-preview">
-                    <img src={coverPreview} alt="Cover preview" className="branding-preview-cover" />
-                    {canEdit() && (
-                      <button
-                        type="button"
-                        className="branding-remove-btn"
-                        onClick={() => { setCoverPreview(null); setCoverFile(null); setBrandingSettings(prev => ({ ...prev, coverPhotoUrl: null })); }}
-                      >
-                        &times; Remove
-                      </button>
-                    )}
+              <h3 className="branding-sub-title">Hero Video</h3>
+              <p className="branding-sub-desc">Select a video template for your booking page hero section.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginTop: '12px' }}>
+                {[
+                  { id: 'candle', label: 'Candle Ambiance', src: '/videos/candle.mp4' },
+                ].map(template => {
+                  const isSelected = brandingSettings.heroVideo === template.id;
+                  return (
+                    <div
+                      key={template.id}
+                      onClick={() => canEdit() && setBrandingSettings(prev => ({ ...prev, heroVideo: isSelected ? null : template.id }))}
+                      style={{
+                        border: isSelected ? `3px solid ${brandingSettings.primaryColor}` : '2px solid #e0e0e0',
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        cursor: canEdit() ? 'pointer' : 'default',
+                        position: 'relative',
+                        background: '#000'
+                      }}
+                    >
+                      <video
+                        src={template.src}
+                        muted
+                        loop
+                        autoPlay
+                        playsInline
+                        style={{ width: '100%', height: '120px', objectFit: 'cover', display: 'block' }}
+                      />
+                      <div style={{
+                        padding: '8px 10px',
+                        background: isSelected ? brandingSettings.primaryColor : '#f8f8f8',
+                        color: isSelected ? '#fff' : '#333',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        textAlign: 'center'
+                      }}>
+                        {isSelected && '✓ '}{template.label}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* No video option */}
+                <div
+                  onClick={() => canEdit() && setBrandingSettings(prev => ({ ...prev, heroVideo: null }))}
+                  style={{
+                    border: !brandingSettings.heroVideo ? `3px solid ${brandingSettings.primaryColor}` : '2px solid #e0e0e0',
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    cursor: canEdit() ? 'pointer' : 'default',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '152px'
+                  }}
+                >
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f0f0', color: '#999', fontSize: '2rem' }}>
+                    🚫
                   </div>
-                ) : (
-                  <div className="branding-placeholder">
-                    <span className="branding-placeholder-icon">🌄</span>
-                    <span>No cover photo uploaded</span>
+                  <div style={{
+                    padding: '8px 10px',
+                    background: !brandingSettings.heroVideo ? brandingSettings.primaryColor : '#f8f8f8',
+                    color: !brandingSettings.heroVideo ? '#fff' : '#333',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    textAlign: 'center'
+                  }}>
+                    {!brandingSettings.heroVideo && '✓ '}No Video
                   </div>
-                )}
-                {canEdit() && (
-                  <label className="branding-upload-btn">
-                    {coverFile ? 'Change Cover Photo' : 'Upload Cover Photo'}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/webp"
-                      onChange={handleCoverFileChange}
-                      style={{ display: 'none' }}
-                    />
-                  </label>
-                )}
+                </div>
               </div>
             </div>
 

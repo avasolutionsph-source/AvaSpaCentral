@@ -154,11 +154,11 @@ const BookingPage = () => {
           const defaultSlug = import.meta.env.VITE_DEFAULT_BUSINESS_SLUG || 'daet-spa';
           if (!businessIdOrSlug) {
             // No businessId in URL — use default business slug for this domain
-            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${defaultSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
+            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${defaultSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color,hero_video`;
           } else if (isUUID(businessIdOrSlug)) {
-            testUrl = `${supabaseUrl}/rest/v1/businesses?id=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
+            testUrl = `${supabaseUrl}/rest/v1/businesses?id=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color,hero_video`;
           } else {
-            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color`;
+            testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${businessIdOrSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color,hero_video`;
           }
 
           const controller = new AbortController();
@@ -883,13 +883,55 @@ const BookingPage = () => {
         </div>
       </header>
 
-      {/* Hero section with cover photo — no text overlay */}
-      {business?.cover_photo_url && (
+      {/* Hero section with video or cover photo */}
+      {business?.hero_video ? (
+        <div className="booking-hero" style={{ position: 'relative', overflow: 'hidden', height: '280px' }}>
+          <video
+            src={`/videos/${business.hero_video === 'candle' ? 'candle' : business.hero_video}.mp4`}
+            autoPlay
+            muted
+            loop
+            playsInline
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              minWidth: '100%',
+              minHeight: '100%',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'cover',
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            color: '#fff',
+            textAlign: 'center',
+            padding: '20px',
+          }}>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 700, textShadow: '0 2px 8px rgba(0,0,0,0.5)', margin: 0 }}>
+              {business?.name || 'Welcome'}
+            </h2>
+            {business?.tagline && (
+              <p style={{ fontSize: '1rem', opacity: 0.9, marginTop: '8px', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                {business.tagline}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : business?.cover_photo_url ? (
         <div
           className="booking-hero"
           style={{ backgroundImage: `url(${business.cover_photo_url})` }}
         />
-      )}
+      ) : null}
 
       {/* Branch dropdown moved inside booking-services section */}
 

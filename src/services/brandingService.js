@@ -76,7 +76,7 @@ export async function uploadBrandingImage(file, businessId, type) {
  * @returns {Promise<{ logoUrl, coverPhotoUrl, primaryColor, businessName, contactPhone }>}
  */
 export async function getBrandingSettings(businessId) {
-  const empty = { logoUrl: null, coverPhotoUrl: null, primaryColor: null, businessName: null, contactPhone: null, heroTagline: null };
+  const empty = { logoUrl: null, coverPhotoUrl: null, primaryColor: null, businessName: null, contactPhone: null, heroTagline: null, heroVideo: null };
   if (!businessId || !SUPABASE_URL || !SUPABASE_ANON_KEY) return empty;
 
   try {
@@ -89,7 +89,7 @@ export async function getBrandingSettings(businessId) {
     }
 
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/businesses?id=eq.${businessId}&select=logo_url,cover_photo_url,primary_color,name,phone,tagline`,
+      `${SUPABASE_URL}/rest/v1/businesses?id=eq.${businessId}&select=logo_url,cover_photo_url,primary_color,name,phone,tagline,hero_video`,
       {
         headers: {
           apikey: SUPABASE_ANON_KEY,
@@ -109,6 +109,7 @@ export async function getBrandingSettings(businessId) {
       businessName: row.name || null,
       contactPhone: row.phone || null,
       heroTagline: row.tagline || null,
+      heroVideo: row.hero_video || null,
     };
   } catch {
     return empty;
@@ -120,7 +121,7 @@ export async function getBrandingSettings(businessId) {
  * @param {string} businessId
  * @param {{ logoUrl?, coverPhotoUrl?, primaryColor?, businessName?, contactPhone? }} settings
  */
-export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl, primaryColor, businessName, contactPhone, heroTagline }) {
+export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl, primaryColor, businessName, contactPhone, heroTagline, heroVideo }) {
   if (!supabase) throw new Error('Supabase not configured');
 
   const payload = {};
@@ -130,6 +131,7 @@ export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl,
   if (businessName !== undefined) payload.name = businessName;
   if (contactPhone !== undefined) payload.phone = contactPhone;
   if (heroTagline !== undefined) payload.tagline = heroTagline;
+  if (heroVideo !== undefined) payload.hero_video = heroVideo;
 
   const { error } = await supabase
     .from('businesses')

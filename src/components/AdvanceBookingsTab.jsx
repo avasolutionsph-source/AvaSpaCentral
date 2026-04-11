@@ -25,19 +25,28 @@ const AdvanceBookingsTab = () => {
 
     try {
       // Use the authenticated user's token so RLS allows reading business bookings
-      const { supabase } = await import('../services/supabase/supabaseClient');
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || supabaseKey;
+      let token = supabaseKey;
+      try {
+        const { supabase } = await import('../services/supabase/supabaseClient');
+        const sessionPromise = supabase.auth.getSession();
+        const sessionTimeout = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
+        const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout]);
+        if (session?.access_token) token = session.access_token;
+      } catch {}
 
       let url = `${supabaseUrl}/rest/v1/online_bookings?business_id=eq.${user.businessId}&deleted=eq.false&order=created_at.desc`;
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(url, {
         headers: {
           'apikey': supabaseKey,
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) return [];
       const data = await response.json();

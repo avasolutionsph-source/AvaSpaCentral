@@ -109,8 +109,10 @@ const BranchesTab = () => {
     }
   }, [supabaseUrl, supabaseKey, user?.businessId, getHeaders]);
 
-  useEffect(() => { loadBranches(); }, [loadBranches]);
-  useEffect(() => { if (branches.length > 0) loadStaff(); }, [branches, loadStaff]);
+  useEffect(() => {
+    loadBranches();
+    loadStaff(); // Load in parallel instead of waiting for branches
+  }, [loadBranches, loadStaff]);
 
   const generateSlug = (name) => {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'branch';

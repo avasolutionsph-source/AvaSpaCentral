@@ -1438,10 +1438,12 @@ export const usersAdapter = {
     if (isSupabaseConfigured() && authService.currentUser?.businessId) {
       try {
         const businessId = authService.currentUser.businessId;
-        const { data: supabaseUsers, error } = await supabase
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
+        const queryPromise = supabase
           .from('users')
           .select('*')
           .eq('business_id', businessId);
+        const { data: supabaseUsers, error } = await Promise.race([queryPromise, timeoutPromise]);
 
         if (!error && supabaseUsers && supabaseUsers.length > 0) {
           // Get pending deletes from sync queue to avoid re-adding deleted users

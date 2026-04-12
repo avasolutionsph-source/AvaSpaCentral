@@ -150,39 +150,48 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         absent
       });
 
-      // Find overdue clock-outs (clocked in but shift endTime has passed)
+      // Find overdue/missed clock-outs (clocked in but no clock out)
       const nowObj = new Date();
       const nowMins = nowObj.getHours() * 60 + nowObj.getMinutes();
       const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       const overdue = [];
       allVisibleRecords.forEach(record => {
         if (!record.clockIn || record.clockOut) return;
+        const emp = activeEmps.find(e => String(e._id) === String(record.employeeId));
         const schedule = scheduleMapLocal[String(record.employeeId)];
-        if (!schedule?.weeklySchedule) return;
         const recordDate = new Date(record.date + 'T12:00:00');
         const dayOfWeek = dayNames[recordDate.getDay()];
-        const dayShift = schedule.weeklySchedule[dayOfWeek];
-        if (!dayShift?.endTime || !dayShift?.startTime) return;
+        const dayShift = schedule?.weeklySchedule?.[dayOfWeek];
 
+        if (!viewingToday) {
+          // Past date: any clocked-in without clock-out is a missed clock-out
+          overdue.push({
+            ...record,
+            employeeName: emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown',
+            shiftEndTime: dayShift?.endTime || null,
+            isMissed: true
+          });
+          return;
+        }
+
+        // Today: check if shift endTime has passed
+        if (!dayShift?.endTime || !dayShift?.startTime) return;
         const [endH, endM] = dayShift.endTime.split(':').map(Number);
         const endMins = endH * 60 + endM;
         const [startH, startM] = dayShift.startTime.split(':').map(Number);
         const startMins = startH * 60 + startM;
 
         const isOvernight = endMins < startMins;
-        const isRecordFromYesterday = record.date === yesterdayStr;
+        const isRecordFromYesterday = record.date === prevDay;
 
         let isOverdue = false;
         if (isOvernight && isRecordFromYesterday) {
-          // Overnight shift from yesterday - overdue if past endTime today
-          isOverdue = nowMins > endMins + 30; // 30 min grace
+          isOverdue = nowMins > endMins + 30;
         } else if (!isOvernight && !isRecordFromYesterday) {
-          // Same-day shift - overdue if past endTime today
           isOverdue = nowMins > endMins + 30;
         }
 
         if (isOverdue) {
-          const emp = activeEmps.find(e => String(e._id) === String(record.employeeId));
           overdue.push({
             ...record,
             employeeName: emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown',
@@ -534,23 +543,27 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         </div>
       )}
 
-      {/* Overdue Clock-Out Reminders */}
+      {/* Overdue / Missed Clock-Out Reminders */}
       {overdueClockOuts.length > 0 && hasManagementAccess() && (
         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
           <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', fontSize: '0.95rem' }}>
-            Overdue Clock-Outs ({overdueClockOuts.length})
+            {isViewingToday ? `Overdue Clock-Outs (${overdueClockOuts.length})` : `Missed Clock-Outs (${overdueClockOuts.length})`}
           </div>
           <p style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: '0.75rem' }}>
-            These employees haven't clocked out yet and their shift has ended:
+            {isViewingToday
+              ? "These employees haven't clocked out yet and their shift has ended:"
+              : "These employees clocked in but never clocked out:"}
           </p>
           {overdueClockOuts.map((record, idx) => (
             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < overdueClockOuts.length - 1 ? '1px solid #fcd34d' : 'none' }}>
               <span style={{ fontSize: '0.85rem', color: '#78350f' }}>
                 <strong>{record.employeeName}</strong> — clocked in at {formatTime12Hour(record.clockIn)}
               </span>
-              <span style={{ fontSize: '0.8rem', color: '#b45309' }}>
-                Shift ended at {formatTime12Hour(record.shiftEndTime)}
-              </span>
+              {record.shiftEndTime && (
+                <span style={{ fontSize: '0.8rem', color: '#b45309' }}>
+                  Shift ended at {formatTime12Hour(record.shiftEndTime)}
+                </span>
+              )}
             </div>
           ))}
         </div>

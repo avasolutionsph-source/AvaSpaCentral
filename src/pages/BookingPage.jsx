@@ -91,6 +91,7 @@ const BookingPage = () => {
   const [heroFontColor, setHeroFontColor] = useState('#fff');
   const [heroTextX, setHeroTextX] = useState(50);
   const [heroTextY, setHeroTextY] = useState(50);
+  const [heroAnimation, setHeroAnimation] = useState('none');
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -269,7 +270,7 @@ const BookingPage = () => {
 
           // Load hero font settings
           try {
-            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY)&select=key,value`;
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation)&select=key,value`;
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
@@ -278,6 +279,7 @@ const BookingPage = () => {
                 if (s.key === 'heroFontColor' && s.value) setHeroFontColor(s.value);
                 if (s.key === 'heroTextX' && s.value) setHeroTextX(parseInt(s.value));
                 if (s.key === 'heroTextY' && s.value) setHeroTextY(parseInt(s.value));
+                if (s.key === 'heroAnimation' && s.value) setHeroAnimation(s.value);
               });
             }
           } catch (e) { /* best effort */ }
@@ -998,15 +1000,18 @@ const BookingPage = () => {
             pointerEvents: 'none',
           }} />
           {/* Positioned hero text */}
-          <div style={{
-            position: 'absolute',
-            left: `${heroTextX}%`,
-            top: `${heroTextY}%`,
-            transform: 'translate(-50%, -50%)',
-            textAlign: 'center',
-            zIndex: 2,
-            maxWidth: '90%',
-          }}>
+          <div
+            className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
+            style={{
+              position: 'absolute',
+              left: `${heroTextX}%`,
+              top: `${heroTextY}%`,
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+              zIndex: 2,
+              maxWidth: '90%',
+            }}
+          >
             <h2 style={{
               fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
               fontWeight: 400,

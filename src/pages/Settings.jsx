@@ -585,12 +585,14 @@ const Settings = () => {
           const savedHeroFontColor = await SettingsRepository.get('heroFontColor');
           const savedHeroTextX = await SettingsRepository.get('heroTextX');
           const savedHeroTextY = await SettingsRepository.get('heroTextY');
+          const savedHeroAnimation = await SettingsRepository.get('heroAnimation');
           setBrandingSettings(prev => ({
             ...prev,
             ...(savedHeroFont && { heroFont: savedHeroFont }),
             ...(savedHeroFontColor && { heroFontColor: savedHeroFontColor }),
             ...(savedHeroTextX && { heroTextX: parseInt(savedHeroTextX) }),
             ...(savedHeroTextY && { heroTextY: parseInt(savedHeroTextY) }),
+            ...(savedHeroAnimation && { heroAnimation: savedHeroAnimation }),
           }));
         } catch {}
       } catch (err) {
@@ -669,6 +671,7 @@ const Settings = () => {
         await SettingsRepository.set('heroFontColor', brandingSettings.heroFontColor || '#ffffff');
         await SettingsRepository.set('heroTextX', String(brandingSettings.heroTextX ?? 50));
         await SettingsRepository.set('heroTextY', String(brandingSettings.heroTextY ?? 50));
+        await SettingsRepository.set('heroAnimation', brandingSettings.heroAnimation || 'none');
       } catch (fontErr) {
         console.warn('Font settings save failed:', fontErr);
       }
@@ -2107,61 +2110,59 @@ const Settings = () => {
               <p className="branding-sub-desc">Customize the business name font and color on your booking page hero.</p>
               <div className="settings-row">
                 <div className="settings-form-group">
-                  <label>Font</label>
-                  <select
+                  <label>Font (type any Google Font or pick below)</label>
+                  <input
+                    type="text"
                     className="form-control"
                     value={brandingSettings.heroFont || "'Playfair Display', serif"}
                     onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroFont: e.target.value }))}
-                    style={{ fontFamily: brandingSettings.heroFont || "'Playfair Display', serif" }}
+                    placeholder="e.g. 'Great Vibes', cursive"
                     disabled={!canEdit()}
-                  >
-                    <optgroup label="Elegant Serif">
-                      <option value="'Playfair Display', serif">Playfair Display</option>
-                      <option value="'Cormorant Garamond', serif">Cormorant Garamond</option>
-                      <option value="'Cinzel', serif">Cinzel</option>
-                      <option value="'Cinzel Decorative', serif">Cinzel Decorative</option>
-                      <option value="'Libre Baskerville', serif">Libre Baskerville</option>
-                      <option value="'Lora', serif">Lora</option>
-                      <option value="'EB Garamond', serif">EB Garamond</option>
-                      <option value="'Bodoni Moda', serif">Bodoni Moda</option>
-                      <option value="'Cormorant', serif">Cormorant</option>
-                      <option value="'DM Serif Display', serif">DM Serif Display</option>
-                    </optgroup>
-                    <optgroup label="Cursive / Script">
-                      <option value="'Great Vibes', cursive">Great Vibes</option>
-                      <option value="'Dancing Script', cursive">Dancing Script</option>
-                      <option value="'Pacifico', cursive">Pacifico</option>
-                      <option value="'Sacramento', cursive">Sacramento</option>
-                      <option value="'Alex Brush', cursive">Alex Brush</option>
-                      <option value="'Allura', cursive">Allura</option>
-                      <option value="'Tangerine', cursive">Tangerine</option>
-                      <option value="'Pinyon Script', cursive">Pinyon Script</option>
-                      <option value="'Satisfy', cursive">Satisfy</option>
-                      <option value="'Rouge Script', cursive">Rouge Script</option>
-                      <option value="'Italianno', cursive">Italianno</option>
-                      <option value="'Lobster', cursive">Lobster</option>
-                      <option value="'Cookie', cursive">Cookie</option>
-                      <option value="'Courgette', cursive">Courgette</option>
-                      <option value="'Kaushan Script', cursive">Kaushan Script</option>
-                      <option value="'Herr Von Muellerhoff', cursive">Herr Von Muellerhoff</option>
-                      <option value="'Petit Formal Script', cursive">Petit Formal Script</option>
-                      <option value="'Marck Script', cursive">Marck Script</option>
-                      <option value="'Niconne', cursive">Niconne</option>
-                      <option value="'Clicker Script', cursive">Clicker Script</option>
-                    </optgroup>
-                    <optgroup label="Modern / Clean">
-                      <option value="'Montserrat', sans-serif">Montserrat</option>
-                      <option value="'Raleway', sans-serif">Raleway</option>
-                      <option value="'Josefin Sans', sans-serif">Josefin Sans</option>
-                      <option value="'Quicksand', sans-serif">Quicksand</option>
-                      <option value="'Poppins', sans-serif">Poppins</option>
-                      <option value="'Tenor Sans', sans-serif">Tenor Sans</option>
-                      <option value="'Philosopher', sans-serif">Philosopher</option>
-                      <option value="'Cormorant Upright', serif">Cormorant Upright</option>
-                      <option value="'Poiret One', cursive">Poiret One</option>
-                      <option value="'Forum', serif">Forum</option>
-                    </optgroup>
-                  </select>
+                    list="hero-font-suggestions"
+                    style={{ fontFamily: brandingSettings.heroFont || "'Playfair Display', serif" }}
+                  />
+                  <datalist id="hero-font-suggestions">
+                    <option value="'Playfair Display', serif" />
+                    <option value="'Cormorant Garamond', serif" />
+                    <option value="'Cinzel', serif" />
+                    <option value="'Cinzel Decorative', serif" />
+                    <option value="'Libre Baskerville', serif" />
+                    <option value="'Lora', serif" />
+                    <option value="'EB Garamond', serif" />
+                    <option value="'Bodoni Moda', serif" />
+                    <option value="'Cormorant', serif" />
+                    <option value="'DM Serif Display', serif" />
+                    <option value="'Great Vibes', cursive" />
+                    <option value="'Dancing Script', cursive" />
+                    <option value="'Pacifico', cursive" />
+                    <option value="'Sacramento', cursive" />
+                    <option value="'Alex Brush', cursive" />
+                    <option value="'Allura', cursive" />
+                    <option value="'Tangerine', cursive" />
+                    <option value="'Pinyon Script', cursive" />
+                    <option value="'Satisfy', cursive" />
+                    <option value="'Rouge Script', cursive" />
+                    <option value="'Italianno', cursive" />
+                    <option value="'Lobster', cursive" />
+                    <option value="'Cookie', cursive" />
+                    <option value="'Courgette', cursive" />
+                    <option value="'Kaushan Script', cursive" />
+                    <option value="'Herr Von Muellerhoff', cursive" />
+                    <option value="'Petit Formal Script', cursive" />
+                    <option value="'Marck Script', cursive" />
+                    <option value="'Niconne', cursive" />
+                    <option value="'Clicker Script', cursive" />
+                    <option value="'Montserrat', sans-serif" />
+                    <option value="'Raleway', sans-serif" />
+                    <option value="'Josefin Sans', sans-serif" />
+                    <option value="'Quicksand', sans-serif" />
+                    <option value="'Poppins', sans-serif" />
+                    <option value="'Tenor Sans', sans-serif" />
+                    <option value="'Philosopher', sans-serif" />
+                    <option value="'Cormorant Upright', serif" />
+                    <option value="'Poiret One', cursive" />
+                    <option value="'Forum', serif" />
+                  </datalist>
                 </div>
                 <div className="settings-form-group">
                   <label>Text Color</label>
@@ -2182,6 +2183,30 @@ const Settings = () => {
                       style={{ width: '100px' }}
                     />
                   </div>
+                </div>
+              </div>
+              {/* Text Animation */}
+              <div className="settings-row" style={{ marginTop: '12px' }}>
+                <div className="settings-form-group">
+                  <label>Text Animation</label>
+                  <select
+                    className="form-control"
+                    value={brandingSettings.heroAnimation || 'none'}
+                    onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroAnimation: e.target.value }))}
+                    disabled={!canEdit()}
+                  >
+                    <option value="none">None</option>
+                    <option value="fadeIn">Fade In</option>
+                    <option value="fadeInUp">Fade In Up</option>
+                    <option value="fadeInDown">Fade In Down</option>
+                    <option value="zoomIn">Zoom In</option>
+                    <option value="slideInLeft">Slide In Left</option>
+                    <option value="slideInRight">Slide In Right</option>
+                    <option value="typewriter">Typewriter</option>
+                    <option value="glow">Glow Pulse</option>
+                    <option value="shimmer">Shimmer</option>
+                    <option value="float">Float</option>
+                  </select>
                 </div>
               </div>
               {/* Draggable position preview */}

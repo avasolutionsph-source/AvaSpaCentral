@@ -397,6 +397,77 @@
   60% { transform: translateY(-4px); }
 }
 
+/* ── Hero text animations ──────────────────────────────── */
+@keyframes heroFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes heroFadeInUp {
+  from { opacity: 0; transform: translate(-50%, -30%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+@keyframes heroFadeInDown {
+  from { opacity: 0; transform: translate(-50%, -70%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+@keyframes heroZoomIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes heroSlideInLeft {
+  from { opacity: 0; transform: translate(-150%, -50%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+@keyframes heroSlideInRight {
+  from { opacity: 0; transform: translate(50%, -50%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+@keyframes heroGlow {
+  0%, 100% { text-shadow: 0 0 10px rgba(255,255,255,0.3), 0 0 20px rgba(255,255,255,0.1); }
+  50% { text-shadow: 0 0 20px rgba(255,255,255,0.6), 0 0 40px rgba(255,255,255,0.3), 0 0 60px rgba(255,255,255,0.1); }
+}
+@keyframes heroShimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes heroFloat {
+  0%, 100% { transform: translate(-50%, -50%); }
+  50% { transform: translate(-50%, -53%); }
+}
+
+.hero-anim-fadeIn { animation: heroFadeIn 2s ease-out forwards; }
+.hero-anim-fadeInUp { animation: heroFadeInUp 1.5s ease-out forwards; }
+.hero-anim-fadeInDown { animation: heroFadeInDown 1.5s ease-out forwards; }
+.hero-anim-zoomIn { animation: heroZoomIn 1.5s ease-out forwards; }
+.hero-anim-slideInLeft { animation: heroSlideInLeft 1.2s ease-out forwards; }
+.hero-anim-slideInRight { animation: heroSlideInRight 1.2s ease-out forwards; }
+.hero-anim-glow { animation: heroFadeIn 2s ease-out forwards, heroGlow 3s ease-in-out 2s infinite; }
+.hero-anim-shimmer h2 {
+  background: linear-gradient(90deg, currentColor 0%, rgba(255,255,255,0.9) 50%, currentColor 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: heroShimmer 4s linear infinite;
+}
+.hero-anim-shimmer { animation: heroFadeIn 1.5s ease-out forwards; }
+.hero-anim-float { animation: heroFadeIn 2s ease-out forwards, heroFloat 4s ease-in-out 2s infinite; }
+.hero-anim-typewriter h2 {
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid rgba(255,255,255,0.7);
+  animation: heroTypewriter 3s steps(30) forwards, heroBlink 0.8s step-end infinite 3s;
+  display: inline-block;
+  width: 0;
+}
+@keyframes heroTypewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+@keyframes heroBlink {
+  50% { border-color: transparent; }
+}
+
 .booking-hero-overlay {
   position: absolute;
   inset: 0;

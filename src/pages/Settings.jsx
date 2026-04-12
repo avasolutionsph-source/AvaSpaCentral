@@ -708,7 +708,7 @@ const Settings = () => {
           };
 
           for (const [key, value] of Object.entries(heroSettings)) {
-            fetch(`${supabaseUrl}/rest/v1/settings`, {
+            fetch(`${supabaseUrl}/rest/v1/settings?on_conflict=business_id,key`, {
               method: 'POST',
               headers: {
                 'apikey': supabaseKey,

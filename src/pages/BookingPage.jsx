@@ -77,12 +77,45 @@ const isUUID = (str) => {
   return uuidRegex.test(str);
 };
 
-// Build CSS variables for hero animation timing
-const getHeroAnimVars = (delay, duration) => {
-  const vars = {};
-  if (delay && delay !== '0') vars['--anim-delay'] = `${delay}s`;
-  if (duration && duration !== 'default') vars['--anim-dur'] = `${duration}s`;
-  return vars;
+// Build inline animation styles for hero text
+const HERO_ANIM_KEYFRAMES = {
+  fadeIn: 'heroFadeIn',
+  fadeInUp: 'heroFadeInUp',
+  fadeInDown: 'heroFadeInDown',
+  zoomIn: 'heroZoomIn',
+  slideInLeft: 'heroSlideInLeft',
+  slideInRight: 'heroSlideInRight',
+  glow: 'heroFadeIn',
+  shimmer: 'heroFadeIn',
+  float: 'heroFadeIn',
+};
+
+const HERO_ANIM_DEFAULTS = {
+  fadeIn: '2s', fadeInUp: '1.5s', fadeInDown: '1.5s', zoomIn: '1.5s',
+  slideInLeft: '1.2s', slideInRight: '1.2s', glow: '2s', shimmer: '1.5s', float: '2s',
+};
+
+const getHeroAnimStyle = (animation, delay, duration) => {
+  if (!animation || animation === 'none') return {};
+  const keyframe = HERO_ANIM_KEYFRAMES[animation];
+  if (!keyframe) return {};
+  const dur = duration && duration !== 'default' ? `${duration}s` : (HERO_ANIM_DEFAULTS[animation] || '1.5s');
+  const del = delay && delay !== '0' ? `${delay}s` : '0s';
+
+  // Build secondary animation for compound effects
+  let secondaryAnim = '';
+  if (animation === 'glow') {
+    const secondDelay = `calc(${del} + ${dur})`;
+    secondaryAnim = `, heroGlow 3s ease-in-out ${secondDelay} infinite`;
+  } else if (animation === 'float') {
+    const secondDelay = `calc(${del} + ${dur})`;
+    secondaryAnim = `, heroFloat 4s ease-in-out ${secondDelay} infinite`;
+  }
+
+  return {
+    animation: `${keyframe} ${dur} ease-out ${del} forwards${secondaryAnim}`,
+    opacity: 0,
+  };
 };
 
 const BookingPage = () => {
@@ -1040,7 +1073,7 @@ const BookingPage = () => {
               <div
                 key={`anim-video-${heroAnimation}`}
                 className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
-                style={getHeroAnimVars(heroAnimDelay, heroAnimDuration)}
+                style={getHeroAnimStyle(heroAnimation, heroAnimDelay, heroAnimDuration)}
               >
                 <h2 style={{
                   fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
@@ -1118,7 +1151,7 @@ const BookingPage = () => {
               <div
                 key={`anim-cover-${heroAnimation}`}
                 className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
-                style={getHeroAnimVars(heroAnimDelay, heroAnimDuration)}
+                style={getHeroAnimStyle(heroAnimation, heroAnimDelay, heroAnimDuration)}
               >
                 <h2 style={{
                   fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'

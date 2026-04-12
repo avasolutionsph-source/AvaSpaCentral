@@ -1054,8 +1054,71 @@ const BookingPage = () => {
       ) : business?.cover_photo_url ? (
         <div
           className="booking-hero"
-          style={{ backgroundImage: `url(${business.cover_photo_url})` }}
-        />
+          style={{
+            backgroundImage: `url(${business.cover_photo_url})`,
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Dark gradient overlay */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.55) 100%)',
+            pointerEvents: 'none',
+          }} />
+          {/* Position wrapper */}
+          <div style={{
+            position: 'absolute',
+            left: `${heroTextX}%`,
+            top: `${heroTextY}%`,
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            zIndex: 2,
+            maxWidth: '90%',
+          }}>
+            {/* Animated inner content */}
+            <div className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}>
+              <h2 style={{
+                fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+                fontWeight: 400,
+                textShadow: '0 2px 16px rgba(0,0,0,0.5)',
+                margin: 0,
+                letterSpacing: '2px',
+                fontFamily: heroFont || "'Playfair Display', serif",
+                color: heroFontColor || '#fff',
+              }}>
+                {business?.name || 'Welcome'}
+              </h2>
+              {business?.tagline && (
+                <p style={{
+                  fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
+                  opacity: 0.85,
+                  marginTop: '16px',
+                  textShadow: '0 1px 8px rgba(0,0,0,0.5)',
+                  maxWidth: '600px',
+                  fontWeight: 300,
+                  letterSpacing: '1px',
+                  color: heroFontColor || '#fff',
+                  margin: '16px auto 0',
+                }}>
+                  {business.tagline}
+                </p>
+              )}
+            </div>
+          </div>
+          {/* Scroll indicator */}
+          <div style={{
+            position: 'absolute',
+            bottom: '30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: 'rgba(255,255,255,0.6)',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '1.8rem', animation: 'bounce 2s infinite' }}>&#8964;</div>
+          </div>
+        </div>
       ) : null}
 
       {/* Branch dropdown moved inside booking-services section */}

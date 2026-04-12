@@ -1998,24 +1998,29 @@ const Settings = () => {
               {/* Live booking page preview */}
               <span className="branding-preview-label">Booking Page Preview</span>
               <div style={{ border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', maxWidth: '500px', background: '#f9fafb' }}>
-                {/* Topbar */}
+                {/* Floating notch nav bar */}
                 <div style={{
-                  padding: '0.5rem 1rem',
+                  position: 'absolute',
+                  top: '8px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 10,
+                  background: 'rgba(255,255,255,0.95)',
+                  backdropFilter: 'blur(12px)',
+                  borderRadius: '50px',
+                  padding: '0.35rem 1rem',
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: coverPreview ? 'rgba(0,0,0,0.3)' : '#fff',
-                  borderBottom: coverPreview ? 'none' : '1px solid #eee',
-                  position: coverPreview ? 'relative' : 'static',
-                  zIndex: 2
+                  gap: '0.6rem',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
                 }}>
                   {logoPreview
-                    ? <img src={logoPreview} alt="Logo" style={{ maxHeight: '24px', maxWidth: '100px', objectFit: 'contain' }} />
-                    : <span style={{ fontSize: '0.8rem', fontWeight: '700', color: coverPreview ? '#fff' : '#1a1a1a' }}>{brandingSettings.businessName || 'Your Business'}</span>
+                    ? <img src={logoPreview} alt="Logo" style={{ maxHeight: '20px', maxWidth: '80px', objectFit: 'contain' }} />
+                    : <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#1a1a1a' }}>{brandingSettings.businessName || 'Your Business'}</span>
                   }
-                  <div style={{ display: 'flex', gap: '0.35rem' }}>
-                    <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', border: '1px solid', borderColor: coverPreview ? '#fff' : '#ccc', borderRadius: '4px', color: coverPreview ? '#fff' : '#333' }}>Sign In</span>
-                    <span style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: brandingSettings.primaryColor, color: '#fff' }}>Register</span>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <span style={{ fontSize: '0.5rem', padding: '0.15rem 0.4rem', border: '1px solid #ccc', borderRadius: '50px', color: '#555' }}>Sign In</span>
+                    <span style={{ fontSize: '0.5rem', padding: '0.15rem 0.4rem', borderRadius: '50px', background: '#1a1a1a', color: '#fff' }}>Register</span>
                   </div>
                 </div>
                 {/* Hero Preview - Video or Cover Photo */}
@@ -2287,7 +2292,7 @@ const Settings = () => {
                 style={{
                   marginTop: '4px',
                   position: 'relative',
-                  height: '280px',
+                  height: '400px',
                   background: brandingSettings.heroVideo
                     ? `url("/videos/${brandingSettings.heroVideo}.mp4") center/cover`
                     : 'linear-gradient(135deg, #1a1a2e, #0f3460)',

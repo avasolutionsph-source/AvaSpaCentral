@@ -1278,23 +1278,25 @@ const BookingPage = () => {
       {/* Branch selector — standalone section */}
       {branches.length > 1 && (
         <div className="booking-branch-picker booking-section luxe-section">
-          <div className="luxe-section-header">
-            <span className="luxe-section-accent" />
-            <h2>Choose Your Branch</h2>
-            <p className="luxe-section-subtitle">Select the branch nearest to you</p>
-          </div>
-          <div className="branch-cards">
-            {branches.map(branch => (
-              <div
-                key={branch.id}
-                className={`branch-card ${selectedBranch?.id === branch.id ? 'selected' : ''}`}
-                onClick={() => { setSelectedBranch(branch); setShowBranchSelector(false); }}
-              >
-                <div className="branch-card-name">{branch.name}</div>
-                {branch.city && <div className="branch-card-city">{branch.city}</div>}
-                {selectedBranch?.id === branch.id && <span className="branch-card-check">&#10003;</span>}
-              </div>
-            ))}
+          <div className="luxe-section-inner">
+            <div className="luxe-section-header">
+              <span className="luxe-section-accent" />
+              <h2>Choose Your Branch</h2>
+              <p className="luxe-section-subtitle">Select the branch nearest to you</p>
+            </div>
+            <div className="branch-cards">
+              {branches.map(branch => (
+                <div
+                  key={branch.id}
+                  className={`branch-card ${selectedBranch?.id === branch.id ? 'selected' : ''}`}
+                  onClick={() => { setSelectedBranch(branch); setShowBranchSelector(false); }}
+                >
+                  <div className="branch-card-name">{branch.name}</div>
+                  {branch.city && <div className="branch-card-city">{branch.city}</div>}
+                  {selectedBranch?.id === branch.id && <span className="branch-card-check">&#10003;</span>}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

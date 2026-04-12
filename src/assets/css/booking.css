@@ -6,7 +6,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
 html {
   scroll-behavior: smooth;
-  scroll-snap-type: y proximity;
 }
 
 /* ── Scroll-triggered section animations ──────────────── */
@@ -22,14 +21,15 @@ html {
 
 /* ── Branch Picker (standalone section) ───────────────── */
 .booking-branch-picker {
-  max-width: 900px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
   padding: 2rem;
   text-align: center;
 }
 
 .booking-branch-picker.luxe-section {
-  padding: 3rem 2rem;
+  padding: 4rem 2rem;
+  background: #faf8f5;
 }
 .booking-branch-picker h2 {
   font-family: 'Cormorant Garamond', 'Playfair Display', serif;
@@ -1010,9 +1010,9 @@ html {
 .booking-container.luxe-centered {
   display: flex;
   flex-direction: column;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 2rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   gap: 0;
 }
 
@@ -1042,15 +1042,47 @@ html {
   box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.07);
 }
 
-/* ── Full-viewport snap sections ────────────────────────── */
+/* ── Luxe full-width section strips ─────────────────────── */
 .luxe-section {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 3rem 2.5rem;
-  scroll-snap-align: start;
-  box-sizing: border-box;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  box-shadow: none;
+  padding: 5rem 2.5rem;
+  max-width: 100%;
+  margin: 0;
+}
+
+.luxe-section:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* Alternate section backgrounds */
+.luxe-section:nth-child(odd) {
+  background: #fff;
+}
+
+.luxe-section:nth-child(even) {
+  background: #faf8f5;
+}
+
+/* Constrain all direct children */
+.luxe-section > * {
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.luxe-section > .luxe-section-header {
+  max-width: 600px;
+}
+
+/* Inner content constrainer (explicit) */
+.luxe-section-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .booking-section h2 {
@@ -1075,26 +1107,27 @@ html {
 /* Luxe Section Header */
 .luxe-section-header {
   text-align: center;
-  margin-bottom: 1.75rem;
+  margin-bottom: 2.5rem;
   position: relative;
 }
 
 .luxe-section-header h2 {
   justify-content: center;
+  font-size: 2rem;
 }
 
 .luxe-section-accent {
   display: block;
-  width: 40px;
+  width: 50px;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--color-primary, #800020), transparent);
-  margin: 0 auto 1rem;
+  margin: 0 auto 1.25rem;
 }
 
 .luxe-section-subtitle {
-  font-size: 0.9rem;
-  color: #888;
-  margin: 0.4rem 0 0;
+  font-size: 1.05rem;
+  color: #999;
+  margin: 0.5rem 0 0;
   font-weight: 300;
   letter-spacing: 0.03em;
   font-style: italic;
@@ -1737,12 +1770,11 @@ html {
 }
 
 .booking-footer.luxe-footer {
-  min-height: 40vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  scroll-snap-align: start;
+  padding: 4rem 2rem;
 }
 
 .booking-footer p {
@@ -1942,7 +1974,7 @@ html {
   }
 
   .booking-container {
-    padding: 0 1rem;
+    padding: 0;
     gap: 0;
   }
 
@@ -1952,12 +1984,15 @@ html {
   }
 
   .luxe-section {
-    min-height: 100svh;
-    padding: 2rem 1.25rem;
+    padding: 3rem 1.25rem;
   }
 
   .booking-section h2 {
     font-size: 1.1rem;
+  }
+
+  .luxe-section-header h2 {
+    font-size: 1.5rem;
   }
 
   .booking-services-grid {
@@ -1992,7 +2027,7 @@ html {
 
 @media (max-width: 480px) {
   .booking-container {
-    padding: 0 0.75rem;
+    padding: 0;
   }
 
   .booking-section {
@@ -2000,7 +2035,7 @@ html {
   }
 
   .luxe-section {
-    padding: 1.5rem 1rem;
+    padding: 2.5rem 1rem;
   }
 
   .time-slots {
@@ -2317,10 +2352,12 @@ html {
    ============================================================================ */
 
 .luxe-summary-section {
-  background: linear-gradient(135deg, #1a1a1a 0%, #252525 100%);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(135deg, #1a1a1a 0%, #252525 100%) !important;
+  border: none;
+  border-bottom: none;
   color: #d0d0d0;
   border-radius: 0;
+  padding: 5rem 2.5rem;
 }
 
 .luxe-summary-section:hover {
@@ -2534,7 +2571,7 @@ html {
 /* Centered layout responsive */
 @media (max-width: 768px) {
   .booking-container.luxe-centered {
-    padding: 0 1rem;
+    padding: 0;
   }
 
   .luxe-summary-totals {
@@ -2547,11 +2584,5 @@ html {
 
   .luxe-summary-section .booking-note {
     max-width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  .booking-container.luxe-centered {
-    padding: 0 0.75rem;
   }
 }

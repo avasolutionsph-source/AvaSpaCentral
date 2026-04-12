@@ -586,6 +586,7 @@ const Settings = () => {
           const savedHeroTextX = await SettingsRepository.get('heroTextX');
           const savedHeroTextY = await SettingsRepository.get('heroTextY');
           const savedHeroAnimation = await SettingsRepository.get('heroAnimation');
+          const savedHeroFontSize = await SettingsRepository.get('heroFontSize');
           setBrandingSettings(prev => ({
             ...prev,
             ...(savedHeroFont && { heroFont: savedHeroFont }),
@@ -593,6 +594,7 @@ const Settings = () => {
             ...(savedHeroTextX && { heroTextX: parseInt(savedHeroTextX) }),
             ...(savedHeroTextY && { heroTextY: parseInt(savedHeroTextY) }),
             ...(savedHeroAnimation && { heroAnimation: savedHeroAnimation }),
+            ...(savedHeroFontSize && { heroFontSize: savedHeroFontSize }),
           }));
         } catch {}
       } catch (err) {
@@ -672,6 +674,7 @@ const Settings = () => {
         await SettingsRepository.set('heroTextX', String(brandingSettings.heroTextX ?? 50));
         await SettingsRepository.set('heroTextY', String(brandingSettings.heroTextY ?? 50));
         await SettingsRepository.set('heroAnimation', brandingSettings.heroAnimation || 'none');
+        await SettingsRepository.set('heroFontSize', brandingSettings.heroFontSize || 'default');
 
         // Also save directly to Supabase so booking page can read them
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -693,6 +696,7 @@ const Settings = () => {
             heroTextX: String(brandingSettings.heroTextX ?? 50),
             heroTextY: String(brandingSettings.heroTextY ?? 50),
             heroAnimation: brandingSettings.heroAnimation || 'none',
+            heroFontSize: brandingSettings.heroFontSize || 'default',
           };
 
           for (const [key, value] of Object.entries(heroSettings)) {
@@ -2148,8 +2152,20 @@ const Settings = () => {
             {/* Hero Text Style */}
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Hero Text Style</h3>
-              <p className="branding-sub-desc">Customize the business name font and color on your booking page hero.</p>
+              <p className="branding-sub-desc">Customize the business name font, size, and color on your booking page hero.</p>
               <div className="settings-row">
+                <div className="settings-form-group">
+                  <label>Business Name</label>
+                  <input
+                    type="text"
+                    value={brandingSettings.businessName}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, businessName: e.target.value }))}
+                    placeholder="e.g. Daet Massage & Spa"
+                    disabled={!canEdit()}
+                  />
+                </div>
+              </div>
+              <div className="settings-row" style={{ marginTop: '12px' }}>
                 <div className="settings-form-group">
                   <label>Font</label>
                   <select
@@ -2244,6 +2260,21 @@ const Settings = () => {
                       style={{ width: '100px' }}
                     />
                   </div>
+                </div>
+                <div className="settings-form-group">
+                  <label>Text Size</label>
+                  <select
+                    className="form-control"
+                    value={brandingSettings.heroFontSize || 'default'}
+                    onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroFontSize: e.target.value }))}
+                    disabled={!canEdit()}
+                  >
+                    <option value="default">Default</option>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                    <option value="xlarge">Extra Large</option>
+                  </select>
                 </div>
               </div>
               {/* Text Animation */}
@@ -2374,7 +2405,11 @@ const Settings = () => {
                     style={{
                       fontFamily: brandingSettings.heroFont === '__custom__' ? (brandingSettings._customFont || "'Playfair Display', serif") : (brandingSettings.heroFont || "'Playfair Display', serif"),
                       color: brandingSettings.heroFontColor || '#fff',
-                      fontSize: '1.6rem',
+                      fontSize: brandingSettings.heroFontSize === 'small' ? '1rem'
+                        : brandingSettings.heroFontSize === 'medium' ? '1.3rem'
+                        : brandingSettings.heroFontSize === 'large' ? '2rem'
+                        : brandingSettings.heroFontSize === 'xlarge' ? '2.5rem'
+                        : '1.6rem',
                       textShadow: '0 2px 8px rgba(0,0,0,0.5)',
                       whiteSpace: 'nowrap',
                       ...(brandingSettings.heroAnimation === 'fadeIn' && { opacity: 0, animation: 'pvFadeIn 2s ease-out forwards' }),
@@ -2415,16 +2450,6 @@ const Settings = () => {
               <h3 className="branding-sub-title">Footer</h3>
               <p className="branding-sub-desc">Shown at the bottom of your booking page.</p>
               <div className="settings-row">
-                <div className="settings-form-group">
-                  <label>Business Name</label>
-                  <input
-                    type="text"
-                    value={brandingSettings.businessName}
-                    onChange={e => setBrandingSettings(prev => ({ ...prev, businessName: e.target.value }))}
-                    placeholder="e.g. Daet Massage & Spa"
-                    disabled={!canEdit()}
-                  />
-                </div>
                 <div className="settings-form-group">
                   <label>Contact Number</label>
                   <input

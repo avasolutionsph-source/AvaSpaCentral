@@ -92,6 +92,8 @@ const BookingPage = () => {
   const [heroTextX, setHeroTextX] = useState(50);
   const [heroTextY, setHeroTextY] = useState(50);
   const [heroAnimation, setHeroAnimation] = useState('none');
+  const [heroFontSize, setHeroFontSize] = useState('default');
+  const [heroSettingsLoaded, setHeroSettingsLoaded] = useState(false);
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -270,7 +272,7 @@ const BookingPage = () => {
 
           // Load hero font settings
           try {
-            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation)&select=key,value`;
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize)&select=key,value`;
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
@@ -280,8 +282,10 @@ const BookingPage = () => {
                 if (s.key === 'heroTextX' && s.value) setHeroTextX(parseInt(s.value));
                 if (s.key === 'heroTextY' && s.value) setHeroTextY(parseInt(s.value));
                 if (s.key === 'heroAnimation' && s.value) setHeroAnimation(s.value);
+                if (s.key === 'heroFontSize' && s.value) setHeroFontSize(s.value);
               });
             }
+            setHeroSettingsLoaded(true);
           } catch (e) { /* best effort */ }
 
           // Fetch active services for this business using direct REST API
@@ -1010,34 +1014,43 @@ const BookingPage = () => {
             maxWidth: '90%',
           }}>
             {/* Animated inner content */}
-            <div className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}>
-              <h2 style={{
-                fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
-                fontWeight: 400,
-                textShadow: '0 2px 16px rgba(0,0,0,0.5)',
-                margin: 0,
-                letterSpacing: '2px',
-                fontFamily: heroFont || "'Playfair Display', serif",
-                color: heroFontColor || '#fff',
-              }}>
-                {business?.name || 'Welcome'}
-              </h2>
-              {business?.tagline && (
-                <p style={{
-                  fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
-                  opacity: 0.85,
-                  marginTop: '16px',
-                  textShadow: '0 1px 8px rgba(0,0,0,0.5)',
-                  maxWidth: '600px',
-                  fontWeight: 300,
-                  letterSpacing: '1px',
+            {heroSettingsLoaded && (
+              <div
+                key={`anim-video-${heroAnimation}`}
+                className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
+              >
+                <h2 style={{
+                  fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
+                    : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'
+                    : heroFontSize === 'large' ? 'clamp(3rem, 7vw, 5rem)'
+                    : heroFontSize === 'xlarge' ? 'clamp(3.5rem, 8vw, 6rem)'
+                    : 'clamp(2.5rem, 6vw, 4.5rem)',
+                  fontWeight: 400,
+                  textShadow: '0 2px 16px rgba(0,0,0,0.5)',
+                  margin: 0,
+                  letterSpacing: '2px',
+                  fontFamily: heroFont || "'Playfair Display', serif",
                   color: heroFontColor || '#fff',
-                  margin: '16px auto 0',
                 }}>
-                  {business.tagline}
-                </p>
-              )}
-            </div>
+                  {business?.name || 'Welcome'}
+                </h2>
+                {business?.tagline && (
+                  <p style={{
+                    fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
+                    opacity: 0.85,
+                    marginTop: '16px',
+                    textShadow: '0 1px 8px rgba(0,0,0,0.5)',
+                    maxWidth: '600px',
+                    fontWeight: 300,
+                    letterSpacing: '1px',
+                    color: heroFontColor || '#fff',
+                    margin: '16px auto 0',
+                  }}>
+                    {business.tagline}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           {/* Scroll indicator */}
           <div style={{
@@ -1078,34 +1091,43 @@ const BookingPage = () => {
             maxWidth: '90%',
           }}>
             {/* Animated inner content */}
-            <div className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}>
-              <h2 style={{
-                fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
-                fontWeight: 400,
-                textShadow: '0 2px 16px rgba(0,0,0,0.5)',
-                margin: 0,
-                letterSpacing: '2px',
-                fontFamily: heroFont || "'Playfair Display', serif",
-                color: heroFontColor || '#fff',
-              }}>
-                {business?.name || 'Welcome'}
-              </h2>
-              {business?.tagline && (
-                <p style={{
-                  fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
-                  opacity: 0.85,
-                  marginTop: '16px',
-                  textShadow: '0 1px 8px rgba(0,0,0,0.5)',
-                  maxWidth: '600px',
-                  fontWeight: 300,
-                  letterSpacing: '1px',
+            {heroSettingsLoaded && (
+              <div
+                key={`anim-cover-${heroAnimation}`}
+                className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
+              >
+                <h2 style={{
+                  fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
+                    : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'
+                    : heroFontSize === 'large' ? 'clamp(3rem, 7vw, 5rem)'
+                    : heroFontSize === 'xlarge' ? 'clamp(3.5rem, 8vw, 6rem)'
+                    : 'clamp(2.5rem, 6vw, 4.5rem)',
+                  fontWeight: 400,
+                  textShadow: '0 2px 16px rgba(0,0,0,0.5)',
+                  margin: 0,
+                  letterSpacing: '2px',
+                  fontFamily: heroFont || "'Playfair Display', serif",
                   color: heroFontColor || '#fff',
-                  margin: '16px auto 0',
                 }}>
-                  {business.tagline}
-                </p>
-              )}
-            </div>
+                  {business?.name || 'Welcome'}
+                </h2>
+                {business?.tagline && (
+                  <p style={{
+                    fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
+                    opacity: 0.85,
+                    marginTop: '16px',
+                    textShadow: '0 1px 8px rgba(0,0,0,0.5)',
+                    maxWidth: '600px',
+                    fontWeight: 300,
+                    letterSpacing: '1px',
+                    color: heroFontColor || '#fff',
+                    margin: '16px auto 0',
+                  }}>
+                    {business.tagline}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           {/* Scroll indicator */}
           <div style={{

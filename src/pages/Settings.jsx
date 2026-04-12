@@ -598,7 +598,7 @@ const Settings = () => {
         setLogoPreview(data.logoUrl);
         setCoverPreview(data.coverPhotoUrl);
         if (data.primaryColor) applyColorTheme(data.primaryColor);
-        // Load hero font settings from settings repo
+        // Load hero font settings from local repo first, then fallback to Supabase
         try {
           const savedHeroFont = await SettingsRepository.get('heroFont');
           const savedHeroFontColor = await SettingsRepository.get('heroFontColor');
@@ -608,17 +608,56 @@ const Settings = () => {
           const savedHeroFontSize = await SettingsRepository.get('heroFontSize');
           const savedHeroAnimDelay = await SettingsRepository.get('heroAnimDelay');
           const savedHeroAnimDuration = await SettingsRepository.get('heroAnimDuration');
-          setBrandingSettings(prev => ({
-            ...prev,
-            ...(savedHeroFont && { heroFont: savedHeroFont }),
-            ...(savedHeroFontColor && { heroFontColor: savedHeroFontColor }),
-            ...(savedHeroTextX && { heroTextX: parseInt(savedHeroTextX) }),
-            ...(savedHeroTextY && { heroTextY: parseInt(savedHeroTextY) }),
-            ...(savedHeroAnimation && { heroAnimation: savedHeroAnimation }),
-            ...(savedHeroFontSize && { heroFontSize: savedHeroFontSize }),
-            ...(savedHeroAnimDelay && { heroAnimDelay: savedHeroAnimDelay }),
-            ...(savedHeroAnimDuration && { heroAnimDuration: savedHeroAnimDuration }),
-          }));
+
+          const hasLocal = savedHeroFont || savedHeroAnimation;
+
+          if (hasLocal) {
+            // Use local values
+            setBrandingSettings(prev => ({
+              ...prev,
+              ...(savedHeroFont && { heroFont: savedHeroFont }),
+              ...(savedHeroFontColor && { heroFontColor: savedHeroFontColor }),
+              ...(savedHeroTextX && { heroTextX: parseInt(savedHeroTextX) }),
+              ...(savedHeroTextY && { heroTextY: parseInt(savedHeroTextY) }),
+              ...(savedHeroAnimation && { heroAnimation: savedHeroAnimation }),
+              ...(savedHeroFontSize && { heroFontSize: savedHeroFontSize }),
+              ...(savedHeroAnimDelay && { heroAnimDelay: savedHeroAnimDelay }),
+              ...(savedHeroAnimDuration && { heroAnimDuration: savedHeroAnimDuration }),
+            }));
+          } else if (user?.businessId) {
+            // Fallback: load from Supabase (incognito/new device)
+            try {
+              const { supabase } = await import('../services/supabase/supabaseClient');
+              if (supabase) {
+                const { data: rows } = await supabase
+                  .from('settings')
+                  .select('key, value')
+                  .eq('business_id', user.businessId)
+                  .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration']);
+                if (rows && rows.length > 0) {
+                  const s = {};
+                  rows.forEach(r => { s[r.key] = r.value; });
+                  setBrandingSettings(prev => ({
+                    ...prev,
+                    ...(s.heroFont && { heroFont: s.heroFont }),
+                    ...(s.heroFontColor && { heroFontColor: s.heroFontColor }),
+                    ...(s.heroTextX && { heroTextX: parseInt(s.heroTextX) }),
+                    ...(s.heroTextY && { heroTextY: parseInt(s.heroTextY) }),
+                    ...(s.heroAnimation && { heroAnimation: s.heroAnimation }),
+                    ...(s.heroFontSize && { heroFontSize: s.heroFontSize }),
+                    ...(s.heroAnimDelay && { heroAnimDelay: s.heroAnimDelay }),
+                    ...(s.heroAnimDuration && { heroAnimDuration: s.heroAnimDuration }),
+                  }));
+                  // Cache locally for next time
+                  for (const r of rows) {
+                    await SettingsRepository.set(r.key, r.value).catch(() => {});
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('[HeroSettings] Supabase fallback failed:', e);
+            }
+          }
         } catch {}
       } catch (err) {
         console.error('Error loading branding:', err);

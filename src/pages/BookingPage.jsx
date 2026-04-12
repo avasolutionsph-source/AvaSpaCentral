@@ -999,45 +999,45 @@ const BookingPage = () => {
             background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.55) 100%)',
             pointerEvents: 'none',
           }} />
-          {/* Positioned hero text */}
-          <div
-            className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
-            style={{
-              position: 'absolute',
-              left: `${heroTextX}%`,
-              top: `${heroTextY}%`,
-              transform: 'translate(-50%, -50%)',
-              textAlign: 'center',
-              zIndex: 2,
-              maxWidth: '90%',
-            }}
-          >
-            <h2 style={{
-              fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
-              fontWeight: 400,
-              textShadow: '0 2px 16px rgba(0,0,0,0.5)',
-              margin: 0,
-              letterSpacing: '2px',
-              fontFamily: heroFont || "'Playfair Display', serif",
-              color: heroFontColor || '#fff',
-            }}>
-              {business?.name || 'Welcome'}
-            </h2>
-            {business?.tagline && (
-              <p style={{
-                fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
-                opacity: 0.85,
-                marginTop: '16px',
-                textShadow: '0 1px 8px rgba(0,0,0,0.5)',
-                maxWidth: '600px',
-                fontWeight: 300,
-                letterSpacing: '1px',
+          {/* Position wrapper */}
+          <div style={{
+            position: 'absolute',
+            left: `${heroTextX}%`,
+            top: `${heroTextY}%`,
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            zIndex: 2,
+            maxWidth: '90%',
+          }}>
+            {/* Animated inner content */}
+            <div className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}>
+              <h2 style={{
+                fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+                fontWeight: 400,
+                textShadow: '0 2px 16px rgba(0,0,0,0.5)',
+                margin: 0,
+                letterSpacing: '2px',
+                fontFamily: heroFont || "'Playfair Display', serif",
                 color: heroFontColor || '#fff',
-                margin: '16px auto 0',
               }}>
-                {business.tagline}
-              </p>
-            )}
+                {business?.name || 'Welcome'}
+              </h2>
+              {business?.tagline && (
+                <p style={{
+                  fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
+                  opacity: 0.85,
+                  marginTop: '16px',
+                  textShadow: '0 1px 8px rgba(0,0,0,0.5)',
+                  maxWidth: '600px',
+                  fontWeight: 300,
+                  letterSpacing: '1px',
+                  color: heroFontColor || '#fff',
+                  margin: '16px auto 0',
+                }}>
+                  {business.tagline}
+                </p>
+              )}
+            </div>
           </div>
           {/* Scroll indicator */}
           <div style={{

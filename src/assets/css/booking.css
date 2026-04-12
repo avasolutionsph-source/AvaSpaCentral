@@ -403,24 +403,24 @@
   to { opacity: 1; }
 }
 @keyframes heroFadeInUp {
-  from { opacity: 0; transform: translate(-50%, -30%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes heroFadeInDown {
-  from { opacity: 0; transform: translate(-50%, -70%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
+  from { opacity: 0; transform: translateY(-30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes heroZoomIn {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
 }
 @keyframes heroSlideInLeft {
-  from { opacity: 0; transform: translate(-150%, -50%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
+  from { opacity: 0; transform: translateX(-100px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 @keyframes heroSlideInRight {
-  from { opacity: 0; transform: translate(50%, -50%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
+  from { opacity: 0; transform: translateX(100px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 @keyframes heroGlow {
   0%, 100% { text-shadow: 0 0 10px rgba(255,255,255,0.3), 0 0 20px rgba(255,255,255,0.1); }
@@ -431,8 +431,8 @@
   100% { background-position: 200% center; }
 }
 @keyframes heroFloat {
-  0%, 100% { transform: translate(-50%, -50%); }
-  50% { transform: translate(-50%, -53%); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
 .hero-anim-fadeIn { animation: heroFadeIn 2s ease-out forwards; }

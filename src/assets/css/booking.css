@@ -456,6 +456,52 @@
   min-height: 400px;
   background-size: cover;
   background-position: center;
+  position: relative;
+  overflow: hidden;
+}
+.booking-hero-fullscreen {
+  height: 100svh;
+  min-height: 400px;
+}
+
+/* Scroll down indicator */
+.hero-scroll-indicator {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  z-index: 4;
+  animation: heroScrollFadeIn 1.5s ease-out 2s forwards;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.hero-scroll-indicator:hover {
+  opacity: 1 !important;
+}
+.hero-scroll-text {
+  font-size: 0.65rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  font-weight: 300;
+}
+.hero-scroll-arrow {
+  color: rgba(255,255,255,0.5);
+  animation: heroScrollBounce 2s ease-in-out infinite;
+}
+@keyframes heroScrollFadeIn {
+  to { opacity: 0.7; }
+}
+@keyframes heroScrollBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+.booking-hero {
   background-repeat: no-repeat;
   position: relative;
   display: flex;
@@ -1588,6 +1634,10 @@
   .booking-hero {
     height: 40vh;
     min-height: 280px;
+  }
+  .booking-hero-fullscreen {
+    height: 100svh;
+    min-height: 350px;
   }
 
   .booking-hero-title {

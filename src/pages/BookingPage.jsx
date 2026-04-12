@@ -1039,7 +1039,7 @@ const BookingPage = () => {
 
       {/* Hero section with video or cover photo */}
       {business?.hero_video ? (
-        <div className="booking-hero" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100vh', minHeight: '500px' }}>
+        <div className="booking-hero booking-hero-fullscreen">
           <video
             src={`/videos/${business.hero_video === 'candle' ? 'candle' : business.hero_video}.mp4`}
             autoPlay
@@ -1086,12 +1086,12 @@ const BookingPage = () => {
             {heroSettingsLoaded && (
               <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
-                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(12, parseInt(heroFontSize) * 0.6)}px, ${parseInt(heroFontSize) / 16}vw + 1rem, ${parseInt(heroFontSize) * 2.5}px)`
-                    : heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
-                    : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'
-                    : heroFontSize === 'large' ? 'clamp(3rem, 7vw, 5rem)'
-                    : heroFontSize === 'xlarge' ? 'clamp(3.5rem, 8vw, 6rem)'
-                    : 'clamp(2.5rem, 6vw, 4.5rem)',
+                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(14, parseInt(heroFontSize) * 0.4)}px, ${parseInt(heroFontSize) / 10}vw, ${parseInt(heroFontSize) * 2.5}px)`
+                    : heroFontSize === 'small' ? 'clamp(1.2rem, 4vw, 2.5rem)'
+                    : heroFontSize === 'medium' ? 'clamp(1.5rem, 5vw, 3.5rem)'
+                    : heroFontSize === 'large' ? 'clamp(1.8rem, 7vw, 5rem)'
+                    : heroFontSize === 'xlarge' ? 'clamp(2rem, 8vw, 6rem)'
+                    : 'clamp(1.5rem, 6vw, 4.5rem)',
                   fontWeight: 400,
                   textShadow: '0 2px 16px rgba(0,0,0,0.5)',
                   margin: 0,
@@ -1140,16 +1140,17 @@ const BookingPage = () => {
               }} />
             </div>
           )}
-          {/* Scroll indicator */}
-          <div style={{
-            position: 'absolute',
-            bottom: '30px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            color: 'rgba(255,255,255,0.6)',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '1.8rem', animation: 'bounce 2s infinite' }}>&#8964;</div>
+          {/* Scroll down indicator */}
+          <div
+            className="hero-scroll-indicator"
+            onClick={() => document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            <span className="hero-scroll-text">Scroll Down</span>
+            <div className="hero-scroll-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
+            </div>
           </div>
         </div>
       ) : business?.cover_photo_url ? (
@@ -1182,12 +1183,12 @@ const BookingPage = () => {
             {heroSettingsLoaded && (
               <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
-                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(12, parseInt(heroFontSize) * 0.6)}px, ${parseInt(heroFontSize) / 16}vw + 1rem, ${parseInt(heroFontSize) * 2.5}px)`
-                    : heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
-                    : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'
-                    : heroFontSize === 'large' ? 'clamp(3rem, 7vw, 5rem)'
-                    : heroFontSize === 'xlarge' ? 'clamp(3.5rem, 8vw, 6rem)'
-                    : 'clamp(2.5rem, 6vw, 4.5rem)',
+                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(14, parseInt(heroFontSize) * 0.4)}px, ${parseInt(heroFontSize) / 10}vw, ${parseInt(heroFontSize) * 2.5}px)`
+                    : heroFontSize === 'small' ? 'clamp(1.2rem, 4vw, 2.5rem)'
+                    : heroFontSize === 'medium' ? 'clamp(1.5rem, 5vw, 3.5rem)'
+                    : heroFontSize === 'large' ? 'clamp(1.8rem, 7vw, 5rem)'
+                    : heroFontSize === 'xlarge' ? 'clamp(2rem, 8vw, 6rem)'
+                    : 'clamp(1.5rem, 6vw, 4.5rem)',
                   fontWeight: 400,
                   textShadow: '0 2px 16px rgba(0,0,0,0.5)',
                   margin: 0,
@@ -1236,16 +1237,17 @@ const BookingPage = () => {
               }} />
             </div>
           )}
-          {/* Scroll indicator */}
-          <div style={{
-            position: 'absolute',
-            bottom: '30px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            color: 'rgba(255,255,255,0.6)',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '1.8rem', animation: 'bounce 2s infinite' }}>&#8964;</div>
+          {/* Scroll down indicator */}
+          <div
+            className="hero-scroll-indicator"
+            onClick={() => document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth' })}
+          >
+            <span className="hero-scroll-text">Scroll Down</span>
+            <div className="hero-scroll-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
+            </div>
           </div>
         </div>
       ) : null}

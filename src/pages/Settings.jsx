@@ -690,6 +690,7 @@ const Settings = () => {
       return;
     }
     setLogoFile(file);
+    setBrandingSettings(prev => ({ ...prev, heroLogoEnabled: true }));
     const reader = new FileReader();
     reader.onload = (ev) => setLogoPreview(ev.target.result);
     reader.readAsDataURL(file);

@@ -89,6 +89,8 @@ const BookingPage = () => {
   const [business, setBusiness] = useState(null);
   const [heroFont, setHeroFont] = useState("'Playfair Display', serif");
   const [heroFontColor, setHeroFontColor] = useState('#fff');
+  const [heroTextX, setHeroTextX] = useState(50);
+  const [heroTextY, setHeroTextY] = useState(50);
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -267,13 +269,15 @@ const BookingPage = () => {
 
           // Load hero font settings
           try {
-            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor)&select=key,value`;
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY)&select=key,value`;
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
               fontData.forEach(s => {
                 if (s.key === 'heroFont' && s.value) setHeroFont(s.value);
                 if (s.key === 'heroFontColor' && s.value) setHeroFontColor(s.value);
+                if (s.key === 'heroTextX' && s.value) setHeroTextX(parseInt(s.value));
+                if (s.key === 'heroTextY' && s.value) setHeroTextY(parseInt(s.value));
               });
             }
           } catch (e) { /* best effort */ }
@@ -986,17 +990,22 @@ const BookingPage = () => {
             mixBlendMode: 'overlay',
             pointerEvents: 'none',
           }} />
+          {/* Dark gradient overlay */}
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.6) 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            color: '#fff',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.55) 100%)',
+            pointerEvents: 'none',
+          }} />
+          {/* Positioned hero text */}
+          <div style={{
+            position: 'absolute',
+            left: `${heroTextX}%`,
+            top: `${heroTextY}%`,
+            transform: 'translate(-50%, -50%)',
             textAlign: 'center',
-            padding: '20px',
+            zIndex: 2,
+            maxWidth: '90%',
           }}>
             <h2 style={{
               fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
@@ -1018,6 +1027,8 @@ const BookingPage = () => {
                 maxWidth: '600px',
                 fontWeight: 300,
                 letterSpacing: '1px',
+                color: heroFontColor || '#fff',
+                margin: '16px auto 0',
               }}>
                 {business.tagline}
               </p>

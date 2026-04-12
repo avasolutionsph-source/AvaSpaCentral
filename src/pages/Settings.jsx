@@ -61,6 +61,10 @@ const Settings = () => {
     contactPhone: '',
     heroTagline: '',
     heroVideo: null,
+    heroFont: "'Playfair Display', serif",
+    heroFontColor: '#ffffff',
+    heroTextX: 50,
+    heroTextY: 50,
   });
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -579,8 +583,15 @@ const Settings = () => {
         try {
           const savedHeroFont = await SettingsRepository.get('heroFont');
           const savedHeroFontColor = await SettingsRepository.get('heroFontColor');
-          if (savedHeroFont) setBrandingSettings(prev => ({ ...prev, heroFont: savedHeroFont }));
-          if (savedHeroFontColor) setBrandingSettings(prev => ({ ...prev, heroFontColor: savedHeroFontColor }));
+          const savedHeroTextX = await SettingsRepository.get('heroTextX');
+          const savedHeroTextY = await SettingsRepository.get('heroTextY');
+          setBrandingSettings(prev => ({
+            ...prev,
+            ...(savedHeroFont && { heroFont: savedHeroFont }),
+            ...(savedHeroFontColor && { heroFontColor: savedHeroFontColor }),
+            ...(savedHeroTextX && { heroTextX: parseInt(savedHeroTextX) }),
+            ...(savedHeroTextY && { heroTextY: parseInt(savedHeroTextY) }),
+          }));
         } catch {}
       } catch (err) {
         console.error('Error loading branding:', err);
@@ -656,6 +667,8 @@ const Settings = () => {
         await SettingsRepository.set('footerFontSize', brandingSettings.footerFontSize || '14');
         await SettingsRepository.set('heroFont', brandingSettings.heroFont || "'Playfair Display', serif");
         await SettingsRepository.set('heroFontColor', brandingSettings.heroFontColor || '#ffffff');
+        await SettingsRepository.set('heroTextX', String(brandingSettings.heroTextX ?? 50));
+        await SettingsRepository.set('heroTextY', String(brandingSettings.heroTextY ?? 50));
       } catch (fontErr) {
         console.warn('Font settings save failed:', fontErr);
       }
@@ -2171,22 +2184,85 @@ const Settings = () => {
                   </div>
                 </div>
               </div>
-              {/* Font preview */}
-              <div style={{
-                marginTop: '12px',
-                padding: '20px',
-                background: 'linear-gradient(135deg, #1a1a2e, #0f3460)',
-                borderRadius: '10px',
-                textAlign: 'center',
-              }}>
-                <span style={{
-                  fontFamily: brandingSettings.heroFont || "'Playfair Display', serif",
-                  color: brandingSettings.heroFontColor || '#fff',
-                  fontSize: '1.8rem',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                }}>
+              {/* Draggable position preview */}
+              <p className="branding-sub-desc" style={{ marginTop: '16px', marginBottom: '4px' }}>
+                Drag the text to position it on your hero.
+              </p>
+              <div
+                style={{
+                  marginTop: '4px',
+                  position: 'relative',
+                  height: '220px',
+                  background: brandingSettings.heroVideo
+                    ? `url("/videos/${brandingSettings.heroVideo}.mp4") center/cover`
+                    : 'linear-gradient(135deg, #1a1a2e, #0f3460)',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  cursor: 'default',
+                  userSelect: 'none',
+                }}
+              >
+                {brandingSettings.heroVideo && (
+                  <video
+                    src={`/videos/${brandingSettings.heroVideo}.mp4`}
+                    autoPlay muted loop playsInline
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(1px) brightness(0.85)' }}
+                  />
+                )}
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${brandingSettings.heroTextX ?? 50}%`,
+                    top: `${brandingSettings.heroTextY ?? 50}%`,
+                    transform: 'translate(-50%, -50%)',
+                    cursor: canEdit() ? 'grab' : 'default',
+                    fontFamily: brandingSettings.heroFont || "'Playfair Display', serif",
+                    color: brandingSettings.heroFontColor || '#fff',
+                    fontSize: '1.6rem',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                    whiteSpace: 'nowrap',
+                    zIndex: 2,
+                  }}
+                  draggable={false}
+                  onMouseDown={canEdit() ? (e) => {
+                    e.preventDefault();
+                    const container = e.currentTarget.parentElement;
+                    const rect = container.getBoundingClientRect();
+                    const onMove = (ev) => {
+                      const x = Math.max(5, Math.min(95, ((ev.clientX - rect.left) / rect.width) * 100));
+                      const y = Math.max(5, Math.min(95, ((ev.clientY - rect.top) / rect.height) * 100));
+                      setBrandingSettings(prev => ({ ...prev, heroTextX: Math.round(x), heroTextY: Math.round(y) }));
+                    };
+                    const onUp = () => {
+                      document.removeEventListener('mousemove', onMove);
+                      document.removeEventListener('mouseup', onUp);
+                    };
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                  } : undefined}
+                  onTouchStart={canEdit() ? (e) => {
+                    const container = e.currentTarget.parentElement;
+                    const rect = container.getBoundingClientRect();
+                    const onMove = (ev) => {
+                      const touch = ev.touches[0];
+                      const x = Math.max(5, Math.min(95, ((touch.clientX - rect.left) / rect.width) * 100));
+                      const y = Math.max(5, Math.min(95, ((touch.clientY - rect.top) / rect.height) * 100));
+                      setBrandingSettings(prev => ({ ...prev, heroTextX: Math.round(x), heroTextY: Math.round(y) }));
+                    };
+                    const onEnd = () => {
+                      document.removeEventListener('touchmove', onMove);
+                      document.removeEventListener('touchend', onEnd);
+                    };
+                    document.addEventListener('touchmove', onMove, { passive: false });
+                    document.addEventListener('touchend', onEnd);
+                  } : undefined}
+                >
                   {brandingSettings.businessName || 'Your Business Name'}
-                </span>
+                </div>
+                <div style={{ position: 'absolute', bottom: '8px', right: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', zIndex: 2 }}>
+                  Position: {brandingSettings.heroTextX ?? 50}%, {brandingSettings.heroTextY ?? 50}%
+                </div>
               </div>
             </div>
 

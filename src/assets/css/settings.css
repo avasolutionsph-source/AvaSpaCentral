@@ -1677,25 +1677,26 @@
 @keyframes pvTypewriter { from { width: 0; } to { width: 100%; } }
 @keyframes pvBlink { 50% { border-color: transparent; } }
 
-.pv-anim-fadeIn { animation: pvFadeIn 2s ease-out forwards !important; }
-.pv-anim-fadeInUp { animation: pvFadeInUp 1.5s ease-out forwards !important; }
-.pv-anim-fadeInDown { animation: pvFadeInDown 1.5s ease-out forwards !important; }
-.pv-anim-zoomIn { animation: pvZoomIn 1.5s ease-out forwards !important; }
-.pv-anim-slideInLeft { animation: pvSlideLeft 1.2s ease-out forwards !important; }
-.pv-anim-slideInRight { animation: pvSlideRight 1.2s ease-out forwards !important; }
-.pv-anim-glow { animation: pvFadeIn 1.5s ease-out forwards, pvGlow 3s ease-in-out 1.5s infinite !important; }
-.pv-anim-float { animation: pvFadeIn 1.5s ease-out forwards, pvFloat 3s ease-in-out 1.5s infinite !important; }
+.pv-anim-fadeIn { animation: pvFadeIn var(--anim-dur, 2s) ease-out var(--anim-delay, 0s) forwards !important; opacity: 0; }
+.pv-anim-fadeInUp { animation: pvFadeInUp var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards !important; opacity: 0; }
+.pv-anim-fadeInDown { animation: pvFadeInDown var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards !important; opacity: 0; }
+.pv-anim-zoomIn { animation: pvZoomIn var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards !important; opacity: 0; }
+.pv-anim-slideInLeft { animation: pvSlideLeft var(--anim-dur, 1.2s) ease-out var(--anim-delay, 0s) forwards !important; opacity: 0; }
+.pv-anim-slideInRight { animation: pvSlideRight var(--anim-dur, 1.2s) ease-out var(--anim-delay, 0s) forwards !important; opacity: 0; }
+.pv-anim-glow { animation: pvFadeIn var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards, pvGlow 3s ease-in-out calc(var(--anim-delay, 0s) + var(--anim-dur, 1.5s)) infinite !important; opacity: 0; }
+.pv-anim-float { animation: pvFadeIn var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards, pvFloat 3s ease-in-out calc(var(--anim-delay, 0s) + var(--anim-dur, 1.5s)) infinite !important; opacity: 0; }
 .pv-anim-shimmer {
   background-size: 200% auto !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   background-clip: text !important;
-  animation: pvFadeIn 1s ease-out forwards, pvShimmer 3s linear 1s infinite !important;
+  animation: pvFadeIn var(--anim-dur, 1s) ease-out var(--anim-delay, 0s) forwards, pvShimmer 3s linear calc(var(--anim-delay, 0s) + var(--anim-dur, 1s)) infinite !important;
+  opacity: 0;
 }
 .pv-anim-typewriter {
   overflow: hidden !important;
   white-space: nowrap !important;
   border-right: 2px solid rgba(255,255,255,0.8) !important;
   width: 0 !important;
-  animation: pvTypewriter 2.5s steps(25) forwards, pvBlink 0.7s step-end 2.5s infinite !important;
+  animation: pvTypewriter var(--anim-dur, 2.5s) steps(25) var(--anim-delay, 0s) forwards, pvBlink 0.7s step-end calc(var(--anim-delay, 0s) + var(--anim-dur, 2.5s)) infinite !important;
 }

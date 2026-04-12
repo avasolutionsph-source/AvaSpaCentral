@@ -2330,6 +2330,9 @@ const Settings = () => {
                       <option value="2">2s</option>
                       <option value="3">3s</option>
                       <option value="5">5s</option>
+                      <option value="7">7s</option>
+                      <option value="10">10s</option>
+                      <option value="15">15s</option>
                     </select>
                   </div>
                   <div className="settings-form-group">
@@ -2349,7 +2352,9 @@ const Settings = () => {
                       <option value="2">2s</option>
                       <option value="3">3s (Slow)</option>
                       <option value="4">4s</option>
-                      <option value="5">5s (Very Slow)</option>
+                      <option value="5">5s</option>
+                      <option value="7">7s (Very Slow)</option>
+                      <option value="10">10s</option>
                     </select>
                   </div>
                 </div>
@@ -2452,11 +2457,10 @@ const Settings = () => {
                       textShadow: '0 2px 8px rgba(0,0,0,0.5)',
                       whiteSpace: 'nowrap',
                       ...(brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' && {
-                        animationDelay: `${brandingSettings.heroAnimDelay || 0}s`,
+                        '--anim-delay': `${brandingSettings.heroAnimDelay || 0}s`,
                         ...(brandingSettings.heroAnimDuration && brandingSettings.heroAnimDuration !== 'default' && {
-                          animationDuration: `${brandingSettings.heroAnimDuration}s`,
+                          '--anim-dur': `${brandingSettings.heroAnimDuration}s`,
                         }),
-                        ...(parseFloat(brandingSettings.heroAnimDelay) > 0 && { opacity: 0 }),
                       }),
                       ...(brandingSettings.heroAnimation === 'shimmer' && {
                         background: `linear-gradient(90deg, ${brandingSettings.heroFontColor || '#fff'} 0%, rgba(255,255,255,0.4) 50%, ${brandingSettings.heroFontColor || '#fff'} 100%)`,

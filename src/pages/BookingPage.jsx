@@ -1024,9 +1024,8 @@ const BookingPage = () => {
                 className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
                 style={{
                   ...(heroAnimation !== 'none' && {
-                    animationDelay: `${heroAnimDelay || 0}s`,
-                    ...(heroAnimDuration !== 'default' && { animationDuration: `${heroAnimDuration}s` }),
-                    ...(parseFloat(heroAnimDelay) > 0 && { opacity: 0 }),
+                    '--anim-delay': `${heroAnimDelay || 0}s`,
+                    ...(heroAnimDuration !== 'default' && { '--anim-dur': `${heroAnimDuration}s` }),
                   }),
                 }}
               >
@@ -1108,9 +1107,8 @@ const BookingPage = () => {
                 className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
                 style={{
                   ...(heroAnimation !== 'none' && {
-                    animationDelay: `${heroAnimDelay || 0}s`,
-                    ...(heroAnimDuration !== 'default' && { animationDuration: `${heroAnimDuration}s` }),
-                    ...(parseFloat(heroAnimDelay) > 0 && { opacity: 0 }),
+                    '--anim-delay': `${heroAnimDelay || 0}s`,
+                    ...(heroAnimDuration !== 'default' && { '--anim-dur': `${heroAnimDuration}s` }),
                   }),
                 }}
               >

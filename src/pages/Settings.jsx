@@ -739,7 +739,7 @@ const Settings = () => {
             // Use PostgREST upsert via fetch with timeout
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000);
-            const res = await fetch(`${supabaseUrl}/rest/v1/settings`, {
+            const res = await fetch(`${supabaseUrl}/rest/v1/settings?on_conflict=business_id,key`, {
               method: 'POST',
               headers: {
                 'apikey': supabaseKey,

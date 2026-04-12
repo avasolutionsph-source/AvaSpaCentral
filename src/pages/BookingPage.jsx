@@ -997,6 +997,23 @@ const BookingPage = () => {
 
   const currentProgressStep = getCurrentStep();
 
+  // Scroll-triggered fade-in for booking sections
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('section-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.booking-section, .booking-progress, .booking-summary').forEach(el => {
+      el.classList.add('section-animate');
+      observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [loading]);
+
   // Scroll to summary section (for mobile)
   const scrollToSummary = () => {
     const summaryEl = document.querySelector('.booking-summary');
@@ -1045,6 +1062,7 @@ const BookingPage = () => {
             autoPlay
             muted
             playsInline
+            onEnded={(e) => { e.target.style.filter = 'blur(6px) brightness(0.7) contrast(1.1)'; }}
             style={{
               position: 'absolute',
               top: 0,
@@ -1054,6 +1072,7 @@ const BookingPage = () => {
               objectFit: 'cover',
               filter: 'blur(1.5px) brightness(0.85) contrast(1.1)',
               transform: 'scale(1.05)',
+              transition: 'filter 2s ease-out',
             }}
           />
           {/* Film grain overlay to mask pixelation */}
@@ -1145,7 +1164,7 @@ const BookingPage = () => {
             className="hero-scroll-indicator"
             onClick={() => document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth' })}
           >
-            <span className="hero-scroll-text">Scroll Down</span>
+            <span className="hero-scroll-text">Scroll to Book</span>
             <div className="hero-scroll-arrow">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12l7 7 7-7"/>
@@ -1242,7 +1261,7 @@ const BookingPage = () => {
             className="hero-scroll-indicator"
             onClick={() => document.getElementById('booking-form')?.scrollIntoView({ behavior: 'smooth' })}
           >
-            <span className="hero-scroll-text">Scroll Down</span>
+            <span className="hero-scroll-text">Scroll to Book</span>
             <div className="hero-scroll-arrow">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12l7 7 7-7"/>
@@ -1284,34 +1303,30 @@ const BookingPage = () => {
 
       {/* Legacy branch selector removed - replaced by inline branch section above */}
 
+      {/* Branch selector — standalone section */}
+      {branches.length > 1 && (
+        <div className="booking-branch-picker booking-section">
+          <h2>Choose Your Branch</h2>
+          <p style={{ color: '#888', marginBottom: '16px', fontSize: '0.95rem' }}>Select the branch nearest to you</p>
+          <div className="branch-cards">
+            {branches.map(branch => (
+              <div
+                key={branch.id}
+                className={`branch-card ${selectedBranch?.id === branch.id ? 'selected' : ''}`}
+                onClick={() => { setSelectedBranch(branch); setShowBranchSelector(false); }}
+              >
+                <div className="branch-card-name">{branch.name}</div>
+                {branch.city && <div className="branch-card-city">{branch.city}</div>}
+                {selectedBranch?.id === branch.id && <span className="branch-card-check">&#10003;</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="booking-container">
         {/* Left side: Services */}
         <div className="booking-services">
-          {/* Branch Dropdown */}
-          {branches.length > 1 && (
-            <div className="booking-section">
-              <h2>Select Branch</h2>
-              <select
-                value={selectedBranch?.id || ''}
-                onChange={(e) => {
-                  const branch = branches.find(b => b.id === e.target.value);
-                  if (branch) {
-                    setSelectedBranch(branch);
-                    setShowBranchSelector(false);
-                  }
-                }}
-                className="form-control"
-                style={{ fontSize: '1rem', padding: '0.75rem 1rem' }}
-              >
-                <option value="" disabled>Select a branch...</option>
-                {branches.map(branch => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}{branch.city ? ` — ${branch.city}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           <div className="booking-section">
             <h2>1. Select Services</h2>

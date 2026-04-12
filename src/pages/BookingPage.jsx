@@ -1272,43 +1272,17 @@ const BookingPage = () => {
         </div>
       ) : null}
 
-      {/* Branch dropdown moved inside booking-services section */}
-
-      {/* Progress Indicator — new order: Services → Date/Time → Therapist → Location → Details */}
-      <div id="booking-form" className="booking-progress">
-        <div className={`progress-step active ${selectedServices.length > 0 ? 'completed' : ''}`}>
-          <span className="progress-step-number">{selectedServices.length > 0 ? '✓' : '1'}</span>
-          <span>Services</span>
-        </div>
-        <div className={`progress-divider ${selectedServices.length > 0 ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${selectedServices.length > 0 ? 'active' : ''} ${selectedDate && selectedTime ? 'completed' : ''}`}>
-          <span className="progress-step-number">{selectedDate && selectedTime ? '✓' : '2'}</span>
-          <span>Date & Time</span>
-        </div>
-        <div className={`progress-divider ${selectedDate && selectedTime ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${selectedDate ? 'active' : ''} ${selectedTherapists.length > 0 || therapistMode === 'auto' ? 'completed' : ''}`}>
-          <span className="progress-step-number">{selectedTherapists.length > 0 || therapistMode === 'auto' ? '✓' : '3'}</span>
-          <span>Therapist</span>
-        </div>
-        <div className={`progress-divider ${therapistMode === 'auto' || selectedTherapists.length > 0 ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${selectedDate ? 'active' : ''} ${serviceLocation ? 'completed' : ''}`}>
-          <span className="progress-step-number">{serviceLocation ? '✓' : '4'}</span>
-          <span>Location</span>
-        </div>
-        <div className={`progress-divider ${serviceLocation ? 'completed' : ''}`}></div>
-        <div className={`progress-step ${serviceLocation ? 'active' : ''} ${customerName && customerPhone ? 'completed' : ''}`}>
-          <span className="progress-step-number">{customerName && customerPhone ? '✓' : '5'}</span>
-          <span>Details</span>
-        </div>
-      </div>
-
-      {/* Legacy branch selector removed - replaced by inline branch section above */}
+      {/* Scroll anchor for hero "Scroll to Book" */}
+      <div id="booking-form" />
 
       {/* Branch selector — standalone section */}
       {branches.length > 1 && (
-        <div className="booking-branch-picker booking-section">
-          <h2>Choose Your Branch</h2>
-          <p style={{ color: '#888', marginBottom: '16px', fontSize: '0.95rem' }}>Select the branch nearest to you</p>
+        <div className="booking-branch-picker booking-section luxe-section">
+          <div className="luxe-section-header">
+            <span className="luxe-section-accent" />
+            <h2>Choose Your Branch</h2>
+            <p className="luxe-section-subtitle">Select the branch nearest to you</p>
+          </div>
           <div className="branch-cards">
             {branches.map(branch => (
               <div
@@ -1329,8 +1303,12 @@ const BookingPage = () => {
         {/* Left side: Services */}
         <div className="booking-services">
 
-          <div className="booking-section">
-            <h2>1. Select Services</h2>
+          <div className="booking-section luxe-section">
+            <div className="luxe-section-header">
+              <span className="luxe-section-accent" />
+              <h2>Select Services</h2>
+              <p className="luxe-section-subtitle">Choose from our curated menu of treatments</p>
+            </div>
 
             {/* Search & Filter */}
             <div className="booking-filters">
@@ -1458,9 +1436,13 @@ const BookingPage = () => {
             )}
           </div>
 
-          {/* Date & Time Selection — step 2 */}
-          <div className="booking-section">
-            <h2>2. Select Date & Time</h2>
+          {/* Date & Time Selection */}
+          <div className="booking-section luxe-section">
+            <div className="luxe-section-header">
+              <span className="luxe-section-accent" />
+              <h2>Date & Time</h2>
+              <p className="luxe-section-subtitle">Pick your preferred schedule</p>
+            </div>
 
             {/* Calendar */}
             <div style={{ marginBottom: '1.5rem' }}>
@@ -1582,10 +1564,14 @@ const BookingPage = () => {
             )}
           </div>
 
-          {/* Therapist Selection — step 3, filtered by date/time availability */}
+          {/* Therapist Selection */}
           {availableTherapists.length > 0 && selectedDate && !isDayClosed && (
-          <div className="booking-section">
-            <h2>3. Choose Therapist <span className="optional">(Optional)</span></h2>
+          <div className="booking-section luxe-section">
+            <div className="luxe-section-header">
+              <span className="luxe-section-accent" />
+              <h2>Choose Therapist <span className="optional">(Optional)</span></h2>
+              <p className="luxe-section-subtitle">Select your preferred wellness specialist</p>
+            </div>
 
             {/* Mode Selection */}
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -1742,8 +1728,12 @@ const BookingPage = () => {
           )}
 
           {/* Service Location Selection */}
-          <div className="booking-section">
-            <h2>4. Service Location</h2>
+          <div className="booking-section luxe-section">
+            <div className="luxe-section-header">
+              <span className="luxe-section-accent" />
+              <h2>Service Location</h2>
+              <p className="luxe-section-subtitle">Where would you like your treatment?</p>
+            </div>
             <div className="service-location-options">
               <button
                 className={`location-option ${serviceLocation === 'in_store' ? 'selected' : ''}`}
@@ -1836,8 +1826,12 @@ const BookingPage = () => {
           {/* Date & Time moved to step 2 above therapist */}
 
           {/* Customer Details */}
-          <div className="booking-section">
-            <h2>5. Your Details</h2>
+          <div className="booking-section luxe-section">
+            <div className="luxe-section-header">
+              <span className="luxe-section-accent" />
+              <h2>Your Details</h2>
+              <p className="luxe-section-subtitle">Tell us a bit about yourself</p>
+            </div>
 
             <div className="customer-form">
               <div className="form-group">
@@ -1887,7 +1881,7 @@ const BookingPage = () => {
         </div>
 
         {/* Right side: Cart Summary */}
-        <div className="booking-summary">
+        <div className="booking-summary luxe-section">
           <div className="summary-sticky">
             <h3>Booking Summary</h3>
 
@@ -1980,10 +1974,16 @@ const BookingPage = () => {
       </div>
 
       {/* Footer */}
-      <footer className="booking-footer">
-        <p>&copy; {new Date().getFullYear()} {business?.name}. All rights reserved.</p>
-        {business?.address && <p>{business.address}</p>}
-        {business?.phone && <p>Contact: {business.phone}</p>}
+      <footer className="booking-footer luxe-footer">
+        <div className="luxe-footer-divider" />
+        <p className="luxe-footer-brand">{business?.name}</p>
+        {business?.tagline && <p className="luxe-footer-tagline">{business.tagline}</p>}
+        <div className="luxe-footer-details">
+          {business?.address && <p>{business.address}</p>}
+          {business?.phone && <p>{business.phone}</p>}
+          {business?.email && <p>{business.email}</p>}
+        </div>
+        <p className="luxe-footer-copy">&copy; {new Date().getFullYear()} {business?.name}. All rights reserved.</p>
       </footer>
 
       {/* Mobile Floating Summary Bar */}

@@ -2588,66 +2588,116 @@ const Settings = () => {
                     {brandingSettings.businessName || 'Your Business Name'}
                   </div>
                 </div>
-                {/* Draggable logo on hero preview */}
-                {brandingSettings.heroLogoEnabled && logoPreview && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `${brandingSettings.heroLogoX ?? 50}%`,
-                      top: `${brandingSettings.heroLogoY ?? 20}%`,
-                      transform: 'translate(-50%, -50%)',
-                      zIndex: 3,
-                      cursor: canEdit() ? 'grab' : 'default',
-                    }}
-                    draggable={false}
-                    onMouseDown={canEdit() ? (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const container = e.currentTarget.parentElement;
-                      const rect = container.getBoundingClientRect();
-                      const onMove = (ev) => {
-                        const x = Math.max(5, Math.min(95, ((ev.clientX - rect.left) / rect.width) * 100));
-                        const y = Math.max(5, Math.min(95, ((ev.clientY - rect.top) / rect.height) * 100));
-                        setBrandingSettings(prev => ({ ...prev, heroLogoX: Math.round(x), heroLogoY: Math.round(y) }));
-                      };
-                      const onUp = () => {
-                        document.removeEventListener('mousemove', onMove);
-                        document.removeEventListener('mouseup', onUp);
-                      };
-                      document.addEventListener('mousemove', onMove);
-                      document.addEventListener('mouseup', onUp);
-                    } : undefined}
-                    onTouchStart={canEdit() ? (e) => {
-                      e.stopPropagation();
-                      const container = e.currentTarget.parentElement;
-                      const rect = container.getBoundingClientRect();
-                      const onMove = (ev) => {
-                        const touch = ev.touches[0];
-                        const x = Math.max(5, Math.min(95, ((touch.clientX - rect.left) / rect.width) * 100));
-                        const y = Math.max(5, Math.min(95, ((touch.clientY - rect.top) / rect.height) * 100));
-                        setBrandingSettings(prev => ({ ...prev, heroLogoX: Math.round(x), heroLogoY: Math.round(y) }));
-                      };
-                      const onEnd = () => {
-                        document.removeEventListener('touchmove', onMove);
-                        document.removeEventListener('touchend', onEnd);
-                      };
-                      document.addEventListener('touchmove', onMove, { passive: false });
-                      document.addEventListener('touchend', onEnd);
-                    } : undefined}
-                  >
-                    <img
-                      src={logoPreview}
-                      alt="Logo"
+                {/* Draggable & resizable logo on hero preview */}
+                {brandingSettings.heroLogoEnabled && logoPreview && (() => {
+                  const logoSize = brandingSettings.heroLogoSize ?? 80;
+                  const handleStyle = (cursor) => ({
+                    position: 'absolute', width: '10px', height: '10px',
+                    background: '#1a73e8', border: '1px solid #fff', borderRadius: '1px',
+                    cursor, zIndex: 5, boxShadow: '0 0 3px rgba(0,0,0,0.4)',
+                  });
+                  const startResize = (e, corner) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const startX = e.clientX || e.touches?.[0]?.clientX;
+                    const startY = e.clientY || e.touches?.[0]?.clientY;
+                    const startSize = logoSize;
+                    const onMove = (ev) => {
+                      const cx = ev.clientX || ev.touches?.[0]?.clientX;
+                      const cy = ev.clientY || ev.touches?.[0]?.clientY;
+                      const dx = cx - startX;
+                      const dy = cy - startY;
+                      let delta = 0;
+                      if (corner === 'se') delta = Math.max(dx, dy);
+                      else if (corner === 'sw') delta = Math.max(-dx, dy);
+                      else if (corner === 'ne') delta = Math.max(dx, -dy);
+                      else if (corner === 'nw') delta = Math.max(-dx, -dy);
+                      const newSize = Math.max(30, Math.min(300, startSize + delta));
+                      setBrandingSettings(prev => ({ ...prev, heroLogoSize: Math.round(newSize) }));
+                    };
+                    const onUp = () => {
+                      document.removeEventListener('mousemove', onMove);
+                      document.removeEventListener('mouseup', onUp);
+                      document.removeEventListener('touchmove', onMove);
+                      document.removeEventListener('touchend', onUp);
+                    };
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                    document.addEventListener('touchmove', onMove, { passive: false });
+                    document.addEventListener('touchend', onUp);
+                  };
+                  return (
+                    <div
                       style={{
-                        maxHeight: `${brandingSettings.heroLogoSize ?? 80}px`,
-                        maxWidth: `${(brandingSettings.heroLogoSize ?? 80) * 2.5}px`,
-                        objectFit: 'contain',
-                        filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
-                        pointerEvents: 'none',
+                        position: 'absolute',
+                        left: `${brandingSettings.heroLogoX ?? 50}%`,
+                        top: `${brandingSettings.heroLogoY ?? 20}%`,
+                        transform: 'translate(-50%, -50%)',
+                        zIndex: 3,
+                        cursor: canEdit() ? 'grab' : 'default',
                       }}
-                    />
-                  </div>
-                )}
+                      draggable={false}
+                      onMouseDown={canEdit() ? (e) => {
+                        if (e.target.dataset.handle) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const container = e.currentTarget.parentElement;
+                        const rect = container.getBoundingClientRect();
+                        const onMove = (ev) => {
+                          const x = Math.max(5, Math.min(95, ((ev.clientX - rect.left) / rect.width) * 100));
+                          const y = Math.max(5, Math.min(95, ((ev.clientY - rect.top) / rect.height) * 100));
+                          setBrandingSettings(prev => ({ ...prev, heroLogoX: Math.round(x), heroLogoY: Math.round(y) }));
+                        };
+                        const onUp = () => {
+                          document.removeEventListener('mousemove', onMove);
+                          document.removeEventListener('mouseup', onUp);
+                        };
+                        document.addEventListener('mousemove', onMove);
+                        document.addEventListener('mouseup', onUp);
+                      } : undefined}
+                      onTouchStart={canEdit() ? (e) => {
+                        if (e.target.dataset.handle) return;
+                        e.stopPropagation();
+                        const container = e.currentTarget.parentElement;
+                        const rect = container.getBoundingClientRect();
+                        const onMove = (ev) => {
+                          const touch = ev.touches[0];
+                          const x = Math.max(5, Math.min(95, ((touch.clientX - rect.left) / rect.width) * 100));
+                          const y = Math.max(5, Math.min(95, ((touch.clientY - rect.top) / rect.height) * 100));
+                          setBrandingSettings(prev => ({ ...prev, heroLogoX: Math.round(x), heroLogoY: Math.round(y) }));
+                        };
+                        const onEnd = () => {
+                          document.removeEventListener('touchmove', onMove);
+                          document.removeEventListener('touchend', onEnd);
+                        };
+                        document.addEventListener('touchmove', onMove, { passive: false });
+                        document.addEventListener('touchend', onEnd);
+                      } : undefined}
+                    >
+                      <div style={{ position: 'relative', display: 'inline-block', border: '2px solid #1a73e8', padding: '2px' }}>
+                        <img
+                          src={logoPreview}
+                          alt="Logo"
+                          style={{
+                            height: `${logoSize}px`,
+                            maxWidth: `${logoSize * 2.5}px`,
+                            objectFit: 'contain',
+                            display: 'block',
+                            filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
+                            pointerEvents: 'none',
+                          }}
+                        />
+                        {/* Corner resize handles */}
+                        {canEdit() && <>
+                          <div data-handle="nw" style={{ ...handleStyle('nw-resize'), top: '-6px', left: '-6px' }} onMouseDown={(e) => startResize(e, 'nw')} onTouchStart={(e) => startResize(e, 'nw')} />
+                          <div data-handle="ne" style={{ ...handleStyle('ne-resize'), top: '-6px', right: '-6px' }} onMouseDown={(e) => startResize(e, 'ne')} onTouchStart={(e) => startResize(e, 'ne')} />
+                          <div data-handle="sw" style={{ ...handleStyle('sw-resize'), bottom: '-6px', left: '-6px' }} onMouseDown={(e) => startResize(e, 'sw')} onTouchStart={(e) => startResize(e, 'sw')} />
+                          <div data-handle="se" style={{ ...handleStyle('se-resize'), bottom: '-6px', right: '-6px' }} onMouseDown={(e) => startResize(e, 'se')} onTouchStart={(e) => startResize(e, 'se')} />
+                        </>}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div style={{ position: 'absolute', bottom: '8px', right: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', zIndex: 2 }}>
                   Position: {brandingSettings.heroTextX ?? 50}%, {brandingSettings.heroTextY ?? 50}%
                 </div>

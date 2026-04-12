@@ -19,9 +19,9 @@ html { scroll-behavior: smooth; }
 
 /* ── Branch Picker (standalone section) ───────────────── */
 .booking-branch-picker {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem;
+  padding: 2rem;
   text-align: center;
 }
 .booking-branch-picker h2 {
@@ -280,7 +280,7 @@ html { scroll-behavior: smooth; }
   min-height: 100vh;
   background: #f7f5f2;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Roboto', sans-serif;
-  padding-bottom: 80px; /* Space for mobile summary bar */
+  padding-bottom: 0;
 }
 
 @media (min-width: 1025px) {
@@ -1002,6 +1002,14 @@ html { scroll-behavior: smooth; }
   grid-template-columns: 1fr 400px;
   gap: 2.5rem;
   max-width: 1400px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem;
+}
+
+.booking-container.luxe-centered {
+  display: flex;
+  flex-direction: column;
+  max-width: 900px;
   margin: 0 auto;
   padding: 2.5rem 2rem;
 }
@@ -2270,5 +2278,244 @@ html { scroll-behavior: smooth; }
   .change-branch-btn {
     width: 100%;
     margin-top: 0.5rem;
+  }
+}
+
+/* ============================================================================
+   LUXE SUMMARY SECTION (inline, bottom of page)
+   ============================================================================ */
+
+.luxe-summary-section {
+  background: linear-gradient(135deg, #1a1a1a 0%, #252525 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #d0d0d0;
+}
+
+.luxe-summary-section .luxe-section-header h2 {
+  color: #fff;
+}
+
+.luxe-summary-section .luxe-section-subtitle {
+  color: #999;
+}
+
+.luxe-summary-section .luxe-section-accent {
+  background: linear-gradient(90deg, transparent, #d4a574, transparent);
+}
+
+/* Empty state */
+.luxe-summary-empty {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.luxe-summary-empty-icon {
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+.luxe-summary-empty p {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.3rem;
+  color: #777;
+  margin: 0 0 0.5rem;
+}
+
+.luxe-summary-empty small {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+/* Summary content grid */
+.luxe-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.luxe-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 700px) {
+  .luxe-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+.luxe-summary-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #d4a574;
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Summary items (dark themed) */
+.luxe-summary-section .summary-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0;
+}
+
+.luxe-summary-section .summary-item {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+}
+
+.luxe-summary-section .item-name {
+  color: #e0e0e0;
+  font-size: 0.9rem;
+}
+
+.luxe-summary-section .item-duration {
+  color: #777;
+}
+
+.luxe-summary-section .item-price {
+  color: #d4a574;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem;
+}
+
+.luxe-summary-section .remove-item {
+  color: #555;
+}
+
+.luxe-summary-section .remove-item:hover {
+  color: #ef4444;
+}
+
+/* Detail card */
+.luxe-detail-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.luxe-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.luxe-detail-icon {
+  color: #d4a574;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.luxe-detail-placeholder {
+  color: #555;
+  font-style: italic;
+  font-size: 0.9rem;
+  padding: 1rem;
+  background: rgba(255,255,255,0.02);
+  border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,0.08);
+  text-align: center;
+}
+
+/* Totals */
+.luxe-summary-totals {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 400px;
+  margin-left: auto;
+}
+
+.luxe-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #999;
+}
+
+.luxe-total-main {
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 600;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.luxe-total-main span:last-child {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem;
+}
+
+.luxe-total-deposit {
+  background: rgba(212, 165, 116, 0.08);
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(212, 165, 116, 0.15);
+  color: #d4a574;
+  font-weight: 600;
+}
+
+.luxe-total-deposit span:last-child {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+}
+
+/* Submit button inside summary section */
+.luxe-summary-section .submit-booking-btn {
+  max-width: 400px;
+  margin: 0.5rem auto 0;
+  display: block;
+}
+
+.luxe-summary-section .booking-note {
+  color: #666;
+  max-width: 400px;
+  margin: 0.75rem auto 0;
+}
+
+/* Hide old sidebar summary on centered layout */
+.luxe-centered .booking-summary {
+  display: none;
+}
+
+/* Centered layout responsive */
+@media (max-width: 768px) {
+  .booking-container.luxe-centered {
+    padding: 1.5rem 1rem;
+  }
+
+  .luxe-summary-totals {
+    max-width: 100%;
+  }
+
+  .luxe-summary-section .submit-booking-btn {
+    max-width: 100%;
+  }
+
+  .luxe-summary-section .booking-note {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .booking-container.luxe-centered {
+    padding: 1rem 0.75rem;
   }
 }

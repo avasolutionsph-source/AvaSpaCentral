@@ -1299,8 +1299,7 @@ const BookingPage = () => {
         </div>
       )}
 
-      <div className="booking-container">
-        {/* Left side: Services */}
+      <div className="booking-container luxe-centered">
         <div className="booking-services">
 
           <div className="booking-section luxe-section">
@@ -1878,96 +1877,125 @@ const BookingPage = () => {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Right side: Cart Summary */}
-        <div className="booking-summary luxe-section">
-          <div className="summary-sticky">
-            <h3>Booking Summary</h3>
+          {/* Booking Summary — inline at the end */}
+          <div className="booking-section luxe-section luxe-summary-section">
+            <div className="luxe-section-header">
+              <span className="luxe-section-accent" />
+              <h2>Booking Summary</h2>
+              <p className="luxe-section-subtitle">Review your selections before booking</p>
+            </div>
 
             {selectedServices.length === 0 ? (
-              <div className="empty-cart">
-                <p>No services selected</p>
-                <small>Select services from the left</small>
+              <div className="luxe-summary-empty">
+                <div className="luxe-summary-empty-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
+                </div>
+                <p>No services selected yet</p>
+                <small>Choose from the treatments above to get started</small>
               </div>
             ) : (
-              <>
-                <div className="summary-items">
-                  {selectedServices.map(service => (
-                    <div key={service.id} className="summary-item">
-                      <div className="item-info">
-                        <span className="item-name">{service.name}</span>
-                        {service.duration && (
-                          <span className="item-duration">{service.duration} min</span>
+              <div className="luxe-summary-content">
+                <div className="luxe-summary-grid">
+                  {/* Selected Services */}
+                  <div className="luxe-summary-services">
+                    <h4 className="luxe-summary-label">Selected Services</h4>
+                    <div className="summary-items">
+                      {selectedServices.map(service => (
+                        <div key={service.id} className="summary-item">
+                          <div className="item-info">
+                            <span className="item-name">{service.name}</span>
+                            {service.duration && (
+                              <span className="item-duration">{service.duration} min</span>
+                            )}
+                          </div>
+                          <span className="item-price">₱{service.price?.toLocaleString()}</span>
+                          <button
+                            className="remove-item"
+                            onClick={() => toggleService(service)}
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Schedule & Details */}
+                  <div className="luxe-summary-details">
+                    <h4 className="luxe-summary-label">Appointment Details</h4>
+                    {selectedDate && selectedTime ? (
+                      <div className="luxe-detail-card">
+                        <div className="luxe-detail-row">
+                          <span className="luxe-detail-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                          </span>
+                          <span>{new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                        </div>
+                        <div className="luxe-detail-row">
+                          <span className="luxe-detail-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                          </span>
+                          <span>{selectedTime}</span>
+                        </div>
+                        {selectedBranch && (
+                          <div className="luxe-detail-row">
+                            <span className="luxe-detail-icon">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            </span>
+                            <span>{selectedBranch.name}</span>
+                          </div>
+                        )}
+                        {serviceLocation !== 'in_store' && serviceAddress && (
+                          <div className="luxe-detail-row">
+                            <span className="luxe-detail-icon">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                            </span>
+                            <span>{serviceLocation === 'home_service' ? 'Home' : 'Hotel'}: {serviceAddress}</span>
+                          </div>
                         )}
                       </div>
-                      <span className="item-price">₱{service.price?.toLocaleString()}</span>
-                      <button
-                        className="remove-item"
-                        onClick={() => toggleService(service)}
-                        title="Remove"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                    ) : (
+                      <p className="luxe-detail-placeholder">Select date & time above</p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="summary-totals">
-                  <div className="total-row subtotal">
-                    <span>Services</span>
+                {/* Totals */}
+                <div className="luxe-summary-totals">
+                  <div className="luxe-total-row">
+                    <span>Services ({selectedServices.length})</span>
                     <span>₱{servicesTotal.toLocaleString()}</span>
                   </div>
                   {transportFee > 0 && (
-                    <div className="total-row transport-fee">
-                      <span>
-                        {serviceLocation === 'home_service' ? 'Home Service Fee' : 'Hotel Service Fee'}
-                      </span>
+                    <div className="luxe-total-row">
+                      <span>{serviceLocation === 'home_service' ? 'Home Service Fee' : 'Hotel Service Fee'}</span>
                       <span>₱{transportFee.toLocaleString()}</span>
                     </div>
                   )}
-                  <div className="total-row">
+                  <div className="luxe-total-row luxe-total-main">
                     <span>Total</span>
-                    <span className="total-amount">₱{cartTotal.toLocaleString()}</span>
+                    <span>₱{cartTotal.toLocaleString()}</span>
                   </div>
-                  <div className="total-row deposit">
+                  <div className="luxe-total-row luxe-total-deposit">
                     <span>Deposit Required (50%)</span>
-                    <span className="deposit-amount">₱{depositAmount.toLocaleString()}</span>
+                    <span>₱{depositAmount.toLocaleString()}</span>
                   </div>
                 </div>
-
-                {/* Service Location Info */}
-                {serviceLocation !== 'in_store' && serviceAddress && (
-                  <div className="summary-location">
-                    <p><strong>Service at:</strong> {serviceLocation === 'home_service' ? 'Home' : 'Hotel'}</p>
-                    <p className="summary-address">{serviceAddress}{serviceCity ? `, ${serviceCity}` : ''}</p>
-                  </div>
-                )}
-
-                {selectedDate && selectedTime && (
-                  <div className="summary-schedule">
-                    <p><strong>Date:</strong> {selectedDate}</p>
-                    <p><strong>Time:</strong> {selectedTime}</p>
-                    {selectedTherapist && (
-                      <p><strong>Therapist:</strong> {
-                        therapists.find(t => t.id === selectedTherapist)?.first_name
-                      }</p>
-                    )}
-                  </div>
-                )}
 
                 <button
                   className="submit-booking-btn"
                   onClick={handleSubmitBooking}
                   disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
                 >
-                  {submitting ? 'Submitting...' : `Book Now`}
+                  {submitting ? 'Submitting...' : 'Confirm Booking'}
                 </button>
 
                 <p className="booking-note">
                   We'll contact you to confirm your booking and arrange payment.
                 </p>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -1986,27 +2014,7 @@ const BookingPage = () => {
         <p className="luxe-footer-copy">&copy; {new Date().getFullYear()} {business?.name}. All rights reserved.</p>
       </footer>
 
-      {/* Mobile Floating Summary Bar */}
-      <div className="mobile-summary-bar">
-        <div className="mobile-summary-info">
-          <span className="mobile-summary-count">
-            {selectedServices.length === 0
-              ? 'No services selected'
-              : `${selectedServices.length} service${selectedServices.length > 1 ? 's' : ''} selected`
-            }
-          </span>
-          {cartTotal > 0 && (
-            <span className="mobile-summary-total">₱{cartTotal.toLocaleString()}</span>
-          )}
-        </div>
-        <button
-          className="mobile-summary-btn"
-          onClick={handleSubmitBooking}
-          disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
-        >
-          {submitting ? 'Submitting...' : 'Book Now'}
-        </button>
-      </div>
+      {/* Mobile floating bar removed — summary is now inline at the bottom */}
     </div>
   );
 };

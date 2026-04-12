@@ -1071,7 +1071,8 @@ const BookingPage = () => {
             {heroSettingsLoaded && (
               <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
-                  fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
+                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(12, parseInt(heroFontSize) * 0.6)}px, ${parseInt(heroFontSize) / 16}vw + 1rem, ${parseInt(heroFontSize) * 2.5}px)`
+                    : heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
                     : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'
                     : heroFontSize === 'large' ? 'clamp(3rem, 7vw, 5rem)'
                     : heroFontSize === 'xlarge' ? 'clamp(3.5rem, 8vw, 6rem)'
@@ -1163,7 +1164,8 @@ const BookingPage = () => {
             {heroSettingsLoaded && (
               <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
-                  fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
+                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(12, parseInt(heroFontSize) * 0.6)}px, ${parseInt(heroFontSize) / 16}vw + 1rem, ${parseInt(heroFontSize) * 2.5}px)`
+                    : heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
                     : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'
                     : heroFontSize === 'large' ? 'clamp(3rem, 7vw, 5rem)'
                     : heroFontSize === 'xlarge' ? 'clamp(3.5rem, 8vw, 6rem)'

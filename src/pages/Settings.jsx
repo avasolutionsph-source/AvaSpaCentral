@@ -2387,21 +2387,6 @@ const Settings = () => {
                     />
                   </div>
                 </div>
-                <div className="settings-form-group">
-                  <label>Text Size</label>
-                  <select
-                    className="form-control"
-                    value={brandingSettings.heroFontSize || 'default'}
-                    onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroFontSize: e.target.value }))}
-                    disabled={!canEdit()}
-                  >
-                    <option value="default">Default</option>
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large">Large</option>
-                    <option value="xlarge">Extra Large</option>
-                  </select>
-                </div>
               </div>
               {/* Text Animation */}
               <div className="settings-row" style={{ marginTop: '12px' }}>
@@ -2560,33 +2545,83 @@ const Settings = () => {
                     document.addEventListener('touchend', onEnd);
                   } : undefined}
                 >
-                  {/* Animated inner text */}
-                  <div
-                    key={brandingSettings._animKey || brandingSettings.heroAnimation || 'init'}
-                    className={brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' ? `pv-anim-${brandingSettings.heroAnimation}` : ''}
-                    style={{
-                      fontFamily: brandingSettings.heroFont === '__custom__' ? (brandingSettings._customFont || "'Playfair Display', serif") : (brandingSettings.heroFont || "'Playfair Display', serif"),
-                      color: brandingSettings.heroFontColor || '#fff',
-                      fontSize: brandingSettings.heroFontSize === 'small' ? '1rem'
-                        : brandingSettings.heroFontSize === 'medium' ? '1.3rem'
-                        : brandingSettings.heroFontSize === 'large' ? '2rem'
-                        : brandingSettings.heroFontSize === 'xlarge' ? '2.5rem'
-                        : '1.6rem',
-                      textShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                      whiteSpace: 'nowrap',
-                      ...(brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' && {
-                        '--anim-delay': `${brandingSettings.heroAnimDelay || 0}s`,
-                        ...(brandingSettings.heroAnimDuration && brandingSettings.heroAnimDuration !== 'default' && {
-                          '--anim-dur': `${brandingSettings.heroAnimDuration}s`,
-                        }),
-                      }),
-                      ...(brandingSettings.heroAnimation === 'shimmer' && {
-                        background: `linear-gradient(90deg, ${brandingSettings.heroFontColor || '#fff'} 0%, rgba(255,255,255,0.4) 50%, ${brandingSettings.heroFontColor || '#fff'} 100%)`,
-                      }),
-                    }}
-                  >
-                    {brandingSettings.businessName || 'Your Business Name'}
-                  </div>
+                  {/* Animated inner text with resize handles */}
+                  {(() => {
+                    const fs = brandingSettings.heroFontSize;
+                    const textSize = typeof fs === 'number' ? fs
+                      : fs === 'small' ? 16 : fs === 'medium' ? 22
+                      : fs === 'large' ? 32 : fs === 'xlarge' ? 40
+                      : !isNaN(parseInt(fs)) ? parseInt(fs) : 26;
+                    const handleStyle = (cursor) => ({
+                      position: 'absolute', width: '8px', height: '8px',
+                      background: '#1a73e8', border: '1px solid #fff', borderRadius: '1px',
+                      cursor, zIndex: 5, boxShadow: '0 0 3px rgba(0,0,0,0.4)',
+                    });
+                    const startResize = (e, corner) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const startX = e.clientX || e.touches?.[0]?.clientX;
+                      const startY = e.clientY || e.touches?.[0]?.clientY;
+                      const startSize = textSize;
+                      const onMove = (ev) => {
+                        const cx = ev.clientX || ev.touches?.[0]?.clientX;
+                        const cy = ev.clientY || ev.touches?.[0]?.clientY;
+                        const dx = cx - startX;
+                        const dy = cy - startY;
+                        let delta = 0;
+                        if (corner === 'se') delta = Math.max(dx, dy);
+                        else if (corner === 'sw') delta = Math.max(-dx, dy);
+                        else if (corner === 'ne') delta = Math.max(dx, -dy);
+                        else if (corner === 'nw') delta = Math.max(-dx, -dy);
+                        const newSize = Math.max(12, Math.min(80, startSize + delta * 0.5));
+                        setBrandingSettings(prev => ({ ...prev, heroFontSize: Math.round(newSize) }));
+                      };
+                      const onUp = () => {
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                        document.removeEventListener('touchmove', onMove);
+                        document.removeEventListener('touchend', onUp);
+                      };
+                      document.addEventListener('mousemove', onMove);
+                      document.addEventListener('mouseup', onUp);
+                      document.addEventListener('touchmove', onMove, { passive: false });
+                      document.addEventListener('touchend', onUp);
+                    };
+                    return (
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <div
+                          key={brandingSettings._animKey || brandingSettings.heroAnimation || 'init'}
+                          className={brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' ? `pv-anim-${brandingSettings.heroAnimation}` : ''}
+                          style={{
+                            fontFamily: brandingSettings.heroFont === '__custom__' ? (brandingSettings._customFont || "'Playfair Display', serif") : (brandingSettings.heroFont || "'Playfair Display', serif"),
+                            color: brandingSettings.heroFontColor || '#fff',
+                            fontSize: `${textSize}px`,
+                            textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                            whiteSpace: 'nowrap',
+                            padding: '4px 8px',
+                            border: '2px solid rgba(26,115,232,0.6)',
+                            ...(brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' && {
+                              '--anim-delay': `${brandingSettings.heroAnimDelay || 0}s`,
+                              ...(brandingSettings.heroAnimDuration && brandingSettings.heroAnimDuration !== 'default' && {
+                                '--anim-dur': `${brandingSettings.heroAnimDuration}s`,
+                              }),
+                            }),
+                            ...(brandingSettings.heroAnimation === 'shimmer' && {
+                              background: `linear-gradient(90deg, ${brandingSettings.heroFontColor || '#fff'} 0%, rgba(255,255,255,0.4) 50%, ${brandingSettings.heroFontColor || '#fff'} 100%)`,
+                            }),
+                          }}
+                        >
+                          {brandingSettings.businessName || 'Your Business Name'}
+                        </div>
+                        {canEdit() && <>
+                          <div data-handle="nw" style={{ ...handleStyle('nw-resize'), top: '-5px', left: '-5px' }} onMouseDown={(e) => startResize(e, 'nw')} onTouchStart={(e) => startResize(e, 'nw')} />
+                          <div data-handle="ne" style={{ ...handleStyle('ne-resize'), top: '-5px', right: '-5px' }} onMouseDown={(e) => startResize(e, 'ne')} onTouchStart={(e) => startResize(e, 'ne')} />
+                          <div data-handle="sw" style={{ ...handleStyle('sw-resize'), bottom: '-5px', left: '-5px' }} onMouseDown={(e) => startResize(e, 'sw')} onTouchStart={(e) => startResize(e, 'sw')} />
+                          <div data-handle="se" style={{ ...handleStyle('se-resize'), bottom: '-5px', right: '-5px' }} onMouseDown={(e) => startResize(e, 'se')} onTouchStart={(e) => startResize(e, 'se')} />
+                        </>}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {/* Draggable & resizable logo on hero preview */}
                 {brandingSettings.heroLogoEnabled && logoPreview && (() => {

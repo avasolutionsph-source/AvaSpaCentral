@@ -702,64 +702,37 @@ const Settings = () => {
         await SettingsRepository.set('heroAnimDuration', brandingSettings.heroAnimDuration || 'default');
 
         // Also save directly to Supabase so booking page can read them
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        if (supabaseUrl && supabaseKey && user?.businessId) {
-          // Get auth token using the same method as saveBrandingSettings
-          let token = supabaseKey;
+        if (user?.businessId) {
           try {
             const { supabase } = await import('../services/supabase/supabaseClient');
-            const { data } = await Promise.race([
-              supabase.auth.getSession(),
-              new Promise((_, r) => setTimeout(() => r('timeout'), 3000))
-            ]);
-            if (data?.session?.access_token) token = data.session.access_token;
-          } catch {}
+            if (supabase) {
+              const heroSettings = {
+                heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
+                heroFontColor: brandingSettings.heroFontColor || '#ffffff',
+                heroTextX: String(brandingSettings.heroTextX ?? 50),
+                heroTextY: String(brandingSettings.heroTextY ?? 50),
+                heroAnimation: brandingSettings.heroAnimation || 'none',
+                heroFontSize: brandingSettings.heroFontSize || 'default',
+                heroAnimDelay: brandingSettings.heroAnimDelay || '0',
+                heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
+              };
 
-          const heroSettings = {
-            heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
-            heroFontColor: brandingSettings.heroFontColor || '#ffffff',
-            heroTextX: String(brandingSettings.heroTextX ?? 50),
-            heroTextY: String(brandingSettings.heroTextY ?? 50),
-            heroAnimation: brandingSettings.heroAnimation || 'none',
-            heroFontSize: brandingSettings.heroFontSize || 'default',
-            heroAnimDelay: brandingSettings.heroAnimDelay || '0',
-            heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
-          };
+              const rows = Object.entries(heroSettings).map(([key, value]) => ({
+                business_id: user.businessId,
+                key,
+                value,
+              }));
 
-          const savePromises = Object.entries(heroSettings).map(async ([key, value]) => {
-            // Try PATCH (update) first
-            const patchRes = await fetch(
-              `${supabaseUrl}/rest/v1/settings?business_id=eq.${user.businessId}&key=eq.${key}`,
-              {
-                method: 'PATCH',
-                headers: {
-                  'apikey': supabaseKey,
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                  'Prefer': 'return=headers-only',
-                },
-                body: JSON.stringify({ value }),
+              const { error } = await supabase
+                .from('settings')
+                .upsert(rows, { onConflict: 'business_id,key' });
+
+              if (error) {
+                console.error('[HeroSettings] Upsert failed:', error);
+              } else {
+                console.log('[HeroSettings] Saved to Supabase successfully');
               }
-            );
-            // If no row was updated (new key), INSERT it
-            if (patchRes.ok && patchRes.headers.get('content-range')?.startsWith('*/0')) {
-              await fetch(`${supabaseUrl}/rest/v1/settings`, {
-                method: 'POST',
-                headers: {
-                  'apikey': supabaseKey,
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                  'Prefer': 'return=minimal',
-                },
-                body: JSON.stringify({ key, value, business_id: user.businessId }),
-              });
             }
-          });
-
-          try {
-            await Promise.all(savePromises);
-            console.log('[HeroSettings] Saved to Supabase successfully');
           } catch (e) {
             console.error('[HeroSettings] Save failed:', e);
           }

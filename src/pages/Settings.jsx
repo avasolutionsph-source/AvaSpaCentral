@@ -664,7 +664,7 @@ const Settings = () => {
         heroVideo: brandingSettings.heroVideo || null,
       });
 
-      // Save font settings to settings table (best effort)
+      // Save font settings to settings table (best effort - local)
       try {
         await SettingsRepository.set('footerFont', brandingSettings.footerFont || 'default');
         await SettingsRepository.set('footerFontSize', brandingSettings.footerFontSize || '14');
@@ -673,6 +673,42 @@ const Settings = () => {
         await SettingsRepository.set('heroTextX', String(brandingSettings.heroTextX ?? 50));
         await SettingsRepository.set('heroTextY', String(brandingSettings.heroTextY ?? 50));
         await SettingsRepository.set('heroAnimation', brandingSettings.heroAnimation || 'none');
+
+        // Also save directly to Supabase so booking page can read them
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (supabaseUrl && supabaseKey && user?.businessId) {
+          let token = supabaseKey;
+          try {
+            const { supabase } = await import('../services/supabase/supabaseClient');
+            const { data: { session } } = await Promise.race([
+              supabase.auth.getSession(),
+              new Promise((_, r) => setTimeout(() => r('timeout'), 3000))
+            ]);
+            if (session?.access_token) token = session.access_token;
+          } catch {}
+
+          const heroSettings = {
+            heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
+            heroFontColor: brandingSettings.heroFontColor || '#ffffff',
+            heroTextX: String(brandingSettings.heroTextX ?? 50),
+            heroTextY: String(brandingSettings.heroTextY ?? 50),
+            heroAnimation: brandingSettings.heroAnimation || 'none',
+          };
+
+          for (const [key, value] of Object.entries(heroSettings)) {
+            fetch(`${supabaseUrl}/rest/v1/settings`, {
+              method: 'POST',
+              headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates',
+              },
+              body: JSON.stringify({ key, value, business_id: user.businessId }),
+            }).catch(() => {});
+          }
+        }
       } catch (fontErr) {
         console.warn('Font settings save failed:', fontErr);
       }
@@ -2233,14 +2269,26 @@ const Settings = () => {
                 </div>
               </div>
               {/* Draggable position preview */}
-              <p className="branding-sub-desc" style={{ marginTop: '16px', marginBottom: '4px' }}>
-                Drag the text to position it on your hero.
-              </p>
+              <div style={{ marginTop: '16px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p className="branding-sub-desc" style={{ margin: 0 }}>
+                  Drag the text to position it on your hero.
+                </p>
+                {brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => setBrandingSettings(prev => ({ ...prev, _animKey: Date.now() }))}
+                    style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+                  >
+                    Replay Animation
+                  </button>
+                )}
+              </div>
               <div
                 style={{
                   marginTop: '4px',
                   position: 'relative',
-                  height: '220px',
+                  height: '280px',
                   background: brandingSettings.heroVideo
                     ? `url("/videos/${brandingSettings.heroVideo}.mp4") center/cover`
                     : 'linear-gradient(135deg, #1a1a2e, #0f3460)',
@@ -2273,6 +2321,15 @@ const Settings = () => {
                     textShadow: '0 2px 8px rgba(0,0,0,0.5)',
                     whiteSpace: 'nowrap',
                     zIndex: 2,
+                    // Inline animation to ensure it overrides
+                    ...(brandingSettings.heroAnimation === 'fadeIn' && { animation: 'heroFadeIn 2s ease-out forwards' }),
+                    ...(brandingSettings.heroAnimation === 'fadeInUp' && { animation: 'heroFadeInUp 1.5s ease-out forwards' }),
+                    ...(brandingSettings.heroAnimation === 'fadeInDown' && { animation: 'heroFadeInDown 1.5s ease-out forwards' }),
+                    ...(brandingSettings.heroAnimation === 'zoomIn' && { animation: 'heroZoomIn 1.5s ease-out forwards' }),
+                    ...(brandingSettings.heroAnimation === 'slideInLeft' && { animation: 'heroSlideInLeft 1.2s ease-out forwards' }),
+                    ...(brandingSettings.heroAnimation === 'slideInRight' && { animation: 'heroSlideInRight 1.2s ease-out forwards' }),
+                    ...(brandingSettings.heroAnimation === 'glow' && { animation: 'heroFadeIn 2s ease-out forwards, heroGlow 3s ease-in-out 2s infinite' }),
+                    ...(brandingSettings.heroAnimation === 'float' && { animation: 'heroFadeIn 2s ease-out forwards, heroFloat 4s ease-in-out 2s infinite' }),
                   }}
                   draggable={false}
                   onMouseDown={canEdit() ? (e) => {

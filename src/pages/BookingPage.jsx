@@ -85,10 +85,14 @@ const getHeroAnimStyle = (anim, delay, duration) => {
   const dur = duration && duration !== 'default' ? `${duration}s` : (defaultDurations[anim] || '1.5s');
   const keyframeMap = { fadeIn: 'heroFadeIn', fadeInUp: 'heroFadeInUp', fadeInDown: 'heroFadeInDown', zoomIn: 'heroZoomIn', slideInLeft: 'heroSlideInLeft', slideInRight: 'heroSlideInRight', glow: 'heroFadeIn', shimmer: 'heroFadeIn', float: 'heroFadeIn', typewriter: 'heroFadeIn' };
   const kf = keyframeMap[anim] || 'heroFadeIn';
-  let animation = `${kf} ${dur} ease-out ${d} both`;
-  if (anim === 'glow') animation += `, heroGlow 3s ease-in-out calc(${d} + ${dur}) infinite`;
-  if (anim === 'float') animation += `, heroFloat 4s ease-in-out calc(${d} + ${dur}) infinite`;
-  return { opacity: 0, animation };
+  console.log('[HeroAnim] anim:', anim, 'keyframe:', kf, 'dur:', dur, 'delay:', d);
+  return {
+    animationName: kf,
+    animationDuration: dur,
+    animationTimingFunction: 'ease-out',
+    animationDelay: d,
+    animationFillMode: 'both',
+  };
 };
 
 const BookingPage = () => {
@@ -304,7 +308,11 @@ const BookingPage = () => {
               });
             }
             setHeroSettingsLoaded(true);
-          } catch (e) { /* best effort */ }
+            console.log('[HeroSettings] Loaded from Supabase:', JSON.stringify(fontData));
+          } catch (e) {
+            console.error('[HeroSettings] Error loading:', e);
+            setHeroSettingsLoaded(true);
+          }
 
           // Fetch active services for this business using direct REST API
           console.log('[BookingPage] Fetching services...');

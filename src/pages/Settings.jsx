@@ -2102,30 +2102,52 @@ const Settings = () => {
                     style={{ fontFamily: brandingSettings.heroFont || "'Playfair Display', serif" }}
                     disabled={!canEdit()}
                   >
-                    {[
-                      { value: "'Playfair Display', serif", label: 'Playfair Display' },
-                      { value: "'Great Vibes', cursive", label: 'Great Vibes' },
-                      { value: "'Dancing Script', cursive", label: 'Dancing Script' },
-                      { value: "'Pacifico', cursive", label: 'Pacifico' },
-                      { value: "'Sacramento', cursive", label: 'Sacramento' },
-                      { value: "'Alex Brush', cursive", label: 'Alex Brush' },
-                      { value: "'Allura', cursive", label: 'Allura' },
-                      { value: "'Tangerine', cursive", label: 'Tangerine' },
-                      { value: "'Cormorant Garamond', serif", label: 'Cormorant Garamond' },
-                      { value: "'Cinzel', serif", label: 'Cinzel' },
-                      { value: "'Libre Baskerville', serif", label: 'Libre Baskerville' },
-                      { value: "'Lora', serif", label: 'Lora' },
-                      { value: "'Pinyon Script', cursive", label: 'Pinyon Script' },
-                      { value: "'Satisfy', cursive", label: 'Satisfy' },
-                      { value: "'Rouge Script', cursive", label: 'Rouge Script' },
-                      { value: "'Italianno', cursive", label: 'Italianno' },
-                      { value: "'Montserrat', sans-serif", label: 'Montserrat' },
-                      { value: "'Raleway', sans-serif", label: 'Raleway' },
-                      { value: "'Josefin Sans', sans-serif", label: 'Josefin Sans' },
-                      { value: "'Quicksand', sans-serif", label: 'Quicksand' },
-                    ].map(f => (
-                      <option key={f.value} value={f.value}>{f.label}</option>
-                    ))}
+                    <optgroup label="Elegant Serif">
+                      <option value="'Playfair Display', serif">Playfair Display</option>
+                      <option value="'Cormorant Garamond', serif">Cormorant Garamond</option>
+                      <option value="'Cinzel', serif">Cinzel</option>
+                      <option value="'Cinzel Decorative', serif">Cinzel Decorative</option>
+                      <option value="'Libre Baskerville', serif">Libre Baskerville</option>
+                      <option value="'Lora', serif">Lora</option>
+                      <option value="'EB Garamond', serif">EB Garamond</option>
+                      <option value="'Bodoni Moda', serif">Bodoni Moda</option>
+                      <option value="'Cormorant', serif">Cormorant</option>
+                      <option value="'DM Serif Display', serif">DM Serif Display</option>
+                    </optgroup>
+                    <optgroup label="Cursive / Script">
+                      <option value="'Great Vibes', cursive">Great Vibes</option>
+                      <option value="'Dancing Script', cursive">Dancing Script</option>
+                      <option value="'Pacifico', cursive">Pacifico</option>
+                      <option value="'Sacramento', cursive">Sacramento</option>
+                      <option value="'Alex Brush', cursive">Alex Brush</option>
+                      <option value="'Allura', cursive">Allura</option>
+                      <option value="'Tangerine', cursive">Tangerine</option>
+                      <option value="'Pinyon Script', cursive">Pinyon Script</option>
+                      <option value="'Satisfy', cursive">Satisfy</option>
+                      <option value="'Rouge Script', cursive">Rouge Script</option>
+                      <option value="'Italianno', cursive">Italianno</option>
+                      <option value="'Lobster', cursive">Lobster</option>
+                      <option value="'Cookie', cursive">Cookie</option>
+                      <option value="'Courgette', cursive">Courgette</option>
+                      <option value="'Kaushan Script', cursive">Kaushan Script</option>
+                      <option value="'Herr Von Muellerhoff', cursive">Herr Von Muellerhoff</option>
+                      <option value="'Petit Formal Script', cursive">Petit Formal Script</option>
+                      <option value="'Marck Script', cursive">Marck Script</option>
+                      <option value="'Niconne', cursive">Niconne</option>
+                      <option value="'Clicker Script', cursive">Clicker Script</option>
+                    </optgroup>
+                    <optgroup label="Modern / Clean">
+                      <option value="'Montserrat', sans-serif">Montserrat</option>
+                      <option value="'Raleway', sans-serif">Raleway</option>
+                      <option value="'Josefin Sans', sans-serif">Josefin Sans</option>
+                      <option value="'Quicksand', sans-serif">Quicksand</option>
+                      <option value="'Poppins', sans-serif">Poppins</option>
+                      <option value="'Tenor Sans', sans-serif">Tenor Sans</option>
+                      <option value="'Philosopher', sans-serif">Philosopher</option>
+                      <option value="'Cormorant Upright', serif">Cormorant Upright</option>
+                      <option value="'Poiret One', cursive">Poiret One</option>
+                      <option value="'Forum', serif">Forum</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div className="settings-form-group">

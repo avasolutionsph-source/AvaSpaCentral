@@ -7,7 +7,18 @@ import '../assets/css/booking.css';
 
 // Available hero fonts for booking page
 const HERO_FONTS = [
+  // Elegant Serif
   { value: "'Playfair Display', serif", label: 'Playfair Display', google: 'Playfair+Display:wght@400;700' },
+  { value: "'Cormorant Garamond', serif", label: 'Cormorant Garamond', google: 'Cormorant+Garamond:wght@300;400;600' },
+  { value: "'Cinzel', serif", label: 'Cinzel', google: 'Cinzel:wght@400;700' },
+  { value: "'Cinzel Decorative', serif", label: 'Cinzel Decorative', google: 'Cinzel+Decorative:wght@400;700' },
+  { value: "'Libre Baskerville', serif", label: 'Libre Baskerville', google: 'Libre+Baskerville:wght@400;700' },
+  { value: "'Lora', serif", label: 'Lora', google: 'Lora:wght@400;700' },
+  { value: "'EB Garamond', serif", label: 'EB Garamond', google: 'EB+Garamond:wght@400;600' },
+  { value: "'Bodoni Moda', serif", label: 'Bodoni Moda', google: 'Bodoni+Moda:wght@400;700' },
+  { value: "'Cormorant', serif", label: 'Cormorant', google: 'Cormorant:wght@300;400;700' },
+  { value: "'DM Serif Display', serif", label: 'DM Serif Display', google: 'DM+Serif+Display' },
+  // Cursive / Script
   { value: "'Great Vibes', cursive", label: 'Great Vibes', google: 'Great+Vibes' },
   { value: "'Dancing Script', cursive", label: 'Dancing Script', google: 'Dancing+Script:wght@400;700' },
   { value: "'Pacifico', cursive", label: 'Pacifico', google: 'Pacifico' },
@@ -15,18 +26,30 @@ const HERO_FONTS = [
   { value: "'Alex Brush', cursive", label: 'Alex Brush', google: 'Alex+Brush' },
   { value: "'Allura', cursive", label: 'Allura', google: 'Allura' },
   { value: "'Tangerine', cursive", label: 'Tangerine', google: 'Tangerine:wght@400;700' },
-  { value: "'Cormorant Garamond', serif", label: 'Cormorant Garamond', google: 'Cormorant+Garamond:wght@300;400;600' },
-  { value: "'Cinzel', serif", label: 'Cinzel', google: 'Cinzel:wght@400;700' },
-  { value: "'Libre Baskerville', serif", label: 'Libre Baskerville', google: 'Libre+Baskerville:wght@400;700' },
-  { value: "'Lora', serif", label: 'Lora', google: 'Lora:wght@400;700' },
   { value: "'Pinyon Script', cursive", label: 'Pinyon Script', google: 'Pinyon+Script' },
   { value: "'Satisfy', cursive", label: 'Satisfy', google: 'Satisfy' },
   { value: "'Rouge Script', cursive", label: 'Rouge Script', google: 'Rouge+Script' },
   { value: "'Italianno', cursive", label: 'Italianno', google: 'Italianno' },
+  { value: "'Lobster', cursive", label: 'Lobster', google: 'Lobster' },
+  { value: "'Cookie', cursive", label: 'Cookie', google: 'Cookie' },
+  { value: "'Courgette', cursive", label: 'Courgette', google: 'Courgette' },
+  { value: "'Kaushan Script', cursive", label: 'Kaushan Script', google: 'Kaushan+Script' },
+  { value: "'Herr Von Muellerhoff', cursive", label: 'Herr Von Muellerhoff', google: 'Herr+Von+Muellerhoff' },
+  { value: "'Petit Formal Script', cursive", label: 'Petit Formal Script', google: 'Petit+Formal+Script' },
+  { value: "'Marck Script', cursive", label: 'Marck Script', google: 'Marck+Script' },
+  { value: "'Niconne', cursive", label: 'Niconne', google: 'Niconne' },
+  { value: "'Clicker Script', cursive", label: 'Clicker Script', google: 'Clicker+Script' },
+  // Modern / Clean
   { value: "'Montserrat', sans-serif", label: 'Montserrat', google: 'Montserrat:wght@300;400;700' },
   { value: "'Raleway', sans-serif", label: 'Raleway', google: 'Raleway:wght@300;400;700' },
   { value: "'Josefin Sans', sans-serif", label: 'Josefin Sans', google: 'Josefin+Sans:wght@300;400;700' },
   { value: "'Quicksand', sans-serif", label: 'Quicksand', google: 'Quicksand:wght@300;400;700' },
+  { value: "'Poppins', sans-serif", label: 'Poppins', google: 'Poppins:wght@300;400;700' },
+  { value: "'Tenor Sans', sans-serif", label: 'Tenor Sans', google: 'Tenor+Sans' },
+  { value: "'Philosopher', sans-serif", label: 'Philosopher', google: 'Philosopher:wght@400;700' },
+  { value: "'Cormorant Upright', serif", label: 'Cormorant Upright', google: 'Cormorant+Upright:wght@300;400;700' },
+  { value: "'Poiret One', cursive", label: 'Poiret One', google: 'Poiret+One' },
+  { value: "'Forum', serif", label: 'Forum', google: 'Forum' },
 ];
 
 export { HERO_FONTS };
@@ -950,8 +973,19 @@ const BookingPage = () => {
               width: '100%',
               height: '100%',
               objectFit: 'cover',
+              filter: 'blur(1.5px) brightness(0.85) contrast(1.1)',
+              transform: 'scale(1.05)',
             }}
           />
+          {/* Film grain overlay to mask pixelation */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\' opacity=\'0.08\'/%3E%3C/svg%3E")',
+            opacity: 0.4,
+            mixBlendMode: 'overlay',
+            pointerEvents: 'none',
+          }} />
           <div style={{
             position: 'absolute',
             inset: 0,

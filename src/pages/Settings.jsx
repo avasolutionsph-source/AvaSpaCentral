@@ -13,6 +13,7 @@ import BranchesTab from './BranchesTab';
 import { authService } from '../services/supabase';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
+import { HERO_FONTS } from '../pages/BookingPage';
 
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId } = useApp();
@@ -71,6 +72,24 @@ const Settings = () => {
   const [logoPreview, setLogoPreview] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
   const [savingBranding, setSavingBranding] = useState(false);
+
+  // Load Google Font for hero text preview
+  useEffect(() => {
+    const font = brandingSettings?.heroFont;
+    if (!font || font === '__custom__') return;
+    const fontEntry = HERO_FONTS?.find(f => f.value === font);
+    if (fontEntry?.google) {
+      const linkId = 'settings-hero-google-font';
+      let link = document.getElementById(linkId);
+      if (!link) {
+        link = document.createElement('link');
+        link.id = linkId;
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+      link.href = `https://fonts.googleapis.com/css2?family=${fontEntry.google}&display=swap`;
+    }
+  }, [brandingSettings?.heroFont]);
 
   // Profile Settings
   const [profileData, setProfileData] = useState({

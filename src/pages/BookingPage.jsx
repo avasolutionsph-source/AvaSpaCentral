@@ -920,6 +920,24 @@ const BookingPage = () => {
     });
   }, [therapists, selectedDate, selectedTime, shiftSchedules]);
 
+  // Scroll-triggered fade-in for booking sections
+  useEffect(() => {
+    if (loading) return;
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('section-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.booking-section, .booking-progress, .booking-summary').forEach(el => {
+      el.classList.add('section-animate');
+      observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [loading]);
+
   // Loading state — luxurious spa loading screen
   if (loading) {
     return (
@@ -996,23 +1014,6 @@ const BookingPage = () => {
   };
 
   const currentProgressStep = getCurrentStep();
-
-  // Scroll-triggered fade-in for booking sections
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('section-visible');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.08 });
-    document.querySelectorAll('.booking-section, .booking-progress, .booking-summary').forEach(el => {
-      el.classList.add('section-animate');
-      observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, [loading]);
 
   // Scroll to summary section (for mobile)
   const scrollToSummary = () => {

@@ -2237,6 +2237,44 @@ const Settings = () => {
               </div>
             </div>
 
+            {/* Logo Upload */}
+            <div className="branding-sub-section">
+              <h3 className="branding-sub-title">Logo</h3>
+              <p className="branding-sub-desc">Upload your business logo. You can also display it on the hero section.</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo" style={{ maxHeight: '60px', maxWidth: '160px', objectFit: 'contain', borderRadius: '6px', border: '1px solid #e0e0e0', padding: '8px', background: '#fff' }} />
+                ) : (
+                  <div style={{ width: '80px', height: '60px', borderRadius: '6px', border: '2px dashed #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '0.75rem', textAlign: 'center' }}>
+                    No logo
+                  </div>
+                )}
+                <div>
+                  <label className="btn btn-sm" style={{ cursor: 'pointer', display: 'inline-block' }}>
+                    {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoFileChange}
+                      style={{ display: 'none' }}
+                      disabled={!canEdit()}
+                    />
+                  </label>
+                  {logoPreview && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ marginLeft: '8px', color: '#999' }}
+                      onClick={() => { setLogoFile(null); setLogoPreview(null); setBrandingSettings(prev => ({ ...prev, logoUrl: null })); }}
+                      disabled={!canEdit()}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Hero Text Style */}
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Hero Text Style</h3>

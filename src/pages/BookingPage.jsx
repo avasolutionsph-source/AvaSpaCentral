@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
 import { getCustomerSession, logoutCustomer } from '../services/customerAuthService';
@@ -77,46 +77,79 @@ const isUUID = (str) => {
   return uuidRegex.test(str);
 };
 
-// Build inline animation styles for hero text
-const HERO_ANIM_KEYFRAMES = {
-  fadeIn: 'heroFadeIn',
-  fadeInUp: 'heroFadeInUp',
-  fadeInDown: 'heroFadeInDown',
-  zoomIn: 'heroZoomIn',
-  slideInLeft: 'heroSlideInLeft',
-  slideInRight: 'heroSlideInRight',
-  glow: 'heroFadeIn',
-  shimmer: 'heroFadeIn',
-  float: 'heroFadeIn',
+// Web Animations API keyframes for hero text
+const HERO_ANIM_FRAMES = {
+  fadeIn: [
+    { opacity: 0 },
+    { opacity: 1 },
+  ],
+  fadeInUp: [
+    { opacity: 0, transform: 'translateY(30px)' },
+    { opacity: 1, transform: 'translateY(0)' },
+  ],
+  fadeInDown: [
+    { opacity: 0, transform: 'translateY(-30px)' },
+    { opacity: 1, transform: 'translateY(0)' },
+  ],
+  zoomIn: [
+    { opacity: 0, transform: 'scale(0.5)' },
+    { opacity: 1, transform: 'scale(1)' },
+  ],
+  slideInLeft: [
+    { opacity: 0, transform: 'translateX(-100px)' },
+    { opacity: 1, transform: 'translateX(0)' },
+  ],
+  slideInRight: [
+    { opacity: 0, transform: 'translateX(100px)' },
+    { opacity: 1, transform: 'translateX(0)' },
+  ],
+  glow: [
+    { opacity: 0 },
+    { opacity: 1 },
+  ],
+  shimmer: [
+    { opacity: 0 },
+    { opacity: 1 },
+  ],
+  float: [
+    { opacity: 0 },
+    { opacity: 1 },
+  ],
 };
 
 const HERO_ANIM_DEFAULTS = {
-  fadeIn: '2s', fadeInUp: '1.5s', fadeInDown: '1.5s', zoomIn: '1.5s',
-  slideInLeft: '1.2s', slideInRight: '1.2s', glow: '2s', shimmer: '1.5s', float: '2s',
+  fadeIn: 2000, fadeInUp: 1500, fadeInDown: 1500, zoomIn: 1500,
+  slideInLeft: 1200, slideInRight: 1200, glow: 2000, shimmer: 1500, float: 2000,
 };
 
-const getHeroAnimStyle = (animation, delay, duration) => {
-  if (!animation || animation === 'none') return {};
-  const keyframe = HERO_ANIM_KEYFRAMES[animation];
-  if (!keyframe) return {};
-  const dur = duration && duration !== 'default' ? `${duration}s` : (HERO_ANIM_DEFAULTS[animation] || '1.5s');
-  const del = delay && delay !== '0' ? `${delay}s` : '0s';
+// Hook that runs a Web Animations API animation on mount
+function useHeroAnimation(animation, delay, duration) {
+  const ref = useRef(null);
 
-  // Build secondary animation for compound effects
-  let secondaryAnim = '';
-  if (animation === 'glow') {
-    const secondDelay = `calc(${del} + ${dur})`;
-    secondaryAnim = `, heroGlow 3s ease-in-out ${secondDelay} infinite`;
-  } else if (animation === 'float') {
-    const secondDelay = `calc(${del} + ${dur})`;
-    secondaryAnim = `, heroFloat 4s ease-in-out ${secondDelay} infinite`;
-  }
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !animation || animation === 'none') return;
+    const frames = HERO_ANIM_FRAMES[animation];
+    if (!frames) return;
 
-  return {
-    animation: `${keyframe} ${dur} ease-out ${del} forwards${secondaryAnim}`,
-    opacity: 0,
-  };
-};
+    const dur = duration && duration !== 'default' ? parseFloat(duration) * 1000 : (HERO_ANIM_DEFAULTS[animation] || 1500);
+    const del = delay && delay !== '0' ? parseFloat(delay) * 1000 : 0;
+
+    // Start hidden
+    el.style.opacity = '0';
+
+    const anim = el.animate(frames, {
+      duration: dur,
+      delay: del,
+      easing: 'ease-out',
+      fill: 'forwards',
+    });
+
+    return () => anim.cancel();
+  }, [animation, delay, duration]);
+
+  return ref;
+}
 
 const BookingPage = () => {
   // Get businessId or slug from URL - also support branchSlug
@@ -137,6 +170,7 @@ const BookingPage = () => {
   const [heroAnimDelay, setHeroAnimDelay] = useState('0');
   const [heroAnimDuration, setHeroAnimDuration] = useState('default');
   const [heroSettingsLoaded, setHeroSettingsLoaded] = useState(false);
+  const heroAnimRef = useHeroAnimation(heroSettingsLoaded ? heroAnimation : 'none', heroAnimDelay, heroAnimDuration);
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -1070,11 +1104,7 @@ const BookingPage = () => {
           }}>
             {/* Animated inner content */}
             {heroSettingsLoaded && (
-              <div
-                key={`anim-video-${heroAnimation}`}
-                className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
-                style={getHeroAnimStyle(heroAnimation, heroAnimDelay, heroAnimDuration)}
-              >
+              <div ref={heroAnimRef}>
                 <h2 style={{
                   fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
                     : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'
@@ -1148,11 +1178,7 @@ const BookingPage = () => {
           }}>
             {/* Animated inner content */}
             {heroSettingsLoaded && (
-              <div
-                key={`anim-cover-${heroAnimation}`}
-                className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
-                style={getHeroAnimStyle(heroAnimation, heroAnimDelay, heroAnimDuration)}
-              >
+              <div ref={heroAnimRef}>
                 <h2 style={{
                   fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
                     : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'

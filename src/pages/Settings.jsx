@@ -2341,20 +2341,7 @@ const Settings = () => {
                   />
                 )}
                 <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
-                {/* Inline keyframes for preview animations */}
-                <style>{`
-                  @keyframes pvFadeIn { from { opacity: 0; } to { opacity: 1; } }
-                  @keyframes pvFadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-                  @keyframes pvFadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
-                  @keyframes pvZoomIn { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
-                  @keyframes pvSlideLeft { from { opacity: 0; transform: translateX(-80px); } to { opacity: 1; transform: translateX(0); } }
-                  @keyframes pvSlideRight { from { opacity: 0; transform: translateX(80px); } to { opacity: 1; transform: translateX(0); } }
-                  @keyframes pvGlow { 0%,100% { text-shadow: 0 0 10px rgba(255,255,255,0.3); } 50% { text-shadow: 0 0 25px rgba(255,255,255,0.7), 0 0 50px rgba(255,255,255,0.3); } }
-                  @keyframes pvFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-                  @keyframes pvShimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-                  @keyframes pvTypewriter { from { width: 0; } to { width: 100%; } }
-                  @keyframes pvBlink { 50% { border-color: transparent; } }
-                `}</style>
+                {/* Animation keyframes are in settings.css */}
                 {/* Position wrapper (draggable) */}
                 <div
                   style={{
@@ -2401,7 +2388,8 @@ const Settings = () => {
                 >
                   {/* Animated inner text */}
                   <div
-                    key={brandingSettings._animKey || 'init'}
+                    key={brandingSettings._animKey || brandingSettings.heroAnimation || 'init'}
+                    className={brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' ? `pv-anim-${brandingSettings.heroAnimation}` : ''}
                     style={{
                       fontFamily: brandingSettings.heroFont === '__custom__' ? (brandingSettings._customFont || "'Playfair Display', serif") : (brandingSettings.heroFont || "'Playfair Display', serif"),
                       color: brandingSettings.heroFontColor || '#fff',
@@ -2412,27 +2400,8 @@ const Settings = () => {
                         : '1.6rem',
                       textShadow: '0 2px 8px rgba(0,0,0,0.5)',
                       whiteSpace: 'nowrap',
-                      ...(brandingSettings.heroAnimation === 'fadeIn' && { opacity: 0, animation: 'pvFadeIn 2s ease-out forwards' }),
-                      ...(brandingSettings.heroAnimation === 'fadeInUp' && { opacity: 0, animation: 'pvFadeInUp 1.5s ease-out forwards' }),
-                      ...(brandingSettings.heroAnimation === 'fadeInDown' && { opacity: 0, animation: 'pvFadeInDown 1.5s ease-out forwards' }),
-                      ...(brandingSettings.heroAnimation === 'zoomIn' && { opacity: 0, animation: 'pvZoomIn 1.5s ease-out forwards' }),
-                      ...(brandingSettings.heroAnimation === 'slideInLeft' && { opacity: 0, animation: 'pvSlideLeft 1.2s ease-out forwards' }),
-                      ...(brandingSettings.heroAnimation === 'slideInRight' && { opacity: 0, animation: 'pvSlideRight 1.2s ease-out forwards' }),
-                      ...(brandingSettings.heroAnimation === 'glow' && { animation: 'pvFadeIn 1.5s ease-out forwards, pvGlow 3s ease-in-out 1.5s infinite' }),
-                      ...(brandingSettings.heroAnimation === 'float' && { animation: 'pvFadeIn 1.5s ease-out forwards, pvFloat 3s ease-in-out 1.5s infinite' }),
                       ...(brandingSettings.heroAnimation === 'shimmer' && {
                         background: `linear-gradient(90deg, ${brandingSettings.heroFontColor || '#fff'} 0%, rgba(255,255,255,0.4) 50%, ${brandingSettings.heroFontColor || '#fff'} 100%)`,
-                        backgroundSize: '200% auto',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                        animation: 'pvFadeIn 1s ease-out forwards, pvShimmer 3s linear 1s infinite',
-                      }),
-                      ...(brandingSettings.heroAnimation === 'typewriter' && {
-                        overflow: 'hidden',
-                        borderRight: '2px solid rgba(255,255,255,0.8)',
-                        width: 0,
-                        animation: 'pvTypewriter 2.5s steps(25) forwards, pvBlink 0.7s step-end 2.5s infinite',
                       }),
                     }}
                   >

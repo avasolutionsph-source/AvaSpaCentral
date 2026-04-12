@@ -1446,17 +1446,17 @@ const BookingPage = () => {
             </div>
 
             {/* Calendar */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '0.5rem', color: '#555' }}>&#8249;</button>
-                <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>
+            <div className="luxe-calendar">
+              <div className="luxe-calendar-nav">
+                <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="luxe-calendar-arrow">&#8249;</button>
+                <span className="luxe-calendar-month">
                   {calendarMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
                 </span>
-                <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '0.5rem', color: '#555' }}>&#8250;</button>
+                <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="luxe-calendar-arrow">&#8250;</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center' }}>
+              <div className="luxe-calendar-grid">
                 {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-                  <div key={d} style={{ fontSize: '0.75rem', color: '#888', padding: '0.3rem', fontWeight: '600' }}>{d}</div>
+                  <div key={d} className="luxe-calendar-dayname">{d}</div>
                 ))}
                 {calendarDays.map((date, i) => {
                   if (!date) return <div key={`pad-${i}`} />;
@@ -1469,57 +1469,37 @@ const BookingPage = () => {
                       key={dateStr}
                       onClick={() => { if (available) { setSelectedDate(dateStr); setSelectedTime(''); } }}
                       disabled={!available}
-                      style={{
-                        padding: '0.5rem 0',
-                        borderRadius: '8px',
-                        border: isSelected ? '2px solid var(--color-accent, #1B5E37)' : isToday ? '1px solid #d1d5db' : '1px solid transparent',
-                        background: isSelected ? 'var(--color-accent, #1B5E37)' : available ? '#fff' : '#f9fafb',
-                        color: isSelected ? '#fff' : available ? '#1a1a1a' : '#ccc',
-                        cursor: available ? 'pointer' : 'default',
-                        fontWeight: isSelected || isToday ? '700' : '400',
-                        fontSize: '0.9rem',
-                        transition: 'all 0.15s'
-                      }}
+                      className={`luxe-calendar-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${!available ? 'disabled' : ''}`}
                     >
                       {date.getDate()}
                     </button>
                   );
                 })}
               </div>
-              {/* Legend */}
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.75rem', color: '#888' }}>
-                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: 'var(--color-accent, #1B5E37)', marginRight: '4px' }}></span>Selected</span>
-                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#fff', border: '1px solid #d1d5db', marginRight: '4px' }}></span>Available</span>
-                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#f3f4f6', marginRight: '4px' }}></span>Closed</span>
-              </div>
             </div>
 
             {/* Time Slots */}
             {isDayClosed ? (
-              <div style={{ textAlign: 'center', padding: '1.5rem', color: '#ef4444', fontWeight: '600', background: '#fef2f2', borderRadius: '8px' }}>
+              <div className="luxe-closed-msg">
                 Closed on {selectedDayHours?.day}. Please select another date.
               </div>
             ) : !selectedDate ? (
-              <p style={{ color: '#888', fontSize: '0.9rem', textAlign: 'center', padding: '1rem' }}>Select a date from the calendar above</p>
+              <p className="luxe-placeholder-msg">Select a date from the calendar above</p>
             ) : (
               <>
                 {/* Best time suggestion */}
                 {bestTimeSlot && (
-                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '1.1rem' }}>&#9889;</span>
-                    <span style={{ fontSize: '0.85rem', color: '#166534' }}>
-                      <strong>Best time available:</strong> {bestTimeSlot} — fewest bookings
+                  <div className="luxe-best-time">
+                    <span className="luxe-best-time-text">
+                      Recommended: <strong>{bestTimeSlot}</strong>
                     </span>
-                    <button
-                      onClick={() => setSelectedTime(bestTimeSlot)}
-                      style={{ marginLeft: 'auto', padding: '0.3rem 0.8rem', borderRadius: '6px', border: '1px solid #16a34a', background: '#fff', color: '#16a34a', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}
-                    >
+                    <button onClick={() => setSelectedTime(bestTimeSlot)} className="luxe-best-time-btn">
                       Select
                     </button>
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                <div className="luxe-time-grid">
                   {timeSlots.map(time => {
                     const status = getSlotStatus(time);
                     const isFull = status === 'full';
@@ -1530,36 +1510,18 @@ const BookingPage = () => {
                         key={time}
                         onClick={() => { if (!isFull) setSelectedTime(time); }}
                         disabled={isFull}
-                        style={{
-                          padding: '0.6rem 0.25rem',
-                          borderRadius: '8px',
-                          border: isSelected ? '2px solid var(--color-accent, #1B5E37)' : '1px solid #e5e7eb',
-                          background: isSelected ? 'var(--color-accent, #1B5E37)' : isFull ? '#f3f4f6' : '#fff',
-                          color: isSelected ? '#fff' : isFull ? '#bbb' : '#1a1a1a',
-                          cursor: isFull ? 'not-allowed' : 'pointer',
-                          fontSize: '0.85rem',
-                          fontWeight: isSelected ? '600' : '400',
-                          position: 'relative',
-                          transition: 'all 0.15s'
-                        }}
+                        className={`luxe-time-slot ${isSelected ? 'selected' : ''} ${isFull ? 'full' : ''} ${isPeak ? 'peak' : ''}`}
                       >
                         {time}
                         {isPeak && !isSelected && (
-                          <span style={{ display: 'block', fontSize: '0.6rem', color: '#f59e0b', fontWeight: '600', marginTop: '2px' }}>Peak</span>
+                          <span className="luxe-time-badge peak">Popular</span>
                         )}
                         {isFull && (
-                          <span style={{ display: 'block', fontSize: '0.6rem', color: '#999', marginTop: '2px' }}>Full</span>
+                          <span className="luxe-time-badge full">Full</span>
                         )}
                       </button>
                     );
                   })}
-                </div>
-
-                {/* Slot legend */}
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.75rem', color: '#888' }}>
-                  <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '3px', background: '#fff', border: '1px solid #e5e7eb', marginRight: '4px' }}></span>Available</span>
-                  <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '3px', background: '#fff', border: '1px solid #f59e0b', marginRight: '4px' }}></span>Peak Hours</span>
-                  <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '3px', background: '#f3f4f6', marginRight: '4px' }}></span>Full</span>
                 </div>
               </>
             )}

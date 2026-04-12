@@ -1507,6 +1507,225 @@ html {
   font-weight: 500;
 }
 
+/* ── Luxe Calendar ─────────────────────────────────────── */
+.luxe-calendar {
+  margin-bottom: 2rem;
+}
+
+.luxe-calendar-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.luxe-calendar-month {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 0.02em;
+}
+
+.luxe-calendar-arrow {
+  background: none;
+  border: 1px solid #e8e5e0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.luxe-calendar-arrow:hover {
+  border-color: var(--color-primary, #800020);
+  color: var(--color-primary, #800020);
+  background: rgba(128, 0, 32, 0.03);
+}
+
+.luxe-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+
+.luxe-calendar-dayname {
+  font-size: 0.7rem;
+  color: #999;
+  padding: 0.4rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.luxe-calendar-day {
+  padding: 0.6rem 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #1a1a1a;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 400;
+  transition: all 0.2s;
+}
+
+.luxe-calendar-day:hover:not(.disabled):not(.selected) {
+  background: rgba(128, 0, 32, 0.04);
+  border-color: rgba(128, 0, 32, 0.15);
+}
+
+.luxe-calendar-day.today {
+  font-weight: 700;
+  border-color: #d1d5db;
+}
+
+.luxe-calendar-day.selected {
+  background: var(--color-primary, #800020);
+  color: #fff;
+  font-weight: 700;
+  border-color: var(--color-primary, #800020);
+  box-shadow: 0 2px 8px rgba(128, 0, 32, 0.25);
+}
+
+.luxe-calendar-day.disabled {
+  color: #d0d0d0;
+  cursor: default;
+}
+
+/* ── Luxe Time Slots ──────────────────────────────────── */
+.luxe-closed-msg {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--color-primary, #800020);
+  font-weight: 500;
+  background: rgba(128, 0, 32, 0.04);
+  border: 1px solid rgba(128, 0, 32, 0.1);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.luxe-placeholder-msg {
+  color: #999;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 1.5rem;
+  font-style: italic;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem;
+}
+
+.luxe-best-time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(128, 0, 32, 0.03);
+  border: 1px solid rgba(128, 0, 32, 0.1);
+  border-radius: 10px;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.luxe-best-time-text {
+  font-size: 0.88rem;
+  color: #555;
+  letter-spacing: 0.01em;
+}
+
+.luxe-best-time-text strong {
+  color: var(--color-primary, #800020);
+}
+
+.luxe-best-time-btn {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-primary, #800020);
+  background: transparent;
+  color: var(--color-primary, #800020);
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.luxe-best-time-btn:hover {
+  background: var(--color-primary, #800020);
+  color: #fff;
+}
+
+.luxe-time-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .luxe-time-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.luxe-time-slot {
+  padding: 0.7rem 0.25rem;
+  border-radius: 8px;
+  border: 1px solid #e8e5e0;
+  background: #fff;
+  color: #1a1a1a;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 400;
+  position: relative;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.luxe-time-slot:hover:not(.full):not(.selected) {
+  border-color: var(--color-primary, #800020);
+  background: rgba(128, 0, 32, 0.03);
+}
+
+.luxe-time-slot.selected {
+  background: var(--color-primary, #800020);
+  border-color: var(--color-primary, #800020);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(128, 0, 32, 0.25);
+}
+
+.luxe-time-slot.full {
+  background: #f5f3f0;
+  color: #bbb;
+  cursor: not-allowed;
+  border-color: #ebe8e4;
+}
+
+.luxe-time-badge {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.luxe-time-badge.peak {
+  color: #c4841d;
+}
+
+.luxe-time-badge.full {
+  color: #aaa;
+}
+
 /* Customer Form */
 .customer-form {
   display: grid;

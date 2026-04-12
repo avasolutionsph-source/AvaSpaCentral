@@ -296,7 +296,10 @@ const BookingPage = () => {
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
+              console.log('[HeroSettings] Loaded from Supabase:', JSON.stringify(fontData));
+              const loaded = {};
               fontData.forEach(s => {
+                loaded[s.key] = s.value;
                 if (s.key === 'heroFont' && s.value) setHeroFont(s.value);
                 if (s.key === 'heroFontColor' && s.value) setHeroFontColor(s.value);
                 if (s.key === 'heroTextX' && s.value) setHeroTextX(parseInt(s.value));
@@ -306,11 +309,13 @@ const BookingPage = () => {
                 if (s.key === 'heroAnimDelay' && s.value) setHeroAnimDelay(s.value);
                 if (s.key === 'heroAnimDuration' && s.value) setHeroAnimDuration(s.value);
               });
+              console.log('[HeroSettings] Animation:', loaded.heroAnimation, 'Delay:', loaded.heroAnimDelay, 'Duration:', loaded.heroAnimDuration);
+            } else {
+              console.error('[HeroSettings] Fetch failed:', fontRes.status, fontRes.statusText);
             }
             setHeroSettingsLoaded(true);
-            console.log('[HeroSettings] Loaded from Supabase:', JSON.stringify(fontData));
           } catch (e) {
-            console.error('[HeroSettings] Error loading:', e);
+            console.error('[HeroSettings] Error:', e);
             setHeroSettingsLoaded(true);
           }
 

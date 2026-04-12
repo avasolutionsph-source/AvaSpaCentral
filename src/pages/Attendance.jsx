@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
-import { format, parseISO, differenceInMinutes, isAfter, startOfDay } from 'date-fns';
+import { format, parseISO, differenceInMinutes, isAfter, startOfDay, subDays, addDays } from 'date-fns';
 import CameraCapture from '../components/CameraCapture';
 import { LazyImage } from '../components/OptimizedImage';
 import { logClockIn, logClockOut } from '../utils/activityLogger';
@@ -25,6 +25,10 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Date selection for viewing attendance
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const isViewingToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
+
   // Quick clock form
   const [quickEmployeeId, setQuickEmployeeId] = useState('');
 
@@ -41,6 +45,9 @@ const Attendance = ({ embedded = false, onDataChange }) => {
 
   useEffect(() => {
     loadData();
+  }, [selectedDate]);
+
+  useEffect(() => {
     // Update time every second for clock display
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -94,18 +101,18 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       });
       setScheduleMap(scheduleMapLocal);
 
-      // Filter today's attendance
+      // Filter attendance for selected date
+      const targetDate = selectedDate;
       const today = format(new Date(), 'yyyy-MM-dd');
-      let todayRecords = attendance.filter(a => a.date === today);
+      const viewingToday = targetDate === today;
+      let todayRecords = attendance.filter(a => a.date === targetDate);
 
-      // Find overnight shift records (clocked in yesterday, not yet clocked out)
-      // Only include if their shift hasn't ended yet (based on schedule endTime)
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
-      const overnightRecords = attendance.filter(
-        a => a.date === yesterdayStr && a.clockIn && !a.clockOut && isOvernightShiftActive(a, scheduleMapLocal)
-      );
+      // Find overnight shift records (clocked in the day before, not yet clocked out)
+      // Only include if viewing today and their shift hasn't ended yet
+      const prevDay = format(subDays(parseISO(targetDate), 1), 'yyyy-MM-dd');
+      const overnightRecords = viewingToday ? attendance.filter(
+        a => a.date === prevDay && a.clockIn && !a.clockOut && isOvernightShiftActive(a, scheduleMapLocal)
+      ) : [];
 
       const userBranchId = getUserBranchId();
       if (userBranchId) {
@@ -549,8 +556,8 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         </div>
       )}
 
-      {/* Quick Clock In/Out */}
-      <div className="quick-clock-section">
+      {/* Quick Clock In/Out - only show when viewing today */}
+      {isViewingToday && <div className="quick-clock-section">
         <h3 className="mb-md text-base">
           {!hasManagementAccess() ? 'My Attendance' : 'Quick Clock In/Out'}
         </h3>
@@ -609,13 +616,50 @@ const Attendance = ({ embedded = false, onDataChange }) => {
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
-      {/* Today's Attendance Table */}
+      {/* Attendance Table */}
       <div className="attendance-table-section">
-        <h3 className="mb-lg text-lg">
-          {!hasManagementAccess() ? 'My Attendance Today' : "Today's Attendance"} - {format(new Date(), 'EEEE, MMMM dd, yyyy')}
-        </h3>
+        <div className="flex items-center justify-between mb-lg" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
+          <h3 className="text-lg" style={{ margin: 0 }}>
+            {!hasManagementAccess() ? 'My Attendance' : 'Attendance'} - {format(parseISO(selectedDate), 'EEEE, MMMM dd, yyyy')}
+          </h3>
+          {hasManagementAccess() && (
+            <div className="flex items-center gap-sm">
+              <button
+                className="btn btn-sm"
+                onClick={() => setSelectedDate(format(subDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
+                title="Previous day"
+              >
+                &larr;
+              </button>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                className="form-control"
+                style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.875rem' }}
+              />
+              <button
+                className="btn btn-sm"
+                onClick={() => setSelectedDate(format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
+                disabled={selectedDate >= format(new Date(), 'yyyy-MM-dd')}
+                title="Next day"
+              >
+                &rarr;
+              </button>
+              {!isViewingToday && (
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
+                >
+                  Today
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         <table className="attendance-table">
           <thead>
             <tr>
@@ -707,7 +751,9 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                   </td>
                   {hasManagementAccess() && (
                     <td>
-                      {!record?.clockIn ? (
+                      {!isViewingToday ? (
+                        <span className="text-sm text-gray-500">-</span>
+                      ) : !record?.clockIn ? (
                         <button
                           className="btn btn-xs btn-success"
                           onClick={() => handleQuickClock('in')}

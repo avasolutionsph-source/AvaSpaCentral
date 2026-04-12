@@ -93,6 +93,8 @@ const BookingPage = () => {
   const [heroTextY, setHeroTextY] = useState(50);
   const [heroAnimation, setHeroAnimation] = useState('none');
   const [heroFontSize, setHeroFontSize] = useState('default');
+  const [heroAnimDelay, setHeroAnimDelay] = useState('0');
+  const [heroAnimDuration, setHeroAnimDuration] = useState('default');
   const [heroSettingsLoaded, setHeroSettingsLoaded] = useState(false);
 
   // Branch system
@@ -272,7 +274,7 @@ const BookingPage = () => {
 
           // Load hero font settings
           try {
-            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize)&select=key,value`;
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration)&select=key,value`;
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
@@ -283,6 +285,8 @@ const BookingPage = () => {
                 if (s.key === 'heroTextY' && s.value) setHeroTextY(parseInt(s.value));
                 if (s.key === 'heroAnimation' && s.value) setHeroAnimation(s.value);
                 if (s.key === 'heroFontSize' && s.value) setHeroFontSize(s.value);
+                if (s.key === 'heroAnimDelay' && s.value) setHeroAnimDelay(s.value);
+                if (s.key === 'heroAnimDuration' && s.value) setHeroAnimDuration(s.value);
               });
             }
             setHeroSettingsLoaded(true);
@@ -1018,6 +1022,13 @@ const BookingPage = () => {
               <div
                 key={`anim-video-${heroAnimation}`}
                 className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
+                style={{
+                  ...(heroAnimation !== 'none' && {
+                    animationDelay: `${heroAnimDelay || 0}s`,
+                    ...(heroAnimDuration !== 'default' && { animationDuration: `${heroAnimDuration}s` }),
+                    ...(parseFloat(heroAnimDelay) > 0 && { opacity: 0 }),
+                  }),
+                }}
               >
                 <h2 style={{
                   fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
@@ -1095,6 +1106,13 @@ const BookingPage = () => {
               <div
                 key={`anim-cover-${heroAnimation}`}
                 className={heroAnimation !== 'none' ? `hero-anim-${heroAnimation}` : ''}
+                style={{
+                  ...(heroAnimation !== 'none' && {
+                    animationDelay: `${heroAnimDelay || 0}s`,
+                    ...(heroAnimDuration !== 'default' && { animationDuration: `${heroAnimDuration}s` }),
+                    ...(parseFloat(heroAnimDelay) > 0 && { opacity: 0 }),
+                  }),
+                }}
               >
                 <h2 style={{
                   fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'

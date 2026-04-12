@@ -587,6 +587,8 @@ const Settings = () => {
           const savedHeroTextY = await SettingsRepository.get('heroTextY');
           const savedHeroAnimation = await SettingsRepository.get('heroAnimation');
           const savedHeroFontSize = await SettingsRepository.get('heroFontSize');
+          const savedHeroAnimDelay = await SettingsRepository.get('heroAnimDelay');
+          const savedHeroAnimDuration = await SettingsRepository.get('heroAnimDuration');
           setBrandingSettings(prev => ({
             ...prev,
             ...(savedHeroFont && { heroFont: savedHeroFont }),
@@ -595,6 +597,8 @@ const Settings = () => {
             ...(savedHeroTextY && { heroTextY: parseInt(savedHeroTextY) }),
             ...(savedHeroAnimation && { heroAnimation: savedHeroAnimation }),
             ...(savedHeroFontSize && { heroFontSize: savedHeroFontSize }),
+            ...(savedHeroAnimDelay && { heroAnimDelay: savedHeroAnimDelay }),
+            ...(savedHeroAnimDuration && { heroAnimDuration: savedHeroAnimDuration }),
           }));
         } catch {}
       } catch (err) {
@@ -675,6 +679,8 @@ const Settings = () => {
         await SettingsRepository.set('heroTextY', String(brandingSettings.heroTextY ?? 50));
         await SettingsRepository.set('heroAnimation', brandingSettings.heroAnimation || 'none');
         await SettingsRepository.set('heroFontSize', brandingSettings.heroFontSize || 'default');
+        await SettingsRepository.set('heroAnimDelay', brandingSettings.heroAnimDelay || '0');
+        await SettingsRepository.set('heroAnimDuration', brandingSettings.heroAnimDuration || 'default');
 
         // Also save directly to Supabase so booking page can read them
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -697,6 +703,8 @@ const Settings = () => {
             heroTextY: String(brandingSettings.heroTextY ?? 50),
             heroAnimation: brandingSettings.heroAnimation || 'none',
             heroFontSize: brandingSettings.heroFontSize || 'default',
+            heroAnimDelay: brandingSettings.heroAnimDelay || '0',
+            heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
           };
 
           for (const [key, value] of Object.entries(heroSettings)) {
@@ -2303,6 +2311,49 @@ const Settings = () => {
                   </select>
                 </div>
               </div>
+              {brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' && (
+                <div className="settings-row" style={{ marginTop: '12px' }}>
+                  <div className="settings-form-group">
+                    <label>Delay (seconds before animation starts)</label>
+                    <select
+                      className="form-control"
+                      value={brandingSettings.heroAnimDelay || '0'}
+                      onChange={(e) => {
+                        setBrandingSettings(prev => ({ ...prev, heroAnimDelay: e.target.value, _animKey: Date.now() }));
+                      }}
+                      disabled={!canEdit()}
+                    >
+                      <option value="0">No delay</option>
+                      <option value="0.5">0.5s</option>
+                      <option value="1">1s</option>
+                      <option value="1.5">1.5s</option>
+                      <option value="2">2s</option>
+                      <option value="3">3s</option>
+                      <option value="5">5s</option>
+                    </select>
+                  </div>
+                  <div className="settings-form-group">
+                    <label>Duration (how long the animation plays)</label>
+                    <select
+                      className="form-control"
+                      value={brandingSettings.heroAnimDuration || 'default'}
+                      onChange={(e) => {
+                        setBrandingSettings(prev => ({ ...prev, heroAnimDuration: e.target.value, _animKey: Date.now() }));
+                      }}
+                      disabled={!canEdit()}
+                    >
+                      <option value="default">Default</option>
+                      <option value="0.5">0.5s (Very Fast)</option>
+                      <option value="1">1s (Fast)</option>
+                      <option value="1.5">1.5s</option>
+                      <option value="2">2s</option>
+                      <option value="3">3s (Slow)</option>
+                      <option value="4">4s</option>
+                      <option value="5">5s (Very Slow)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
               {/* Draggable position preview */}
               <div style={{ marginTop: '16px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <p className="branding-sub-desc" style={{ margin: 0 }}>
@@ -2400,6 +2451,13 @@ const Settings = () => {
                         : '1.6rem',
                       textShadow: '0 2px 8px rgba(0,0,0,0.5)',
                       whiteSpace: 'nowrap',
+                      ...(brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' && {
+                        animationDelay: `${brandingSettings.heroAnimDelay || 0}s`,
+                        ...(brandingSettings.heroAnimDuration && brandingSettings.heroAnimDuration !== 'default' && {
+                          animationDuration: `${brandingSettings.heroAnimDuration}s`,
+                        }),
+                        ...(parseFloat(brandingSettings.heroAnimDelay) > 0 && { opacity: 0 }),
+                      }),
                       ...(brandingSettings.heroAnimation === 'shimmer' && {
                         background: `linear-gradient(90deg, ${brandingSettings.heroFontColor || '#fff'} 0%, rgba(255,255,255,0.4) 50%, ${brandingSettings.heroFontColor || '#fff'} 100%)`,
                       }),

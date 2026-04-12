@@ -217,27 +217,113 @@
   }
 }
 
-/* Loading State */
-.booking-loading {
+/* Loading State — Luxurious Spa */
+.booking-loading-luxe {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  gap: 1rem;
+  background: #0a0a0a;
+  overflow: hidden;
 }
-
-.booking-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #e0e0e0;
-  border-top-color: var(--color-accent, #1B5E37);
+.luxe-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(139,90,43,0.08) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 50%, rgba(139,90,43,0.05) 0%, transparent 60%);
+  animation: luxeBgPulse 4s ease-in-out infinite;
+}
+@keyframes luxeBgPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.luxe-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  animation: luxeFadeIn 1.2s ease-out forwards;
+  opacity: 0;
+}
+@keyframes luxeFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.luxe-logo {
+  max-height: 60px;
+  max-width: 160px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(139,90,43,0.3));
+  animation: luxeLogoPulse 3s ease-in-out 1s infinite;
+}
+@keyframes luxeLogoPulse {
+  0%, 100% { filter: drop-shadow(0 0 20px rgba(139,90,43,0.3)); }
+  50% { filter: drop-shadow(0 0 30px rgba(139,90,43,0.5)); }
+}
+.luxe-brand {
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  color: #d4af7a;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  font-weight: 300;
+  text-align: center;
+}
+.luxe-line {
+  width: 200px;
+  height: 1px;
+  background: rgba(212,175,122,0.2);
+  border-radius: 1px;
+  overflow: hidden;
+  position: relative;
+}
+.luxe-line-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, #d4af7a, transparent);
+  animation: luxeLineSlide 2s ease-in-out infinite;
+}
+@keyframes luxeLineSlide {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+.luxe-tagline {
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-size: clamp(0.85rem, 2vw, 1.1rem);
+  color: rgba(212,175,122,0.5);
+  letter-spacing: 2px;
+  font-style: italic;
+  animation: luxeFadeIn 1.5s ease-out 0.5s forwards;
+  opacity: 0;
+}
+.luxe-ornament {
+  position: absolute;
+  bottom: 40px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+  animation: luxeFadeIn 2s ease-out 1s forwards;
+  opacity: 0;
+}
+.luxe-ornament span {
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  background: rgba(212,175,122,0.4);
+  animation: luxeDots 1.5s ease-in-out infinite;
 }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.luxe-ornament span:nth-child(2) { animation-delay: 0.3s; }
+.luxe-ornament span:nth-child(3) { animation-delay: 0.6s; }
+@keyframes luxeDots {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
 }
 
 /* Error State */
@@ -342,6 +428,8 @@
 
 .booking-topbar .auth-btn.login-btn {
   color: #555;
+  border: none;
+  background: transparent;
 }
 
 .booking-topbar .auth-btn.register-btn {

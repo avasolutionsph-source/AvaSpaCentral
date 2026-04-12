@@ -920,13 +920,25 @@ const BookingPage = () => {
     });
   }, [therapists, selectedDate, selectedTime, shiftSchedules]);
 
-  // Loading state
+  // Loading state — luxurious spa loading screen
   if (loading) {
     return (
       <div className="booking-page">
-        <div className="booking-loading">
-          <div className="booking-spinner"></div>
-          <p>Loading services...</p>
+        <div className="booking-loading-luxe">
+          <div className="luxe-bg" />
+          <div className="luxe-content">
+            {business?.logo_url && (
+              <img src={business.logo_url} alt="" className="luxe-logo" />
+            )}
+            <div className="luxe-brand">{business?.name || 'Loading'}</div>
+            <div className="luxe-line">
+              <div className="luxe-line-fill" />
+            </div>
+            <div className="luxe-tagline">{business?.tagline || 'Preparing your experience...'}</div>
+          </div>
+          <div className="luxe-ornament">
+            <span></span><span></span><span></span>
+          </div>
         </div>
       </div>
     );

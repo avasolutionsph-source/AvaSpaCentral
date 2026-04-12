@@ -122,7 +122,7 @@ export async function getBrandingSettings(businessId) {
  * @param {{ logoUrl?, coverPhotoUrl?, primaryColor?, businessName?, contactPhone? }} settings
  */
 export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl, primaryColor, businessName, contactPhone, heroTagline, heroVideo }) {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+  if (!supabase) throw new Error('Supabase not configured');
 
   const payload = {};
   if (logoUrl !== undefined) payload.logo_url = logoUrl;
@@ -133,36 +133,12 @@ export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl,
   if (heroTagline !== undefined) payload.tagline = heroTagline;
   if (heroVideo !== undefined) payload.hero_video = heroVideo;
 
-  // Use direct fetch with timeout to avoid supabase client auth hanging
-  let token = SUPABASE_ANON_KEY;
-  try {
-    if (supabase) {
-      const sessionPromise = supabase.auth.getSession();
-      const timeout = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
-      const { data } = await Promise.race([sessionPromise, timeout]);
-      if (data?.session?.access_token) token = data.session.access_token;
-    }
-  } catch {}
+  const { error } = await supabase
+    .from('businesses')
+    .update(payload)
+    .eq('id', businessId);
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/businesses?id=eq.${businessId}`, {
-    method: 'PATCH',
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal',
-    },
-    body: JSON.stringify(payload),
-    signal: controller.signal,
-  });
-
-  clearTimeout(timeoutId);
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `Failed to save branding (${res.status})`);
+  if (error) {
+    throw new Error(error.message || 'Failed to save branding');
   }
 }

@@ -683,41 +683,34 @@ const Settings = () => {
         await SettingsRepository.set('heroAnimDuration', brandingSettings.heroAnimDuration || 'default');
 
         // Also save directly to Supabase so booking page can read them
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        if (supabaseUrl && supabaseKey && user?.businessId) {
-          let token = supabaseKey;
+        if (user?.businessId) {
           try {
             const { supabase } = await import('../services/supabase/supabaseClient');
-            const { data: { session } } = await Promise.race([
-              supabase.auth.getSession(),
-              new Promise((_, r) => setTimeout(() => r('timeout'), 3000))
-            ]);
-            if (session?.access_token) token = session.access_token;
-          } catch {}
+            const heroSettings = {
+              heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
+              heroFontColor: brandingSettings.heroFontColor || '#ffffff',
+              heroTextX: String(brandingSettings.heroTextX ?? 50),
+              heroTextY: String(brandingSettings.heroTextY ?? 50),
+              heroAnimation: brandingSettings.heroAnimation || 'none',
+              heroFontSize: brandingSettings.heroFontSize || 'default',
+              heroAnimDelay: brandingSettings.heroAnimDelay || '0',
+              heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
+            };
 
-          const heroSettings = {
-            heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
-            heroFontColor: brandingSettings.heroFontColor || '#ffffff',
-            heroTextX: String(brandingSettings.heroTextX ?? 50),
-            heroTextY: String(brandingSettings.heroTextY ?? 50),
-            heroAnimation: brandingSettings.heroAnimation || 'none',
-            heroFontSize: brandingSettings.heroFontSize || 'default',
-            heroAnimDelay: brandingSettings.heroAnimDelay || '0',
-            heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
-          };
+            const upsertRows = Object.entries(heroSettings).map(([key, value]) => ({
+              key,
+              value,
+              business_id: user.businessId,
+            }));
 
-          for (const [key, value] of Object.entries(heroSettings)) {
-            fetch(`${supabaseUrl}/rest/v1/settings?on_conflict=business_id,key`, {
-              method: 'POST',
-              headers: {
-                'apikey': supabaseKey,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'resolution=merge-duplicates',
-              },
-              body: JSON.stringify({ key, value, business_id: user.businessId }),
-            }).catch(() => {});
+            const { error } = await supabase
+              .from('settings')
+              .upsert(upsertRows, { onConflict: 'business_id,key' });
+
+            if (error) console.error('[HeroSettings] Supabase save error:', error);
+            else console.log('[HeroSettings] Saved to Supabase successfully');
+          } catch (e) {
+            console.error('[HeroSettings] Save failed:', e);
           }
         }
       } catch (fontErr) {

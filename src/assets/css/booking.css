@@ -435,13 +435,63 @@
   50% { transform: translateY(-10px); }
 }
 
-.hero-anim-fadeIn { animation: heroFadeIn var(--anim-dur, 2s) ease-out var(--anim-delay, 0s) forwards; opacity: 0; }
-.hero-anim-fadeInUp { animation: heroFadeInUp var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards; opacity: 0; }
-.hero-anim-fadeInDown { animation: heroFadeInDown var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards; opacity: 0; }
-.hero-anim-zoomIn { animation: heroZoomIn var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards; opacity: 0; }
-.hero-anim-slideInLeft { animation: heroSlideInLeft var(--anim-dur, 1.2s) ease-out var(--anim-delay, 0s) forwards; opacity: 0; }
-.hero-anim-slideInRight { animation: heroSlideInRight var(--anim-dur, 1.2s) ease-out var(--anim-delay, 0s) forwards; opacity: 0; }
-.hero-anim-glow { animation: heroFadeIn var(--anim-dur, 2s) ease-out var(--anim-delay, 0s) forwards, heroGlow 3s ease-in-out calc(var(--anim-delay, 0s) + var(--anim-dur, 2s)) infinite; opacity: 0; }
+.hero-anim-fadeIn {
+  animation-name: heroFadeIn;
+  animation-duration: var(--anim-dur, 2s);
+  animation-timing-function: ease-out;
+  animation-delay: var(--anim-delay, 0s);
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+.hero-anim-fadeInUp {
+  animation-name: heroFadeInUp;
+  animation-duration: var(--anim-dur, 1.5s);
+  animation-timing-function: ease-out;
+  animation-delay: var(--anim-delay, 0s);
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+.hero-anim-fadeInDown {
+  animation-name: heroFadeInDown;
+  animation-duration: var(--anim-dur, 1.5s);
+  animation-timing-function: ease-out;
+  animation-delay: var(--anim-delay, 0s);
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+.hero-anim-zoomIn {
+  animation-name: heroZoomIn;
+  animation-duration: var(--anim-dur, 1.5s);
+  animation-timing-function: ease-out;
+  animation-delay: var(--anim-delay, 0s);
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+.hero-anim-slideInLeft {
+  animation-name: heroSlideInLeft;
+  animation-duration: var(--anim-dur, 1.2s);
+  animation-timing-function: ease-out;
+  animation-delay: var(--anim-delay, 0s);
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+.hero-anim-slideInRight {
+  animation-name: heroSlideInRight;
+  animation-duration: var(--anim-dur, 1.2s);
+  animation-timing-function: ease-out;
+  animation-delay: var(--anim-delay, 0s);
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+.hero-anim-glow {
+  animation-name: heroFadeIn, heroGlow;
+  animation-duration: var(--anim-dur, 2s), 3s;
+  animation-timing-function: ease-out, ease-in-out;
+  animation-delay: var(--anim-delay, 0s), calc(var(--anim-delay, 0s) + var(--anim-dur, 2s));
+  animation-fill-mode: forwards, none;
+  animation-iteration-count: 1, infinite;
+  opacity: 0;
+}
 .hero-anim-shimmer h2 {
   background: linear-gradient(90deg, currentColor 0%, rgba(255,255,255,0.9) 50%, currentColor 100%);
   background-size: 200% auto;
@@ -450,13 +500,33 @@
   background-clip: text;
   animation: heroShimmer 4s linear infinite;
 }
-.hero-anim-shimmer { animation: heroFadeIn var(--anim-dur, 1.5s) ease-out var(--anim-delay, 0s) forwards; opacity: 0; }
-.hero-anim-float { animation: heroFadeIn var(--anim-dur, 2s) ease-out var(--anim-delay, 0s) forwards, heroFloat 4s ease-in-out calc(var(--anim-delay, 0s) + var(--anim-dur, 2s)) infinite; opacity: 0; }
+.hero-anim-shimmer {
+  animation-name: heroFadeIn;
+  animation-duration: var(--anim-dur, 1.5s);
+  animation-timing-function: ease-out;
+  animation-delay: var(--anim-delay, 0s);
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+.hero-anim-float {
+  animation-name: heroFadeIn, heroFloat;
+  animation-duration: var(--anim-dur, 2s), 4s;
+  animation-timing-function: ease-out, ease-in-out;
+  animation-delay: var(--anim-delay, 0s), calc(var(--anim-delay, 0s) + var(--anim-dur, 2s));
+  animation-fill-mode: forwards, none;
+  animation-iteration-count: 1, infinite;
+  opacity: 0;
+}
 .hero-anim-typewriter h2 {
   overflow: hidden;
   white-space: nowrap;
   border-right: 2px solid rgba(255,255,255,0.7);
-  animation: heroTypewriter var(--anim-dur, 3s) steps(30) var(--anim-delay, 0s) forwards, heroBlink 0.8s step-end calc(var(--anim-delay, 0s) + var(--anim-dur, 3s)) infinite;
+  animation-name: heroTypewriter, heroBlink;
+  animation-duration: var(--anim-dur, 3s), 0.8s;
+  animation-timing-function: steps(30), step-end;
+  animation-delay: var(--anim-delay, 0s), calc(var(--anim-delay, 0s) + var(--anim-dur, 3s));
+  animation-fill-mode: forwards, none;
+  animation-iteration-count: 1, infinite;
   display: inline-block;
   width: 0;
 }

@@ -996,6 +996,7 @@ const BookingPage = () => {
             src={`/videos/${business.hero_video === 'candle' ? 'candle' : business.hero_video}.mp4`}
             autoPlay
             muted
+            loop
             playsInline
             style={{
               position: 'absolute',

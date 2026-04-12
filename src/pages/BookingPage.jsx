@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
 import { getCustomerSession, logoutCustomer } from '../services/customerAuthService';
@@ -79,42 +79,15 @@ const isUUID = (str) => {
 
 // Web Animations API keyframes for hero text
 const HERO_ANIM_FRAMES = {
-  fadeIn: [
-    { opacity: 0 },
-    { opacity: 1 },
-  ],
-  fadeInUp: [
-    { opacity: 0, transform: 'translateY(30px)' },
-    { opacity: 1, transform: 'translateY(0)' },
-  ],
-  fadeInDown: [
-    { opacity: 0, transform: 'translateY(-30px)' },
-    { opacity: 1, transform: 'translateY(0)' },
-  ],
-  zoomIn: [
-    { opacity: 0, transform: 'scale(0.5)' },
-    { opacity: 1, transform: 'scale(1)' },
-  ],
-  slideInLeft: [
-    { opacity: 0, transform: 'translateX(-100px)' },
-    { opacity: 1, transform: 'translateX(0)' },
-  ],
-  slideInRight: [
-    { opacity: 0, transform: 'translateX(100px)' },
-    { opacity: 1, transform: 'translateX(0)' },
-  ],
-  glow: [
-    { opacity: 0 },
-    { opacity: 1 },
-  ],
-  shimmer: [
-    { opacity: 0 },
-    { opacity: 1 },
-  ],
-  float: [
-    { opacity: 0 },
-    { opacity: 1 },
-  ],
+  fadeIn: [{ opacity: 0 }, { opacity: 1 }],
+  fadeInUp: [{ opacity: 0, transform: 'translateY(30px)' }, { opacity: 1, transform: 'translateY(0)' }],
+  fadeInDown: [{ opacity: 0, transform: 'translateY(-30px)' }, { opacity: 1, transform: 'translateY(0)' }],
+  zoomIn: [{ opacity: 0, transform: 'scale(0.5)' }, { opacity: 1, transform: 'scale(1)' }],
+  slideInLeft: [{ opacity: 0, transform: 'translateX(-100px)' }, { opacity: 1, transform: 'translateX(0)' }],
+  slideInRight: [{ opacity: 0, transform: 'translateX(100px)' }, { opacity: 1, transform: 'translateX(0)' }],
+  glow: [{ opacity: 0 }, { opacity: 1 }],
+  shimmer: [{ opacity: 0 }, { opacity: 1 }],
+  float: [{ opacity: 0 }, { opacity: 1 }],
 };
 
 const HERO_ANIM_DEFAULTS = {
@@ -122,33 +95,19 @@ const HERO_ANIM_DEFAULTS = {
   slideInLeft: 1200, slideInRight: 1200, glow: 2000, shimmer: 1500, float: 2000,
 };
 
-// Hook that runs a Web Animations API animation on mount
-function useHeroAnimation(animation, delay, duration) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const el = ref.current;
+// Callback ref that fires animation the instant the element mounts
+function animateHeroRef(animation, delay, duration) {
+  return (el) => {
     if (!el || !animation || animation === 'none') return;
+    if (el.dataset.heroAnimated) return; // prevent re-trigger on re-render
+    el.dataset.heroAnimated = '1';
     const frames = HERO_ANIM_FRAMES[animation];
     if (!frames) return;
-
     const dur = duration && duration !== 'default' ? parseFloat(duration) * 1000 : (HERO_ANIM_DEFAULTS[animation] || 1500);
     const del = delay && delay !== '0' ? parseFloat(delay) * 1000 : 0;
-
-    // Start hidden
     el.style.opacity = '0';
-
-    const anim = el.animate(frames, {
-      duration: dur,
-      delay: del,
-      easing: 'ease-out',
-      fill: 'forwards',
-    });
-
-    return () => anim.cancel();
-  }, [animation, delay, duration]);
-
-  return ref;
+    el.animate(frames, { duration: dur, delay: del, easing: 'ease-out', fill: 'forwards' });
+  };
 }
 
 const BookingPage = () => {
@@ -170,7 +129,6 @@ const BookingPage = () => {
   const [heroAnimDelay, setHeroAnimDelay] = useState('0');
   const [heroAnimDuration, setHeroAnimDuration] = useState('default');
   const [heroSettingsLoaded, setHeroSettingsLoaded] = useState(false);
-  const heroAnimRef = useHeroAnimation(heroSettingsLoaded ? heroAnimation : 'none', heroAnimDelay, heroAnimDuration);
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -1104,7 +1062,7 @@ const BookingPage = () => {
           }}>
             {/* Animated inner content */}
             {heroSettingsLoaded && (
-              <div ref={heroAnimRef}>
+              <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
                   fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
                     : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'
@@ -1178,7 +1136,7 @@ const BookingPage = () => {
           }}>
             {/* Animated inner content */}
             {heroSettingsLoaded && (
-              <div ref={heroAnimRef}>
+              <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
                   fontSize: heroFontSize === 'small' ? 'clamp(1.5rem, 4vw, 2.5rem)'
                     : heroFontSize === 'medium' ? 'clamp(2rem, 5vw, 3.5rem)'

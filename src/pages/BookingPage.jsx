@@ -133,6 +133,9 @@ const BookingPage = () => {
   const [heroLogoX, setHeroLogoX] = useState(50);
   const [heroLogoY, setHeroLogoY] = useState(20);
   const [heroLogoSize, setHeroLogoSize] = useState(80);
+  const [heroLogoAnimation, setHeroLogoAnimation] = useState('none');
+  const [heroLogoAnimDelay, setHeroLogoAnimDelay] = useState('0');
+  const [heroLogoAnimDuration, setHeroLogoAnimDuration] = useState('default');
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -311,7 +314,7 @@ const BookingPage = () => {
 
           // Load hero font settings
           try {
-            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration,heroLogoEnabled,heroLogoX,heroLogoY,heroLogoSize)&select=key,value`;
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration,heroLogoEnabled,heroLogoX,heroLogoY,heroLogoSize,heroLogoAnimation,heroLogoAnimDelay,heroLogoAnimDuration)&select=key,value`;
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
@@ -331,6 +334,9 @@ const BookingPage = () => {
                 if (s.key === 'heroLogoX' && s.value) setHeroLogoX(parseInt(s.value));
                 if (s.key === 'heroLogoY' && s.value) setHeroLogoY(parseInt(s.value));
                 if (s.key === 'heroLogoSize' && s.value) setHeroLogoSize(parseInt(s.value));
+                if (s.key === 'heroLogoAnimation' && s.value) setHeroLogoAnimation(s.value);
+                if (s.key === 'heroLogoAnimDelay' && s.value) setHeroLogoAnimDelay(s.value);
+                if (s.key === 'heroLogoAnimDuration' && s.value) setHeroLogoAnimDuration(s.value);
               });
               console.log('[HeroSettings] Animation:', loaded.heroAnimation, 'Delay:', loaded.heroAnimDelay, 'Duration:', loaded.heroAnimDuration);
             } else {
@@ -1106,14 +1112,17 @@ const BookingPage = () => {
           </div>
           {/* Hero logo */}
           {heroLogoEnabled && business?.logo_url && (
-            <div style={{
-              position: 'absolute',
-              left: `${heroLogoX}%`,
-              top: `${heroLogoY}%`,
-              transform: 'translate(-50%, -50%)',
-              zIndex: 3,
-              pointerEvents: 'none',
-            }}>
+            <div
+              ref={animateHeroRef(heroLogoAnimation, heroLogoAnimDelay, heroLogoAnimDuration)}
+              style={{
+                position: 'absolute',
+                left: `${heroLogoX}%`,
+                top: `${heroLogoY}%`,
+                transform: 'translate(-50%, -50%)',
+                zIndex: 3,
+                pointerEvents: 'none',
+              }}
+            >
               <img src={business.logo_url} alt="" style={{
                 maxHeight: `${heroLogoSize}px`,
                 maxWidth: `${heroLogoSize * 2.5}px`,
@@ -1199,14 +1208,17 @@ const BookingPage = () => {
           </div>
           {/* Hero logo */}
           {heroLogoEnabled && business?.logo_url && (
-            <div style={{
-              position: 'absolute',
-              left: `${heroLogoX}%`,
-              top: `${heroLogoY}%`,
-              transform: 'translate(-50%, -50%)',
-              zIndex: 3,
-              pointerEvents: 'none',
-            }}>
+            <div
+              ref={animateHeroRef(heroLogoAnimation, heroLogoAnimDelay, heroLogoAnimDuration)}
+              style={{
+                position: 'absolute',
+                left: `${heroLogoX}%`,
+                top: `${heroLogoY}%`,
+                transform: 'translate(-50%, -50%)',
+                zIndex: 3,
+                pointerEvents: 'none',
+              }}
+            >
               <img src={business.logo_url} alt="" style={{
                 maxHeight: `${heroLogoSize}px`,
                 maxWidth: `${heroLogoSize * 2.5}px`,

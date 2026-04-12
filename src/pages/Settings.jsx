@@ -70,6 +70,9 @@ const Settings = () => {
     heroLogoX: 50,
     heroLogoY: 20,
     heroLogoSize: 80,
+    heroLogoAnimation: 'none',
+    heroLogoAnimDelay: '0',
+    heroLogoAnimDuration: 'default',
   });
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -616,6 +619,9 @@ const Settings = () => {
           const savedHeroLogoX = await SettingsRepository.get('heroLogoX');
           const savedHeroLogoY = await SettingsRepository.get('heroLogoY');
           const savedHeroLogoSize = await SettingsRepository.get('heroLogoSize');
+          const savedHeroLogoAnimation = await SettingsRepository.get('heroLogoAnimation');
+          const savedHeroLogoAnimDelay = await SettingsRepository.get('heroLogoAnimDelay');
+          const savedHeroLogoAnimDuration = await SettingsRepository.get('heroLogoAnimDuration');
 
           const hasLocal = savedHeroFont || savedHeroAnimation || savedHeroLogoEnabled;
 
@@ -635,6 +641,9 @@ const Settings = () => {
               ...(savedHeroLogoX && { heroLogoX: parseInt(savedHeroLogoX) }),
               ...(savedHeroLogoY && { heroLogoY: parseInt(savedHeroLogoY) }),
               ...(savedHeroLogoSize && { heroLogoSize: parseInt(savedHeroLogoSize) }),
+              ...(savedHeroLogoAnimation && { heroLogoAnimation: savedHeroLogoAnimation }),
+              ...(savedHeroLogoAnimDelay && { heroLogoAnimDelay: savedHeroLogoAnimDelay }),
+              ...(savedHeroLogoAnimDuration && { heroLogoAnimDuration: savedHeroLogoAnimDuration }),
             }));
           } else if (user?.businessId) {
             // Fallback: load from Supabase (incognito/new device)
@@ -645,7 +654,7 @@ const Settings = () => {
                   .from('settings')
                   .select('key, value')
                   .eq('business_id', user.businessId)
-                  .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration','heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize']);
+                  .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration','heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize','heroLogoAnimation','heroLogoAnimDelay','heroLogoAnimDuration']);
                 if (rows && rows.length > 0) {
                   const s = {};
                   rows.forEach(r => { s[r.key] = r.value; });
@@ -663,6 +672,9 @@ const Settings = () => {
                     ...(s.heroLogoX && { heroLogoX: parseInt(s.heroLogoX) }),
                     ...(s.heroLogoY && { heroLogoY: parseInt(s.heroLogoY) }),
                     ...(s.heroLogoSize && { heroLogoSize: parseInt(s.heroLogoSize) }),
+                    ...(s.heroLogoAnimation && { heroLogoAnimation: s.heroLogoAnimation }),
+                    ...(s.heroLogoAnimDelay && { heroLogoAnimDelay: s.heroLogoAnimDelay }),
+                    ...(s.heroLogoAnimDuration && { heroLogoAnimDuration: s.heroLogoAnimDuration }),
                   }));
                   // Cache locally for next time
                   for (const r of rows) {
@@ -760,6 +772,9 @@ const Settings = () => {
         await SettingsRepository.set('heroLogoX', String(brandingSettings.heroLogoX ?? 50));
         await SettingsRepository.set('heroLogoY', String(brandingSettings.heroLogoY ?? 20));
         await SettingsRepository.set('heroLogoSize', String(brandingSettings.heroLogoSize ?? 80));
+        await SettingsRepository.set('heroLogoAnimation', brandingSettings.heroLogoAnimation || 'none');
+        await SettingsRepository.set('heroLogoAnimDelay', brandingSettings.heroLogoAnimDelay || '0');
+        await SettingsRepository.set('heroLogoAnimDuration', brandingSettings.heroLogoAnimDuration || 'default');
 
         // Also save directly to Supabase so booking page can read them
         if (user?.businessId) {
@@ -779,6 +794,9 @@ const Settings = () => {
                 heroLogoX: String(brandingSettings.heroLogoX ?? 50),
                 heroLogoY: String(brandingSettings.heroLogoY ?? 20),
                 heroLogoSize: String(brandingSettings.heroLogoSize ?? 80),
+                heroLogoAnimation: brandingSettings.heroLogoAnimation || 'none',
+                heroLogoAnimDelay: brandingSettings.heroLogoAnimDelay || '0',
+                heroLogoAnimDuration: brandingSettings.heroLogoAnimDuration || 'default',
               };
 
               // Save each setting individually to avoid batch RLS issues
@@ -2751,22 +2769,64 @@ const Settings = () => {
                   Show logo on hero section
                   {!logoPreview && <span style={{ fontSize: '0.8rem', color: '#999' }}>(upload a logo first)</span>}
                 </label>
-                {brandingSettings.heroLogoEnabled && logoPreview && (
-                  <div className="settings-row" style={{ marginTop: '10px' }}>
+                {brandingSettings.heroLogoEnabled && logoPreview && (<>
+                  <div className="settings-row" style={{ marginTop: '12px' }}>
                     <div className="settings-form-group">
-                      <label>Logo Size ({brandingSettings.heroLogoSize ?? 80}px)</label>
-                      <input
-                        type="range"
-                        min="30"
-                        max="200"
-                        value={brandingSettings.heroLogoSize ?? 80}
-                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoSize: parseInt(e.target.value) }))}
+                      <label>Logo Animation</label>
+                      <select
+                        className="form-control"
+                        value={brandingSettings.heroLogoAnimation || 'none'}
+                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimation: e.target.value }))}
                         disabled={!canEdit()}
-                        style={{ width: '100%' }}
-                      />
+                      >
+                        <option value="none">None</option>
+                        <option value="fadeIn">Fade In</option>
+                        <option value="fadeInUp">Fade In Up</option>
+                        <option value="fadeInDown">Fade In Down</option>
+                        <option value="zoomIn">Zoom In</option>
+                        <option value="slideInLeft">Slide In Left</option>
+                        <option value="slideInRight">Slide In Right</option>
+                      </select>
                     </div>
                   </div>
-                )}
+                  {brandingSettings.heroLogoAnimation && brandingSettings.heroLogoAnimation !== 'none' && (
+                    <div className="settings-row" style={{ marginTop: '8px' }}>
+                      <div className="settings-form-group">
+                        <label>Delay</label>
+                        <select
+                          className="form-control"
+                          value={brandingSettings.heroLogoAnimDelay || '0'}
+                          onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDelay: e.target.value }))}
+                          disabled={!canEdit()}
+                        >
+                          <option value="0">No delay</option>
+                          <option value="0.5">0.5s</option>
+                          <option value="1">1s</option>
+                          <option value="1.5">1.5s</option>
+                          <option value="2">2s</option>
+                          <option value="3">3s</option>
+                          <option value="5">5s</option>
+                        </select>
+                      </div>
+                      <div className="settings-form-group">
+                        <label>Duration</label>
+                        <select
+                          className="form-control"
+                          value={brandingSettings.heroLogoAnimDuration || 'default'}
+                          onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDuration: e.target.value }))}
+                          disabled={!canEdit()}
+                        >
+                          <option value="default">Default</option>
+                          <option value="0.5">0.5s</option>
+                          <option value="1">1s</option>
+                          <option value="1.5">1.5s</option>
+                          <option value="2">2s</option>
+                          <option value="3">3s</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </>)}
               </div>
             </div>
 

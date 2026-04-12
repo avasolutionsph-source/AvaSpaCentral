@@ -2135,6 +2135,7 @@ const Settings = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginTop: '12px' }}>
                 {[
                   { id: 'candle', label: 'Candle Ambiance', src: '/videos/candle.mp4' },
+                  { id: 'candle2', label: 'Candle Ambiance 2', src: '/videos/candle2.mp4' },
                 ].map(template => {
                   const isSelected = brandingSettings.heroVideo === template.id;
                   return (

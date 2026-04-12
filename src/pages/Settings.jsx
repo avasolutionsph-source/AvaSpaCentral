@@ -702,36 +702,60 @@ const Settings = () => {
         await SettingsRepository.set('heroAnimDuration', brandingSettings.heroAnimDuration || 'default');
 
         // Also save directly to Supabase so booking page can read them
-        if (user?.businessId) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (supabaseUrl && supabaseKey && user?.businessId) {
           try {
-            const { supabase } = await import('../services/supabase/supabaseClient');
-            if (supabase) {
-              const heroSettings = {
-                heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
-                heroFontColor: brandingSettings.heroFontColor || '#ffffff',
-                heroTextX: String(brandingSettings.heroTextX ?? 50),
-                heroTextY: String(brandingSettings.heroTextY ?? 50),
-                heroAnimation: brandingSettings.heroAnimation || 'none',
-                heroFontSize: brandingSettings.heroFontSize || 'default',
-                heroAnimDelay: brandingSettings.heroAnimDelay || '0',
-                heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
-              };
-
-              const rows = Object.entries(heroSettings).map(([key, value]) => ({
-                business_id: user.businessId,
-                key,
-                value,
-              }));
-
-              const { error } = await supabase
-                .from('settings')
-                .upsert(rows, { onConflict: 'business_id,key' });
-
-              if (error) {
-                console.error('[HeroSettings] Upsert failed:', error);
-              } else {
-                console.log('[HeroSettings] Saved to Supabase successfully');
+            // Get auth token with timeout
+            let token = supabaseKey;
+            try {
+              const { supabase } = await import('../services/supabase/supabaseClient');
+              if (supabase) {
+                const { data } = await Promise.race([
+                  supabase.auth.getSession(),
+                  new Promise((_, r) => setTimeout(() => r('timeout'), 3000))
+                ]);
+                if (data?.session?.access_token) token = data.session.access_token;
               }
+            } catch {}
+
+            const heroSettings = {
+              heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
+              heroFontColor: brandingSettings.heroFontColor || '#ffffff',
+              heroTextX: String(brandingSettings.heroTextX ?? 50),
+              heroTextY: String(brandingSettings.heroTextY ?? 50),
+              heroAnimation: brandingSettings.heroAnimation || 'none',
+              heroFontSize: brandingSettings.heroFontSize || 'default',
+              heroAnimDelay: brandingSettings.heroAnimDelay || '0',
+              heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
+            };
+
+            const rows = Object.entries(heroSettings).map(([key, value]) => ({
+              business_id: user.businessId,
+              key,
+              value,
+            }));
+
+            // Use PostgREST upsert via fetch with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            const res = await fetch(`${supabaseUrl}/rest/v1/settings`, {
+              method: 'POST',
+              headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates,return=minimal',
+              },
+              body: JSON.stringify(rows),
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+              console.error('[HeroSettings] Upsert failed:', res.status, await res.text().catch(() => ''));
+            } else {
+              console.log('[HeroSettings] Saved to Supabase successfully');
             }
           } catch (e) {
             console.error('[HeroSettings] Save failed:', e);

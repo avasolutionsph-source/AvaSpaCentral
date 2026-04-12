@@ -13,7 +13,6 @@ import BranchesTab from './BranchesTab';
 import { authService } from '../services/supabase';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
-import '../assets/css/booking.css';
 
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId } = useApp();
@@ -2306,30 +2305,29 @@ const Settings = () => {
                   />
                 )}
                 <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+                {/* Inline keyframes for preview animations */}
+                <style>{`
+                  @keyframes pvFadeIn { from { opacity: 0; } to { opacity: 1; } }
+                  @keyframes pvFadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+                  @keyframes pvFadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
+                  @keyframes pvZoomIn { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+                  @keyframes pvSlideLeft { from { opacity: 0; transform: translateX(-80px); } to { opacity: 1; transform: translateX(0); } }
+                  @keyframes pvSlideRight { from { opacity: 0; transform: translateX(80px); } to { opacity: 1; transform: translateX(0); } }
+                  @keyframes pvGlow { 0%,100% { text-shadow: 0 0 10px rgba(255,255,255,0.3); } 50% { text-shadow: 0 0 25px rgba(255,255,255,0.7), 0 0 50px rgba(255,255,255,0.3); } }
+                  @keyframes pvFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+                  @keyframes pvShimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+                  @keyframes pvTypewriter { from { width: 0; } to { width: 100%; } }
+                  @keyframes pvBlink { 50% { border-color: transparent; } }
+                `}</style>
+                {/* Position wrapper (draggable) */}
                 <div
-                  key={brandingSettings._animKey || 'initial'}
-                  className={brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' ? `hero-anim-${brandingSettings.heroAnimation}` : ''}
                   style={{
                     position: 'absolute',
                     left: `${brandingSettings.heroTextX ?? 50}%`,
                     top: `${brandingSettings.heroTextY ?? 50}%`,
                     transform: 'translate(-50%, -50%)',
-                    cursor: canEdit() ? 'grab' : 'default',
-                    fontFamily: brandingSettings.heroFont === '__custom__' ? (brandingSettings._customFont || "'Playfair Display', serif") : (brandingSettings.heroFont || "'Playfair Display', serif"),
-                    color: brandingSettings.heroFontColor || '#fff',
-                    fontSize: '1.6rem',
-                    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                    whiteSpace: 'nowrap',
                     zIndex: 2,
-                    // Inline animation to ensure it overrides
-                    ...(brandingSettings.heroAnimation === 'fadeIn' && { animation: 'heroFadeIn 2s ease-out forwards' }),
-                    ...(brandingSettings.heroAnimation === 'fadeInUp' && { animation: 'heroFadeInUp 1.5s ease-out forwards' }),
-                    ...(brandingSettings.heroAnimation === 'fadeInDown' && { animation: 'heroFadeInDown 1.5s ease-out forwards' }),
-                    ...(brandingSettings.heroAnimation === 'zoomIn' && { animation: 'heroZoomIn 1.5s ease-out forwards' }),
-                    ...(brandingSettings.heroAnimation === 'slideInLeft' && { animation: 'heroSlideInLeft 1.2s ease-out forwards' }),
-                    ...(brandingSettings.heroAnimation === 'slideInRight' && { animation: 'heroSlideInRight 1.2s ease-out forwards' }),
-                    ...(brandingSettings.heroAnimation === 'glow' && { animation: 'heroFadeIn 2s ease-out forwards, heroGlow 3s ease-in-out 2s infinite' }),
-                    ...(brandingSettings.heroAnimation === 'float' && { animation: 'heroFadeIn 2s ease-out forwards, heroFloat 4s ease-in-out 2s infinite' }),
+                    cursor: canEdit() ? 'grab' : 'default',
                   }}
                   draggable={false}
                   onMouseDown={canEdit() ? (e) => {
@@ -2365,7 +2363,41 @@ const Settings = () => {
                     document.addEventListener('touchend', onEnd);
                   } : undefined}
                 >
-                  {brandingSettings.businessName || 'Your Business Name'}
+                  {/* Animated inner text */}
+                  <div
+                    key={brandingSettings._animKey || 'init'}
+                    style={{
+                      fontFamily: brandingSettings.heroFont === '__custom__' ? (brandingSettings._customFont || "'Playfair Display', serif") : (brandingSettings.heroFont || "'Playfair Display', serif"),
+                      color: brandingSettings.heroFontColor || '#fff',
+                      fontSize: '1.6rem',
+                      textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                      whiteSpace: 'nowrap',
+                      ...(brandingSettings.heroAnimation === 'fadeIn' && { opacity: 0, animation: 'pvFadeIn 2s ease-out forwards' }),
+                      ...(brandingSettings.heroAnimation === 'fadeInUp' && { opacity: 0, animation: 'pvFadeInUp 1.5s ease-out forwards' }),
+                      ...(brandingSettings.heroAnimation === 'fadeInDown' && { opacity: 0, animation: 'pvFadeInDown 1.5s ease-out forwards' }),
+                      ...(brandingSettings.heroAnimation === 'zoomIn' && { opacity: 0, animation: 'pvZoomIn 1.5s ease-out forwards' }),
+                      ...(brandingSettings.heroAnimation === 'slideInLeft' && { opacity: 0, animation: 'pvSlideLeft 1.2s ease-out forwards' }),
+                      ...(brandingSettings.heroAnimation === 'slideInRight' && { opacity: 0, animation: 'pvSlideRight 1.2s ease-out forwards' }),
+                      ...(brandingSettings.heroAnimation === 'glow' && { animation: 'pvFadeIn 1.5s ease-out forwards, pvGlow 3s ease-in-out 1.5s infinite' }),
+                      ...(brandingSettings.heroAnimation === 'float' && { animation: 'pvFadeIn 1.5s ease-out forwards, pvFloat 3s ease-in-out 1.5s infinite' }),
+                      ...(brandingSettings.heroAnimation === 'shimmer' && {
+                        background: `linear-gradient(90deg, ${brandingSettings.heroFontColor || '#fff'} 0%, rgba(255,255,255,0.4) 50%, ${brandingSettings.heroFontColor || '#fff'} 100%)`,
+                        backgroundSize: '200% auto',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                        animation: 'pvFadeIn 1s ease-out forwards, pvShimmer 3s linear 1s infinite',
+                      }),
+                      ...(brandingSettings.heroAnimation === 'typewriter' && {
+                        overflow: 'hidden',
+                        borderRight: '2px solid rgba(255,255,255,0.8)',
+                        width: 0,
+                        animation: 'pvTypewriter 2.5s steps(25) forwards, pvBlink 0.7s step-end 2.5s infinite',
+                      }),
+                    }}
+                  >
+                    {brandingSettings.businessName || 'Your Business Name'}
+                  </div>
                 </div>
                 <div style={{ position: 'absolute', bottom: '8px', right: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', zIndex: 2 }}>
                   Position: {brandingSettings.heroTextX ?? 50}%, {brandingSettings.heroTextY ?? 50}%

@@ -18,6 +18,14 @@ CREATE POLICY "Public can view active employees" ON employees
     FOR SELECT
     USING (status = 'active' AND deleted = false);
 
+-- Allow anyone to read hero/branding settings (needed for booking page hero)
+CREATE POLICY "Public can view hero settings" ON settings
+    FOR SELECT
+    USING (key IN (
+        'heroFont', 'heroFontColor', 'heroTextX', 'heroTextY',
+        'heroAnimation', 'heroFontSize', 'heroAnimDelay', 'heroAnimDuration'
+    ));
+
 -- ============================================================================
 -- NOTE: If you get "policy already exists" errors, that's OK - it means
 -- the policies are already in place. You can ignore those errors.

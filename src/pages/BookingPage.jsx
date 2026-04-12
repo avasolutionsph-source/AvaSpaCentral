@@ -129,6 +129,10 @@ const BookingPage = () => {
   const [heroAnimDelay, setHeroAnimDelay] = useState('0');
   const [heroAnimDuration, setHeroAnimDuration] = useState('default');
   const [heroSettingsLoaded, setHeroSettingsLoaded] = useState(false);
+  const [heroLogoEnabled, setHeroLogoEnabled] = useState(false);
+  const [heroLogoX, setHeroLogoX] = useState(50);
+  const [heroLogoY, setHeroLogoY] = useState(20);
+  const [heroLogoSize, setHeroLogoSize] = useState(80);
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -307,7 +311,7 @@ const BookingPage = () => {
 
           // Load hero font settings
           try {
-            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration)&select=key,value`;
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration,heroLogoEnabled,heroLogoX,heroLogoY,heroLogoSize)&select=key,value`;
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
@@ -323,6 +327,10 @@ const BookingPage = () => {
                 if (s.key === 'heroFontSize' && s.value) setHeroFontSize(s.value);
                 if (s.key === 'heroAnimDelay' && s.value) setHeroAnimDelay(s.value);
                 if (s.key === 'heroAnimDuration' && s.value) setHeroAnimDuration(s.value);
+                if (s.key === 'heroLogoEnabled') setHeroLogoEnabled(s.value === 'true');
+                if (s.key === 'heroLogoX' && s.value) setHeroLogoX(parseInt(s.value));
+                if (s.key === 'heroLogoY' && s.value) setHeroLogoY(parseInt(s.value));
+                if (s.key === 'heroLogoSize' && s.value) setHeroLogoSize(parseInt(s.value));
               });
               console.log('[HeroSettings] Animation:', loaded.heroAnimation, 'Delay:', loaded.heroAnimDelay, 'Duration:', loaded.heroAnimDuration);
             } else {
@@ -1095,6 +1103,24 @@ const BookingPage = () => {
               </div>
             )}
           </div>
+          {/* Hero logo */}
+          {heroLogoEnabled && business?.logo_url && (
+            <div style={{
+              position: 'absolute',
+              left: `${heroLogoX}%`,
+              top: `${heroLogoY}%`,
+              transform: 'translate(-50%, -50%)',
+              zIndex: 3,
+              pointerEvents: 'none',
+            }}>
+              <img src={business.logo_url} alt="" style={{
+                maxHeight: `${heroLogoSize}px`,
+                maxWidth: `${heroLogoSize * 2.5}px`,
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
+              }} />
+            </div>
+          )}
           {/* Scroll indicator */}
           <div style={{
             position: 'absolute',
@@ -1169,6 +1195,24 @@ const BookingPage = () => {
               </div>
             )}
           </div>
+          {/* Hero logo */}
+          {heroLogoEnabled && business?.logo_url && (
+            <div style={{
+              position: 'absolute',
+              left: `${heroLogoX}%`,
+              top: `${heroLogoY}%`,
+              transform: 'translate(-50%, -50%)',
+              zIndex: 3,
+              pointerEvents: 'none',
+            }}>
+              <img src={business.logo_url} alt="" style={{
+                maxHeight: `${heroLogoSize}px`,
+                maxWidth: `${heroLogoSize * 2.5}px`,
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
+              }} />
+            </div>
+          )}
           {/* Scroll indicator */}
           <div style={{
             position: 'absolute',

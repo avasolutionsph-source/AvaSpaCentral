@@ -66,6 +66,10 @@ const Settings = () => {
     heroFontColor: '#ffffff',
     heroTextX: 50,
     heroTextY: 50,
+    heroLogoEnabled: false,
+    heroLogoX: 50,
+    heroLogoY: 20,
+    heroLogoSize: 80,
   });
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -608,8 +612,12 @@ const Settings = () => {
           const savedHeroFontSize = await SettingsRepository.get('heroFontSize');
           const savedHeroAnimDelay = await SettingsRepository.get('heroAnimDelay');
           const savedHeroAnimDuration = await SettingsRepository.get('heroAnimDuration');
+          const savedHeroLogoEnabled = await SettingsRepository.get('heroLogoEnabled');
+          const savedHeroLogoX = await SettingsRepository.get('heroLogoX');
+          const savedHeroLogoY = await SettingsRepository.get('heroLogoY');
+          const savedHeroLogoSize = await SettingsRepository.get('heroLogoSize');
 
-          const hasLocal = savedHeroFont || savedHeroAnimation;
+          const hasLocal = savedHeroFont || savedHeroAnimation || savedHeroLogoEnabled;
 
           if (hasLocal) {
             // Use local values
@@ -623,6 +631,10 @@ const Settings = () => {
               ...(savedHeroFontSize && { heroFontSize: savedHeroFontSize }),
               ...(savedHeroAnimDelay && { heroAnimDelay: savedHeroAnimDelay }),
               ...(savedHeroAnimDuration && { heroAnimDuration: savedHeroAnimDuration }),
+              ...(savedHeroLogoEnabled != null && { heroLogoEnabled: savedHeroLogoEnabled === 'true' }),
+              ...(savedHeroLogoX && { heroLogoX: parseInt(savedHeroLogoX) }),
+              ...(savedHeroLogoY && { heroLogoY: parseInt(savedHeroLogoY) }),
+              ...(savedHeroLogoSize && { heroLogoSize: parseInt(savedHeroLogoSize) }),
             }));
           } else if (user?.businessId) {
             // Fallback: load from Supabase (incognito/new device)
@@ -633,7 +645,7 @@ const Settings = () => {
                   .from('settings')
                   .select('key, value')
                   .eq('business_id', user.businessId)
-                  .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration']);
+                  .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration','heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize']);
                 if (rows && rows.length > 0) {
                   const s = {};
                   rows.forEach(r => { s[r.key] = r.value; });
@@ -647,6 +659,10 @@ const Settings = () => {
                     ...(s.heroFontSize && { heroFontSize: s.heroFontSize }),
                     ...(s.heroAnimDelay && { heroAnimDelay: s.heroAnimDelay }),
                     ...(s.heroAnimDuration && { heroAnimDuration: s.heroAnimDuration }),
+                    ...(s.heroLogoEnabled != null && { heroLogoEnabled: s.heroLogoEnabled === 'true' }),
+                    ...(s.heroLogoX && { heroLogoX: parseInt(s.heroLogoX) }),
+                    ...(s.heroLogoY && { heroLogoY: parseInt(s.heroLogoY) }),
+                    ...(s.heroLogoSize && { heroLogoSize: parseInt(s.heroLogoSize) }),
                   }));
                   // Cache locally for next time
                   for (const r of rows) {
@@ -739,6 +755,10 @@ const Settings = () => {
         await SettingsRepository.set('heroFontSize', brandingSettings.heroFontSize || 'default');
         await SettingsRepository.set('heroAnimDelay', brandingSettings.heroAnimDelay || '0');
         await SettingsRepository.set('heroAnimDuration', brandingSettings.heroAnimDuration || 'default');
+        await SettingsRepository.set('heroLogoEnabled', brandingSettings.heroLogoEnabled ? 'true' : 'false');
+        await SettingsRepository.set('heroLogoX', String(brandingSettings.heroLogoX ?? 50));
+        await SettingsRepository.set('heroLogoY', String(brandingSettings.heroLogoY ?? 20));
+        await SettingsRepository.set('heroLogoSize', String(brandingSettings.heroLogoSize ?? 80));
 
         // Also save directly to Supabase so booking page can read them
         if (user?.businessId) {
@@ -754,6 +774,10 @@ const Settings = () => {
                 heroFontSize: brandingSettings.heroFontSize || 'default',
                 heroAnimDelay: brandingSettings.heroAnimDelay || '0',
                 heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
+                heroLogoEnabled: brandingSettings.heroLogoEnabled ? 'true' : 'false',
+                heroLogoX: String(brandingSettings.heroLogoX ?? 50),
+                heroLogoY: String(brandingSettings.heroLogoY ?? 20),
+                heroLogoSize: String(brandingSettings.heroLogoSize ?? 80),
               };
 
               // Save each setting individually to avoid batch RLS issues
@@ -2526,9 +2550,99 @@ const Settings = () => {
                     {brandingSettings.businessName || 'Your Business Name'}
                   </div>
                 </div>
+                {/* Draggable logo on hero preview */}
+                {brandingSettings.heroLogoEnabled && logoPreview && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${brandingSettings.heroLogoX ?? 50}%`,
+                      top: `${brandingSettings.heroLogoY ?? 20}%`,
+                      transform: 'translate(-50%, -50%)',
+                      zIndex: 3,
+                      cursor: canEdit() ? 'grab' : 'default',
+                    }}
+                    draggable={false}
+                    onMouseDown={canEdit() ? (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const container = e.currentTarget.parentElement;
+                      const rect = container.getBoundingClientRect();
+                      const onMove = (ev) => {
+                        const x = Math.max(5, Math.min(95, ((ev.clientX - rect.left) / rect.width) * 100));
+                        const y = Math.max(5, Math.min(95, ((ev.clientY - rect.top) / rect.height) * 100));
+                        setBrandingSettings(prev => ({ ...prev, heroLogoX: Math.round(x), heroLogoY: Math.round(y) }));
+                      };
+                      const onUp = () => {
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                      };
+                      document.addEventListener('mousemove', onMove);
+                      document.addEventListener('mouseup', onUp);
+                    } : undefined}
+                    onTouchStart={canEdit() ? (e) => {
+                      e.stopPropagation();
+                      const container = e.currentTarget.parentElement;
+                      const rect = container.getBoundingClientRect();
+                      const onMove = (ev) => {
+                        const touch = ev.touches[0];
+                        const x = Math.max(5, Math.min(95, ((touch.clientX - rect.left) / rect.width) * 100));
+                        const y = Math.max(5, Math.min(95, ((touch.clientY - rect.top) / rect.height) * 100));
+                        setBrandingSettings(prev => ({ ...prev, heroLogoX: Math.round(x), heroLogoY: Math.round(y) }));
+                      };
+                      const onEnd = () => {
+                        document.removeEventListener('touchmove', onMove);
+                        document.removeEventListener('touchend', onEnd);
+                      };
+                      document.addEventListener('touchmove', onMove, { passive: false });
+                      document.addEventListener('touchend', onEnd);
+                    } : undefined}
+                  >
+                    <img
+                      src={logoPreview}
+                      alt="Logo"
+                      style={{
+                        maxHeight: `${brandingSettings.heroLogoSize ?? 80}px`,
+                        maxWidth: `${(brandingSettings.heroLogoSize ?? 80) * 2.5}px`,
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  </div>
+                )}
                 <div style={{ position: 'absolute', bottom: '8px', right: '10px', color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', zIndex: 2 }}>
                   Position: {brandingSettings.heroTextX ?? 50}%, {brandingSettings.heroTextY ?? 50}%
                 </div>
+              </div>
+
+              {/* Hero Logo Toggle & Size */}
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!brandingSettings.heroLogoEnabled}
+                    onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoEnabled: e.target.checked }))}
+                    disabled={!canEdit() || !logoPreview}
+                  />
+                  Show logo on hero section
+                  {!logoPreview && <span style={{ fontSize: '0.8rem', color: '#999' }}>(upload a logo first)</span>}
+                </label>
+                {brandingSettings.heroLogoEnabled && logoPreview && (
+                  <div className="settings-row" style={{ marginTop: '10px' }}>
+                    <div className="settings-form-group">
+                      <label>Logo Size ({brandingSettings.heroLogoSize ?? 80}px)</label>
+                      <input
+                        type="range"
+                        min="30"
+                        max="200"
+                        value={brandingSettings.heroLogoSize ?? 80}
+                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoSize: parseInt(e.target.value) }))}
+                        disabled={!canEdit()}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

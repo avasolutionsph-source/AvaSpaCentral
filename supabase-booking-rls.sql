@@ -23,7 +23,8 @@ CREATE POLICY "Public can view hero settings" ON settings
     FOR SELECT
     USING (key IN (
         'heroFont', 'heroFontColor', 'heroTextX', 'heroTextY',
-        'heroAnimation', 'heroFontSize', 'heroAnimDelay', 'heroAnimDuration'
+        'heroAnimation', 'heroFontSize', 'heroAnimDelay', 'heroAnimDuration',
+        'heroLogoEnabled', 'heroLogoX', 'heroLogoY', 'heroLogoSize'
     ));
 
 -- ============================================================================

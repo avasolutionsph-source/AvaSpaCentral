@@ -931,13 +931,10 @@ const BookingPage = () => {
               <img src={business.logo_url} alt="" className="luxe-logo" />
             )}
             <div className="luxe-brand">{business?.name || 'Loading'}</div>
-            <div className="luxe-line">
-              <div className="luxe-line-fill" />
+            <div className="luxe-progress-track">
+              <div className="luxe-progress-bar" />
             </div>
             <div className="luxe-tagline">{business?.tagline || 'Preparing your experience...'}</div>
-          </div>
-          <div className="luxe-ornament">
-            <span></span><span></span><span></span>
           </div>
         </div>
       </div>

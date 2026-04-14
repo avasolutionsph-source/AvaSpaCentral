@@ -307,7 +307,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
 
     // Calculate commissions
     const empTransactions = transactions.filter(t => {
-      if (t.employee?._id !== employee._id) return false;
+      if (t.employee?.id !== employee._id) return false;
       const transDate = parseISO(t.date);
       return isWithinInterval(transDate, { start: startDate, end: endDate });
     });
@@ -315,7 +315,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
     let commissions = 0;
     empTransactions.forEach(t => {
       if (employee.commission?.type === 'percentage') {
-        commissions += t.total * (employee.commission.value / 100);
+        commissions += t.totalAmount * (employee.commission.value / 100);
       } else if (employee.commission?.type === 'fixed') {
         commissions += employee.commission.value;
       }

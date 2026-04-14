@@ -1245,15 +1245,30 @@ class SupabaseSyncManager {
       return { success: false, message: 'Not authenticated' };
     }
 
+    // Reset any items stuck in 'processing' from a previous failed sync
+    await this.resetStuckItems();
+
     this._isSyncing = true;
     this._notifyListeners({ type: 'sync_start' });
 
-    try {
-      // 1. Push local changes to Supabase
-      const pushResult = await this._pushChanges();
+    // Timeout to prevent sync from getting stuck indefinitely
+    const SYNC_TIMEOUT_MS = 30000; // 30 seconds
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Sync timed out after 30 seconds')), SYNC_TIMEOUT_MS)
+    );
 
-      // 2. Pull changes from Supabase
-      const pullResult = await this._pullChanges();
+    try {
+      const syncWork = async () => {
+        // 1. Push local changes to Supabase
+        const pushResult = await this._pushChanges();
+
+        // 2. Pull changes from Supabase
+        const pullResult = await this._pullChanges();
+
+        return { pushResult, pullResult };
+      };
+
+      const { pushResult, pullResult } = await Promise.race([syncWork(), timeoutPromise]);
 
       this._lastSync = new Date().toISOString();
 

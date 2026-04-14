@@ -10,6 +10,8 @@ import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
 import CashDrawerHistoryTab from './CashDrawerHistory';
 import { SettingsRepository } from '../services/storage/repositories';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
+import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import '../assets/css/pos.css';
 
 const POS = () => {
@@ -182,10 +184,26 @@ const POS = () => {
     // Retry queue load after sync has time to complete
     const queueRetry = setTimeout(() => { if (isMounted) loadQueue(); }, 3000);
 
+    // Listen for attendance changes (clock-in/out) to refresh rotation queue
+    const unsubscribeData = dataChangeEmitter.subscribe((event) => {
+      if (isMounted && event?.entityType === 'attendance') {
+        loadQueue();
+      }
+    });
+
+    // Also refresh after Supabase sync pulls new data
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (isMounted && status?.type === 'sync_complete' && status?.pulled > 0) {
+        loadQueue();
+      }
+    });
+
     // Cleanup function to prevent memory leaks
     return () => {
       isMounted = false;
       clearTimeout(queueRetry);
+      unsubscribeData();
+      unsubscribeSync();
     };
   }, []);
 
@@ -726,6 +744,7 @@ const POS = () => {
           businessId: user?.businessId,
           ...(getUserBranchId() && { branchId: getUserBranchId() }),
           receiptNumber,
+          employeeId: employee._id,
           date: new Date().toISOString(),
           items: cart.map(item => ({
             id: item.id,

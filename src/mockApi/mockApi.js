@@ -465,7 +465,14 @@ export const serviceRotationApi = {
   async getRotationQueue() {
     await delay();
 
-    const rotation = await initServiceRotation();
+    // Load rotation data (service counts) - fallback to empty if fails
+    let rotation = { serviceCount: {}, lastServed: null };
+    try {
+      rotation = await initServiceRotation();
+    } catch (err) {
+      console.warn('[ServiceRotation] Failed to init rotation, using defaults:', err);
+    }
+
     const today = getTodayDateString();
 
     // Use attendanceAdapter.getAttendance() — exact same path as Attendance page
@@ -479,9 +486,9 @@ export const serviceRotationApi = {
 
     // Sort by clock-in time (earliest first)
     attendanceWithEmployees.sort((a, b) => {
-      const timeA = a.clockIn.replace(':', '');
-      const timeB = b.clockIn.replace(':', '');
-      return parseInt(timeA) - parseInt(timeB);
+      const timeA = String(a.clockIn || '').replace(':', '');
+      const timeB = String(b.clockIn || '').replace(':', '');
+      return parseInt(timeA || '0') - parseInt(timeB || '0');
     });
 
     // Build queue with employee details and service count
@@ -492,7 +499,7 @@ export const serviceRotationApi = {
         employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
         position: att.employee?.position || '',
         clockInTime: att.clockIn,
-        servicesCompleted: rotation.serviceCount[empId] || 0,
+        servicesCompleted: (rotation.serviceCount && rotation.serviceCount[empId]) || 0,
         queuePosition: index + 1,
         isNext: index === 0 && rotation.lastServed !== empId
       };

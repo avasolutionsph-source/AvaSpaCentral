@@ -796,8 +796,9 @@ const BookingPage = () => {
     if (!selectedDayHours || !selectedDayHours.enabled) {
       return [];
     }
-    let openTime = selectedDayHours.open || '09:00';
-    let closeTime = selectedDayHours.close || '21:00';
+    let openTime = selectedDayHours.open;
+    let closeTime = selectedDayHours.close;
+    if (!openTime || !closeTime) return []; // Business hours not configured
     const [openH, openM] = openTime.split(':').map(Number);
     const [closeH, closeM] = closeTime.split(':').map(Number);
     let closeMins = closeH * 60 + closeM;

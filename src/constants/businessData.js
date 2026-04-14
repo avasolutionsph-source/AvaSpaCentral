@@ -117,10 +117,10 @@ export const CUSTOMER_TIERS = {
   NEW: { minSpend: 0, discount: 0, color: '#CD7F32' }
 };
 
-// Default business hours
+// Default business hours — null forces configuration through Settings
 export const DEFAULT_BUSINESS_HOURS = {
-  open: '09:00',
-  close: '21:00'
+  open: null,
+  close: null
 };
 
 // Duration options for appointments (in minutes)

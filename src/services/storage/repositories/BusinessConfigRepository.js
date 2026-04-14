@@ -51,8 +51,8 @@ const DEFAULT_BUSINESS_SETTINGS = {
   taxRate: 0,
   receiptFooter: 'Thank you for your visit!',
   businessHours: {
-    open: '09:00',
-    close: '21:00'
+    open: null,
+    close: null
   }
 };
 

@@ -20,8 +20,8 @@ export const mockDatabase = {
       receiptFooter: 'Thank you for your visit!',
       dailyGoal: 0,
       businessHours: {
-        open: '09:00',
-        close: '21:00'
+        open: null,
+        close: null
       }
     }
   },
@@ -56,11 +56,11 @@ export const mockDatabase = {
   // Product Consumption - Empty array (tracked during services)
   productConsumption: [],
 
-  // Shift Configuration - Keep defaults for functionality
+  // Shift Configuration - No hardcoded times, must be configured by the business
   shiftConfig: {
-    dayShift: { startTime: '09:00', endTime: '20:00', label: 'Day Shift', color: '#10b981' },
-    nightShift: { startTime: '13:00', endTime: '21:00', label: 'Night Shift', color: '#6366f1' },
-    wholeDayShift: { startTime: '09:00', endTime: '21:00', label: 'Whole Day', color: '#f59e0b' },
+    dayShift: { startTime: null, endTime: null, label: 'Day Shift', color: '#10b981' },
+    nightShift: { startTime: null, endTime: null, label: 'Night Shift', color: '#6366f1' },
+    wholeDayShift: { startTime: null, endTime: null, label: 'Whole Day', color: '#f59e0b' },
     off: { startTime: null, endTime: null, label: 'Day Off', color: '#6b7280' }
   },
 

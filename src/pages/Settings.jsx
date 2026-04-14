@@ -32,13 +32,13 @@ const Settings = () => {
 
   // Business Hours
   const [businessHours, setBusinessHours] = useState([
-    { day: 'Monday', open: '09:00', close: '18:00', enabled: true },
-    { day: 'Tuesday', open: '09:00', close: '18:00', enabled: true },
-    { day: 'Wednesday', open: '09:00', close: '18:00', enabled: true },
-    { day: 'Thursday', open: '09:00', close: '18:00', enabled: true },
-    { day: 'Friday', open: '09:00', close: '18:00', enabled: true },
-    { day: 'Saturday', open: '10:00', close: '16:00', enabled: true },
-    { day: 'Sunday', open: '10:00', close: '16:00', enabled: false }
+    { day: 'Monday', open: '', close: '', enabled: true },
+    { day: 'Tuesday', open: '', close: '', enabled: true },
+    { day: 'Wednesday', open: '', close: '', enabled: true },
+    { day: 'Thursday', open: '', close: '', enabled: true },
+    { day: 'Friday', open: '', close: '', enabled: true },
+    { day: 'Saturday', open: '', close: '', enabled: true },
+    { day: 'Sunday', open: '', close: '', enabled: false }
   ]);
 
   // POS Settings

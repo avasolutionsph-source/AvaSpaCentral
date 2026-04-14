@@ -18,6 +18,37 @@ const MainLayout = () => {
   const [loggingOut, setLoggingOut] = useState(false);
   const notificationRef = React.useRef(null);
 
+  // Setup check — persistent banner for unconfigured settings
+  const [setupIssues, setSetupIssues] = useState([]);
+
+  useEffect(() => {
+    const checkSetup = async () => {
+      const issues = [];
+      try {
+        // Check shift config
+        const shiftConfig = await mockApi.shiftSchedules.getShiftConfig();
+        if (!shiftConfig?.dayShift?.startTime || !shiftConfig?.nightShift?.startTime || !shiftConfig?.wholeDayShift?.startTime) {
+          issues.push({ id: 'shift-config', message: 'Shift schedule times are not configured. Therapist schedules will not work correctly.', action: '/settings' });
+        }
+
+        // Check business hours
+        const SettingsRepo = (await import('../services/storage/repositories/SettingsRepository')).default;
+        const savedHours = await SettingsRepo.get('businessHours');
+        const hasValidHours = savedHours && Array.isArray(savedHours) && savedHours.some(h => h.open && h.close);
+        if (!hasValidHours) {
+          issues.push({ id: 'business-hours', message: 'Business hours are not configured. Booking page time slots will not appear.', action: '/settings' });
+        }
+      } catch (e) {
+        console.warn('[SetupCheck] Error:', e);
+      }
+      setSetupIssues(issues);
+    };
+    checkSetup();
+    // Re-check when navigating back from settings
+    const interval = setInterval(checkSetup, 30000);
+    return () => clearInterval(interval);
+  }, [location.pathname]);
+
 
   const handleLogout = async () => {
     if (loggingOut) return; // Prevent double-click
@@ -790,6 +821,23 @@ const MainLayout = () => {
 
         {/* Page Content */}
         <main id="main-content" className="page-content" role="main">
+          {/* Setup required banner — persistent until configured */}
+          {setupIssues.length > 0 && (
+            <div className="setup-banner">
+              <div className="setup-banner-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div className="setup-banner-content">
+                <strong>Setup Required</strong>
+                {setupIssues.map(issue => (
+                  <p key={issue.id}>{issue.message}</p>
+                ))}
+              </div>
+              <button className="setup-banner-btn" onClick={() => navigate('/settings')}>
+                Go to Settings
+              </button>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>

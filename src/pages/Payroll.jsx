@@ -3,6 +3,121 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, subDays, isWithinInterval } from 'date-fns';
 
+const formatPeso = (value) => `₱${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const BreakdownPopover = ({ type, payroll, onClose }) => {
+  const popoverRef = React.useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  const renderContent = () => {
+    const hr = payroll._hourlyRate ?? 0;
+
+    switch (type) {
+      case 'regularPay':
+        return (
+          <>
+            <div className="breakdown-title">Regular Pay Breakdown</div>
+            <div className="breakdown-row"><span>Hourly Rate</span><span>{formatPeso(hr)}</span></div>
+            <div className="breakdown-row"><span>Regular Hours</span><span>{payroll.regularHours}h</span></div>
+            <div className="breakdown-formula">{formatPeso(hr)} × {payroll.regularHours}h</div>
+            <div className="breakdown-total"><span>Total</span><span>{formatPeso(payroll.regularPay)}</span></div>
+          </>
+        );
+      case 'overtimePay':
+        return (
+          <>
+            <div className="breakdown-title">Overtime Pay Breakdown</div>
+            <div className="breakdown-row"><span>Hourly Rate</span><span>{formatPeso(hr)}</span></div>
+            <div className="breakdown-row"><span>OT Hours</span><span>{payroll.overtimeHours}h</span></div>
+            <div className="breakdown-row"><span>OT Multiplier</span><span>×{payroll.appliedRates?.overtime ?? 1.25}</span></div>
+            <div className="breakdown-formula">{formatPeso(hr)} × {payroll.overtimeHours}h × {payroll.appliedRates?.overtime ?? 1.25}</div>
+            <div className="breakdown-total"><span>Total</span><span>{formatPeso(payroll.overtimePay)}</span></div>
+          </>
+        );
+      case 'commissions': {
+        const details = payroll._commissionDetails || [];
+        return (
+          <>
+            <div className="breakdown-title">Commission Breakdown</div>
+            {payroll.employee?.commission?.type === 'percentage' && (
+              <div className="breakdown-row"><span>Commission Rate</span><span>{payroll.employee.commission.value}%</span></div>
+            )}
+            {details.length > 0 ? (
+              <>
+                <div className="breakdown-subtitle">{details.length} service(s) this period</div>
+                <div className="breakdown-list">
+                  {details.map((d, i) => (
+                    <div key={i} className="breakdown-row">
+                      <span className="breakdown-receipt">#{d.receipt}</span>
+                      <span>{formatPeso(d.serviceTotal)} → {formatPeso(d.commission)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="breakdown-empty">No services found this period</div>
+            )}
+            <div className="breakdown-total"><span>Total</span><span>{formatPeso(payroll.commissions)}</span></div>
+          </>
+        );
+      }
+      case 'grossPay':
+        return (
+          <>
+            <div className="breakdown-title">Gross Pay Breakdown</div>
+            <div className="breakdown-row"><span>Regular Pay</span><span>{formatPeso(payroll.regularPay)}</span></div>
+            <div className="breakdown-row"><span>Overtime Pay</span><span>{formatPeso(payroll.overtimePay)}</span></div>
+            {payroll.nightDiffPay > 0 && (
+              <div className="breakdown-row"><span>Night Differential</span><span>{formatPeso(payroll.nightDiffPay)}</span></div>
+            )}
+            <div className="breakdown-row"><span>Commissions</span><span>{formatPeso(payroll.commissions)}</span></div>
+            <div className="breakdown-total"><span>Gross Pay</span><span>{formatPeso(payroll.grossPay)}</span></div>
+          </>
+        );
+      case 'deductions': {
+        const d = payroll.deductions;
+        return (
+          <>
+            <div className="breakdown-title">Deductions Breakdown</div>
+            <div className="breakdown-subtitle">Semi-monthly (monthly ÷ 2)</div>
+            <div className="breakdown-row"><span>SSS</span><span>{formatPeso(d.sss)}</span></div>
+            <div className="breakdown-row"><span>PhilHealth</span><span>{formatPeso(d.philHealth)}</span></div>
+            <div className="breakdown-row"><span>Pag-IBIG</span><span>{formatPeso(d.pagibig)}</span></div>
+            <div className="breakdown-row"><span>Withholding Tax</span><span>{formatPeso(d.withholdingTax)}</span></div>
+            <div className="breakdown-total"><span>Total Deductions</span><span>{formatPeso(d.total)}</span></div>
+          </>
+        );
+      }
+      case 'netPay':
+        return (
+          <>
+            <div className="breakdown-title">Net Pay Breakdown</div>
+            <div className="breakdown-row"><span>Gross Pay</span><span>{formatPeso(payroll.grossPay)}</span></div>
+            <div className="breakdown-row subtract"><span>- Deductions</span><span>{formatPeso(payroll.deductions.total)}</span></div>
+            <div className="breakdown-total"><span>Net Pay</span><span>{formatPeso(payroll.netPay)}</span></div>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="breakdown-popover" ref={popoverRef}>
+      {renderContent()}
+    </div>
+  );
+};
+
 const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef }) => {
   const { showToast, getUserBranchId } = useApp();
 
@@ -22,6 +137,15 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
   const [selectedPayslip, setSelectedPayslip] = useState(null);
 
   const [showGovRemittance, setShowGovRemittance] = useState(false);
+
+  // Breakdown popover state
+  const [activeBreakdown, setActiveBreakdown] = useState(null); // { employeeId, type }
+
+  const toggleBreakdown = (employeeId, type) => {
+    setActiveBreakdown(prev =>
+      prev?.employeeId === employeeId && prev?.type === type ? null : { employeeId, type }
+    );
+  };
 
   useEffect(() => {
     loadData();
@@ -313,12 +437,21 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
     });
 
     let commissions = 0;
+    const commissionDetails = [];
     empTransactions.forEach(t => {
+      let comm = 0;
       if (employee.commission?.type === 'percentage') {
-        commissions += t.totalAmount * (employee.commission.value / 100);
+        comm = t.totalAmount * (employee.commission.value / 100);
       } else if (employee.commission?.type === 'fixed') {
-        commissions += employee.commission.value;
+        comm = employee.commission.value;
       }
+      commissions += comm;
+      commissionDetails.push({
+        receipt: t.receiptNumber || '—',
+        serviceTotal: t.totalAmount,
+        commission: comm,
+        date: t.date
+      });
     });
 
     // Gross pay (now includes night differential)
@@ -379,7 +512,11 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       appliedRates: {
         overtime: overtimeRate,
         nightDiff: nightDiffRate
-      }
+      },
+      // Store breakdown details for clickable popovers
+      _hourlyRate: hourlyRate,
+      _commissionDetails: commissionDetails,
+      _monthlyGross: monthlyGross
     };
   };
 
@@ -665,12 +802,27 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
                   </td>
                   <td className="number">{payroll.daysWorked}</td>
                   <td className="number">{payroll.regularHours + payroll.overtimeHours}h</td>
-                  <td className="number">₱{payroll.regularPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="number">₱{payroll.overtimePay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="number">₱{payroll.commissions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="number">₱{payroll.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="number">₱{payroll.deductions.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="number">₱{payroll.netPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  {['regularPay', 'overtimePay', 'commissions', 'grossPay', 'deductions', 'netPay'].map(field => {
+                    const value = field === 'deductions' ? payroll.deductions.total : payroll[field];
+                    const isActive = activeBreakdown?.employeeId === payroll.employee._id && activeBreakdown?.type === field;
+                    return (
+                      <td key={field} className="number" style={{ position: 'relative' }}>
+                        <span
+                          className="payroll-clickable-value"
+                          onClick={() => toggleBreakdown(payroll.employee._id, field)}
+                        >
+                          {formatPeso(value)}
+                        </span>
+                        {isActive && (
+                          <BreakdownPopover
+                            type={field}
+                            payroll={payroll}
+                            onClose={() => setActiveBreakdown(null)}
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
                   <td>
                     <span className={`payroll-status-badge ${payroll.status}`}>
                       {payroll.status}

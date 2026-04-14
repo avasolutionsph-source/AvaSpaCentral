@@ -390,6 +390,115 @@
   padding: var(--spacing-xs) 0;
 }
 
+/* Clickable Value & Breakdown Popover */
+.payroll-clickable-value {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  border-bottom: 1px dashed var(--gray-400);
+}
+
+.payroll-clickable-value:hover {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-bottom-color: var(--primary);
+}
+
+.breakdown-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: var(--z-dropdown, 100);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-md);
+  min-width: 280px;
+  max-width: 360px;
+  text-align: left;
+  font-weight: 400;
+  animation: breakdownFadeIn 0.15s ease-out;
+}
+
+@keyframes breakdownFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.breakdown-title {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--gray-900);
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 2px solid var(--primary);
+}
+
+.breakdown-subtitle {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-bottom: var(--spacing-sm);
+  font-style: italic;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 0.8125rem;
+  color: var(--gray-700);
+}
+
+.breakdown-row.subtract {
+  color: var(--error);
+}
+
+.breakdown-receipt {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  font-family: monospace;
+}
+
+.breakdown-formula {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  text-align: center;
+  padding: var(--spacing-xs) 0;
+  font-style: italic;
+  border-top: 1px dashed var(--gray-200);
+  margin-top: var(--spacing-xs);
+}
+
+.breakdown-list {
+  max-height: 160px;
+  overflow-y: auto;
+  margin-bottom: var(--spacing-xs);
+  padding-right: var(--spacing-xs);
+}
+
+.breakdown-empty {
+  font-size: 0.8125rem;
+  color: var(--gray-400);
+  text-align: center;
+  padding: var(--spacing-sm) 0;
+  font-style: italic;
+}
+
+.breakdown-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--gray-900);
+  padding-top: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  border-top: 2px solid var(--gray-200);
+}
+
 /* Empty State */
 .empty-payroll {
   text-align: center;

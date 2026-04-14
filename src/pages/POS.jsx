@@ -132,35 +132,25 @@ const POS = () => {
 
     const loadQueue = async () => {
       try {
-        // Build rotation queue directly from attendance data (same source as Attendance page)
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const allAttendance = await mockApi.attendance.getAttendance();
-        const todayClockedIn = allAttendance.filter(a => {
-          const d = typeof a.date === 'string' ? a.date : String(a.date).split('T')[0];
-          return d === todayStr && a.clockIn && !a.clockOut;
-        });
-
-        // Sort by clock-in time
-        todayClockedIn.sort((a, b) => (a.clockIn || '').localeCompare(b.clockIn || ''));
-
-        // Build queue
-        const queue = todayClockedIn.map((att, index) => {
-          const empId = String(att.employee?._id || att.employeeId);
-          return {
-            employeeId: empId,
-            employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
-            position: att.employee?.position || '',
-            clockInTime: att.clockIn,
-            servicesCompleted: 0,
-            queuePosition: index + 1,
-            isNext: index === 0
-          };
-        });
+        // Use the API which reads actual service counts from ServiceRotationRepository
+        const result = await mockApi.serviceRotation.getRotationQueue();
 
         if (!isMounted) return;
+
+        // Filter by branch if needed
+        const userBranchId = getUserBranchId();
+        let queue = result.queue || [];
+        if (userBranchId) {
+          // Get employee branch mapping
+          const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
+          const branchEmpIds = new Set(allEmployees.filter(e => e.branchId === userBranchId).map(e => String(e._id || e.id)));
+          queue = queue.filter(q => branchEmpIds.has(q.employeeId));
+          // Re-number queue positions
+          queue.forEach((q, i) => { q.queuePosition = i + 1; });
+        }
+
         setRotationQueue(queue);
-        setNextEmployee(queue[0] || null);
+        setNextEmployee(result.nextEmployee || queue[0] || null);
       } catch (error) {
         console.error('[POS] Failed to load rotation queue:', error);
       }
@@ -232,33 +222,23 @@ const POS = () => {
     }
   }, [showToast]);
 
-  // Load service rotation queue directly from attendance data
+  // Load service rotation queue from the API (includes actual service counts)
   const loadRotationQueue = useCallback(async () => {
     try {
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const allAttendance = await mockApi.attendance.getAttendance();
-      const todayClockedIn = allAttendance.filter(a => {
-        const d = typeof a.date === 'string' ? a.date : String(a.date).split('T')[0];
-        return d === todayStr && a.clockIn && !a.clockOut;
-      });
-      todayClockedIn.sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+      const result = await mockApi.serviceRotation.getRotationQueue();
 
-      const queue = todayClockedIn.map((att, index) => {
-        const empId = String(att.employee?._id || att.employeeId);
-        return {
-          employeeId: empId,
-          employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
-          position: att.employee?.position || '',
-          clockInTime: att.clockIn,
-          servicesCompleted: 0,
-          queuePosition: index + 1,
-          isNext: index === 0
-        };
-      });
+      // Filter by branch if needed
+      const userBranchId = getUserBranchId();
+      let queue = result.queue || [];
+      if (userBranchId) {
+        const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
+        const branchEmpIds = new Set(allEmployees.filter(e => e.branchId === userBranchId).map(e => String(e._id || e.id)));
+        queue = queue.filter(q => branchEmpIds.has(q.employeeId));
+        queue.forEach((q, i) => { q.queuePosition = i + 1; });
+      }
 
       setRotationQueue(queue);
-      setNextEmployee(queue[0] || null);
+      setNextEmployee(result.nextEmployee || queue[0] || null);
 
       if (!selectedEmployee && queue[0]) {
         setSelectedEmployee(queue[0].employeeId);

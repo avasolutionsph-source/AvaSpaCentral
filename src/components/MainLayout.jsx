@@ -31,9 +31,32 @@ const MainLayout = () => {
           issues.push({ id: 'shift-config', message: 'Shift schedule times are not configured. Therapist schedules will not work correctly.', action: '/settings' });
         }
 
-        // Check business hours
+        // Check business hours — try Dexie first, then Supabase
         const SettingsRepo = (await import('../services/storage/repositories/SettingsRepository')).default;
-        const savedHours = await SettingsRepo.get('businessHours');
+        let savedHours = await SettingsRepo.get('businessHours');
+
+        // Fallback: check Supabase if local is empty (fresh browser)
+        if (!savedHours && user?.businessId) {
+          try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            if (supabaseUrl && supabaseKey) {
+              const res = await fetch(
+                `${supabaseUrl}/rest/v1/settings?business_id=eq.${user.businessId}&key=eq.businessHours&select=value`,
+                { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+              );
+              if (res.ok) {
+                const data = await res.json();
+                if (data?.[0]?.value) {
+                  savedHours = data[0].value;
+                  // Cache locally for next time
+                  await SettingsRepo.set('businessHours', savedHours);
+                }
+              }
+            }
+          } catch (e) { /* Supabase check is best-effort */ }
+        }
+
         const hasValidHours = savedHours && Array.isArray(savedHours) && savedHours.some(h => h.open && h.close);
         if (!hasValidHours) {
           issues.push({ id: 'business-hours', message: 'Business hours are not configured. Booking page time slots will not appear.', action: '/settings' });

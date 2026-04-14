@@ -12,6 +12,7 @@ import CashDrawerHistoryTab from './CashDrawerHistory';
 import { SettingsRepository } from '../services/storage/repositories';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
+import storageService from '../services/storage';
 import '../assets/css/pos.css';
 
 const POS = () => {
@@ -76,6 +77,8 @@ const POS = () => {
   const [rotationQueue, setRotationQueue] = useState([]);
   const [nextEmployee, setNextEmployee] = useState(null);
   const [showRotationQueue, setShowRotationQueue] = useState(true);
+  const [serviceCountFilter, setServiceCountFilter] = useState('today');
+  const [historicalServiceCounts, setHistoricalServiceCounts] = useState({});
 
   // Room selection state
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -265,6 +268,40 @@ const POS = () => {
       console.error('[POS] Failed to load rotation queue:', error);
     }
   }, []);
+
+  // Load historical service counts based on filter
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        let transactions;
+        if (serviceCountFilter === 'today') {
+          transactions = await storageService.transactions.getByDate(todayStr);
+        } else if (serviceCountFilter === 'week') {
+          const weekAgo = new Date(now);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          const weekStr = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+          transactions = await storageService.transactions.getByDateRange(weekStr, todayStr);
+        } else if (serviceCountFilter === 'month') {
+          const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+          transactions = await storageService.transactions.getByDateRange(monthStart, todayStr);
+        } else {
+          transactions = await storageService.transactions.getAll();
+        }
+        const completed = (transactions || []).filter(t => t.status === 'completed');
+        const counts = {};
+        completed.forEach(t => {
+          const empId = t.employeeId || t.employee?.id;
+          if (empId) counts[empId] = (counts[empId] || 0) + 1;
+        });
+        setHistoricalServiceCounts(counts);
+      } catch (err) {
+        console.warn('[POS] Failed to load service counts:', err);
+      }
+    };
+    loadCounts();
+  }, [serviceCountFilter]);
 
   // Load scheduled employees when advance booking date changes
   useEffect(() => {
@@ -1324,6 +1361,23 @@ const POS = () => {
                       <span className="rotation-queue-title">🔄 Service Rotation Queue</span>
                       <span className="rotation-queue-count">{availableRotationQueue.length} available</span>
                     </div>
+                    <div className="rotation-service-filter">
+                      {[
+                        { key: 'today', label: 'Today' },
+                        { key: 'week', label: 'Week' },
+                        { key: 'month', label: 'Month' },
+                        { key: 'all', label: 'All Time' }
+                      ].map(f => (
+                        <button
+                          key={f.key}
+                          type="button"
+                          className={`rotation-filter-btn ${serviceCountFilter === f.key ? 'active' : ''}`}
+                          onClick={() => setServiceCountFilter(f.key)}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
                     <div className="rotation-queue-list">
                       {availableRotationQueue.map((emp, index) => (
                         <div
@@ -1338,7 +1392,7 @@ const POS = () => {
                             <div className="rotation-queue-name">{emp.employeeName}</div>
                             <div className="rotation-queue-details">
                               <span className="rotation-clock-in">⏰ {formatTime12Hour(emp.clockInTime)}</span>
-                              <span className="rotation-services">🎯 {emp.servicesCompleted} services</span>
+                              <span className="rotation-services">🎯 {historicalServiceCounts[emp.employeeId] || 0} services</span>
                             </div>
                           </div>
                           {emp.isNext && (

@@ -965,6 +965,34 @@
   font-weight: 500;
 }
 
+.rotation-service-filter {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.rotation-filter-btn {
+  font-size: 0.675rem;
+  padding: 2px 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  background: white;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rotation-filter-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.rotation-filter-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
 .rotation-queue-list {
   display: flex;
   flex-direction: column;

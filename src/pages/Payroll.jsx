@@ -679,32 +679,67 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       {payrollData.length > 0 && (
         <div className="payroll-summary-grid">
           <div className="payroll-summary-card total">
-            <div className="payroll-summary-icon">👥</div>
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
             <div className="payroll-summary-value">{summary.employees}</div>
             <div className="payroll-summary-label">Employees</div>
           </div>
           <div className="payroll-summary-card gross">
-            <div className="payroll-summary-icon">💵</div>
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <path d="M12 8v8"/>
+                <path d="M8 12h8"/>
+                <line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+            </div>
             <div className="payroll-summary-value">₱{summary.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="payroll-summary-label">Gross Pay</div>
           </div>
           <div className="payroll-summary-card deductions">
-            <div className="payroll-summary-icon">📉</div>
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                <polyline points="17 6 23 6 23 12"/>
+              </svg>
+            </div>
             <div className="payroll-summary-value">₱{summary.totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="payroll-summary-label">Deductions</div>
           </div>
           <div className="payroll-summary-card net">
-            <div className="payroll-summary-icon">✅</div>
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v20"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
             <div className="payroll-summary-value">₱{summary.netPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="payroll-summary-label">Net Pay</div>
           </div>
-          <div className="payroll-summary-card">
-            <div className="payroll-summary-icon">💰</div>
+          <div className="payroll-summary-card commissions">
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v12"/>
+                <path d="M15 9.5c0-1.38-1.34-2.5-3-2.5s-3 1.12-3 2.5 1.34 2.5 3 2.5 3 1.12 3 2.5-1.34 2.5-3 2.5"/>
+              </svg>
+            </div>
             <div className="payroll-summary-value">₱{summary.commissions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="payroll-summary-label">Commissions</div>
           </div>
-          <div className="payroll-summary-card">
-            <div className="payroll-summary-icon">⏰</div>
+          <div className="payroll-summary-card overtime">
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
             <div className="payroll-summary-value">₱{summary.overtime.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="payroll-summary-label">Overtime Pay</div>
           </div>

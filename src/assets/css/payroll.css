@@ -55,8 +55,51 @@
 }
 
 .payroll-summary-icon {
-  font-size: 2rem;
-  margin-bottom: var(--spacing-sm);
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--spacing-md) auto;
+}
+
+.payroll-summary-card.total .payroll-summary-icon {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+.payroll-summary-card.gross .payroll-summary-icon {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0ea5e9;
+}
+
+.payroll-summary-card.deductions .payroll-summary-icon {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.payroll-summary-card.net .payroll-summary-icon {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.payroll-summary-card.commissions .payroll-summary-icon {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.payroll-summary-card.overtime .payroll-summary-icon {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+}
+
+.payroll-summary-card.commissions::before {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.payroll-summary-card.overtime::before {
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
 }
 
 .payroll-summary-value {

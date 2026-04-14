@@ -103,7 +103,7 @@ const ProtectedLayout = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/book" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return children;

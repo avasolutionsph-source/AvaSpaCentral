@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 // ChartJS is registered globally in main.jsx via utils/chartConfig
 import { Line, Pie, Bar, Doughnut } from 'react-chartjs-2';
 import { DashboardSkeleton } from '../components/Skeleton';
@@ -298,6 +299,29 @@ const Dashboard = () => {
     setRefreshing(false);
     showToast('Dashboard refreshed', 'success');
   }, [showToast]);
+
+  // Auto-refresh when transactions change (local POS sales)
+  useEffect(() => {
+    let debounce = null;
+    const unsubscribe = dataChangeEmitter.subscribe((change) => {
+      if (change.entityType === 'transactions' || change.entityType === 'attendance') {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => loadDashboardData(), 500);
+      }
+    });
+    return () => {
+      unsubscribe();
+      clearTimeout(debounce);
+    };
+  }, []);
+
+  // Periodic refresh for cross-device sync (every 60 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [selectedBranchId]);
 
   const calculateRoomUtilization = (rooms) => {
     const occupied = rooms.filter(r => r.status === 'occupied').length;
@@ -702,7 +726,7 @@ const Dashboard = () => {
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       labels.push(dayNames[d.getDay()]);
       const dayData = byDay.find(day => day.date === dateStr);
       data.push(dayData ? dayData.revenue : 0);

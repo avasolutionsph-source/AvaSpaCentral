@@ -706,7 +706,8 @@ export const transactionsAdapter = {
     // Group by day
     const byDay = {};
     transactions.forEach(t => {
-      const date = new Date(t.date).toISOString().split('T')[0];
+      const dd = new Date(t.date);
+      const date = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`;
       if (!byDay[date]) {
         byDay[date] = { date, revenue: 0, transactions: 0 };
       }
@@ -1667,6 +1668,7 @@ export const shiftSchedulesAdapter = {
       return clone(savedConfig);
     }
     // Fall back to default from mockDatabase
+    console.warn('[ShiftSchedules] Using hardcoded default shiftConfig — no saved config found locally or in cloud');
     return clone(mockDatabase.shiftConfig);
   },
 

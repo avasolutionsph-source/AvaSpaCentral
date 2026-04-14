@@ -732,6 +732,8 @@ class SupabaseSyncManager {
       if (converted.schedule && converted.schedule.weeklySchedule) {
         converted.weeklySchedule = converted.schedule.weeklySchedule;
       }
+      // Remove the JSONB wrapper to avoid confusion in Dexie
+      delete converted.schedule;
     }
 
     // Special handling for employees: reconstruct commission object and extract metadata fields
@@ -1077,6 +1079,14 @@ class SupabaseSyncManager {
           if (hasPendingLocal) {
             console.log(`[SupabaseSyncManager] Skipping realtime update - pending local changes for ${entityType}/${dexieRecord._id}`);
             break;
+          }
+          // Timestamp guard: don't overwrite local data with older server data
+          const existingLocal = await db[dexieTableName].get(dexieRecord._id);
+          if (existingLocal?.updatedAt && dexieRecord.updatedAt) {
+            if (new Date(existingLocal.updatedAt) > new Date(dexieRecord.updatedAt)) {
+              console.log(`[SupabaseSyncManager] Skipping stale realtime update for ${entityType}/${dexieRecord._id} (local is newer)`);
+              break;
+            }
           }
           // Handle soft-deleted records: remove from local instead of re-adding
           if (newRecord.deleted) {

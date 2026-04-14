@@ -1365,11 +1365,11 @@ const POS = () => {
                   </div>
                 )}
 
-                {/* No employees clocked in warning */}
+                {/* No employees clocked in info */}
                 {!isAdvanceBooking && rotationQueue.length === 0 && (
                   <div className="rotation-no-queue">
-                    <span>⚠️</span>
-                    <p>No employees clocked in today. Select manually below.</p>
+                    <span>ℹ️</span>
+                    <p>No employees clocked in yet. You can still select a therapist below.</p>
                   </div>
                 )}
 
@@ -1431,24 +1431,23 @@ const POS = () => {
                       );
                     }
 
-                    // For regular POS: check if therapist is clocked in and not busy
+                    // For regular POS: show clock-in status as info, but allow selection regardless
                     const inQueue = rotationQueue.find(q => String(q.employeeId) === String(emp._id));
                     const isClockedIn = !!inQueue;
                     const isBusy = busyEmployeeIds.includes(String(emp._id));
-                    const canSelect = isClockedIn && !isBusy;
                     return (
                       <option
                         key={emp._id}
                         value={emp._id}
-                        disabled={!canSelect}
-                        style={!canSelect ? { color: '#999999' } : {}}
+                        disabled={isBusy}
+                        style={isBusy ? { color: '#999999' } : {}}
                       >
                         {emp.firstName} {emp.lastName} - {emp.position}
                         {isBusy
                           ? ' (🔴 Doing service)'
                           : isClockedIn
                             ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)`
-                            : ' (Not clocked in)'}
+                            : ''}
                       </option>
                     );
                   })}

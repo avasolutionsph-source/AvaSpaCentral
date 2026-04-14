@@ -470,57 +470,64 @@ const initServiceRotation = async () => {
 
 export const serviceRotationApi = {
   // Get today's rotation queue (sorted by clock-in time)
+  // IMPORTANT: Attendance (who's clocked in) and service counts are loaded independently.
+  // If service count loading fails, the queue still shows clocked-in employees.
   async getRotationQueue() {
     await delay();
 
-    // Load rotation data (service counts) - fallback to empty if fails
-    let rotation = { serviceCount: {}, lastServed: null };
-    try {
-      rotation = await initServiceRotation();
-    } catch (err) {
-      console.warn('[ServiceRotation] Failed to init rotation, using defaults:', err);
-    }
-
     const today = getTodayDateString();
 
-    // Use attendanceAdapter.getAttendance() — exact same path as Attendance page
+    // ── STEP 1: Build queue from attendance (independent of service counts) ──
     const allAttendance = await attendanceAdapter.getAttendance();
-    // Filter today's clocked-in employees (already enriched with employee data)
     const todayAttendance = allAttendance.filter(a => {
       const recordDate = typeof a.date === 'string' ? a.date : String(a.date).split('T')[0];
       return recordDate === today && a.clockIn && !a.clockOut;
     });
-    const attendanceWithEmployees = todayAttendance;
 
     // Sort by clock-in time (earliest first)
-    attendanceWithEmployees.sort((a, b) => {
+    todayAttendance.sort((a, b) => {
       const timeA = String(a.clockIn || '').replace(':', '');
       const timeB = String(b.clockIn || '').replace(':', '');
       return parseInt(timeA || '0') - parseInt(timeB || '0');
     });
 
-    // Build queue with employee details and service count
-    const queue = attendanceWithEmployees.map((att, index) => {
+    // Build queue with employee details (no service counts yet)
+    const queue = todayAttendance.map((att, index) => {
       const empId = String(att.employee?._id || att.employeeId);
       return {
         employeeId: empId,
         employeeName: att.employee ? `${att.employee.firstName} ${att.employee.lastName}` : 'Unknown',
         position: att.employee?.position || '',
         clockInTime: att.clockIn,
-        servicesCompleted: (rotation.serviceCount && rotation.serviceCount[empId]) || 0,
+        servicesCompleted: 0,
         queuePosition: index + 1,
-        isNext: index === 0 && rotation.lastServed !== empId
+        isNext: index === 0
       };
     });
 
-    // Determine who should be next based on rotation
-    if (queue.length > 0) {
-      const lastServedIndex = queue.findIndex(q => q.employeeId === rotation.lastServed);
-      if (lastServedIndex >= 0 && lastServedIndex < queue.length - 1) {
-        queue.forEach((q, i) => q.isNext = i === lastServedIndex + 1);
-      } else {
-        queue.forEach((q, i) => q.isNext = i === 0);
+    // ── STEP 2: Attach service counts (completely separate, never breaks queue) ──
+    try {
+      const rotation = await initServiceRotation();
+      const serviceCounts = rotation.serviceCount || rotation.rotationData?.serviceCount || {};
+      const lastServed = rotation.lastServed || rotation.rotationData?.lastServed || null;
+
+      // Attach counts to queue entries
+      queue.forEach(q => {
+        q.servicesCompleted = serviceCounts[q.employeeId] || 0;
+      });
+
+      // Determine who should be next based on rotation
+      if (queue.length > 0) {
+        const lastServedIndex = queue.findIndex(q => q.employeeId === lastServed);
+        if (lastServedIndex >= 0 && lastServedIndex < queue.length - 1) {
+          queue.forEach((q, i) => q.isNext = i === lastServedIndex + 1);
+        } else {
+          queue.forEach((q, i) => q.isNext = i === 0);
+        }
       }
+    } catch (err) {
+      // Service count failed — queue still works, just shows 0 services
+      console.warn('[ServiceRotation] Service count load failed, queue unaffected:', err.message);
     }
 
     return {

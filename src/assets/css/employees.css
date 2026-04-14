@@ -144,6 +144,64 @@
   font-weight: 500;
 }
 
+/* Service Count */
+.employee-service-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--gray-200);
+}
+
+.service-count-number {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-dark, #7A1B1B);
+}
+
+.service-count-label {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+/* Service Filter Bar */
+.service-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.service-filter-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--gray-600);
+}
+
+.service-filter-btn {
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-full);
+  background: white;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.service-filter-btn:hover {
+  border-color: var(--primary-dark, #7A1B1B);
+  color: var(--primary-dark, #7A1B1B);
+}
+
+.service-filter-btn.active {
+  background: var(--primary-dark, #7A1B1B);
+  color: white;
+  border-color: var(--primary-dark, #7A1B1B);
+}
+
 .employee-actions {
   display: flex;
   gap: var(--spacing-sm);

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { useCrudOperations } from '../hooks';
 import { CrudModal, FilterBar, PageHeader, ConfirmDialog, EmptyState } from '../components/shared';
+import storageService from '../services/storage';
 
 // Constants - 4 positions that map directly to roles
 const POSITIONS = [
@@ -63,6 +64,45 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     };
     loadBranches();
   }, [user?.businessId]);
+
+  // Service count tracking
+  const [serviceCounts, setServiceCounts] = useState({});
+  const [serviceFilter, setServiceFilter] = useState('all');
+
+  useEffect(() => {
+    const loadServiceCounts = async () => {
+      try {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        let transactions;
+        if (serviceFilter === 'today') {
+          transactions = await storageService.transactions.getByDate(todayStr);
+        } else if (serviceFilter === 'week') {
+          const weekAgo = new Date(now);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          const weekStr = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+          transactions = await storageService.transactions.getByDateRange(weekStr, todayStr);
+        } else if (serviceFilter === 'month') {
+          const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+          transactions = await storageService.transactions.getByDateRange(monthStart, todayStr);
+        } else {
+          transactions = await storageService.transactions.getAll();
+        }
+
+        const completed = (transactions || []).filter(t => t.status === 'completed');
+        const counts = {};
+        completed.forEach(t => {
+          const empId = t.employeeId || t.employee?.id;
+          if (empId) counts[empId] = (counts[empId] || 0) + 1;
+        });
+        setServiceCounts(counts);
+      } catch (err) {
+        console.warn('Failed to load service counts:', err);
+      }
+    };
+    loadServiceCounts();
+  }, [serviceFilter]);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -416,6 +456,24 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
         </div>
       </FilterBar>
 
+      <div className="service-filter-bar">
+        <span className="service-filter-label">Services:</span>
+        {[
+          { key: 'today', label: 'Today' },
+          { key: 'week', label: 'This Week' },
+          { key: 'month', label: 'This Month' },
+          { key: 'all', label: 'All Time' }
+        ].map(f => (
+          <button
+            key={f.key}
+            className={`service-filter-btn ${serviceFilter === f.key ? 'active' : ''}`}
+            onClick={() => setServiceFilter(f.key)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {filteredEmployees.length === 0 ? (
         <EmptyState
           icon="👥"
@@ -480,6 +538,10 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
                     {employee.skills.length > 3 && <span className="skill-badge">+{employee.skills.length - 3}</span>}
                   </div>
                 )}
+                <div className="employee-service-count">
+                  <span className="service-count-number">{serviceCounts[employee._id] || 0}</span>
+                  <span className="service-count-label">services ({serviceFilter === 'today' ? 'today' : serviceFilter === 'week' ? 'this week' : serviceFilter === 'month' ? 'this month' : 'all time'})</span>
+                </div>
               </div>
               {canManageEmployees() && (
                 <div className="employee-actions">

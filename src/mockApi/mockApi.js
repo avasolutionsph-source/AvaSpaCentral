@@ -447,6 +447,14 @@ const initServiceRotation = async () => {
   // Load from repository
   const record = await ServiceRotationRepository.getByDate(today);
   if (record) {
+    // Normalize: extract from rotationData if sync restructured it
+    if (!record.serviceCount && record.rotationData?.serviceCount) {
+      record.serviceCount = record.rotationData.serviceCount;
+    }
+    if (!record.lastServed && record.rotationData?.lastServed) {
+      record.lastServed = record.rotationData.lastServed;
+    }
+    if (!record.serviceCount) record.serviceCount = {};
     return record;
   }
 

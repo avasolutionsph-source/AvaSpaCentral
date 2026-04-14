@@ -757,6 +757,21 @@ class SupabaseSyncManager {
       if (metadata.active !== undefined) converted.active = metadata.active;
     }
 
+    // Special handling for serviceRotation: unwrap rotationData JSONB back to top-level fields
+    if (entityType === 'serviceRotation') {
+      if (converted.rotationData && typeof converted.rotationData === 'object') {
+        const rd = converted.rotationData;
+        if (rd.serviceCount) converted.serviceCount = rd.serviceCount;
+        if (rd.service_count) converted.serviceCount = rd.service_count;
+        if (rd.lastServed) converted.lastServed = rd.lastServed;
+        if (rd.last_served) converted.lastServed = rd.last_served;
+        if (rd.queue) converted.queue = rd.queue;
+        if (rd.employeeOrder) converted.employeeOrder = rd.employeeOrder;
+        if (rd.employee_order) converted.employeeOrder = rd.employee_order;
+        delete converted.rotationData;
+      }
+    }
+
     return converted;
   }
 

@@ -31,27 +31,24 @@ const MainLayout = () => {
           issues.push({ id: 'shift-config', message: 'Shift schedule times are not configured. Therapist schedules will not work correctly.', action: '/settings' });
         }
 
-        // Check business hours — try Dexie first, then Supabase
+        // Check business hours — try Dexie first, then Supabase (authenticated)
         const SettingsRepo = (await import('../services/storage/repositories/SettingsRepository')).default;
         let savedHours = await SettingsRepo.get('businessHours');
 
         // Fallback: check Supabase if local is empty (fresh browser)
         if (!savedHours && user?.businessId) {
           try {
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-            const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-            if (supabaseUrl && supabaseKey) {
-              const res = await fetch(
-                `${supabaseUrl}/rest/v1/settings?business_id=eq.${user.businessId}&key=eq.businessHours&select=value`,
-                { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
-              );
-              if (res.ok) {
-                const data = await res.json();
-                if (data?.[0]?.value) {
-                  savedHours = data[0].value;
-                  // Cache locally for next time
-                  await SettingsRepo.set('businessHours', savedHours);
-                }
+            const { supabase } = await import('../services/supabase/supabaseClient');
+            if (supabase) {
+              const { data, error } = await supabase
+                .from('settings')
+                .select('value')
+                .eq('business_id', user.businessId)
+                .eq('key', 'businessHours')
+                .single();
+              if (!error && data?.value) {
+                savedHours = data.value;
+                await SettingsRepo.set('businessHours', savedHours);
               }
             }
           } catch (e) { /* Supabase check is best-effort */ }

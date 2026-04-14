@@ -484,15 +484,29 @@ export const serviceRotationApi = {
       return recordDate === today && a.clockIn && !a.clockOut;
     });
 
+    // Include yesterday's carry-over employees (clocked in yesterday, not yet clocked out)
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
+    const overnightAttendance = allAttendance.filter(a => {
+      const recordDate = typeof a.date === 'string' ? a.date : String(a.date).split('T')[0];
+      return recordDate === yesterdayStr && a.clockIn && !a.clockOut;
+    });
+
+    // Combine today + overnight, but don't duplicate employees
+    const todayEmpIds = new Set(todayAttendance.map(a => String(a.employee?._id || a.employeeId)));
+    const uniqueOvernight = overnightAttendance.filter(a => !todayEmpIds.has(String(a.employee?._id || a.employeeId)));
+    const allClockedIn = [...todayAttendance, ...uniqueOvernight];
+
     // Sort by clock-in time (earliest first)
-    todayAttendance.sort((a, b) => {
+    allClockedIn.sort((a, b) => {
       const timeA = String(a.clockIn || '').replace(':', '');
       const timeB = String(b.clockIn || '').replace(':', '');
       return parseInt(timeA || '0') - parseInt(timeB || '0');
     });
 
     // Build queue with employee details (no service counts yet)
-    const queue = todayAttendance.map((att, index) => {
+    const queue = allClockedIn.map((att, index) => {
       const empId = String(att.employee?._id || att.employeeId);
       return {
         employeeId: empId,

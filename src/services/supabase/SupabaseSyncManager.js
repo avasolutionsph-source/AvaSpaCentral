@@ -579,6 +579,9 @@ class SupabaseSyncManager {
       // Handle special Dexie fields
       if (key === '_id') {
         converted.id = value;
+      } else if (key === 'id' && converted.id) {
+        // Skip auto-increment 'id' if we already have a UUID '_id'
+        continue;
       } else if (key === '_createdAt') {
         converted.created_at = value;
       } else if (key === '_updatedAt') {
@@ -664,6 +667,21 @@ class SupabaseSyncManager {
       }
     }
 
+    // Special handling for payroll_config_logs: pack individual fields into changes JSONB
+    if (tableName === 'payroll_config_logs') {
+      const changeFields = ['config_key', 'old_value', 'new_value', 'description'];
+      const changesData = {};
+      for (const field of changeFields) {
+        if (converted[field] !== undefined) {
+          changesData[field] = converted[field];
+          delete converted[field];
+        }
+      }
+      if (Object.keys(changesData).length > 0) {
+        converted.changes = changesData;
+      }
+    }
+
     // Fix corrupted data before pushing
     if (tableName === 'gift_certificates') {
       // Ensure balance is never null/NaN (use amount as fallback)
@@ -723,6 +741,18 @@ class SupabaseSyncManager {
         // Convert field name to camelCase
         const camelKey = this._toCamelCase(key);
         converted[camelKey] = value;
+      }
+    }
+
+    // Special handling for payroll_config_logs: unpack changes JSONB into individual fields
+    if (entityType === 'payrollConfigLogs') {
+      if (converted.changes && typeof converted.changes === 'object') {
+        const changes = converted.changes;
+        if (changes.config_key !== undefined) converted.configKey = changes.config_key;
+        if (changes.old_value !== undefined) converted.oldValue = changes.old_value;
+        if (changes.new_value !== undefined) converted.newValue = changes.new_value;
+        if (changes.description !== undefined) converted.description = changes.description;
+        delete converted.changes;
       }
     }
 

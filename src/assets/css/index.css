@@ -1372,6 +1372,7 @@ select {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow: hidden;
   background: var(--color-background);
 }
 

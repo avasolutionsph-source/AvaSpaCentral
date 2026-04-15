@@ -837,6 +837,23 @@ const POS = () => {
         // Save transaction
         await mockApi.transactions.createTransaction(transaction);
 
+        // Add to open cash drawer if payment is cash
+        if (transaction.paymentMethod === 'Cash') {
+          try {
+            const openSession = await mockApi.cashDrawer.getOpenSession(user._id);
+            if (openSession) {
+              await mockApi.cashDrawer.addTransaction(openSession._id, {
+                type: 'Sale',
+                amount: transaction.totalAmount,
+                method: 'Cash',
+                description: transaction.receiptNumber
+              });
+            }
+          } catch (err) {
+            console.warn('Cash drawer transaction logging failed:', err);
+          }
+        }
+
         // Log the transaction activity
         logTransaction(user, transaction.receiptNumber, transaction.totalAmount, transaction.paymentMethod);
 

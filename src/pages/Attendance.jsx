@@ -302,8 +302,12 @@ const Attendance = ({ embedded = false, onDataChange }) => {
 
       if (type === 'in') {
         const result = await mockApi.attendance.clockIn(employeeId, captureWithBranch);
+        if (result?.missedClockOut) {
+          const missedDate = new Date(result.missedClockOut.date + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+          showToast(`Warning: ${employeeName} did not clock out last shift (${missedDate}, clocked in at ${result.missedClockOut.clockIn}). Please update their attendance.`, 'warning');
+        }
         if (isOutOfRange) {
-          showToast('Clocked in but you are outside the allowed area. Pending manager approval.', 'warning');
+          showToast('Clocked in but outside the allowed area. Pending manager approval.', 'warning');
         } else if (result?.shiftWarning) {
           const [warnType, shiftTime] = result.shiftWarning.split('|');
           if (warnType === 'early_clockin') {
@@ -311,7 +315,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
           } else if (warnType === 'very_late') {
             showToast(`Clocked in - very late! Shift started at ${shiftTime}`, 'warning');
           }
-        } else {
+        } else if (!result?.missedClockOut) {
           showToast('Clocked in successfully with photo!', 'success');
         }
         logClockIn(user, employeeName);

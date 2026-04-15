@@ -194,6 +194,10 @@ const MyPortal = () => {
 
       if (type === 'in') {
         const result = await mockApi.attendance.clockIn(employeeId, captureWithBranch);
+        if (result?.missedClockOut) {
+          const missedDate = new Date(result.missedClockOut.date + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+          showToast(`Warning: You did not clock out last shift (${missedDate}, clocked in at ${result.missedClockOut.clockIn}). Please inform your manager.`, 'warning');
+        }
         if (isOutOfRange) {
           showToast('Clocked in but you are outside the allowed area. Pending manager approval.', 'warning');
         } else if (result?.shiftWarning) {
@@ -203,7 +207,7 @@ const MyPortal = () => {
           } else if (warnType === 'very_late') {
             showToast(`Clocked in - very late! Your shift started at ${shiftTime}`, 'warning');
           }
-        } else {
+        } else if (!result?.missedClockOut) {
           showToast('Clocked in successfully!', 'success');
         }
         logClockIn(user, employeeName);

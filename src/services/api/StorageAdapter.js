@@ -1137,10 +1137,21 @@ export const attendanceAdapter = {
     console.log('[AttendanceAdapter] clockIn - employeeId:', employeeId, 'type:', typeof employeeId);
     console.log('[AttendanceAdapter] clockIn - date:', today);
 
-    // Check if already clocked in today
-    const existing = await storageService.attendance.find(
-      a => String(a.employeeId) === empId && a.date === today
+    // Check for missed clock-out from previous shifts
+    let missedClockOut = null;
+    const allRecords = await storageService.attendance.find(
+      a => String(a.employeeId) === empId
     );
+    const previousRecords = allRecords
+      .filter(a => a.date !== today && a.clockIn && !a.clockOut)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    if (previousRecords.length > 0) {
+      const missed = previousRecords[0];
+      missedClockOut = { date: missed.date, clockIn: missed.clockIn };
+    }
+
+    // Check if already clocked in today
+    const existing = allRecords.filter(a => a.date === today);
 
     console.log('[AttendanceAdapter] clockIn - existing records for today:', existing.length);
 
@@ -1211,6 +1222,7 @@ export const attendanceAdapter = {
     return {
       success: true,
       shiftWarning,
+      missedClockOut,
       attendance: clone({
         ...record,
         employee: employee || null

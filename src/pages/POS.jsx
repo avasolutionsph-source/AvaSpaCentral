@@ -1031,7 +1031,7 @@ const POS = () => {
   }
 
   return (
-    <div className="pos-page">
+    <div className={`pos-page ${activeTab !== 'pos' ? 'tab-scrollable' : ''}`}>
       {/* Tab Navigation */}
       <div className="sales-tabs">
         <button

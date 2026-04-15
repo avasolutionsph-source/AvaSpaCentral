@@ -8,6 +8,12 @@
   overflow: hidden;
 }
 
+/* When showing non-POS tabs (Customers, GC, Cash Drawer), allow scrolling */
+.pos-page.tab-scrollable {
+  height: auto;
+  overflow: visible;
+}
+
 .pos-container {
   display: flex;
   flex: 1;

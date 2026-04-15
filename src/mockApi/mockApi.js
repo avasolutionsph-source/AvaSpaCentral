@@ -268,7 +268,7 @@ const initPayrollConfig = async () => {
   const storedLS = localStorage.getItem('payrollConfig');
   if (storedLS) {
     let config;
-    try { config = JSON.parse(storedLS); } catch { localStorage.removeItem('payrollConfig'); return await PayrollConfigRepository.getAll(); }
+    try { config = JSON.parse(storedLS); } catch { localStorage.removeItem('payrollConfig'); return await PayrollConfigRepository.getAllConfig(); }
     // Migrate using repository (triggers sync events)
     for (const [key, value] of Object.entries(config)) {
       await PayrollConfigRepository.set(key, value);
@@ -292,8 +292,8 @@ const initPayrollConfig = async () => {
     localStorage.removeItem('payrollConfigLogs');
   }
 
-  // Load from repository
-  const config = await PayrollConfigRepository.getAll();
+  // Load from repository (getAllConfig returns {key: value} object)
+  const config = await PayrollConfigRepository.getAllConfig();
   if (Object.keys(config).length > 0) {
     return config;
   }

@@ -1256,6 +1256,20 @@ class SupabaseSyncManager {
   }
 
   /**
+   * Get all sync queue items for debugging/viewing
+   */
+  async getQueueItems() {
+    return await db.syncQueue.toArray();
+  }
+
+  /**
+   * Delete a specific sync queue item by id
+   */
+  async deleteQueueItem(id) {
+    await db.syncQueue.delete(id);
+  }
+
+  /**
    * Main sync operation - push local changes and pull remote changes
    */
   async sync() {

@@ -10,7 +10,6 @@ import { supabaseSyncManager, isSupabaseConfigured } from '../services/supabase'
 
 /**
  * Hook to get sync status and controls
- * @returns {{ isSyncing: boolean, pendingCount: number, failedCount: number, triggerSync: () => Promise, retryFailed: () => Promise }}
  */
 export function useSyncStatus() {
   const [status, setStatus] = useState({
@@ -69,10 +68,22 @@ export function useSyncStatus() {
     return await supabaseSyncManager.retryFailed();
   }, []);
 
+  const getQueueItems = useCallback(async () => {
+    if (!isSupabaseConfigured()) return [];
+    return await supabaseSyncManager.getQueueItems();
+  }, []);
+
+  const deleteQueueItem = useCallback(async (id) => {
+    if (!isSupabaseConfigured()) return;
+    await supabaseSyncManager.deleteQueueItem(id);
+  }, []);
+
   return {
     ...status,
     triggerSync,
     retryFailed,
+    getQueueItems,
+    deleteQueueItem,
   };
 }
 

@@ -13,6 +13,7 @@ const Customers = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState(''); // Filter by spend tier
   const [activeTab, setActiveTab] = useState('customers'); // 'customers', 'loyalty'
+  const [expandedCustomer, setExpandedCustomer] = useState(null);
 
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
@@ -640,114 +641,109 @@ const Customers = () => {
           {filteredCustomers.map(customer => {
             const tierBadge = getSpendTierBadge(customer.tier);
             return (
-              <div key={customer._id} className="customer-card">
-              <div className="customer-header">
-                <div className="customer-avatar">
+              <div key={customer._id} className="customer-card" style={{ padding: 0 }}>
+              {/* Compact view: avatar + name + tier */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '12px 16px', cursor: 'pointer'
+              }} onClick={() => setExpandedCustomer(expandedCustomer === customer._id ? null : customer._id)}>
+                <div className="customer-avatar" style={{ flexShrink: 0, width: '40px', height: '40px', fontSize: '0.85rem' }}>
                   {customer.name?.split(' ').map(n => n.charAt(0)).join('').slice(0, 2) || '?'}
                 </div>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  {/* Spend-based Tier Badge */}
-                  <div
-                    className="spend-tier-badge"
-                    title={`${customer.tier} tier - ${customer.tierInfo?.discount || 0}% discount`}
-                    style={{
-                      background: tierBadge.bg,
-                      color: tierBadge.color,
-                      padding: '4px 10px',
-                      borderRadius: '20px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {customer.name}
+                    {isBirthdayToday(customer.birthday) && (
+                      <span style={{ marginLeft: '6px', fontSize: '0.8rem' }}>🎂</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginTop: '2px' }}>
+                    {customer.phone || customer.email || 'No contact info'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  <div style={{
+                    background: tierBadge.bg, color: tierBadge.color,
+                    padding: '3px 8px', borderRadius: '12px',
+                    fontSize: '0.7rem', fontWeight: 600
+                  }}>
                     {tierBadge.icon} {customer.tier}
                   </div>
-                  {/* Loyalty Points Badge */}
-                  {(customer.loyaltyPoints || 0) > 0 && (
-                    <div
-                      className={`loyalty-badge ${getCustomerTier(customer.loyaltyPoints || 0).name.toLowerCase()}`}
-                      onClick={() => openRedeemModal(customer)}
-                      title="Click to redeem rewards"
-                    >
-                      {getCustomerTier(customer.loyaltyPoints || 0).icon} {customer.loyaltyPoints} pts
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="2"
+                    style={{ transform: expandedCustomer === customer._id ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Expanded details */}
+              {expandedCustomer === customer._id && (
+                <div style={{ padding: '0 16px 12px', borderTop: '1px solid var(--gray-100)' }}>
+                  <div className="customer-contact-info" style={{ marginTop: '12px' }}>
+                    {customer.email && (
+                      <div className="contact-item">
+                        <span className="contact-item-icon">✉</span>
+                        <span>{customer.email}</span>
+                      </div>
+                    )}
+                    <div className="contact-item">
+                      <span className="contact-item-icon">📞</span>
+                      <span>{customer.phone || '-'}</span>
+                    </div>
+                    {customer.birthday && (
+                      <div className="contact-item">
+                        <span className="contact-item-icon">🎂</span>
+                        <span>{format(parseISO(customer.birthday), 'MMM dd, yyyy')}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="customer-stats">
+                    <div className="stat-item">
+                      <span className="stat-value">{customer.totalVisits || customer.visitCount || 0}</span>
+                      <span className="stat-label">Visits</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-value">₱{(customer.totalSpent || 0).toLocaleString()}</span>
+                      <span className="stat-label">Total Spent</span>
+                    </div>
+                    {(customer.loyaltyPoints || 0) > 0 && (
+                      <div className="stat-item">
+                        <span className="stat-value">{customer.loyaltyPoints}</span>
+                        <span className="stat-label">Points</span>
+                      </div>
+                    )}
+                  </div>
+                  {customer.tierInfo?.nextTier && customer.tierInfo.spendToNextTier > 0 && (
+                    <div style={{
+                      padding: '8px 12px', background: 'var(--gray-50)',
+                      borderRadius: 'var(--radius-sm)', marginTop: '8px',
+                      fontSize: '0.75rem', color: 'var(--gray-600)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span>Progress to {customer.tierInfo.nextTier}</span>
+                        <span>₱{customer.tierInfo.spendToNextTier.toLocaleString()} more</span>
+                      </div>
+                      <div style={{ height: '4px', background: 'var(--gray-200)', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', background: 'var(--primary)', borderRadius: '2px',
+                          width: `${Math.min(100, ((customer.totalSpent || 0) / (customer.tierInfo.nextTier === 'REGULAR' ? 20000 : 50000)) * 100)}%`
+                        }}></div>
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
-              <h3 className="customer-name">
-                {customer.name}
-                {isBirthdayToday(customer.birthday) && (
-                  <span className="birthday-indicator">🎂 Birthday Today!</span>
-                )}
-              </h3>
-              <div className="customer-contact-info">
-                <div className="contact-item">
-                  <span className="contact-item-icon">✉</span>
-                  <span>{customer.email}</span>
-                </div>
-                <div className="contact-item">
-                  <span className="contact-item-icon">📞</span>
-                  <span>{customer.phone}</span>
-                </div>
-                {customer.birthday && (
-                  <div className="contact-item">
-                    <span className="contact-item-icon">🎂</span>
-                    <span>{format(parseISO(customer.birthday), 'MMM dd, yyyy')}</span>
-                  </div>
-                )}
-              </div>
-              <div className="customer-stats">
-                <div className="stat-item">
-                  <span className="stat-value">{customer.totalVisits || customer.visitCount || 0}</span>
-                  <span className="stat-label">Visits</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-value">₱{(customer.totalSpent || 0).toLocaleString()}</span>
-                  <span className="stat-label">Total Spent</span>
-                </div>
-              </div>
-              {/* Tier Progress Indicator */}
-              {customer.tierInfo?.nextTier && customer.tierInfo.spendToNextTier > 0 && (
-                <div style={{
-                  padding: '8px 12px',
-                  background: 'var(--gray-50)',
-                  borderRadius: 'var(--radius-sm)',
-                  marginTop: 'var(--spacing-sm)',
-                  fontSize: '0.75rem',
-                  color: 'var(--gray-600)'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span>Progress to {customer.tierInfo.nextTier}</span>
-                    <span>₱{customer.tierInfo.spendToNextTier.toLocaleString()} more</span>
-                  </div>
-                  <div style={{
-                    height: '4px',
-                    background: 'var(--gray-200)',
-                    borderRadius: '2px',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{
-                      height: '100%',
-                      background: 'var(--primary)',
-                      width: `${Math.min(100, ((customer.totalSpent || 0) / (customer.tierInfo.nextTier === 'REGULAR' ? 20000 : 50000)) * 100)}%`,
-                      borderRadius: '2px'
-                    }}></div>
+                  {customer.notes && (
+                    <div className="customer-notes" style={{ marginTop: '8px' }}>
+                      💬 {customer.notes}
+                    </div>
+                  )}
+                  <div className="customer-actions" style={{ marginTop: '10px' }}>
+                    <button className="btn btn-sm btn-secondary" onClick={() => openEditModal(customer)}>Edit</button>
+                    <button className="btn btn-sm btn-primary" onClick={() => openHistoryModal(customer)}>History</button>
+                    <button className="btn btn-sm btn-points" onClick={() => openLoyaltyModal(customer)}>+ Points</button>
+                    <button className="btn btn-sm btn-error" onClick={() => handleDelete(customer)}>Delete</button>
                   </div>
                 </div>
               )}
-              {customer.notes && (
-                <div className="customer-notes">
-                  💬 {customer.notes}
-                </div>
-              )}
-              <div className="customer-actions">
-                <button className="btn btn-sm btn-secondary" onClick={() => openEditModal(customer)}>Edit</button>
-                <button className="btn btn-sm btn-primary" onClick={() => openHistoryModal(customer)}>History</button>
-                <button className="btn btn-sm btn-points" onClick={() => openLoyaltyModal(customer)}>+ Points</button>
-                <button className="btn btn-sm btn-error" onClick={() => handleDelete(customer)}>Delete</button>
-              </div>
             </div>
             );
           })}

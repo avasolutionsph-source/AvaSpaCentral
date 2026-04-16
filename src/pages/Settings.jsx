@@ -2247,6 +2247,64 @@ const Settings = () => {
                   )}
                 </div>
               </div>
+              {logoPreview && (<>
+                <div className="settings-row" style={{ marginTop: '16px' }}>
+                  <div className="settings-form-group">
+                    <label>Logo Animation</label>
+                    <select
+                      className="form-control"
+                      value={brandingSettings.heroLogoAnimation || 'none'}
+                      onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimation: e.target.value }))}
+                      disabled={!canEdit()}
+                    >
+                      <option value="none">None</option>
+                      <option value="fadeIn">Fade In</option>
+                      <option value="fadeInUp">Fade In Up</option>
+                      <option value="fadeInDown">Fade In Down</option>
+                      <option value="zoomIn">Zoom In</option>
+                      <option value="slideInLeft">Slide In Left</option>
+                      <option value="slideInRight">Slide In Right</option>
+                    </select>
+                  </div>
+                </div>
+                {brandingSettings.heroLogoAnimation && brandingSettings.heroLogoAnimation !== 'none' && (
+                  <div className="settings-row" style={{ marginTop: '8px' }}>
+                    <div className="settings-form-group">
+                      <label>Delay (seconds before animation starts)</label>
+                      <select
+                        className="form-control"
+                        value={brandingSettings.heroLogoAnimDelay || '0'}
+                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDelay: e.target.value }))}
+                        disabled={!canEdit()}
+                      >
+                        <option value="0">No delay</option>
+                        <option value="0.5">0.5s</option>
+                        <option value="1">1s</option>
+                        <option value="1.5">1.5s</option>
+                        <option value="2">2s</option>
+                        <option value="3">3s</option>
+                        <option value="5">5s</option>
+                      </select>
+                    </div>
+                    <div className="settings-form-group">
+                      <label>Duration (how long the animation plays)</label>
+                      <select
+                        className="form-control"
+                        value={brandingSettings.heroLogoAnimDuration || 'default'}
+                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDuration: e.target.value }))}
+                        disabled={!canEdit()}
+                      >
+                        <option value="default">Default</option>
+                        <option value="0.5">0.5s</option>
+                        <option value="1">1s</option>
+                        <option value="1.5">1.5s</option>
+                        <option value="2">2s</option>
+                        <option value="3">3s</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </>)}
             </div>
 
             {/* Hero Text Style */}
@@ -2712,67 +2770,6 @@ const Settings = () => {
                 </div>
               </div>
 
-              {/* Hero Logo Settings */}
-              {logoPreview && (<div style={{ marginTop: '16px' }}>
-                <>
-                  <div className="settings-row" style={{ marginTop: '12px' }}>
-                    <div className="settings-form-group">
-                      <label>Logo Animation</label>
-                      <select
-                        className="form-control"
-                        value={brandingSettings.heroLogoAnimation || 'none'}
-                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimation: e.target.value }))}
-                        disabled={!canEdit()}
-                      >
-                        <option value="none">None</option>
-                        <option value="fadeIn">Fade In</option>
-                        <option value="fadeInUp">Fade In Up</option>
-                        <option value="fadeInDown">Fade In Down</option>
-                        <option value="zoomIn">Zoom In</option>
-                        <option value="slideInLeft">Slide In Left</option>
-                        <option value="slideInRight">Slide In Right</option>
-                      </select>
-                    </div>
-                  </div>
-                  {brandingSettings.heroLogoAnimation && brandingSettings.heroLogoAnimation !== 'none' && (
-                    <div className="settings-row" style={{ marginTop: '8px' }}>
-                      <div className="settings-form-group">
-                        <label>Delay</label>
-                        <select
-                          className="form-control"
-                          value={brandingSettings.heroLogoAnimDelay || '0'}
-                          onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDelay: e.target.value }))}
-                          disabled={!canEdit()}
-                        >
-                          <option value="0">No delay</option>
-                          <option value="0.5">0.5s</option>
-                          <option value="1">1s</option>
-                          <option value="1.5">1.5s</option>
-                          <option value="2">2s</option>
-                          <option value="3">3s</option>
-                          <option value="5">5s</option>
-                        </select>
-                      </div>
-                      <div className="settings-form-group">
-                        <label>Duration</label>
-                        <select
-                          className="form-control"
-                          value={brandingSettings.heroLogoAnimDuration || 'default'}
-                          onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDuration: e.target.value }))}
-                          disabled={!canEdit()}
-                        >
-                          <option value="default">Default</option>
-                          <option value="0.5">0.5s</option>
-                          <option value="1">1s</option>
-                          <option value="1.5">1.5s</option>
-                          <option value="2">2s</option>
-                          <option value="3">3s</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </>
-              </div>)}
             </div>
 
             {/* Footer */}

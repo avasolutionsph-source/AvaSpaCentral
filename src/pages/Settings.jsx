@@ -124,50 +124,6 @@ const Settings = () => {
     loginAlerts: true
   });
 
-  // Login History
-  const [loginHistory, setLoginHistory] = useState([
-    {
-      id: 1,
-      date: '2025-01-25 09:30 AM',
-      device: 'Windows 10 - Chrome',
-      location: 'Philippines',
-      ip: '192.168.1.100',
-      status: 'Success'
-    },
-    {
-      id: 2,
-      date: '2025-01-24 02:15 PM',
-      device: 'iPhone 13 - Safari',
-      location: 'Philippines',
-      ip: '192.168.1.105',
-      status: 'Success'
-    },
-    {
-      id: 3,
-      date: '2025-01-24 08:45 AM',
-      device: 'Windows 10 - Chrome',
-      location: 'Philippines',
-      ip: '192.168.1.100',
-      status: 'Success'
-    },
-    {
-      id: 4,
-      date: '2025-01-23 11:20 AM',
-      device: 'Android - Chrome',
-      location: 'Manila, Philippines',
-      ip: '203.177.xxx.xxx',
-      status: 'Failed'
-    },
-    {
-      id: 5,
-      date: '2025-01-23 09:00 AM',
-      device: 'Windows 10 - Chrome',
-      location: 'Philippines',
-      ip: '192.168.1.100',
-      status: 'Success'
-    }
-  ]);
-
   // Payroll Configuration State
   const [payrollConfig, setPayrollConfig] = useState(null);
   const [payrollConfigLogs, setPayrollConfigLogs] = useState([]);
@@ -3584,50 +3540,6 @@ const Settings = () => {
                   Save Security Settings
                 </button>
               )}
-            </div>
-          </div>
-        </div>
-
-        {/* Login History */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <div className="settings-section-icon">📋</div>
-            <div className="settings-section-title">
-              <h2>Login History</h2>
-              <p>Review your recent login activity and security events</p>
-            </div>
-          </div>
-          <div className="settings-section-body">
-            <div className="login-history-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date & Time</th>
-                    <th>Device & Browser</th>
-                    <th>Location</th>
-                    <th>IP Address</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loginHistory.map(login => (
-                    <tr key={login.id}>
-                      <td>{login.date}</td>
-                      <td>{login.device}</td>
-                      <td>{login.location}</td>
-                      <td><code>{login.ip}</code></td>
-                      <td>
-                        <span className={`badge ${login.status === 'Success' ? 'badge-success' : 'badge-error'}`}>
-                          {login.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="login-history-note">
-              💡 We keep your login history for 90 days for security purposes
             </div>
           </div>
         </div>

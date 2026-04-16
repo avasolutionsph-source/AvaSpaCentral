@@ -2264,11 +2264,14 @@ const Settings = () => {
                       <option value="zoomIn">Zoom In</option>
                       <option value="slideInLeft">Slide In Left</option>
                       <option value="slideInRight">Slide In Right</option>
+                      <option value="glow">Glow Pulse</option>
+                      <option value="shimmer">Shimmer</option>
+                      <option value="float">Float</option>
                     </select>
                   </div>
                 </div>
                 {brandingSettings.heroLogoAnimation && brandingSettings.heroLogoAnimation !== 'none' && (
-                  <div className="settings-row" style={{ marginTop: '8px' }}>
+                  <div className="settings-row" style={{ marginTop: '12px' }}>
                     <div className="settings-form-group">
                       <label>Delay (seconds before animation starts)</label>
                       <select
@@ -2284,6 +2287,9 @@ const Settings = () => {
                         <option value="2">2s</option>
                         <option value="3">3s</option>
                         <option value="5">5s</option>
+                        <option value="7">7s</option>
+                        <option value="10">10s</option>
+                        <option value="15">15s</option>
                       </select>
                     </div>
                     <div className="settings-form-group">
@@ -2295,11 +2301,15 @@ const Settings = () => {
                         disabled={!canEdit()}
                       >
                         <option value="default">Default</option>
-                        <option value="0.5">0.5s</option>
-                        <option value="1">1s</option>
+                        <option value="0.5">0.5s (Very Fast)</option>
+                        <option value="1">1s (Fast)</option>
                         <option value="1.5">1.5s</option>
                         <option value="2">2s</option>
-                        <option value="3">3s</option>
+                        <option value="3">3s (Slow)</option>
+                        <option value="4">4s</option>
+                        <option value="5">5s</option>
+                        <option value="7">7s (Very Slow)</option>
+                        <option value="10">10s</option>
                       </select>
                     </div>
                   </div>

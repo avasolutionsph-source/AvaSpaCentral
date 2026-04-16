@@ -1141,7 +1141,7 @@ const BookingPage = () => {
             )}
           </div>
           {/* Hero logo */}
-          {heroLogoEnabled && business?.logo_url && (
+          {business?.logo_url && (
             <div
               ref={animateHeroRef(heroLogoAnimation, heroLogoAnimDelay, heroLogoAnimDuration)}
               style={{
@@ -1238,7 +1238,7 @@ const BookingPage = () => {
             )}
           </div>
           {/* Hero logo */}
-          {heroLogoEnabled && business?.logo_url && (
+          {business?.logo_url && (
             <div
               ref={animateHeroRef(heroLogoAnimation, heroLogoAnimDelay, heroLogoAnimDuration)}
               style={{

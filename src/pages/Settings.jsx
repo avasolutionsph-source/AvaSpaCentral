@@ -658,7 +658,6 @@ const Settings = () => {
       return;
     }
     setLogoFile(file);
-    setBrandingSettings(prev => ({ ...prev, heroLogoEnabled: true }));
     const reader = new FileReader();
     reader.onload = (ev) => setLogoPreview(ev.target.result);
     reader.readAsDataURL(file);
@@ -2599,7 +2598,7 @@ const Settings = () => {
                   })()}
                 </div>
                 {/* Draggable & resizable logo on hero preview */}
-                {brandingSettings.heroLogoEnabled && logoPreview && (() => {
+                {logoPreview && (() => {
                   const logoSize = brandingSettings.heroLogoSize ?? 80;
                   const handleStyle = (cursor) => ({
                     position: 'absolute', width: '10px', height: '10px',
@@ -2713,19 +2712,9 @@ const Settings = () => {
                 </div>
               </div>
 
-              {/* Hero Logo Toggle & Size */}
-              <div style={{ marginTop: '16px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!brandingSettings.heroLogoEnabled}
-                    onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoEnabled: e.target.checked }))}
-                    disabled={!canEdit() || !logoPreview}
-                  />
-                  Show logo on hero section
-                  {!logoPreview && <span style={{ fontSize: '0.8rem', color: '#999' }}>(upload a logo first)</span>}
-                </label>
-                {brandingSettings.heroLogoEnabled && logoPreview && (<>
+              {/* Hero Logo Settings */}
+              {logoPreview && (<div style={{ marginTop: '16px' }}>
+                <>
                   <div className="settings-row" style={{ marginTop: '12px' }}>
                     <div className="settings-form-group">
                       <label>Logo Animation</label>
@@ -2782,8 +2771,8 @@ const Settings = () => {
                       </div>
                     </div>
                   )}
-                </>)}
-              </div>
+                </>
+              </div>)}
             </div>
 
             {/* Footer */}

@@ -138,11 +138,10 @@ const BookingPage = () => {
   const [heroLogoAnimDuration, setHeroLogoAnimDuration] = useState('default');
 
   // Footer settings
-  const [footerShowName, setFooterShowName] = useState(true);
-  const [footerShowPhone, setFooterShowPhone] = useState(true);
-  const [footerShowEmail, setFooterShowEmail] = useState(true);
-  const [footerShowAddress, setFooterShowAddress] = useState(true);
-  const [footerShowCopyright, setFooterShowCopyright] = useState(true);
+  const [footerLine1, setFooterLine1] = useState('');
+  const [footerLine2, setFooterLine2] = useState('');
+  const [footerLine3, setFooterLine3] = useState('');
+  const [footerLine4, setFooterLine4] = useState('');
 
   // Branch system
   const [branches, setBranches] = useState([]);
@@ -323,7 +322,7 @@ const BookingPage = () => {
 
           // Load hero font settings
           try {
-            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration,heroLogoEnabled,heroLogoX,heroLogoY,heroLogoSize,heroLogoAnimation,heroLogoAnimDelay,heroLogoAnimDuration,footerShowName,footerShowPhone,footerShowEmail,footerShowAddress,footerShowCopyright)&select=key,value`;
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration,heroLogoEnabled,heroLogoX,heroLogoY,heroLogoSize,heroLogoAnimation,heroLogoAnimDelay,heroLogoAnimDuration,footerLine1,footerLine2,footerLine3,footerLine4)&select=key,value`;
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
@@ -346,11 +345,10 @@ const BookingPage = () => {
                 if (s.key === 'heroLogoAnimation' && s.value) setHeroLogoAnimation(s.value);
                 if (s.key === 'heroLogoAnimDelay' && s.value) setHeroLogoAnimDelay(s.value);
                 if (s.key === 'heroLogoAnimDuration' && s.value) setHeroLogoAnimDuration(s.value);
-                if (s.key === 'footerShowName') setFooterShowName(s.value === 'true');
-                if (s.key === 'footerShowPhone') setFooterShowPhone(s.value === 'true');
-                if (s.key === 'footerShowEmail') setFooterShowEmail(s.value === 'true');
-                if (s.key === 'footerShowAddress') setFooterShowAddress(s.value === 'true');
-                if (s.key === 'footerShowCopyright') setFooterShowCopyright(s.value === 'true');
+                if (s.key === 'footerLine1') setFooterLine1(s.value || '');
+                if (s.key === 'footerLine2') setFooterLine2(s.value || '');
+                if (s.key === 'footerLine3') setFooterLine3(s.value || '');
+                if (s.key === 'footerLine4') setFooterLine4(s.value || '');
               });
               console.log('[HeroSettings] Animation:', loaded.heroAnimation, 'Delay:', loaded.heroAnimDelay, 'Duration:', loaded.heroAnimDuration);
             } else {
@@ -2028,17 +2026,15 @@ const BookingPage = () => {
       </div>
 
       {/* Footer */}
-      {(footerShowName || footerShowPhone || footerShowEmail || footerShowAddress || footerShowCopyright) && (
+      {(footerLine1 || footerLine2 || footerLine3 || footerLine4) && (
       <footer className="booking-footer luxe-footer">
         <div className="luxe-footer-divider" />
-        {footerShowName && <p className="luxe-footer-brand">{business?.name}</p>}
-        {footerShowName && business?.tagline && <p className="luxe-footer-tagline">{business.tagline}</p>}
+        {footerLine1 && <p className="luxe-footer-brand">{footerLine1}</p>}
         <div className="luxe-footer-details">
-          {footerShowAddress && business?.address && <p>{business.address}</p>}
-          {footerShowPhone && business?.phone && <p>{business.phone}</p>}
-          {footerShowEmail && business?.email && <p>{business.email}</p>}
+          {footerLine2 && <p>{footerLine2}</p>}
+          {footerLine3 && <p>{footerLine3}</p>}
         </div>
-        {footerShowCopyright && <p className="luxe-footer-copy">&copy; {new Date().getFullYear()} {business?.name}. All rights reserved.</p>}
+        {footerLine4 && <p className="luxe-footer-copy">{footerLine4}</p>}
       </footer>
       )}
 

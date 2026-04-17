@@ -77,11 +77,10 @@ const Settings = () => {
     heroLogoAnimation: 'none',
     heroLogoAnimDelay: '0',
     heroLogoAnimDuration: 'default',
-    footerShowName: true,
-    footerShowPhone: true,
-    footerShowEmail: true,
-    footerShowAddress: true,
-    footerShowCopyright: true,
+    footerLine1: '',
+    footerLine2: '',
+    footerLine3: '',
+    footerLine4: '',
   });
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -605,11 +604,10 @@ const Settings = () => {
           const savedHeroLogoAnimation = await SettingsRepository.get('heroLogoAnimation');
           const savedHeroLogoAnimDelay = await SettingsRepository.get('heroLogoAnimDelay');
           const savedHeroLogoAnimDuration = await SettingsRepository.get('heroLogoAnimDuration');
-          const savedFooterShowName = await SettingsRepository.get('footerShowName');
-          const savedFooterShowPhone = await SettingsRepository.get('footerShowPhone');
-          const savedFooterShowEmail = await SettingsRepository.get('footerShowEmail');
-          const savedFooterShowAddress = await SettingsRepository.get('footerShowAddress');
-          const savedFooterShowCopyright = await SettingsRepository.get('footerShowCopyright');
+          const savedFooterLine1 = await SettingsRepository.get('footerLine1');
+          const savedFooterLine2 = await SettingsRepository.get('footerLine2');
+          const savedFooterLine3 = await SettingsRepository.get('footerLine3');
+          const savedFooterLine4 = await SettingsRepository.get('footerLine4');
 
           const hasLocal = savedHeroFont || savedHeroAnimation || savedHeroLogoEnabled;
 
@@ -632,11 +630,10 @@ const Settings = () => {
               ...(savedHeroLogoAnimation && { heroLogoAnimation: savedHeroLogoAnimation }),
               ...(savedHeroLogoAnimDelay && { heroLogoAnimDelay: savedHeroLogoAnimDelay }),
               ...(savedHeroLogoAnimDuration && { heroLogoAnimDuration: savedHeroLogoAnimDuration }),
-              ...(savedFooterShowName != null && { footerShowName: savedFooterShowName === 'true' }),
-              ...(savedFooterShowPhone != null && { footerShowPhone: savedFooterShowPhone === 'true' }),
-              ...(savedFooterShowEmail != null && { footerShowEmail: savedFooterShowEmail === 'true' }),
-              ...(savedFooterShowAddress != null && { footerShowAddress: savedFooterShowAddress === 'true' }),
-              ...(savedFooterShowCopyright != null && { footerShowCopyright: savedFooterShowCopyright === 'true' }),
+              ...(savedFooterLine1 != null && { footerLine1: savedFooterLine1 }),
+              ...(savedFooterLine2 != null && { footerLine2: savedFooterLine2 }),
+              ...(savedFooterLine3 != null && { footerLine3: savedFooterLine3 }),
+              ...(savedFooterLine4 != null && { footerLine4: savedFooterLine4 }),
             }));
           } else if (user?.businessId) {
             // Fallback: load from Supabase (incognito/new device)
@@ -767,11 +764,10 @@ const Settings = () => {
         await SettingsRepository.set('heroLogoAnimation', brandingSettings.heroLogoAnimation || 'none');
         await SettingsRepository.set('heroLogoAnimDelay', brandingSettings.heroLogoAnimDelay || '0');
         await SettingsRepository.set('heroLogoAnimDuration', brandingSettings.heroLogoAnimDuration || 'default');
-        await SettingsRepository.set('footerShowName', brandingSettings.footerShowName ? 'true' : 'false');
-        await SettingsRepository.set('footerShowPhone', brandingSettings.footerShowPhone ? 'true' : 'false');
-        await SettingsRepository.set('footerShowEmail', brandingSettings.footerShowEmail ? 'true' : 'false');
-        await SettingsRepository.set('footerShowAddress', brandingSettings.footerShowAddress ? 'true' : 'false');
-        await SettingsRepository.set('footerShowCopyright', brandingSettings.footerShowCopyright ? 'true' : 'false');
+        await SettingsRepository.set('footerLine1', brandingSettings.footerLine1 || '');
+        await SettingsRepository.set('footerLine2', brandingSettings.footerLine2 || '');
+        await SettingsRepository.set('footerLine3', brandingSettings.footerLine3 || '');
+        await SettingsRepository.set('footerLine4', brandingSettings.footerLine4 || '');
 
         // Also save directly to Supabase so booking page can read them
         if (user?.businessId) {
@@ -794,11 +790,10 @@ const Settings = () => {
                 heroLogoAnimation: brandingSettings.heroLogoAnimation || 'none',
                 heroLogoAnimDelay: brandingSettings.heroLogoAnimDelay || '0',
                 heroLogoAnimDuration: brandingSettings.heroLogoAnimDuration || 'default',
-                footerShowName: brandingSettings.footerShowName ? 'true' : 'false',
-                footerShowPhone: brandingSettings.footerShowPhone ? 'true' : 'false',
-                footerShowEmail: brandingSettings.footerShowEmail ? 'true' : 'false',
-                footerShowAddress: brandingSettings.footerShowAddress ? 'true' : 'false',
-                footerShowCopyright: brandingSettings.footerShowCopyright ? 'true' : 'false',
+                footerLine1: brandingSettings.footerLine1 || '',
+                footerLine2: brandingSettings.footerLine2 || '',
+                footerLine3: brandingSettings.footerLine3 || '',
+                footerLine4: brandingSettings.footerLine4 || '',
               };
 
               // Save each setting individually to avoid batch RLS issues
@@ -2863,42 +2858,56 @@ const Settings = () => {
             {/* Footer */}
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Footer</h3>
-              <p className="branding-sub-desc">Choose what to show at the bottom of your booking page.</p>
+              <p className="branding-sub-desc">Type what you want to show at the bottom of your booking page. Leave a line blank to hide it.</p>
 
-              {/* Footer visibility toggles */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                {[
-                  { key: 'footerShowName', label: 'Business Name' },
-                  { key: 'footerShowPhone', label: 'Phone Number' },
-                  { key: 'footerShowEmail', label: 'Email Address' },
-                  { key: 'footerShowAddress', label: 'Address' },
-                  { key: 'footerShowCopyright', label: 'Copyright Text' },
-                ].map(item => (
-                  <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={brandingSettings[item.key] !== false}
-                      onChange={(e) => setBrandingSettings(prev => ({ ...prev, [item.key]: e.target.checked }))}
-                      disabled={!canEdit()}
-                    />
-                    {item.label}
-                  </label>
-                ))}
-              </div>
-
-              <div className="settings-row">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div className="settings-form-group">
-                  <label>Contact Number</label>
+                  <label>Line 1</label>
                   <input
                     type="text"
-                    value={brandingSettings.contactPhone}
-                    onChange={e => setBrandingSettings(prev => ({ ...prev, contactPhone: e.target.value }))}
-                    placeholder="e.g. +639991234567"
+                    className="form-control"
+                    value={brandingSettings.footerLine1}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, footerLine1: e.target.value }))}
+                    placeholder="e.g. Daet Massage and Spa"
+                    disabled={!canEdit()}
+                  />
+                </div>
+                <div className="settings-form-group">
+                  <label>Line 2</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={brandingSettings.footerLine2}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, footerLine2: e.target.value }))}
+                    placeholder="e.g. 09918005245"
+                    disabled={!canEdit()}
+                  />
+                </div>
+                <div className="settings-form-group">
+                  <label>Line 3</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={brandingSettings.footerLine3}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, footerLine3: e.target.value }))}
+                    placeholder="e.g. josebenitua@gmail.com"
+                    disabled={!canEdit()}
+                  />
+                </div>
+                <div className="settings-form-group">
+                  <label>Line 4</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={brandingSettings.footerLine4}
+                    onChange={e => setBrandingSettings(prev => ({ ...prev, footerLine4: e.target.value }))}
+                    placeholder="e.g. © 2026 Daet Massage and Spa. All rights reserved."
                     disabled={!canEdit()}
                   />
                 </div>
               </div>
-              <div className="settings-row" style={{ marginTop: '0.75rem' }}>
+
+              <div className="settings-row" style={{ marginTop: '16px' }}>
                 <div className="settings-form-group">
                   <label>Font</label>
                   <select
@@ -2935,11 +2944,12 @@ const Settings = () => {
                   fontFamily: brandingSettings.footerFont && brandingSettings.footerFont !== 'default' ? `'${brandingSettings.footerFont}', sans-serif` : 'inherit',
                   fontSize: `${brandingSettings.footerFontSize || 14}px`
                 }}>
-                  {brandingSettings.footerShowName !== false && <p style={{ fontWeight: 500 }}>{brandingSettings.businessName || 'Your Business Name'}</p>}
-                  {brandingSettings.footerShowPhone !== false && brandingSettings.contactPhone && <p>{brandingSettings.contactPhone}</p>}
-                  {brandingSettings.footerShowCopyright !== false && <p style={{ opacity: 0.6 }}>&copy; {new Date().getFullYear()} {brandingSettings.businessName || 'Your Business Name'}. All rights reserved.</p>}
-                  {!brandingSettings.footerShowName && !brandingSettings.footerShowPhone && !brandingSettings.footerShowEmail && !brandingSettings.footerShowAddress && !brandingSettings.footerShowCopyright && (
-                    <p style={{ opacity: 0.5, fontStyle: 'italic' }}>Footer is hidden</p>
+                  {brandingSettings.footerLine1 && <p style={{ fontWeight: 500 }}>{brandingSettings.footerLine1}</p>}
+                  {brandingSettings.footerLine2 && <p>{brandingSettings.footerLine2}</p>}
+                  {brandingSettings.footerLine3 && <p>{brandingSettings.footerLine3}</p>}
+                  {brandingSettings.footerLine4 && <p style={{ opacity: 0.6 }}>{brandingSettings.footerLine4}</p>}
+                  {!brandingSettings.footerLine1 && !brandingSettings.footerLine2 && !brandingSettings.footerLine3 && !brandingSettings.footerLine4 && (
+                    <p style={{ opacity: 0.5, fontStyle: 'italic' }}>Footer is hidden — type something above to show it</p>
                   )}
                 </div>
               </div>

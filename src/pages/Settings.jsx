@@ -745,6 +745,7 @@ const Settings = () => {
   const handleSaveBranding = async () => {
     if (!user?.businessId) return;
     setSavingBranding(true);
+    let cloudSyncFailed = false;
     try {
       let newLogoUrl = brandingSettings.logoUrl;
       let newCoverUrl = brandingSettings.coverPhotoUrl;
@@ -832,23 +833,30 @@ const Settings = () => {
               }));
               const { error } = await Promise.race([
                 supabase.from('settings').upsert(rows, { onConflict: 'business_id,key' }),
-                new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 8000)),
+                new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 15000)),
               ]);
               if (error) {
                 console.error('[HeroSettings] Bulk upsert failed:', error);
+                cloudSyncFailed = true;
               } else {
                 console.log('[HeroSettings] Saved to Supabase successfully');
               }
             }
           } catch (e) {
             console.error('[HeroSettings] Save failed:', e);
+            cloudSyncFailed = true;
           }
         }
       } catch (fontErr) {
         console.warn('Font settings save failed:', fontErr);
+        cloudSyncFailed = true;
       }
 
-      showToast('Branding saved successfully!', 'success');
+      if (cloudSyncFailed) {
+        showToast('Saved locally, but cloud sync failed. Your booking page may not show the latest changes — please retry.', 'error');
+      } else {
+        showToast('Branding saved successfully!', 'success');
+      }
     } catch (err) {
       console.error('Error saving branding:', err);
       showToast('Failed to save branding. Please try again.', 'error');

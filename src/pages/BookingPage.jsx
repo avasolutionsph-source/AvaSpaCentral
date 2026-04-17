@@ -1123,7 +1123,17 @@ const BookingPage = () => {
             autoPlay
             muted
             playsInline
-            onEnded={(e) => { e.target.style.filter = 'blur(6px) brightness(0.7) contrast(1.1)'; }}
+            onTimeUpdate={(e) => {
+              const v = e.target;
+              const remaining = v.duration - v.currentTime;
+              if (!Number.isFinite(remaining)) return;
+              // Begin the blur 4s before the clip ends so the stop feels gradual
+              if (remaining < 4 && !v.dataset.fading) {
+                v.dataset.fading = '1';
+                v.style.filter = 'blur(6px) brightness(0.7) contrast(1.1)';
+              }
+            }}
+            onEnded={(e) => { e.target.style.filter = 'blur(8px) brightness(0.6) contrast(1.1)'; }}
             style={{
               position: 'absolute',
               top: 0,
@@ -1133,7 +1143,7 @@ const BookingPage = () => {
               objectFit: 'cover',
               filter: 'blur(1.5px) brightness(0.85) contrast(1.1)',
               transform: 'scale(1.05)',
-              transition: 'filter 2s ease-out',
+              transition: 'filter 4s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           />
           {/* Film grain overlay to mask pixelation */}

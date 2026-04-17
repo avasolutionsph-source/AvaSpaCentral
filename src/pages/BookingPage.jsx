@@ -2038,7 +2038,37 @@ const BookingPage = () => {
       </footer>
       )}
 
-      {/* Mobile floating bar removed — summary is now inline at the bottom */}
+      {/* Floating booking summary — always visible, anchored to bottom-center */}
+      {selectedServices.length > 0 && (
+        <div
+          className="floating-summary-bar"
+          onClick={() => document.querySelector('.luxe-summary-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="floating-summary-inner">
+            <div className="floating-summary-left">
+              <span className="floating-summary-count">{selectedServices.length}</span>
+              <div className="floating-summary-labels">
+                <span className="floating-summary-title">{selectedServices.length === 1 ? 'Service' : 'Services'} Selected</span>
+                <span className="floating-summary-sub">
+                  {selectedDate && selectedTime ? `${selectedTime} • ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'Choose date & time'}
+                </span>
+              </div>
+            </div>
+            <div className="floating-summary-right">
+              <div className="floating-summary-total">
+                <span className="floating-summary-total-label">Total</span>
+                <span className="floating-summary-total-amount">₱{cartTotal.toLocaleString()}</span>
+              </div>
+              <span className="floating-summary-cta">
+                View
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

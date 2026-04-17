@@ -2194,6 +2194,10 @@ const Settings = () => {
                 {[
                   { id: 'candle', label: 'Candle Ambiance', src: '/videos/candle.mp4' },
                   { id: 'candle2', label: 'Candle Ambiance 2', src: '/videos/candle2.mp4' },
+                  { id: 'daet', label: 'Daet Template', src: '/videos/daet.mp4' },
+                  { id: 'template3', label: 'Template 3', src: '/videos/template3.mp4' },
+                  { id: 'template4', label: 'Template 4', src: '/videos/template4.mp4' },
+                  { id: 'template5', label: 'Template 5', src: '/videos/template5.mp4' },
                 ].map(template => {
                   const isSelected = brandingSettings.heroVideo === template.id;
                   return (

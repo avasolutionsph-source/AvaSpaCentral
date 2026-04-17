@@ -287,7 +287,7 @@ html {
   min-height: 100vh;
   background: #f7f5f2;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Roboto', sans-serif;
-  padding-bottom: 0;
+  padding-bottom: 96px;
 }
 
 /* Loading State — Luxurious Spa */
@@ -566,18 +566,41 @@ html {
   opacity: 1 !important;
 }
 .hero-scroll-text {
-  font-size: 0.65rem;
-  letter-spacing: 3px;
+  font-size: 1rem;
+  letter-spacing: 4px;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.5);
-  font-weight: 300;
+  color: #fff;
+  font-weight: 700;
+  text-shadow:
+    0 0 8px rgba(255,255,255,0.85),
+    0 0 18px rgba(255,255,255,0.55),
+    0 0 32px rgba(255,255,255,0.35),
+    0 2px 6px rgba(0,0,0,0.5);
+  animation: heroScrollGlow 2.4s ease-in-out infinite;
 }
 .hero-scroll-arrow {
-  color: rgba(255,255,255,0.5);
+  color: #fff;
+  filter: drop-shadow(0 0 6px rgba(255,255,255,0.8)) drop-shadow(0 0 14px rgba(255,255,255,0.45));
   animation: heroScrollBounce 2s ease-in-out infinite;
 }
 @keyframes heroScrollFadeIn {
-  to { opacity: 0.7; }
+  to { opacity: 1; }
+}
+@keyframes heroScrollGlow {
+  0%, 100% {
+    text-shadow:
+      0 0 8px rgba(255,255,255,0.85),
+      0 0 18px rgba(255,255,255,0.55),
+      0 0 32px rgba(255,255,255,0.35),
+      0 2px 6px rgba(0,0,0,0.5);
+  }
+  50% {
+    text-shadow:
+      0 0 14px rgba(255,255,255,1),
+      0 0 26px rgba(255,255,255,0.75),
+      0 0 46px rgba(255,255,255,0.5),
+      0 2px 6px rgba(0,0,0,0.5);
+  }
 }
 @keyframes heroScrollBounce {
   0%, 100% { transform: translateY(0); }
@@ -2804,4 +2827,147 @@ html {
   .luxe-summary-section .booking-note {
     max-width: 100%;
   }
+}
+
+/* ── Floating booking summary bar (always visible, bottom-center, flush) ── */
+.floating-summary-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  width: min(640px, calc(100vw - 24px));
+  padding: 0;
+  background: linear-gradient(180deg, rgba(18, 12, 10, 0.96) 0%, rgba(10, 6, 5, 0.98) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  box-shadow:
+    0 -10px 40px rgba(0, 0, 0, 0.55),
+    0 -2px 14px rgba(212, 175, 55, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  animation: floatingSummarySlideUp 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.floating-summary-bar:hover {
+  transform: translateX(-50%) translateY(-4px);
+  box-shadow:
+    0 -14px 50px rgba(0, 0, 0, 0.65),
+    0 -4px 20px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: rgba(212, 175, 55, 0.55);
+}
+.floating-summary-bar:focus-visible {
+  outline: 2px solid rgba(212, 175, 55, 0.8);
+  outline-offset: 2px;
+}
+.floating-summary-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+}
+.floating-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.floating-summary-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d4af37 0%, #b8941f 100%);
+  color: #1a0f0a;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 10px rgba(212, 175, 55, 0.4);
+  flex-shrink: 0;
+}
+.floating-summary-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.floating-summary-title {
+  color: #f5e9d4;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.floating-summary-sub {
+  color: rgba(245, 233, 212, 0.6);
+  font-size: 0.72rem;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.floating-summary-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+.floating-summary-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+.floating-summary-total-label {
+  color: rgba(245, 233, 212, 0.55);
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.floating-summary-total-amount {
+  color: #f5e9d4;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.floating-summary-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #d4af37 0%, #b8941f 100%);
+  color: #1a0f0a;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 10px rgba(212, 175, 55, 0.35);
+}
+@keyframes floatingSummarySlideUp {
+  from { transform: translateX(-50%) translateY(110%); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+@media (max-width: 520px) {
+  .floating-summary-bar {
+    width: calc(100vw - 12px);
+    border-radius: 14px 14px 0 0;
+  }
+  .floating-summary-inner {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .floating-summary-sub { display: none; }
+  .floating-summary-total-amount { font-size: 1rem; }
+  .floating-summary-cta { padding: 7px 10px; font-size: 0.72rem; }
 }

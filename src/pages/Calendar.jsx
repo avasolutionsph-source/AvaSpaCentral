@@ -17,6 +17,7 @@ import {
 import { advanceBookingApi } from '../mockApi/advanceBookingApi';
 import mockApi from '../mockApi';
 import { formatTime12Hour } from '../utils/dateUtils';
+import '../assets/css/hub-pages.css';
 
 const Calendar = () => {
   const navigate = useNavigate();

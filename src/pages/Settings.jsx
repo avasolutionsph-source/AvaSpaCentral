@@ -2755,7 +2755,7 @@ const Settings = () => {
                       else if (corner === 'sw') delta = Math.max(-dx, dy);
                       else if (corner === 'ne') delta = Math.max(dx, -dy);
                       else if (corner === 'nw') delta = Math.max(-dx, -dy);
-                      const newSize = Math.max(30, Math.min(300, startSize + delta));
+                      const newSize = Math.max(30, Math.min(800, startSize + delta));
                       setBrandingSettings(prev => ({ ...prev, heroLogoSize: Math.round(newSize) }));
                     };
                     const onUp = () => {

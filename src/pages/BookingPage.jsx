@@ -1132,8 +1132,24 @@ const BookingPage = () => {
                 v.dataset.fading = '1';
                 v.style.filter = 'blur(6px) brightness(0.7) contrast(1.1)';
               }
+              // Ramp playbackRate from 1 → 0.25 over the last 4s so the
+              // video "slows to a stop" instead of cutting off abruptly.
+              if (remaining < 4) {
+                const t = Math.max(0, Math.min(1, remaining / 4));
+                v.playbackRate = 0.25 + t * 0.75;
+              }
             }}
-            onEnded={(e) => { e.target.style.filter = 'blur(8px) brightness(0.6) contrast(1.1)'; }}
+            onEnded={(e) => {
+              const v = e.target;
+              v.style.filter = 'blur(8px) brightness(0.6) contrast(1.1)';
+              // Keep the scene "alive" by slowly looping back instead of
+              // freezing on the last frame. Reset state and replay muted.
+              v.dataset.fading = '';
+              v.playbackRate = 1;
+              v.currentTime = 0;
+              v.style.filter = 'blur(1.5px) brightness(0.85) contrast(1.1)';
+              v.play().catch(() => {});
+            }}
             style={{
               position: 'absolute',
               top: 0,

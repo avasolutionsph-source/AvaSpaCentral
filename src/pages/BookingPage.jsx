@@ -159,6 +159,8 @@ const BookingPage = () => {
   const [businessHours, setBusinessHours] = useState([]);
   const [shiftSchedules, setShiftSchedules] = useState([]);
   const [existingBookings, setExistingBookings] = useState([]);
+  const [bookingCapacitySetting, setBookingCapacitySetting] = useState(14);
+  const [bookingWindowSetting, setBookingWindowSetting] = useState(90);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   // User selections
@@ -482,6 +484,19 @@ const BookingPage = () => {
             }
           } catch (err) { console.warn('Failed to fetch business hours:', err); }
 
+          // Fetch booking capacity settings
+          try {
+            const capUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(bookingCapacity,bookingWindowMinutes)&select=key,value`;
+            const capRes = await fetch(capUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
+            if (capRes.ok) {
+              const capData = await capRes.json();
+              capData.forEach(s => {
+                if (s.key === 'bookingCapacity' && s.value) setBookingCapacitySetting(parseInt(s.value) || 14);
+                if (s.key === 'bookingWindowMinutes' && s.value) setBookingWindowSetting(parseInt(s.value) || 90);
+              });
+            }
+          } catch (err) { console.warn('Failed to fetch capacity settings:', err); }
+
           // Fetch existing bookings for availability check
           try {
             const bookingsUrl = `${supabaseUrl}/rest/v1/online_bookings?business_id=eq.${actualBusinessId}&status=neq.cancelled&select=preferred_date,preferred_time,branch_id`;
@@ -685,6 +700,13 @@ const BookingPage = () => {
       return;
     }
 
+    // Re-check capacity before submitting
+    const slotStatus = getSlotStatus(selectedTime);
+    if (slotStatus === 'full') {
+      alert('Sorry, this time slot is now full. Please select another time.');
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -818,6 +840,23 @@ const BookingPage = () => {
     return slots;
   }, [selectedDayHours]);
 
+  // Capacity settings: max pax per sliding window (from settings state)
+  const bookingCapacity = bookingCapacitySetting;
+  const bookingWindowMinutes = bookingWindowSetting;
+
+  // Helper: parse "HH:MM AM/PM" to minutes from midnight
+  const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return 0;
+    let h = parseInt(match[1]);
+    const m = parseInt(match[2]);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
+  };
+
   // Count bookings per time slot for selected date
   const slotBookingCounts = useMemo(() => {
     if (!selectedDate) return {};
@@ -828,18 +867,28 @@ const BookingPage = () => {
     return counts;
   }, [selectedDate, existingBookings, selectedBranch]);
 
-  // Count therapists available per slot to determine capacity
-  const therapistCountForDate = useMemo(() => {
-    if (!selectedDate) return 0;
-    return therapists.length || 5; // fallback
-  }, [selectedDate, therapists]);
+  // Get bookings for selected date (for sliding window)
+  const dateBookings = useMemo(() => {
+    if (!selectedDate) return [];
+    return existingBookings.filter(b =>
+      b.preferred_date === selectedDate && (!selectedBranch || !b.branch_id || b.branch_id === selectedBranch.id) && b.preferred_time
+    );
+  }, [selectedDate, existingBookings, selectedBranch]);
 
-  // Determine slot status
+  // Determine slot status using sliding window capacity
   const getSlotStatus = (time) => {
-    const booked = slotBookingCounts[time] || 0;
-    const capacity = therapistCountForDate;
-    if (booked >= capacity) return 'full';
-    if (booked >= capacity * 0.7) return 'peak';
+    const slotMins = parseTimeToMinutes(time);
+    // Count all bookings whose time falls within the sliding window [slotMins, slotMins + windowMinutes)
+    let overlapping = 0;
+    dateBookings.forEach(b => {
+      const bookingMins = parseTimeToMinutes(b.preferred_time);
+      // A booking overlaps if it's within the window before or after this slot
+      if (bookingMins >= slotMins - bookingWindowMinutes + 30 && bookingMins < slotMins + bookingWindowMinutes) {
+        overlapping++;
+      }
+    });
+    if (overlapping >= bookingCapacity) return 'full';
+    if (overlapping >= bookingCapacity * 0.7) return 'peak';
     return 'available';
   };
 

@@ -30,6 +30,10 @@ const Settings = () => {
     website: 'www.daetmassagespa.com'
   });
 
+  // Booking Capacity
+  const [bookingCapacity, setBookingCapacity] = useState(14);
+  const [bookingWindowMinutes, setBookingWindowMinutes] = useState(90);
+
   // Business Hours
   const [businessHours, setBusinessHours] = useState([
     { day: 'Monday', open: '', close: '', enabled: true },
@@ -1138,7 +1142,9 @@ const Settings = () => {
         businessHours: businessHours,
         taxSettings: taxSettings,
         theme: theme,
-        showReceiptAfterCheckout: showReceiptAfterCheckout
+        showReceiptAfterCheckout: showReceiptAfterCheckout,
+        bookingCapacity: bookingCapacity,
+        bookingWindowMinutes: bookingWindowMinutes
       };
 
       // Save settings to Dexie (local)
@@ -1266,6 +1272,11 @@ const Settings = () => {
 
         const savedReceiptSetting = await SettingsRepository.get('showReceiptAfterCheckout');
         if (savedReceiptSetting !== undefined) setShowReceiptAfterCheckout(savedReceiptSetting);
+
+        const savedBookingCapacity = await SettingsRepository.get('bookingCapacity');
+        const savedBookingWindow = await SettingsRepository.get('bookingWindowMinutes');
+        if (savedBookingCapacity) setBookingCapacity(parseInt(savedBookingCapacity));
+        if (savedBookingWindow) setBookingWindowMinutes(parseInt(savedBookingWindow));
 
         // Then try to load from Supabase 'settings' table for cross-device sync
         try {
@@ -3049,6 +3060,59 @@ const Settings = () => {
                 onClick={handleSaveSettings}
               >
                 Save Business Hours
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Booking Capacity */}
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <div className="settings-section-icon">📊</div>
+            <div className="settings-section-title">
+              <h2>Booking Capacity</h2>
+              <p>Limit how many clients can book within a time window to prevent overbooking</p>
+            </div>
+          </div>
+          <div className="settings-section-body">
+            <div className="settings-row">
+              <div className="settings-form-group">
+                <label>Max Clients per Window</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={bookingCapacity}
+                  onChange={(e) => setBookingCapacity(Math.max(1, parseInt(e.target.value) || 1))}
+                  min="1"
+                  max="100"
+                  disabled={!canEdit()}
+                />
+                <small style={{ color: '#6b7280', fontSize: '0.8rem' }}>Maximum number of bookings allowed within the time window</small>
+              </div>
+              <div className="settings-form-group">
+                <label>Time Window (minutes)</label>
+                <select
+                  className="form-control"
+                  value={bookingWindowMinutes}
+                  onChange={(e) => setBookingWindowMinutes(parseInt(e.target.value))}
+                  disabled={!canEdit()}
+                >
+                  <option value="30">30 minutes</option>
+                  <option value="60">60 minutes (1 hour)</option>
+                  <option value="90">90 minutes (1.5 hours)</option>
+                  <option value="120">120 minutes (2 hours)</option>
+                  <option value="180">180 minutes (3 hours)</option>
+                </select>
+                <small style={{ color: '#6b7280', fontSize: '0.8rem' }}>Overlapping time slots share this capacity window</small>
+              </div>
+            </div>
+            <div className="settings-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveSettings}
+              >
+                Save Capacity Settings
               </button>
             </div>
           </div>

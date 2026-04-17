@@ -671,6 +671,70 @@ export const transactionsAdapter = {
     });
   },
 
+  async updateTransaction(id, data) {
+    await delay();
+    const existing = await storageService.transactions.getById(id);
+    if (!existing) throw new Error('Transaction not found');
+    const updated = await storageService.transactions.update(id, data);
+    return clone(updated);
+  },
+
+  async voidTransaction(id, reason, voidedBy) {
+    await delay();
+    return await db.transaction('rw', [db.transactions, db.products, db.syncQueue], async () => {
+      const existing = await storageService.transactions.getById(id);
+      if (!existing) throw new Error('Transaction not found');
+      if (existing.status === 'voided') throw new Error('Transaction already voided');
+
+      // Restore product stock for voided items
+      if (existing.items) {
+        const productIdsToFetch = new Set();
+        for (const item of existing.items) {
+          if (item.type === 'product') {
+            productIdsToFetch.add(item.id);
+          }
+        }
+
+        if (productIdsToFetch.size > 0) {
+          const allProducts = await db.products.where('_id').anyOf([...productIdsToFetch]).toArray();
+          const updates = new Map();
+          for (const item of existing.items) {
+            if (item.type === 'product') {
+              const product = allProducts.find(p => p._id === item.id);
+              if (product && product.stock !== undefined) {
+                const existing = updates.get(item.id) || { ...product };
+                existing.stock = (existing.stock ?? product.stock) + item.quantity;
+                updates.set(item.id, existing);
+              }
+            }
+          }
+          if (updates.size > 0) {
+            await db.products.bulkPut([...updates.values()]);
+            for (const [productId, updatedProduct] of updates) {
+              await db.syncQueue.add({
+                entityType: 'products',
+                entityId: productId,
+                operation: 'update',
+                data: updatedProduct,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                retryCount: 0,
+              });
+            }
+          }
+        }
+      }
+
+      const updated = await storageService.transactions.update(id, {
+        status: 'voided',
+        voidedAt: new Date().toISOString(),
+        voidedBy: voidedBy,
+        voidReason: reason
+      });
+      return clone(updated);
+    });
+  },
+
   async getRevenueSummary(period) {
     await delay();
 
@@ -696,7 +760,7 @@ export const transactionsAdapter = {
 
     const allTransactions = await storageService.transactions.getAll();
     const transactions = allTransactions.filter(t =>
-      new Date(t.date) >= startDate
+      new Date(t.date) >= startDate && t.status !== 'voided'
     );
 
     const totalRevenue = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);

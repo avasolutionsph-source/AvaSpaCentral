@@ -21,8 +21,12 @@ import '../assets/css/pos.css';
 const MyPortal = () => {
   const { user, showToast, hasManagementAccess, getUserBranchId } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'history';
+  const initialTab = searchParams.get('tab') || 'today';
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Today's tasks for therapists
+  const [todayTasks, setTodayTasks] = useState([]);
+  const [todayTasksLoading, setTodayTasksLoading] = useState(false);
 
   // Quick stats for badges
   const [stats, setStats] = useState({
@@ -127,6 +131,106 @@ const MyPortal = () => {
       // Silent fail for stats
     }
   };
+
+  // Load today's tasks for therapists
+  const loadTodayTasks = async () => {
+    if (!user?.employeeId) return;
+    setTodayTasksLoading(true);
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const [bookings, rooms, transactions] = await Promise.all([
+        mockApi.advanceBooking.listAdvanceBookings(),
+        mockApi.rooms.getRooms(),
+        mockApi.transactions.getTransactions()
+      ]);
+
+      const tasks = [];
+
+      // Today's advance bookings for this therapist
+      const myBookings = bookings.filter(b => {
+        if (!b.bookingDateTime) return false;
+        const bookingDate = b.bookingDateTime.split('T')[0];
+        return bookingDate === today && b.employeeId === user.employeeId && b.status !== 'cancelled';
+      });
+      myBookings.forEach(b => {
+        const time = b.bookingDateTime.includes('T')
+          ? format(new Date(b.bookingDateTime), 'h:mm a')
+          : b.bookingDateTime;
+        tasks.push({
+          id: `booking-${b._id}`,
+          type: b.status === 'completed' ? 'completed' : 'upcoming',
+          time,
+          service: b.serviceName || 'Service',
+          client: b.clientName || 'Walk-in',
+          room: b.roomName || 'TBD',
+          status: b.status || 'scheduled',
+          rawTime: new Date(b.bookingDateTime)
+        });
+      });
+
+      // Active rooms assigned to this therapist
+      const myRooms = rooms.filter(r =>
+        r.assignedEmployeeId === user.employeeId &&
+        (r.status === 'occupied' || r.status === 'pending')
+      );
+      myRooms.forEach(r => {
+        tasks.push({
+          id: `room-${r._id}`,
+          type: r.status === 'occupied' ? 'in-progress' : 'pending',
+          time: r.startTime ? format(new Date(r.startTime), 'h:mm a') : 'Now',
+          service: r.currentService || 'Service',
+          client: r.currentClient || 'Client',
+          room: r.name,
+          status: r.status,
+          rawTime: r.startTime ? new Date(r.startTime) : new Date()
+        });
+      });
+
+      // Today's completed transactions for this therapist
+      const myCompleted = transactions.filter(t => {
+        if (!t.date) return false;
+        const txDate = t.date.split('T')[0];
+        return txDate === today && t.employeeId === user.employeeId && t.status !== 'voided';
+      });
+      myCompleted.forEach(t => {
+        // Don't duplicate if already in bookings
+        const alreadyListed = tasks.some(task => task.type !== 'completed');
+        if (!alreadyListed || !tasks.some(task => task.id === `booking-${t.advanceBookingId}`)) {
+          tasks.push({
+            id: `tx-${t._id}`,
+            type: 'completed',
+            time: format(new Date(t.date), 'h:mm a'),
+            service: t.items?.map(i => i.name).join(', ') || 'Service',
+            client: t.customer?.name || 'Walk-in',
+            room: t.roomName || '-',
+            status: 'completed',
+            rawTime: new Date(t.date)
+          });
+        }
+      });
+
+      // Sort: in-progress first, then upcoming by time, then completed
+      const typeOrder = { 'in-progress': 0, 'pending': 1, 'upcoming': 2, 'completed': 3 };
+      tasks.sort((a, b) => {
+        const orderDiff = (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9);
+        if (orderDiff !== 0) return orderDiff;
+        return a.rawTime - b.rawTime;
+      });
+
+      setTodayTasks(tasks);
+    } catch (e) {
+      console.error('Failed to load today tasks:', e);
+    } finally {
+      setTodayTasksLoading(false);
+    }
+  };
+
+  // Load today's tasks on mount and refresh every 30 seconds
+  useEffect(() => {
+    loadTodayTasks();
+    const interval = setInterval(loadTodayTasks, 30000);
+    return () => clearInterval(interval);
+  }, [user?.employeeId]);
 
   // Calculate distance between two GPS coordinates using Haversine formula (returns meters)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -236,7 +340,15 @@ const MyPortal = () => {
     setSearchParams({ tab });
   };
 
+  const todayActiveCount = todayTasks.filter(t => t.type !== 'completed').length;
+
   const tabs = [
+    {
+      id: 'today',
+      label: "Today's Tasks",
+      badge: todayActiveCount > 0 ? todayActiveCount : null,
+      badgeType: 'info'
+    },
     {
       id: 'history',
       label: 'My History',
@@ -370,6 +482,53 @@ const MyPortal = () => {
 
       {/* Tab Content */}
       <div className="hub-content">
+        {activeTab === 'today' && (
+          <div style={{ padding: '16px' }}>
+            {todayTasksLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>Loading tasks...</div>
+            ) : todayTasks.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎉</div>
+                <h3 style={{ margin: '0 0 8px 0', color: '#374151' }}>No tasks for today</h3>
+                <p style={{ color: '#9ca3af', margin: 0 }}>You have no scheduled services or active rooms right now.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {todayTasks.map(task => (
+                  <div key={task.id} style={{
+                    background: task.type === 'in-progress' ? '#eff6ff' : task.type === 'completed' ? '#f9fafb' : '#fff',
+                    border: `1px solid ${task.type === 'in-progress' ? '#93c5fd' : task.type === 'completed' ? '#e5e7eb' : '#e5e7eb'}`,
+                    borderLeft: `4px solid ${task.type === 'in-progress' ? '#3b82f6' : task.type === 'pending' ? '#f59e0b' : task.type === 'completed' ? '#22c55e' : '#6b7280'}`,
+                    borderRadius: '8px',
+                    padding: '14px 16px',
+                    opacity: task.type === 'completed' ? 0.7 : 1
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                          fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase',
+                          padding: '2px 8px', borderRadius: '4px',
+                          background: task.type === 'in-progress' ? '#3b82f6' : task.type === 'pending' ? '#f59e0b' : task.type === 'completed' ? '#22c55e' : '#6b7280',
+                          color: '#fff'
+                        }}>
+                          {task.type === 'in-progress' ? 'In Progress' : task.type === 'pending' ? 'Pending' : task.type === 'completed' ? 'Done' : 'Upcoming'}
+                        </span>
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{task.time}</span>
+                      </div>
+                      {task.room && task.room !== '-' && (
+                        <span style={{ fontSize: '0.8rem', color: '#6b7280', background: '#f3f4f6', padding: '2px 8px', borderRadius: '4px' }}>
+                          🚪 {task.room}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontWeight: 500, fontSize: '0.95rem', color: '#111827' }}>{task.service}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '2px' }}>Client: {task.client}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === 'history' && <MyAttendanceHistory embedded />}
         {activeTab === 'schedule' && <MySchedule embedded onDataChange={loadStats} />}
         {activeTab === 'requests' && <MyRequests embedded onDataChange={loadStats} />}

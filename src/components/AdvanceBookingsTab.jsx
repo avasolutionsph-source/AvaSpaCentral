@@ -353,7 +353,11 @@ const AdvanceBookingsTab = () => {
                       {booking.isHomeService ? '🏠' : '🚪'}
                     </span>
                     <span className="detail-text">
-                      {booking.isHomeService ? 'Home Service' : booking.roomName}
+                      {booking.isHomeService ? 'Home Service' : (
+                        booking.roomName && booking.roomName !== 'TBD'
+                          ? booking.roomName
+                          : <span style={{ color: '#f59e0b', fontStyle: 'italic' }}>No room assigned</span>
+                      )}
                     </span>
                   </div>
                   {booking.isHomeService && booking.clientAddress && (

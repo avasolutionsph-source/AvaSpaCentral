@@ -831,7 +831,9 @@ const POS = () => {
           roomName: selectedRoom ? rooms.find(r => r._id === selectedRoom)?.name : null,
           isHomeService: isHomeService,
           homeServiceAddress: isHomeService ? homeServiceAddress : null,
-          homeServiceFee: isHomeService ? (parseFloat(homeServiceFee) || 0) : 0
+          homeServiceFee: isHomeService ? (parseFloat(homeServiceFee) || 0) : 0,
+          cashier: user?.name || 'Staff',
+          cashierId: user?._id || null
         };
 
         // Save transaction
@@ -884,6 +886,7 @@ const POS = () => {
           amountReceived: paymentMethod === 'Cash' ? parseFloat(amountReceived) : getTotal(),
           changeAmount: getChange(),
           employee: employee ? `${employee.firstName} ${employee.lastName}` : 'Staff',
+          cashier: user?.name || 'Staff',
           customer: customerType === 'walk-in' ? (walkInCustomerData.name || 'Walk-in') : (selectedCustomer?.name || 'Walk-in')
         });
 

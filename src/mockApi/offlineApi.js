@@ -117,6 +117,8 @@ export const transactionsApi = {
   getTransactions: transactionsAdapter.getTransactions,
   getTransaction: transactionsAdapter.getTransaction,
   createTransaction: transactionsAdapter.createTransaction,
+  updateTransaction: transactionsAdapter.updateTransaction,
+  voidTransaction: transactionsAdapter.voidTransaction,
   getRevenueSummary: transactionsAdapter.getRevenueSummary
 };
 

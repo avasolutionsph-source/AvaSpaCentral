@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, subDays } from 'date-fns';
 
 const ServiceHistory = ({ embedded = false, onDataChange }) => {
-  const { showToast, user, canViewAll, isTherapist, getUserBranchId } = useApp();
+  const { showToast, user, canViewAll, isTherapist, getUserBranchId, hasManagementAccess } = useApp();
   const [transactions, setTransactions] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
@@ -12,6 +12,10 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
+  const [showVoidModal, setShowVoidModal] = useState(false);
+  const [voidTarget, setVoidTarget] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voidLoading, setVoidLoading] = useState(false);
 
   // Filters
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -62,7 +66,11 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
         tax: t.tax || 0,
         total: t.totalAmount || t.total || t.subtotal || 0,
         paymentMethod: t.paymentMethod || 'Cash',
-        cashier: t.cashier || 'Staff'
+        cashier: t.cashier || 'Staff',
+        status: t.status || 'completed',
+        voidedAt: t.voidedAt,
+        voidedBy: t.voidedBy,
+        voidReason: t.voidReason
       }));
 
       setTransactions(formattedTransactions);
@@ -150,6 +158,32 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
   const handleViewDetail = (transaction) => {
     setSelectedTransaction(transaction);
     setShowDetailModal(true);
+  };
+
+  const handleVoidClick = (e, transaction) => {
+    e.stopPropagation();
+    setVoidTarget(transaction);
+    setVoidReason('');
+    setShowVoidModal(true);
+  };
+
+  const handleVoidConfirm = async () => {
+    if (!voidTarget || !voidReason.trim()) {
+      showToast('Please enter a reason for voiding', 'error');
+      return;
+    }
+    setVoidLoading(true);
+    try {
+      await mockApi.transactions.voidTransaction(voidTarget.id, voidReason.trim(), user?.name || 'Manager');
+      showToast('Transaction voided successfully', 'success');
+      setShowVoidModal(false);
+      setVoidTarget(null);
+      fetchTransactions();
+    } catch (error) {
+      showToast(error.message || 'Failed to void transaction', 'error');
+    } finally {
+      setVoidLoading(false);
+    }
   };
 
   const handleExport = () => {
@@ -409,13 +443,20 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                   <th className="right">Total</th>
                   <th>Payment</th>
                   <th>Cashier</th>
+                  {hasManagementAccess() && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {currentTransactions.map(transaction => (
-                  <tr key={transaction.id} onClick={() => handleViewDetail(transaction)}>
+                  <tr key={transaction.id} onClick={() => handleViewDetail(transaction)}
+                    style={transaction.status === 'voided' ? { opacity: 0.5, textDecoration: 'line-through' } : {}}>
                     <td>
-                      <span className="transaction-receipt">{transaction.receiptNumber}</span>
+                      <span className="transaction-receipt">
+                        {transaction.receiptNumber}
+                        {transaction.status === 'voided' && (
+                          <span style={{ marginLeft: '6px', background: '#dc2626', color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', textDecoration: 'none', display: 'inline-block' }}>VOIDED</span>
+                        )}
+                      </span>
                     </td>
                     <td>{format(parseISO(transaction.date), 'MMM dd, yyyy h:mm a')}</td>
                     <td>
@@ -440,6 +481,21 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                       </span>
                     </td>
                     <td>{transaction.cashier}</td>
+                    {hasManagementAccess() && (
+                      <td>
+                        {transaction.status !== 'voided' ? (
+                          <button
+                            className="btn btn-sm"
+                            style={{ color: '#dc2626', fontSize: '0.75rem', padding: '4px 8px' }}
+                            onClick={(e) => handleVoidClick(e, transaction)}
+                          >
+                            Void
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.7rem', color: '#999', textDecoration: 'none', display: 'inline-block' }}>Voided</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -507,6 +563,15 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                 <div className="info-label">Cashier</div>
                 <div className="info-value">{selectedTransaction.cashier}</div>
               </div>
+              {selectedTransaction.status === 'voided' && (
+              <div className="info-group" style={{ background: '#fef2f2', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                <div className="info-label" style={{ color: '#dc2626', fontWeight: 700 }}>VOIDED</div>
+                <div className="info-value" style={{ fontSize: '0.85rem' }}>
+                  {selectedTransaction.voidReason}<br/>
+                  <span style={{ color: '#999', fontSize: '0.75rem' }}>by {selectedTransaction.voidedBy} {selectedTransaction.voidedAt && `on ${format(parseISO(selectedTransaction.voidedAt), 'MMM dd, yyyy h:mm a')}`}</span>
+                </div>
+              </div>
+              )}
             </div>
 
             <div className="items-section">
@@ -558,6 +623,48 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                 <span>TOTAL:</span>
                 <span className="summary-value">₱{selectedTransaction.total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Void Transaction Modal */}
+      {showVoidModal && voidTarget && (
+        <div className="modal-overlay" onClick={() => !voidLoading && setShowVoidModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <h2 style={{ margin: '0 0 8px 0', fontSize: '1.2rem' }}>Void Transaction</h2>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
+              This will void receipt <strong>{voidTarget.receiptNumber}</strong> (₱{voidTarget.total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}).
+              Product stock will be restored. This action cannot be undone.
+            </p>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '14px' }}>
+                Reason for voiding *
+              </label>
+              <textarea
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value)}
+                placeholder="e.g. Duplicate entry, changed payment method, wrong service..."
+                rows={3}
+                autoFocus
+                style={{
+                  width: '100%', padding: '10px', fontSize: '14px',
+                  border: '2px solid #d1d5db', borderRadius: '8px', resize: 'vertical'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setShowVoidModal(false)} disabled={voidLoading}>
+                Cancel
+              </button>
+              <button
+                className="btn"
+                style={{ background: '#dc2626', color: '#fff' }}
+                onClick={handleVoidConfirm}
+                disabled={voidLoading || !voidReason.trim()}
+              >
+                {voidLoading ? 'Voiding...' : 'Void Transaction'}
+              </button>
             </div>
           </div>
         </div>

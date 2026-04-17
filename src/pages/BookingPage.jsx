@@ -1209,12 +1209,12 @@ const BookingPage = () => {
             {heroSettingsLoaded && (
               <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
-                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(14, parseInt(heroFontSize) * 0.4)}px, ${parseInt(heroFontSize) / 10}vw, ${parseInt(heroFontSize) * 2.5}px)`
-                    : heroFontSize === 'small' ? 'clamp(1.2rem, 4vw, 2.5rem)'
-                    : heroFontSize === 'medium' ? 'clamp(1.5rem, 5vw, 3.5rem)'
-                    : heroFontSize === 'large' ? 'clamp(1.8rem, 7vw, 5rem)'
-                    : heroFontSize === 'xlarge' ? 'clamp(2rem, 8vw, 6rem)'
-                    : 'clamp(1.5rem, 6vw, 4.5rem)',
+                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(14, parseInt(heroFontSize) * 0.4)}px, ${parseInt(heroFontSize) / 10}cqw, ${parseInt(heroFontSize) * 2.5}px)`
+                    : heroFontSize === 'small' ? 'clamp(1.2rem, 4cqw, 2.5rem)'
+                    : heroFontSize === 'medium' ? 'clamp(1.5rem, 5cqw, 3.5rem)'
+                    : heroFontSize === 'large' ? 'clamp(1.8rem, 7cqw, 5rem)'
+                    : heroFontSize === 'xlarge' ? 'clamp(2rem, 8cqw, 6rem)'
+                    : 'clamp(1.5rem, 6cqw, 4.5rem)',
                   fontWeight: 400,
                   textShadow: '0 2px 16px rgba(0,0,0,0.5)',
                   margin: 0,
@@ -1306,12 +1306,12 @@ const BookingPage = () => {
             {heroSettingsLoaded && (
               <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
-                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(14, parseInt(heroFontSize) * 0.4)}px, ${parseInt(heroFontSize) / 10}vw, ${parseInt(heroFontSize) * 2.5}px)`
-                    : heroFontSize === 'small' ? 'clamp(1.2rem, 4vw, 2.5rem)'
-                    : heroFontSize === 'medium' ? 'clamp(1.5rem, 5vw, 3.5rem)'
-                    : heroFontSize === 'large' ? 'clamp(1.8rem, 7vw, 5rem)'
-                    : heroFontSize === 'xlarge' ? 'clamp(2rem, 8vw, 6rem)'
-                    : 'clamp(1.5rem, 6vw, 4.5rem)',
+                  fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(14, parseInt(heroFontSize) * 0.4)}px, ${parseInt(heroFontSize) / 10}cqw, ${parseInt(heroFontSize) * 2.5}px)`
+                    : heroFontSize === 'small' ? 'clamp(1.2rem, 4cqw, 2.5rem)'
+                    : heroFontSize === 'medium' ? 'clamp(1.5rem, 5cqw, 3.5rem)'
+                    : heroFontSize === 'large' ? 'clamp(1.8rem, 7cqw, 5rem)'
+                    : heroFontSize === 'xlarge' ? 'clamp(2rem, 8cqw, 6rem)'
+                    : 'clamp(1.5rem, 6cqw, 4.5rem)',
                   fontWeight: 400,
                   textShadow: '0 2px 16px rgba(0,0,0,0.5)',
                   margin: 0,

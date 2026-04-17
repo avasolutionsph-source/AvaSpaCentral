@@ -561,6 +561,7 @@ html {
   background-position: center;
   position: relative;
   overflow: hidden;
+  container-type: inline-size;
 }
 .booking-hero-fullscreen {
   height: 100svh;

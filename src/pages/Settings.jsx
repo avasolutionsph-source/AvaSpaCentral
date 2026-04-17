@@ -2643,6 +2643,7 @@ const Settings = () => {
                   overflow: 'hidden',
                   cursor: 'default',
                   userSelect: 'none',
+                  containerType: 'inline-size',
                 }}
               >
                 {brandingSettings.heroVideo && (
@@ -2722,13 +2723,17 @@ const Settings = () => {
                       : fs === 'large' ? 32 : fs === 'xlarge' ? 40
                       : !isNaN(parseInt(fs)) ? parseInt(fs) : 26;
                     // Match BookingPage.jsx live hero font-size formula exactly (WYSIWYG).
+                    // Uses cqw (container query width) so the preview scales the
+                    // text relative to the preview container's width — making text
+                    // proportionally identical to the live page's text relative to
+                    // its viewport-width container.
                     const liveFontSize = !isNaN(parseInt(fs))
-                      ? `clamp(${Math.max(14, parseInt(fs) * 0.4)}px, ${parseInt(fs) / 10}vw, ${parseInt(fs) * 2.5}px)`
-                      : fs === 'small' ? 'clamp(1.2rem, 4vw, 2.5rem)'
-                      : fs === 'medium' ? 'clamp(1.5rem, 5vw, 3.5rem)'
-                      : fs === 'large' ? 'clamp(1.8rem, 7vw, 5rem)'
-                      : fs === 'xlarge' ? 'clamp(2rem, 8vw, 6rem)'
-                      : 'clamp(1.5rem, 6vw, 4.5rem)';
+                      ? `clamp(${Math.max(14, parseInt(fs) * 0.4)}px, ${parseInt(fs) / 10}cqw, ${parseInt(fs) * 2.5}px)`
+                      : fs === 'small' ? 'clamp(1.2rem, 4cqw, 2.5rem)'
+                      : fs === 'medium' ? 'clamp(1.5rem, 5cqw, 3.5rem)'
+                      : fs === 'large' ? 'clamp(1.8rem, 7cqw, 5rem)'
+                      : fs === 'xlarge' ? 'clamp(2rem, 8cqw, 6rem)'
+                      : 'clamp(1.5rem, 6cqw, 4.5rem)';
                     const handleStyle = (cursor) => ({
                       position: 'absolute', width: '8px', height: '8px',
                       background: '#1a73e8', border: '1px solid #fff', borderRadius: '1px',

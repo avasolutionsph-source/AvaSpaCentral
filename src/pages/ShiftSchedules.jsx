@@ -49,6 +49,9 @@ const ShiftSchedules = () => {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configForm, setConfigForm] = useState(null);
 
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, schedule: null });
+
   // Week navigation
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -169,6 +172,19 @@ const ShiftSchedules = () => {
       loadData();
     } catch (error) {
       showToast('Failed to update schedule', 'error');
+    }
+  };
+
+  // Delete schedule
+  const handleDeleteSchedule = async () => {
+    if (!deleteConfirm.schedule) return;
+    try {
+      await mockApi.shiftSchedules.deleteSchedule(deleteConfirm.schedule._id);
+      showToast('Schedule removed successfully!', 'success');
+      setDeleteConfirm({ show: false, schedule: null });
+      loadData();
+    } catch (error) {
+      showToast('Failed to remove schedule', 'error');
     }
   };
 
@@ -551,6 +567,16 @@ const ShiftSchedules = () => {
                     >
                       Template
                     </button>
+                    {hasManagementAccess() && (
+                      <button
+                        className="btn-icon"
+                        style={{ color: '#dc2626' }}
+                        onClick={() => setDeleteConfirm({ show: true, schedule })}
+                        title="Remove from schedule"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
@@ -975,6 +1001,26 @@ const ShiftSchedules = () => {
               </button>
               <button className="btn btn-primary" onClick={handleSaveShiftConfig}>
                 Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && deleteConfirm.schedule && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirm({ show: false, schedule: null })}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <h2 style={{ margin: '0 0 12px 0', fontSize: '1.1rem' }}>Remove from Schedule</h2>
+            <p style={{ color: '#6b7280', marginBottom: '20px' }}>
+              Are you sure you want to remove <strong>{deleteConfirm.schedule.employeeName}</strong> from the shift schedule?
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setDeleteConfirm({ show: false, schedule: null })}>
+                Cancel
+              </button>
+              <button className="btn" style={{ background: '#dc2626', color: '#fff' }} onClick={handleDeleteSchedule}>
+                Remove
               </button>
             </div>
           </div>

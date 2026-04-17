@@ -796,20 +796,21 @@ const Settings = () => {
                 footerLine4: brandingSettings.footerLine4 || '',
               };
 
-              // Save each setting individually to avoid batch RLS issues
-              for (const [key, value] of Object.entries(heroSettings)) {
-                const { error } = await Promise.race([
-                  supabase.from('settings').upsert(
-                    { business_id: user.businessId, key, value },
-                    { onConflict: 'business_id,key' }
-                  ),
-                  new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 5000))
-                ]);
-                if (error) {
-                  console.error(`[HeroSettings] Failed to save ${key}:`, error);
-                }
+              // Single bulk upsert — avoids 21 sequential round-trips
+              const rows = Object.entries(heroSettings).map(([key, value]) => ({
+                business_id: user.businessId,
+                key,
+                value,
+              }));
+              const { error } = await Promise.race([
+                supabase.from('settings').upsert(rows, { onConflict: 'business_id,key' }),
+                new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 8000)),
+              ]);
+              if (error) {
+                console.error('[HeroSettings] Bulk upsert failed:', error);
+              } else {
+                console.log('[HeroSettings] Saved to Supabase successfully');
               }
-              console.log('[HeroSettings] Saved to Supabase successfully');
             }
           } catch (e) {
             console.error('[HeroSettings] Save failed:', e);

@@ -2604,10 +2604,24 @@ const Settings = () => {
                   <video
                     src={`/videos/${brandingSettings.heroVideo}.mp4`}
                     autoPlay muted loop playsInline
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(1px) brightness(0.85)' }}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      filter: 'blur(1.5px) brightness(0.85) contrast(1.1)',
+                      transform: 'scale(1.05)',
+                    }}
                   />
                 )}
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+                {/* Match live page gradient overlay for WYSIWYG preview */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.55) 100%)',
+                  pointerEvents: 'none',
+                }} />
                 {/* Animation keyframes are in settings.css */}
                 {/* Position wrapper (draggable) */}
                 <div
@@ -2660,6 +2674,14 @@ const Settings = () => {
                       : fs === 'small' ? 16 : fs === 'medium' ? 22
                       : fs === 'large' ? 32 : fs === 'xlarge' ? 40
                       : !isNaN(parseInt(fs)) ? parseInt(fs) : 26;
+                    // Match BookingPage.jsx live hero font-size formula exactly (WYSIWYG).
+                    const liveFontSize = !isNaN(parseInt(fs))
+                      ? `clamp(${Math.max(14, parseInt(fs) * 0.4)}px, ${parseInt(fs) / 10}vw, ${parseInt(fs) * 2.5}px)`
+                      : fs === 'small' ? 'clamp(1.2rem, 4vw, 2.5rem)'
+                      : fs === 'medium' ? 'clamp(1.5rem, 5vw, 3.5rem)'
+                      : fs === 'large' ? 'clamp(1.8rem, 7vw, 5rem)'
+                      : fs === 'xlarge' ? 'clamp(2rem, 8vw, 6rem)'
+                      : 'clamp(1.5rem, 6vw, 4.5rem)';
                     const handleStyle = (cursor) => ({
                       position: 'absolute', width: '8px', height: '8px',
                       background: '#1a73e8', border: '1px solid #fff', borderRadius: '1px',
@@ -2703,8 +2725,10 @@ const Settings = () => {
                           style={{
                             fontFamily: brandingSettings.heroFont === '__custom__' ? (brandingSettings._customFont || "'Playfair Display', serif") : (brandingSettings.heroFont || "'Playfair Display', serif"),
                             color: brandingSettings.heroFontColor || '#fff',
-                            fontSize: `${textSize}px`,
-                            textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                            fontSize: liveFontSize,
+                            fontWeight: 400,
+                            letterSpacing: '2px',
+                            textShadow: '0 2px 16px rgba(0,0,0,0.5)',
                             whiteSpace: 'nowrap',
                             padding: '4px 8px',
                             border: '2px solid rgba(26,115,232,0.6)',
@@ -2834,11 +2858,11 @@ const Settings = () => {
                           src={logoPreview}
                           alt="Logo"
                           style={{
-                            height: `${logoSize}px`,
+                            maxHeight: `${logoSize}px`,
                             maxWidth: `${logoSize * 2.5}px`,
                             objectFit: 'contain',
                             display: 'block',
-                            filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
+                            filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
                             pointerEvents: 'none',
                           }}
                         />

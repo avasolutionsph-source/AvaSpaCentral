@@ -202,6 +202,26 @@ const BookingPage = () => {
   const [customerSession, setCustomerSession] = useState(null);
   const [customerAccount, setCustomerAccount] = useState(null);
 
+  // Scroll progress for the floating summary bar (0 = hidden on hero, 1 = fully visible)
+  const [summaryReveal, setSummaryReveal] = useState(0);
+  useEffect(() => {
+    const REVEAL_DISTANCE = 220; // px of scroll over which the bar fades in
+    const handleScroll = () => {
+      const anchor = document.getElementById('booking-form');
+      if (!anchor) { setSummaryReveal(0); return; }
+      const top = anchor.getBoundingClientRect().top;
+      const raw = (REVEAL_DISTANCE - top) / REVEAL_DISTANCE;
+      setSummaryReveal(Math.max(0, Math.min(1, raw)));
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, []);
+
   // Load Google Font for hero text
   useEffect(() => {
     const fontEntry = HERO_FONTS.find(f => f.value === heroFont);
@@ -2061,37 +2081,49 @@ const BookingPage = () => {
       </footer>
       )}
 
-      {/* Floating booking summary — always visible, anchored to bottom-center */}
-      {selectedServices.length > 0 && (
-        <div
-          className="floating-summary-bar"
-          onClick={() => document.querySelector('.luxe-summary-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-          role="button"
-          tabIndex={0}
-        >
-          <div className="floating-summary-inner">
-            <div className="floating-summary-left">
-              <span className="floating-summary-count">{selectedServices.length}</span>
-              <div className="floating-summary-labels">
-                <span className="floating-summary-title">{selectedServices.length === 1 ? 'Service' : 'Services'} Selected</span>
-                <span className="floating-summary-sub">
-                  {selectedDate && selectedTime ? `${selectedTime} • ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'Choose date & time'}
-                </span>
-              </div>
-            </div>
-            <div className="floating-summary-right">
-              <div className="floating-summary-total">
-                <span className="floating-summary-total-label">Total</span>
-                <span className="floating-summary-total-amount">₱{cartTotal.toLocaleString()}</span>
-              </div>
-              <span className="floating-summary-cta">
-                View
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      {/* Floating booking summary — reveals gradually as the user scrolls past the hero */}
+      <div
+        className="floating-summary-bar"
+        onClick={() => document.querySelector('.luxe-summary-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+        role="button"
+        tabIndex={summaryReveal > 0.5 ? 0 : -1}
+        aria-hidden={summaryReveal < 0.1}
+        style={{
+          opacity: summaryReveal,
+          transform: `translateX(-50%) translateY(${(1 - summaryReveal) * 110}%)`,
+          pointerEvents: summaryReveal < 0.2 ? 'none' : 'auto',
+        }}
+      >
+        <div className="floating-summary-inner">
+          <div className="floating-summary-left">
+            <span className="floating-summary-count">{selectedServices.length}</span>
+            <div className="floating-summary-labels">
+              <span className="floating-summary-title">
+                {selectedServices.length === 0
+                  ? 'Booking Summary'
+                  : `${selectedServices.length === 1 ? 'Service' : 'Services'} Selected`}
+              </span>
+              <span className="floating-summary-sub">
+                {selectedServices.length === 0
+                  ? 'Choose treatments to get started'
+                  : selectedDate && selectedTime
+                    ? `${selectedTime} • ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                    : 'Choose date & time'}
               </span>
             </div>
           </div>
+          <div className="floating-summary-right">
+            <div className="floating-summary-total">
+              <span className="floating-summary-total-label">Total</span>
+              <span className="floating-summary-total-amount">₱{cartTotal.toLocaleString()}</span>
+            </div>
+            <span className="floating-summary-cta">
+              View
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </span>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

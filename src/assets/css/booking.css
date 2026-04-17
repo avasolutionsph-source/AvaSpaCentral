@@ -2870,9 +2870,9 @@ html {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-  animation: floatingSummarySlideUp 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease, opacity 0.25s ease;
   padding-bottom: env(safe-area-inset-bottom, 0);
+  will-change: transform, opacity;
 }
 .floating-summary-bar:hover {
   transform: translateX(-50%) translateY(-4px);

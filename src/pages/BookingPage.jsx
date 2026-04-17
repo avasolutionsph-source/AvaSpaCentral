@@ -1245,7 +1245,6 @@ const BookingPage = () => {
           {/* Hero logo */}
           {heroSettingsLoaded && business?.logo_url && (
             <div
-              ref={animateHeroRef(heroLogoAnimation, heroLogoAnimDelay, heroLogoAnimDuration)}
               style={{
                 position: 'absolute',
                 left: `${heroLogoX}%`,
@@ -1255,12 +1254,17 @@ const BookingPage = () => {
                 pointerEvents: 'none',
               }}
             >
-              <img src={business.logo_url} alt="" style={{
-                maxHeight: `${heroLogoSize}px`,
-                maxWidth: `${heroLogoSize * 2.5}px`,
-                objectFit: 'contain',
-                filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
-              }} />
+              {/* Animation lives on a CHILD element so its keyframe transforms
+                  (e.g. slideInRight ends with translateX(0)) don't override the
+                  parent's centering translate(-50%, -50%). */}
+              <div ref={animateHeroRef(heroLogoAnimation, heroLogoAnimDelay, heroLogoAnimDuration)}>
+                <img src={business.logo_url} alt="" style={{
+                  maxHeight: `${heroLogoSize}px`,
+                  maxWidth: `${heroLogoSize * 2.5}px`,
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
+                }} />
+              </div>
             </div>
           )}
           {/* Scroll down indicator */}
@@ -1342,7 +1346,6 @@ const BookingPage = () => {
           {/* Hero logo */}
           {heroSettingsLoaded && business?.logo_url && (
             <div
-              ref={animateHeroRef(heroLogoAnimation, heroLogoAnimDelay, heroLogoAnimDuration)}
               style={{
                 position: 'absolute',
                 left: `${heroLogoX}%`,
@@ -1352,12 +1355,17 @@ const BookingPage = () => {
                 pointerEvents: 'none',
               }}
             >
-              <img src={business.logo_url} alt="" style={{
-                maxHeight: `${heroLogoSize}px`,
-                maxWidth: `${heroLogoSize * 2.5}px`,
-                objectFit: 'contain',
-                filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
-              }} />
+              {/* Animation lives on a CHILD element so its keyframe transforms
+                  (e.g. slideInRight ends with translateX(0)) don't override the
+                  parent's centering translate(-50%, -50%). */}
+              <div ref={animateHeroRef(heroLogoAnimation, heroLogoAnimDelay, heroLogoAnimDuration)}>
+                <img src={business.logo_url} alt="" style={{
+                  maxHeight: `${heroLogoSize}px`,
+                  maxWidth: `${heroLogoSize * 2.5}px`,
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
+                }} />
+              </div>
             </div>
           )}
           {/* Scroll down indicator */}

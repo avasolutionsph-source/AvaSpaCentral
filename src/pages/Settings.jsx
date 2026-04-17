@@ -664,7 +664,7 @@ const Settings = () => {
                   .from('settings')
                   .select('key, value')
                   .eq('business_id', user.businessId)
-                  .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration','heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize','heroLogoAnimation','heroLogoAnimDelay','heroLogoAnimDuration']);
+                  .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration','heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize','heroLogoAnimation','heroLogoAnimDelay','heroLogoAnimDuration','footerLine1','footerLine2','footerLine3','footerLine4','footerFont','footerFontSize']);
                 if (rows && rows.length > 0) {
                   const s = {};
                   rows.forEach(r => { s[r.key] = r.value; });
@@ -685,6 +685,12 @@ const Settings = () => {
                     ...(s.heroLogoAnimation && { heroLogoAnimation: s.heroLogoAnimation }),
                     ...(s.heroLogoAnimDelay && { heroLogoAnimDelay: s.heroLogoAnimDelay }),
                     ...(s.heroLogoAnimDuration && { heroLogoAnimDuration: s.heroLogoAnimDuration }),
+                    ...(s.footerLine1 != null && { footerLine1: s.footerLine1 }),
+                    ...(s.footerLine2 != null && { footerLine2: s.footerLine2 }),
+                    ...(s.footerLine3 != null && { footerLine3: s.footerLine3 }),
+                    ...(s.footerLine4 != null && { footerLine4: s.footerLine4 }),
+                    ...(s.footerFont && { footerFont: s.footerFont }),
+                    ...(s.footerFontSize && { footerFontSize: s.footerFontSize }),
                   }));
                   // Cache locally for next time
                   for (const r of rows) {
@@ -814,6 +820,8 @@ const Settings = () => {
                 footerLine2: brandingSettings.footerLine2 || '',
                 footerLine3: brandingSettings.footerLine3 || '',
                 footerLine4: brandingSettings.footerLine4 || '',
+                footerFont: brandingSettings.footerFont || 'default',
+                footerFontSize: brandingSettings.footerFontSize || '14',
               };
 
               // Single bulk upsert — avoids 21 sequential round-trips
@@ -2323,6 +2331,21 @@ const Settings = () => {
               </div>
               {logoPreview && (<>
                 <div className="settings-row" style={{ marginTop: '16px' }}>
+                  <div className="settings-form-group">
+                    <label>Logo Size ({brandingSettings.heroLogoSize ?? 80}px)</label>
+                    <input
+                      type="range"
+                      min="30"
+                      max="800"
+                      step="10"
+                      value={brandingSettings.heroLogoSize ?? 80}
+                      onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoSize: parseInt(e.target.value) }))}
+                      disabled={!canEdit()}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                </div>
+                <div className="settings-row" style={{ marginTop: '12px' }}>
                   <div className="settings-form-group">
                     <label>Logo Animation</label>
                     <select

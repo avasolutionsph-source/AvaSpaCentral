@@ -2539,6 +2539,31 @@ const Settings = () => {
                   </div>
                 </div>
               </div>
+              {/* Text Size */}
+              {(() => {
+                const fs = brandingSettings.heroFontSize;
+                const currentSize = typeof fs === 'number' ? fs
+                  : fs === 'small' ? 16 : fs === 'medium' ? 22
+                  : fs === 'large' ? 32 : fs === 'xlarge' ? 40
+                  : !isNaN(parseInt(fs)) ? parseInt(fs) : 26;
+                return (
+                  <div className="settings-row" style={{ marginTop: '12px' }}>
+                    <div className="settings-form-group">
+                      <label>Text Size ({currentSize}px)</label>
+                      <input
+                        type="range"
+                        min="12"
+                        max="80"
+                        step="1"
+                        value={currentSize}
+                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroFontSize: parseInt(e.target.value) }))}
+                        disabled={!canEdit()}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
               {/* Text Animation */}
               <div className="settings-row" style={{ marginTop: '12px' }}>
                 <div className="settings-form-group">

@@ -550,6 +550,17 @@ const Settings = () => {
   useEffect(() => {
     const loadBranding = async () => {
       if (!user?.businessId) return;
+
+      // Load cached branding immediately (instant, no network)
+      try {
+        const cachedLogo = await SettingsRepository.get('cachedLogoUrl');
+        const cachedCover = await SettingsRepository.get('cachedCoverUrl');
+        const cachedBusinessName = await SettingsRepository.get('cachedBusinessName');
+        if (cachedLogo) setLogoPreview(cachedLogo);
+        if (cachedCover) setCoverPreview(cachedCover);
+        if (cachedBusinessName) setBrandingSettings(prev => ({ ...prev, businessName: cachedBusinessName }));
+      } catch {}
+
       try {
         const data = await getBrandingSettings(user.businessId);
         setBrandingSettings(prev => ({
@@ -564,6 +575,13 @@ const Settings = () => {
         }));
         setLogoPreview(data.logoUrl);
         setCoverPreview(data.coverPhotoUrl);
+
+        // Cache for instant load next time
+        try {
+          if (data.logoUrl) await SettingsRepository.set('cachedLogoUrl', data.logoUrl);
+          if (data.coverPhotoUrl) await SettingsRepository.set('cachedCoverUrl', data.coverPhotoUrl);
+          if (data.businessName) await SettingsRepository.set('cachedBusinessName', data.businessName);
+        } catch {}
         if (data.primaryColor) applyColorTheme(data.primaryColor);
         // Load hero font settings from local repo first, then fallback to Supabase
         try {

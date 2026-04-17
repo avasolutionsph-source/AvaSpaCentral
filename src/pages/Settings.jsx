@@ -88,16 +88,22 @@ const Settings = () => {
   const [coverPreview, setCoverPreview] = useState(null);
   const [savingBranding, setSavingBranding] = useState(false);
 
-  // Viewport dimensions — used so the hero preview mirrors the live page's
-  // aspect ratio (booking-hero-fullscreen is 100svh × 100vw). Without this,
-  // a percentage like Y=84 looks different in the fixed-height preview than
-  // it does on the actual booking page.
-  const [viewport, setViewport] = useState(() => ({
-    w: typeof window !== 'undefined' ? window.innerWidth : 1920,
-    h: typeof window !== 'undefined' ? window.innerHeight : 1080,
-  }));
+  // Hero preview aspect ratio — needs to predict the visitor's viewport on
+  // the live booking page (which is 100svh × 100vw), not the admin's current
+  // window. Admins often edit in a smaller/split window while visitors view
+  // maximized, so we use the screen's available dimensions as a better
+  // approximation of a typical maximized visitor viewport.
+  const [viewport, setViewport] = useState(() => {
+    if (typeof window === 'undefined') return { w: 1920, h: 1080 };
+    const w = window.screen?.availWidth || window.innerWidth;
+    const h = window.screen?.availHeight || window.innerHeight;
+    return { w, h };
+  });
   useEffect(() => {
-    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    const onResize = () => setViewport({
+      w: window.screen?.availWidth || window.innerWidth,
+      h: window.screen?.availHeight || window.innerHeight,
+    });
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);

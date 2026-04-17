@@ -1138,17 +1138,14 @@ const BookingPage = () => {
                 const t = Math.max(0, Math.min(1, remaining / 4));
                 v.playbackRate = 0.25 + t * 0.75;
               }
-            }}
-            onEnded={(e) => {
-              const v = e.target;
-              v.style.filter = 'blur(8px) brightness(0.6) contrast(1.1)';
-              // Keep the scene "alive" by slowly looping back instead of
-              // freezing on the last frame. Reset state and replay muted.
-              v.dataset.fading = '';
-              v.playbackRate = 1;
-              v.currentTime = 0;
-              v.style.filter = 'blur(1.5px) brightness(0.85) contrast(1.1)';
-              v.play().catch(() => {});
+              // Freeze on the last frame — pause just before end so the
+              // 'ended' event never fires (which would otherwise reset to 0).
+              if (remaining < 0.15 && !v.dataset.frozen) {
+                v.dataset.frozen = '1';
+                v.pause();
+                v.playbackRate = 1;
+                v.style.filter = 'blur(6px) brightness(0.65) contrast(1.1)';
+              }
             }}
             style={{
               position: 'absolute',

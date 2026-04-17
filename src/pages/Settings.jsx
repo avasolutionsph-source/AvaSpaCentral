@@ -2283,7 +2283,7 @@ const Settings = () => {
                     <select
                       className="form-control"
                       value={brandingSettings.heroLogoAnimation || 'none'}
-                      onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimation: e.target.value }))}
+                      onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimation: e.target.value, _logoAnimKey: Date.now() }))}
                       disabled={!canEdit()}
                     >
                       <option value="none">None</option>
@@ -2306,7 +2306,7 @@ const Settings = () => {
                       <select
                         className="form-control"
                         value={brandingSettings.heroLogoAnimDelay || '0'}
-                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDelay: e.target.value }))}
+                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDelay: e.target.value, _logoAnimKey: Date.now() }))}
                         disabled={!canEdit()}
                       >
                         <option value="0">No delay</option>
@@ -2326,7 +2326,7 @@ const Settings = () => {
                       <select
                         className="form-control"
                         value={brandingSettings.heroLogoAnimDuration || 'default'}
-                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDuration: e.target.value }))}
+                        onChange={(e) => setBrandingSettings(prev => ({ ...prev, heroLogoAnimDuration: e.target.value, _logoAnimKey: Date.now() }))}
                         disabled={!canEdit()}
                       >
                         <option value="default">Default</option>
@@ -2341,6 +2341,18 @@ const Settings = () => {
                         <option value="10">10s</option>
                       </select>
                     </div>
+                  </div>
+                )}
+                {brandingSettings.heroLogoAnimation && brandingSettings.heroLogoAnimation !== 'none' && (
+                  <div style={{ marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => setBrandingSettings(prev => ({ ...prev, _logoAnimKey: Date.now() }))}
+                      style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+                    >
+                      Replay Logo Animation
+                    </button>
                   </div>
                 )}
               </>)}
@@ -2780,7 +2792,19 @@ const Settings = () => {
                         document.addEventListener('touchend', onEnd);
                       } : undefined}
                     >
-                      <div style={{ position: 'relative', display: 'inline-block', border: '2px solid #1a73e8', padding: '2px' }}>
+                      <div
+                        key={brandingSettings._logoAnimKey || 'logo-init'}
+                        className={brandingSettings.heroLogoAnimation && brandingSettings.heroLogoAnimation !== 'none' ? `pv-anim-${brandingSettings.heroLogoAnimation}` : ''}
+                        style={{
+                          position: 'relative', display: 'inline-block', border: '2px solid #1a73e8', padding: '2px',
+                          ...(brandingSettings.heroLogoAnimation && brandingSettings.heroLogoAnimation !== 'none' && {
+                            '--anim-delay': `${brandingSettings.heroLogoAnimDelay || 0}s`,
+                            ...(brandingSettings.heroLogoAnimDuration && brandingSettings.heroLogoAnimDuration !== 'default' && {
+                              '--anim-dur': `${brandingSettings.heroLogoAnimDuration}s`,
+                            }),
+                          }),
+                        }}
+                      >
                         <img
                           src={logoPreview}
                           alt="Logo"

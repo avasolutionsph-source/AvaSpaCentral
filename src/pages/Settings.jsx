@@ -77,6 +77,11 @@ const Settings = () => {
     heroLogoAnimation: 'none',
     heroLogoAnimDelay: '0',
     heroLogoAnimDuration: 'default',
+    footerShowName: true,
+    footerShowPhone: true,
+    footerShowEmail: true,
+    footerShowAddress: true,
+    footerShowCopyright: true,
   });
   const [logoFile, setLogoFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
@@ -600,6 +605,11 @@ const Settings = () => {
           const savedHeroLogoAnimation = await SettingsRepository.get('heroLogoAnimation');
           const savedHeroLogoAnimDelay = await SettingsRepository.get('heroLogoAnimDelay');
           const savedHeroLogoAnimDuration = await SettingsRepository.get('heroLogoAnimDuration');
+          const savedFooterShowName = await SettingsRepository.get('footerShowName');
+          const savedFooterShowPhone = await SettingsRepository.get('footerShowPhone');
+          const savedFooterShowEmail = await SettingsRepository.get('footerShowEmail');
+          const savedFooterShowAddress = await SettingsRepository.get('footerShowAddress');
+          const savedFooterShowCopyright = await SettingsRepository.get('footerShowCopyright');
 
           const hasLocal = savedHeroFont || savedHeroAnimation || savedHeroLogoEnabled;
 
@@ -622,6 +632,11 @@ const Settings = () => {
               ...(savedHeroLogoAnimation && { heroLogoAnimation: savedHeroLogoAnimation }),
               ...(savedHeroLogoAnimDelay && { heroLogoAnimDelay: savedHeroLogoAnimDelay }),
               ...(savedHeroLogoAnimDuration && { heroLogoAnimDuration: savedHeroLogoAnimDuration }),
+              ...(savedFooterShowName != null && { footerShowName: savedFooterShowName === 'true' }),
+              ...(savedFooterShowPhone != null && { footerShowPhone: savedFooterShowPhone === 'true' }),
+              ...(savedFooterShowEmail != null && { footerShowEmail: savedFooterShowEmail === 'true' }),
+              ...(savedFooterShowAddress != null && { footerShowAddress: savedFooterShowAddress === 'true' }),
+              ...(savedFooterShowCopyright != null && { footerShowCopyright: savedFooterShowCopyright === 'true' }),
             }));
           } else if (user?.businessId) {
             // Fallback: load from Supabase (incognito/new device)
@@ -752,6 +767,11 @@ const Settings = () => {
         await SettingsRepository.set('heroLogoAnimation', brandingSettings.heroLogoAnimation || 'none');
         await SettingsRepository.set('heroLogoAnimDelay', brandingSettings.heroLogoAnimDelay || '0');
         await SettingsRepository.set('heroLogoAnimDuration', brandingSettings.heroLogoAnimDuration || 'default');
+        await SettingsRepository.set('footerShowName', brandingSettings.footerShowName ? 'true' : 'false');
+        await SettingsRepository.set('footerShowPhone', brandingSettings.footerShowPhone ? 'true' : 'false');
+        await SettingsRepository.set('footerShowEmail', brandingSettings.footerShowEmail ? 'true' : 'false');
+        await SettingsRepository.set('footerShowAddress', brandingSettings.footerShowAddress ? 'true' : 'false');
+        await SettingsRepository.set('footerShowCopyright', brandingSettings.footerShowCopyright ? 'true' : 'false');
 
         // Also save directly to Supabase so booking page can read them
         if (user?.businessId) {
@@ -774,6 +794,11 @@ const Settings = () => {
                 heroLogoAnimation: brandingSettings.heroLogoAnimation || 'none',
                 heroLogoAnimDelay: brandingSettings.heroLogoAnimDelay || '0',
                 heroLogoAnimDuration: brandingSettings.heroLogoAnimDuration || 'default',
+                footerShowName: brandingSettings.footerShowName ? 'true' : 'false',
+                footerShowPhone: brandingSettings.footerShowPhone ? 'true' : 'false',
+                footerShowEmail: brandingSettings.footerShowEmail ? 'true' : 'false',
+                footerShowAddress: brandingSettings.footerShowAddress ? 'true' : 'false',
+                footerShowCopyright: brandingSettings.footerShowCopyright ? 'true' : 'false',
               };
 
               // Save each setting individually to avoid batch RLS issues
@@ -2838,7 +2863,29 @@ const Settings = () => {
             {/* Footer */}
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Footer</h3>
-              <p className="branding-sub-desc">Shown at the bottom of your booking page.</p>
+              <p className="branding-sub-desc">Choose what to show at the bottom of your booking page.</p>
+
+              {/* Footer visibility toggles */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                {[
+                  { key: 'footerShowName', label: 'Business Name' },
+                  { key: 'footerShowPhone', label: 'Phone Number' },
+                  { key: 'footerShowEmail', label: 'Email Address' },
+                  { key: 'footerShowAddress', label: 'Address' },
+                  { key: 'footerShowCopyright', label: 'Copyright Text' },
+                ].map(item => (
+                  <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={brandingSettings[item.key] !== false}
+                      onChange={(e) => setBrandingSettings(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                      disabled={!canEdit()}
+                    />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+
               <div className="settings-row">
                 <div className="settings-form-group">
                   <label>Contact Number</label>
@@ -2888,8 +2935,12 @@ const Settings = () => {
                   fontFamily: brandingSettings.footerFont && brandingSettings.footerFont !== 'default' ? `'${brandingSettings.footerFont}', sans-serif` : 'inherit',
                   fontSize: `${brandingSettings.footerFontSize || 14}px`
                 }}>
-                  <p>© {new Date().getFullYear()} {brandingSettings.businessName || 'Your Business Name'}. All rights reserved.</p>
-                  {brandingSettings.contactPhone && <p>Contact: {brandingSettings.contactPhone}</p>}
+                  {brandingSettings.footerShowName !== false && <p style={{ fontWeight: 500 }}>{brandingSettings.businessName || 'Your Business Name'}</p>}
+                  {brandingSettings.footerShowPhone !== false && brandingSettings.contactPhone && <p>{brandingSettings.contactPhone}</p>}
+                  {brandingSettings.footerShowCopyright !== false && <p style={{ opacity: 0.6 }}>&copy; {new Date().getFullYear()} {brandingSettings.businessName || 'Your Business Name'}. All rights reserved.</p>}
+                  {!brandingSettings.footerShowName && !brandingSettings.footerShowPhone && !brandingSettings.footerShowEmail && !brandingSettings.footerShowAddress && !brandingSettings.footerShowCopyright && (
+                    <p style={{ opacity: 0.5, fontStyle: 'italic' }}>Footer is hidden</p>
+                  )}
                 </div>
               </div>
             </div>

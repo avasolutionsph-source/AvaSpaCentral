@@ -88,6 +88,20 @@ const Settings = () => {
   const [coverPreview, setCoverPreview] = useState(null);
   const [savingBranding, setSavingBranding] = useState(false);
 
+  // Viewport dimensions — used so the hero preview mirrors the live page's
+  // aspect ratio (booking-hero-fullscreen is 100svh × 100vw). Without this,
+  // a percentage like Y=84 looks different in the fixed-height preview than
+  // it does on the actual booking page.
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1920,
+    h: typeof window !== 'undefined' ? window.innerHeight : 1080,
+  }));
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   // Load Google Font for hero text preview
   useEffect(() => {
     const font = brandingSettings?.heroFont;
@@ -2590,7 +2604,9 @@ const Settings = () => {
                 style={{
                   marginTop: '4px',
                   position: 'relative',
-                  height: '400px',
+                  aspectRatio: `${viewport.w} / ${viewport.h}`,
+                  minHeight: '280px',
+                  maxHeight: '70vh',
                   background: brandingSettings.heroVideo
                     ? `url("/videos/${brandingSettings.heroVideo}.mp4") center/cover`
                     : 'linear-gradient(135deg, #1a1a2e, #0f3460)',
@@ -2630,6 +2646,8 @@ const Settings = () => {
                     left: `${brandingSettings.heroTextX ?? 50}%`,
                     top: `${brandingSettings.heroTextY ?? 50}%`,
                     transform: 'translate(-50%, -50%)',
+                    textAlign: 'center',
+                    maxWidth: '90%',
                     zIndex: 2,
                     cursor: canEdit() ? 'grab' : 'default',
                   }}
@@ -2729,9 +2747,8 @@ const Settings = () => {
                             fontWeight: 400,
                             letterSpacing: '2px',
                             textShadow: '0 2px 16px rgba(0,0,0,0.5)',
-                            whiteSpace: 'nowrap',
-                            padding: '4px 8px',
-                            border: '2px solid rgba(26,115,232,0.6)',
+                            margin: 0,
+                            outline: '2px solid rgba(26,115,232,0.6)',
                             ...(brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' && {
                               '--anim-delay': `${brandingSettings.heroAnimDelay || 0}s`,
                               ...(brandingSettings.heroAnimDuration && brandingSettings.heroAnimDuration !== 'default' && {

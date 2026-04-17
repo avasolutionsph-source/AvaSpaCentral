@@ -9,6 +9,7 @@ import { formatTimeRange, formatTime12Hour } from '../utils/dateUtils';
 import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
 import CashDrawerHistoryTab from './CashDrawerHistory';
+import DailySalesReport from './DailySalesReport';
 import { SettingsRepository } from '../services/storage/repositories';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
@@ -1078,6 +1079,12 @@ const POS = () => {
         >
           Cash Drawer
         </button>
+        <button
+          className={`sales-tab ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          Reports
+        </button>
       </div>
 
       {activeTab === 'gc' ? (
@@ -1086,6 +1093,8 @@ const POS = () => {
         <CustomersTab />
       ) : activeTab === 'cashdrawer' ? (
         <CashDrawerHistoryTab embedded />
+      ) : activeTab === 'reports' ? (
+        <DailySalesReport />
       ) : (
       <>
       <div className="pos-container">

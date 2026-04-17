@@ -5,7 +5,6 @@ import { format, subDays, differenceInDays, addDays } from 'date-fns';
 // ChartJS is registered globally in main.jsx via utils/chartConfig
 import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
 import '../assets/css/daet-insights.css';
-import Reports from './Reports';
 
 const AvaSenseiUltrathink = () => {
   const { showToast } = useApp();
@@ -751,12 +750,6 @@ const AvaSenseiUltrathink = () => {
           onClick={() => setActiveTab('performance')}
         >
           Performance
-        </button>
-        <button
-          className={`ava-tab ${activeTab === 'reports' ? 'active' : ''}`}
-          onClick={() => setActiveTab('reports')}
-        >
-          Reports
         </button>
       </div>
 
@@ -2412,12 +2405,6 @@ const AvaSenseiUltrathink = () => {
         </div>
       )}
 
-      {/* Reports Tab - Embedded Reports Page */}
-      {activeTab === 'reports' && (
-        <div className="tab-content-wrapper">
-          <Reports embedded />
-        </div>
-      )}
     </div>
   );
 };

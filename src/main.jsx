@@ -24,6 +24,7 @@ import './assets/css/chatbot.css'
 import './assets/css/settings.css'
 import './assets/css/shift-schedules.css'
 import './assets/css/analytics-dashboard.css'
+import './assets/css/daily-sales-report.css'
 
 // Register ChartJS components globally (once)
 import './utils/chartConfig'

@@ -17,6 +17,30 @@ const getSupabaseConfig = () => ({
   key: import.meta.env.VITE_SUPABASE_ANON_KEY
 });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolve a business identifier (UUID or booking slug) to its UUID.
+ * Returns null when the slug can't be resolved or input is empty.
+ */
+const resolveBusinessUUID = async (businessIdOrSlug) => {
+  if (!businessIdOrSlug) return null;
+  if (UUID_RE.test(businessIdOrSlug)) return businessIdOrSlug;
+
+  const { url, key } = getSupabaseConfig();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/businesses?booking_slug=eq.${encodeURIComponent(businessIdOrSlug)}&select=id`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows[0]?.id || null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Detect Supabase "email already in auth" errors across response shapes.
  */
@@ -81,8 +105,13 @@ const createCustomerAccountRow = async ({ businessId, authUserId, email, name, p
  * @param {object} data - Customer data { email, password, name, phone }
  * @returns {object} - { success, data, error }
  */
-export const registerCustomer = async (businessId, { email, password, name, phone }) => {
+export const registerCustomer = async (businessIdOrSlug, { email, password, name, phone }) => {
   try {
+    const businessId = await resolveBusinessUUID(businessIdOrSlug);
+    if (!businessId) {
+      return { success: false, error: 'This booking page is not available. Please reload and try again.' };
+    }
+
     // 1. Try to create the Supabase Auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -202,9 +231,13 @@ export const registerCustomer = async (businessId, { email, password, name, phon
  * @param {string} password - Customer password
  * @returns {object} - { success, data, error }
  */
-export const loginCustomer = async (businessId, email, password) => {
+export const loginCustomer = async (businessIdOrSlug, email, password) => {
   try {
     const { url, key } = getSupabaseConfig();
+    const businessId = await resolveBusinessUUID(businessIdOrSlug);
+    if (!businessId) {
+      return { success: false, error: 'This booking page is not available. Please reload and try again.' };
+    }
 
     // 1. Sign in with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -294,30 +327,6 @@ export const logoutCustomer = async () => {
   } catch (error) {
     console.error('[CustomerAuth] Logout error:', error);
     return { success: false, error: error.message };
-  }
-};
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/**
- * Resolve a business identifier (UUID or booking slug) to its UUID.
- * Returns null when the slug can't be resolved.
- */
-const resolveBusinessUUID = async (businessIdOrSlug) => {
-  if (!businessIdOrSlug) return null;
-  if (UUID_RE.test(businessIdOrSlug)) return businessIdOrSlug;
-
-  const { url, key } = getSupabaseConfig();
-  try {
-    const res = await fetch(
-      `${url}/rest/v1/businesses?booking_slug=eq.${encodeURIComponent(businessIdOrSlug)}&select=id`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
-    );
-    if (!res.ok) return null;
-    const rows = await res.json();
-    return rows[0]?.id || null;
-  } catch {
-    return null;
   }
 };
 
@@ -540,9 +549,11 @@ export const cancelBooking = async (bookingId) => {
  * @param {string} email - Email to check
  * @returns {boolean}
  */
-export const isEmailRegistered = async (businessId, email) => {
+export const isEmailRegistered = async (businessIdOrSlug, email) => {
   try {
     const { url, key } = getSupabaseConfig();
+    const businessId = await resolveBusinessUUID(businessIdOrSlug);
+    if (!businessId) return false;
 
     const checkUrl = `${url}/rest/v1/customer_accounts?business_id=eq.${businessId}&email=eq.${email.toLowerCase()}&select=id`;
 

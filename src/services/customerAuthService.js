@@ -297,9 +297,33 @@ export const logoutCustomer = async () => {
   }
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolve a business identifier (UUID or booking slug) to its UUID.
+ * Returns null when the slug can't be resolved.
+ */
+const resolveBusinessUUID = async (businessIdOrSlug) => {
+  if (!businessIdOrSlug) return null;
+  if (UUID_RE.test(businessIdOrSlug)) return businessIdOrSlug;
+
+  const { url, key } = getSupabaseConfig();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/businesses?booking_slug=eq.${encodeURIComponent(businessIdOrSlug)}&select=id`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return rows[0]?.id || null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Get current customer session for a specific business
- * @param {string} businessId - The business UUID
+ * @param {string} businessId - The business UUID or booking slug
  * @returns {object|null} - Customer session data or null
  */
 export const getCustomerSession = async (businessId) => {
@@ -310,8 +334,12 @@ export const getCustomerSession = async (businessId) => {
 
     const sessionData = JSON.parse(stored);
 
-    // Verify this is for the correct business
-    if (sessionData.businessId !== businessId) {
+    // The route param can be either a UUID or a booking slug, but the
+    // session always stores the UUID. Resolve the slug if needed before
+    // comparing — otherwise a slug-based URL will never match the stored
+    // UUID and the user gets bounced back to /login in a loop.
+    const targetUUID = await resolveBusinessUUID(businessId);
+    if (!targetUUID || sessionData.businessId !== targetUUID) {
       return null;
     }
 

@@ -15,6 +15,35 @@ import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, upsertSettings, applyColorTheme } from '../services/brandingService';
 import { HERO_FONTS } from '../pages/BookingPage';
 
+const derivePayrollLogChanges = (log) => {
+  if (Array.isArray(log?.changes)) return log.changes;
+  const oldVal = (log && typeof log.oldValue === 'object' && log.oldValue) || {};
+  const newVal = (log && typeof log.newValue === 'object' && log.newValue) || {};
+  const keys = new Set([...Object.keys(oldVal), ...Object.keys(newVal)]);
+  const changes = [];
+  for (const key of keys) {
+    const o = oldVal[key] || {};
+    const n = newVal[key] || {};
+    const field = n.label || o.label || key;
+    if (o.enabled !== n.enabled) {
+      changes.push({ type: 'enabled', field, oldValue: o.enabled, newValue: n.enabled });
+    }
+    if (o.rate !== n.rate) {
+      changes.push({ type: 'rate', field, oldValue: o.rate, newValue: n.rate });
+    }
+  }
+  return changes;
+};
+
+const formatLogTime = (timestamp) => {
+  if (!timestamp) return 'Unknown time';
+  try {
+    return format(parseISO(timestamp), 'MMM dd, yyyy h:mm a');
+  } catch {
+    return 'Unknown time';
+  }
+};
+
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId } = useApp();
 
@@ -3544,34 +3573,42 @@ const Settings = () => {
                         </div>
                       ) : (
                         <div className="payroll-logs-list">
-                          {payrollConfigLogs.slice(0, 10).map(log => (
-                            <div key={log._id} className="payroll-log-entry">
-                              <div className="payroll-log-header">
-                                <span className="payroll-log-user">👤 {log.userName}</span>
-                                <span className="payroll-log-time">
-                                  {format(parseISO(log.timestamp), 'MMM dd, yyyy h:mm a')}
-                                </span>
+                          {payrollConfigLogs.slice(0, 10).map(log => {
+                            const summary = log.summary || log.description || 'Configuration updated';
+                            const changes = derivePayrollLogChanges(log);
+                            return (
+                              <div key={log._id} className="payroll-log-entry">
+                                <div className="payroll-log-header">
+                                  <span className="payroll-log-user">👤 {log.userName || 'Unknown user'}</span>
+                                  <span className="payroll-log-time">{formatLogTime(log.timestamp)}</span>
+                                </div>
+                                <div className="payroll-log-summary">{summary}</div>
+                                <div className="payroll-log-changes">
+                                  {changes.length === 0 ? (
+                                    <div className="payroll-log-change">
+                                      <span>No field-level details recorded</span>
+                                    </div>
+                                  ) : (
+                                    changes.map((change, idx) => (
+                                      <div key={idx} className="payroll-log-change">
+                                        {change.type === 'reset' ? (
+                                          <span>🔄 All settings reset to defaults</span>
+                                        ) : change.type === 'enabled' ? (
+                                          <span>
+                                            {change.field}: {change.newValue ? '✅ Enabled' : '❌ Disabled'}
+                                          </span>
+                                        ) : (
+                                          <span>
+                                            {change.field} rate: {change.oldValue} → {change.newValue}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
                               </div>
-                              <div className="payroll-log-summary">{log.summary}</div>
-                              <div className="payroll-log-changes">
-                                {log.changes.map((change, idx) => (
-                                  <div key={idx} className="payroll-log-change">
-                                    {change.type === 'reset' ? (
-                                      <span>🔄 All settings reset to defaults</span>
-                                    ) : change.type === 'enabled' ? (
-                                      <span>
-                                        {change.field}: {change.newValue ? '✅ Enabled' : '❌ Disabled'}
-                                      </span>
-                                    ) : (
-                                      <span>
-                                        {change.field} rate: {change.oldValue} → {change.newValue}
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

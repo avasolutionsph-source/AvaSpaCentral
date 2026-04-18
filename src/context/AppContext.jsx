@@ -6,6 +6,11 @@ import { setBusinessContext, clearBusinessContext } from '../services/storage/Ba
 import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 import { db } from '../db';
 
+// Sentinel representing "view data from all branches" for Owner/Manager users.
+// Stored in the same selectedBranch slot (so localStorage persistence Just Works).
+// Callers should treat `selectedBranch?._allBranches === true` as "no branch filter".
+export const ALL_BRANCHES = Object.freeze({ id: null, name: 'All Branches', _allBranches: true });
+
 /**
  * Migrate all local data to current business context
  * This handles:
@@ -434,6 +439,18 @@ export const AppProvider = ({ children }) => {
     return ['Owner', 'Manager'].includes(user?.role);
   };
 
+  // Returns the branch id that feature pages should filter by, reflecting the
+  // dropdown selection for Owner/Manager and the user's fixed branch otherwise.
+  // Returns null when no branch filter should apply (All Branches sentinel, or
+  // a Branch Owner user with no branchId yet).
+  const getEffectiveBranchId = () => {
+    if (user?.role === 'Branch Owner') {
+      return user.branchId || null;
+    }
+    if (selectedBranch?._allBranches) return null;
+    return selectedBranch?.id || null;
+  };
+
   // Select a branch (called from BranchSelect page)
   const selectBranch = (branch) => {
     setSelectedBranch(branch);
@@ -497,6 +514,7 @@ export const AppProvider = ({ children }) => {
     selectBranch,
     clearBranch,
     getUserBranchId,
+    getEffectiveBranchId,
     canSeeAllBranches,
     // Sync-related exports
     syncStatus,

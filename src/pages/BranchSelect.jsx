@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, ALL_BRANCHES } from '../context/AppContext';
 import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 
 const BranchSelect = () => {
   const navigate = useNavigate();
-  const { user, selectedBranch, selectBranch, logout, isBranchOwner, getUserBranchId, getFirstPage, isOwner, isManager } = useApp();
+  const { user, selectedBranch, selectBranch, logout, isBranchOwner, getUserBranchId, getFirstPage, isOwner, isManager, canSeeAllBranches } = useApp();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -272,6 +272,29 @@ const BranchSelect = () => {
           )}
 
           <div className="branch-select-grid">
+            {user && canSeeAllBranches() && (
+              <button
+                className="branch-card"
+                onClick={() => handleSelectBranch(ALL_BRANCHES)}
+              >
+                <div className="branch-card-icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                </div>
+                <div className="branch-card-info">
+                  <h3>All Branches</h3>
+                  <p className="branch-card-address">Aggregated view across every branch</p>
+                </div>
+                <span className="branch-card-arrow">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </span>
+              </button>
+            )}
             {branches.map((branch) => (
               <button
                 key={branch.id}

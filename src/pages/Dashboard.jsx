@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, ALL_BRANCHES } from '../context/AppContext';
 import mockApi from '../mockApi';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 // ChartJS is registered globally in main.jsx via utils/chartConfig
@@ -9,7 +9,7 @@ import { DashboardSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch, getUserBranchId } = useApp();
+  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -843,13 +843,18 @@ const Dashboard = () => {
           {branches.length > 0 && canSeeAllBranches() && (
             <select
               className="form-control"
-              value={selectedBranchId || ''}
+              value={selectedBranch?._allBranches ? '__all__' : (selectedBranchId || '')}
               onChange={(e) => {
+                if (e.target.value === '__all__') {
+                  selectBranch(ALL_BRANCHES);
+                  return;
+                }
                 const branch = branches.find(b => b.id === e.target.value);
                 selectBranch(branch || null);
               }}
               style={{ minWidth: '160px', fontSize: '0.875rem' }}
             >
+              <option value="__all__">All Branches</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}

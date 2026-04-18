@@ -44,8 +44,18 @@ const formatLogTime = (timestamp) => {
   }
 };
 
+// Keys whose values are configured per branch. Everything else in the settings
+// table (branding, business info, theme, security) stays business-wide.
+const BRANCH_SCOPED_SETTING_KEYS = new Set([
+  'businessHours',
+  'taxSettings',
+  'bookingCapacity',
+  'bookingWindowMinutes',
+  'showReceiptAfterCheckout',
+]);
+
 const Settings = () => {
-  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId } = useApp();
+  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId, getEffectiveBranchId, selectedBranch } = useApp();
 
   // Tab state for switching between Settings and Activity Logs
   const [activeTab, setActiveTab] = useState('settings');
@@ -1266,22 +1276,50 @@ const Settings = () => {
         theme: theme,
         showReceiptAfterCheckout: showReceiptAfterCheckout,
         bookingCapacity: bookingCapacity,
-        bookingWindowMinutes: bookingWindowMinutes
+        bookingWindowMinutes: bookingWindowMinutes,
       };
 
-      // Save settings to Dexie (local)
+      // Split by scope. Branch-scoped keys need a specific branch selected;
+      // "All Branches" mode blocks branch-level saves so the user doesn't
+      // silently clobber every branch's config with one value.
+      const businessWide = {};
+      const branchScoped = {};
+      for (const [k, v] of Object.entries(settingsData)) {
+        if (BRANCH_SCOPED_SETTING_KEYS.has(k)) branchScoped[k] = v;
+        else businessWide[k] = v;
+      }
+
+      const effectiveBranchId = getEffectiveBranchId();
+      if (Object.keys(branchScoped).length > 0 && !effectiveBranchId) {
+        showToast('Pick a specific branch before saving branch-level settings (tax, hours, capacity, POS).', 'warning');
+        return;
+      }
+
+      // Save to Dexie (local cache — reflects currently-viewed branch).
       await SettingsRepository.setMany(settingsData);
 
-      // Sync to Supabase 'settings' table via direct REST upsert.
+      // Sync to Supabase via direct REST upsert.
       // supabase-js hangs behind stuck auth refreshes — see brandingService.js.
-      let cloudSynced = false;
+      let cloudSynced = true;
       if (user?.businessId) {
-        try {
-          await upsertSettings(user.businessId, settingsData);
-          cloudSynced = true;
-        } catch (syncError) {
-          console.warn('[Settings] Cloud sync failed:', syncError.message);
+        if (Object.keys(businessWide).length > 0) {
+          try {
+            await upsertSettings(user.businessId, businessWide);
+          } catch (syncError) {
+            console.warn('[Settings] Business-wide cloud sync failed:', syncError.message);
+            cloudSynced = false;
+          }
         }
+        if (Object.keys(branchScoped).length > 0) {
+          try {
+            await upsertSettings(user.businessId, branchScoped, { branchId: effectiveBranchId });
+          } catch (syncError) {
+            console.warn('[Settings] Branch-scoped cloud sync failed:', syncError.message);
+            cloudSynced = false;
+          }
+        }
+      } else {
+        cloudSynced = false;
       }
 
       showToast(cloudSynced
@@ -1364,43 +1402,63 @@ const Settings = () => {
         if (savedBookingCapacity) setBookingCapacity(parseInt(savedBookingCapacity));
         if (savedBookingWindow) setBookingWindowMinutes(parseInt(savedBookingWindow));
 
-        // Seed missing-only from cloud. Local is source of truth: if a key
-        // already exists in Dexie, skip the cloud value to preserve unsynced
-        // local edits (see the save-hang history — stale cloud must not
-        // clobber newer local state on remount).
+        // Seed from cloud. For branch-scoped keys, prefer the row for the
+        // currently-selected branch, falling back to the business-wide row
+        // (branch_id IS NULL) as an inherited default. Business-wide keys
+        // always use the NULL-branch row.
         try {
           const { supabase } = await import('../services/supabase/supabaseClient');
           if (supabase && user?.businessId) {
             const { data, error } = await supabase
               .from('settings')
-              .select('key, value')
+              .select('key, value, branch_id')
               .eq('business_id', user.businessId);
 
             if (!error && data && data.length > 0) {
-              const cloudSettings = {};
-              for (const row of data) {
-                cloudSettings[row.key] = row.value;
-              }
+              const effectiveBranchId = getEffectiveBranchId();
+              const pick = (key) => {
+                if (BRANCH_SCOPED_SETTING_KEYS.has(key) && effectiveBranchId) {
+                  const branchRow = data.find(r => r.key === key && r.branch_id === effectiveBranchId);
+                  if (branchRow) return branchRow.value;
+                }
+                const wideRow = data.find(r => r.key === key && r.branch_id === null);
+                return wideRow ? wideRow.value : undefined;
+              };
 
-              if (!savedBusinessInfo && cloudSettings.businessInfo) {
-                setBusinessInfo(cloudSettings.businessInfo);
-                await SettingsRepository.set('businessInfo', cloudSettings.businessInfo);
+              const cloudBusinessInfo = pick('businessInfo');
+              if (!savedBusinessInfo && cloudBusinessInfo) {
+                setBusinessInfo(cloudBusinessInfo);
+                await SettingsRepository.set('businessInfo', cloudBusinessInfo);
               }
-              if (!savedBusinessHours && cloudSettings.businessHours) {
-                setBusinessHours(cloudSettings.businessHours);
-                await SettingsRepository.set('businessHours', cloudSettings.businessHours);
+              const cloudBusinessHours = pick('businessHours');
+              if (!savedBusinessHours && cloudBusinessHours) {
+                setBusinessHours(cloudBusinessHours);
+                await SettingsRepository.set('businessHours', cloudBusinessHours);
               }
-              if (!savedTaxSettings && cloudSettings.taxSettings) {
-                setTaxSettings(cloudSettings.taxSettings);
-                await SettingsRepository.set('taxSettings', cloudSettings.taxSettings);
+              const cloudTax = pick('taxSettings');
+              if (!savedTaxSettings && cloudTax) {
+                setTaxSettings(cloudTax);
+                await SettingsRepository.set('taxSettings', cloudTax);
               }
-              if (!savedTheme && cloudSettings.theme) {
-                setTheme(cloudSettings.theme);
-                await SettingsRepository.set('theme', cloudSettings.theme);
+              const cloudTheme = pick('theme');
+              if (!savedTheme && cloudTheme) {
+                setTheme(cloudTheme);
+                await SettingsRepository.set('theme', cloudTheme);
               }
-              if (savedReceiptSetting === undefined && cloudSettings.showReceiptAfterCheckout !== undefined) {
-                setShowReceiptAfterCheckout(cloudSettings.showReceiptAfterCheckout);
-                await SettingsRepository.set('showReceiptAfterCheckout', cloudSettings.showReceiptAfterCheckout);
+              const cloudReceipt = pick('showReceiptAfterCheckout');
+              if (savedReceiptSetting === undefined && cloudReceipt !== undefined) {
+                setShowReceiptAfterCheckout(cloudReceipt);
+                await SettingsRepository.set('showReceiptAfterCheckout', cloudReceipt);
+              }
+              const cloudCapacity = pick('bookingCapacity');
+              if (!savedBookingCapacity && cloudCapacity !== undefined) {
+                setBookingCapacity(parseInt(cloudCapacity));
+                await SettingsRepository.set('bookingCapacity', cloudCapacity);
+              }
+              const cloudWindow = pick('bookingWindowMinutes');
+              if (!savedBookingWindow && cloudWindow !== undefined) {
+                setBookingWindowMinutes(parseInt(cloudWindow));
+                await SettingsRepository.set('bookingWindowMinutes', cloudWindow);
               }
             }
           }
@@ -1459,6 +1517,68 @@ const Settings = () => {
       clearTimeout(networkDebounceTimer);
     };
   }, []);
+
+  // Re-pull branch-scoped settings (hours, tax, capacity, POS) whenever the
+  // active branch changes. Fall back to the business-wide row as an inherited
+  // default if the branch has no overrides yet.
+  useEffect(() => {
+    if (!user?.businessId) return;
+    const effectiveBranchId = getEffectiveBranchId();
+    let cancelled = false;
+
+    const refetch = async () => {
+      try {
+        const { supabase } = await import('../services/supabase/supabaseClient');
+        if (!supabase) return;
+        const { data, error } = await supabase
+          .from('settings')
+          .select('key, value, branch_id')
+          .eq('business_id', user.businessId)
+          .in('key', Array.from(BRANCH_SCOPED_SETTING_KEYS));
+        if (cancelled || error || !data) return;
+
+        const pick = (key) => {
+          if (effectiveBranchId) {
+            const branchRow = data.find(r => r.key === key && r.branch_id === effectiveBranchId);
+            if (branchRow) return branchRow.value;
+          }
+          const wideRow = data.find(r => r.key === key && r.branch_id === null);
+          return wideRow ? wideRow.value : undefined;
+        };
+
+        const hours = pick('businessHours');
+        if (hours) {
+          setBusinessHours(hours);
+          SettingsRepository.set('businessHours', hours).catch(() => {});
+        }
+        const tax = pick('taxSettings');
+        if (tax) {
+          setTaxSettings(tax);
+          SettingsRepository.set('taxSettings', tax).catch(() => {});
+        }
+        const capacity = pick('bookingCapacity');
+        if (capacity !== undefined) {
+          setBookingCapacity(parseInt(capacity));
+          SettingsRepository.set('bookingCapacity', capacity).catch(() => {});
+        }
+        const bookingWindow = pick('bookingWindowMinutes');
+        if (bookingWindow !== undefined) {
+          setBookingWindowMinutes(parseInt(bookingWindow));
+          SettingsRepository.set('bookingWindowMinutes', bookingWindow).catch(() => {});
+        }
+        const receipt = pick('showReceiptAfterCheckout');
+        if (receipt !== undefined) {
+          setShowReceiptAfterCheckout(receipt);
+          SettingsRepository.set('showReceiptAfterCheckout', receipt).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('[Settings] Branch-scoped reload failed:', e?.message);
+      }
+    };
+
+    refetch();
+    return () => { cancelled = true; };
+  }, [user?.businessId, selectedBranch?.id, selectedBranch?._allBranches]);
 
   // Load payroll configuration
   const loadPayrollConfig = async () => {
@@ -1970,6 +2090,14 @@ const Settings = () => {
     }
   };
 
+  const branchScopedContext = (() => {
+    const eid = getEffectiveBranchId();
+    if (eid && selectedBranch && !selectedBranch._allBranches) {
+      return { kind: 'branch', name: selectedBranch.name, id: eid };
+    }
+    return { kind: 'all', name: null, id: null };
+  })();
+
   return (
     <div className="settings-page">
       <div className="page-header">
@@ -1978,6 +2106,26 @@ const Settings = () => {
           <p>{canEdit() ? 'Configure your spa management system' : 'View spa management system settings'}</p>
         </div>
       </div>
+
+      {activeTab === 'settings' && (
+        <div
+          className={`settings-branch-banner settings-branch-banner--${branchScopedContext.kind}`}
+          style={{
+            margin: '0 0 1rem',
+            padding: '0.75rem 1rem',
+            borderRadius: '8px',
+            background: branchScopedContext.kind === 'branch' ? '#eef5ff' : '#fff7e6',
+            border: branchScopedContext.kind === 'branch' ? '1px solid #b6d4ff' : '1px solid #ffd591',
+            fontSize: '0.9rem',
+          }}
+        >
+          {branchScopedContext.kind === 'branch' ? (
+            <span>Branch-level settings (Hours, Tax, Capacity, POS) are being configured for <strong>{branchScopedContext.name}</strong>. Switch branches from the top dropdown to configure another branch.</span>
+          ) : (
+            <span>Showing business-wide defaults. Pick a specific branch from the top dropdown to save branch-level settings (Hours, Tax, Capacity, POS).</span>
+          )}
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="settings-tabs">

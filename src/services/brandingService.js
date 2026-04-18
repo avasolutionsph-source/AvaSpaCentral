@@ -209,21 +209,27 @@ export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl,
  * Uses direct REST for the same reason as saveBrandingSettings.
  *
  * @param {string} businessId
- * @param {Record<string, string>} settings - map of setting key to value
+ * @param {Record<string, any>} settings - map of setting key to value
+ * @param {{ branchId?: string | null }} [opts] - branchId = null / omitted
+ *   writes business-wide rows (branding). A branch UUID scopes the rows to
+ *   that branch (business hours, tax, booking capacity, POS). Requires the
+ *   supabase-settings-branch-scope.sql migration to be applied.
  */
-export async function upsertSettings(businessId, settings) {
+export async function upsertSettings(businessId, settings, opts = {}) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
 
   const accessToken = getAccessTokenSync();
+  const branchId = opts.branchId ?? null;
 
   const rows = Object.entries(settings).map(([key, value]) => ({
     business_id: businessId,
+    branch_id: branchId,
     key,
     value,
   }));
 
   const res = await fetchWithTimeout(
-    `${SUPABASE_URL}/rest/v1/settings?on_conflict=business_id,key`,
+    `${SUPABASE_URL}/rest/v1/settings?on_conflict=business_id,branch_id,key`,
     {
       method: 'POST',
       headers: {

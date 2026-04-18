@@ -426,25 +426,29 @@ export const AppProvider = ({ children }) => {
     return user?.role === 'Branch Owner';
   };
 
-  // Get user's branch ID (for Branch Owner filtering)
+  // Roles locked to a single assigned branch (cannot toggle the UI dropdown).
+  // Manager and Branch Owner manage one branch; Owner sees everything.
+  const BRANCH_LOCKED_ROLES = ['Branch Owner', 'Manager'];
+
+  // Get user's branch ID (for branch-locked roles)
   const getUserBranchId = () => {
-    if (user?.role === 'Branch Owner') {
-      return user.branchId;
+    if (BRANCH_LOCKED_ROLES.includes(user?.role)) {
+      return user.branchId || null;
     }
-    return null; // Owner/Manager see all branches
+    return null; // Owner sees all branches
   };
 
   // Check if user can see all branches (not restricted to one)
   const canSeeAllBranches = () => {
-    return ['Owner', 'Manager'].includes(user?.role);
+    return user?.role === 'Owner';
   };
 
   // Returns the branch id that feature pages should filter by, reflecting the
-  // dropdown selection for Owner/Manager and the user's fixed branch otherwise.
+  // dropdown selection for Owner and the user's fixed branch for locked roles.
   // Returns null when no branch filter should apply (All Branches sentinel, or
-  // a Branch Owner user with no branchId yet).
+  // a locked-role user with no branchId yet).
   const getEffectiveBranchId = () => {
-    if (user?.role === 'Branch Owner') {
+    if (BRANCH_LOCKED_ROLES.includes(user?.role)) {
       return user.branchId || null;
     }
     if (selectedBranch?._allBranches) return null;

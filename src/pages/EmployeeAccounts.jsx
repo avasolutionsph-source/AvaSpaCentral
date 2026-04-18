@@ -586,14 +586,26 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   };
 
-  // Filter users
+  // Resolve an account's branch from its own branchId or the linked employee.
+  const resolveAccountBranchId = (u) => u?.branchId || u?.employee?.branchId || null;
+
+  // Map branchId -> branch name for card display and dropdown.
+  const branchNameMap = useMemo(() => {
+    const m = new Map();
+    for (const b of branches) m.set(b.id, b.name);
+    return m;
+  }, [branches]);
+
+  // Filter users. In per-branch mode, an account only appears if its resolved
+  // branch matches the selection; unbranched accounts (Owner, legacy rows that
+  // never got stamped) only appear in "All Branches" so per-branch counts
+  // reflect actual assignments.
   const filteredUsers = useMemo(() => {
     let filtered = users;
 
-    // Filter by effective branch (Branch Owner: their branch; Owner: dropdown selection)
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(u => !u.branchId || u.branchId === effectiveBranchId);
+      filtered = filtered.filter(u => resolveAccountBranchId(u) === effectiveBranchId);
     }
 
     if (filterRole !== 'all') {
@@ -762,6 +774,13 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
                     {account.employee.position}
                   </p>
                 )}
+                {(() => {
+                  const bId = resolveAccountBranchId(account);
+                  const bName = bId ? branchNameMap.get(bId) : null;
+                  return bName
+                    ? <p className="account-branch" style={{ fontSize: '0.85rem', color: '#666' }}>📍 {bName}</p>
+                    : <p className="account-branch" style={{ fontSize: '0.85rem', color: '#aaa' }}>📍 No branch assigned</p>;
+                })()}
                 {account.lastLogin && (
                   <p className="account-last-login">
                     Last login: {new Date(account.lastLogin).toLocaleDateString()}

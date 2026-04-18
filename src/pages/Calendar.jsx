@@ -146,7 +146,7 @@ const Calendar = () => {
       // Filter appointments by branch
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        setAppointments(transformedAppointments.filter(item => !item.branchId || item.branchId === effectiveBranchId));
+        setAppointments(transformedAppointments.filter(item => item.branchId === effectiveBranchId));
       } else {
         setAppointments(transformedAppointments);
       }
@@ -185,7 +185,7 @@ const Calendar = () => {
       // Filter attendance by branch
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        setAttendanceData(transformedAttendance.filter(item => !item.branchId || item.branchId === effectiveBranchId));
+        setAttendanceData(transformedAttendance.filter(item => item.branchId === effectiveBranchId));
       } else {
         setAttendanceData(transformedAttendance);
       }
@@ -255,7 +255,7 @@ const Calendar = () => {
       // Filter shifts by branch
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        setShiftData(transformedShifts.filter(item => !item.branchId || item.branchId === effectiveBranchId));
+        setShiftData(transformedShifts.filter(item => item.branchId === effectiveBranchId));
       } else {
         setShiftData(transformedShifts);
       }

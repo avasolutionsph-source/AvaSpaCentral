@@ -16,7 +16,7 @@ import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
 const HRHub = () => {
-  const { isOwner, isManager, isBranchOwner, canEdit, canManageEmployees } = useApp();
+  const { isOwner, isManager, isBranchOwner, canEdit, canManageEmployees, selectedBranch, getEffectiveBranchId } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'employees';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -39,7 +39,7 @@ const HRHub = () => {
 
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [selectedBranch]);
 
   const loadStats = async () => {
     try {
@@ -51,6 +51,18 @@ const HRHub = () => {
 
       const activeEmployees = employees.filter(e => e.status === 'active').length;
       const pendingRequests = payrollRequests.filter(r => r.status === 'pending').length;
+
+      // Scope account count to the effective branch so the badge matches the
+      // Accounts list. Resolve a user's branch from its own branchId or the
+      // linked employee — same rule as EmployeeAccounts.filteredUsers.
+      const effectiveBranchId = getEffectiveBranchId();
+      const employeeById = new Map(employees.map(e => [e._id, e]));
+      const scopedUsers = effectiveBranchId
+        ? users.filter(u => {
+            const resolved = u?.branchId || employeeById.get(u?.employeeId)?.branchId || null;
+            return resolved === effectiveBranchId;
+          })
+        : users;
 
       // Count pending HR requests
       let pendingHRRequests = 0;
@@ -70,7 +82,7 @@ const HRHub = () => {
         totalEmployees: employees.length,
         activeEmployees,
         pendingRequests,
-        totalAccounts: users.length,
+        totalAccounts: scopedUsers.length,
         pendingHRRequests
       });
     } catch (error) {

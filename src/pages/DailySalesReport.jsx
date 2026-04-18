@@ -125,14 +125,17 @@ const DailySalesReport = () => {
         CashAdvanceRequestRepository.getAll(),
         SettingsRepository.get(SAVED_KEY),
       ]);
-      const branchFilter = (item) => !branchId || !item?.branchId || item.branchId === branchId;
+      // Strict per-branch filter: when a branch is selected, only include rows
+      // whose branchId matches exactly. Legacy unbranched rows stay hidden here
+      // and only surface under "All Branches" (branchId === null).
+      const branchFilter = (item) => !branchId || item?.branchId === branchId;
       setTransactions((txs || []).filter(branchFilter));
       setExpenses((exps || []).filter(branchFilter));
       setEmployees(emps || []);
       setCashSessions((sessions || []).filter(branchFilter));
       setCashAdvances((advances || []).filter(branchFilter));
       const branchSaved = Array.isArray(saved)
-        ? saved.filter(r => !branchId || !r.branchId || r.branchId === branchId)
+        ? saved.filter(r => !branchId || r.branchId === branchId)
         : [];
       setSavedReports(branchSaved);
     } catch {

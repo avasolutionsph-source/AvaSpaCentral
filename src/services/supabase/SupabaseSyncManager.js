@@ -165,7 +165,7 @@ const SUPABASE_TABLE_COLUMNS = {
     'id', 'business_id', 'code', 'amount', 'balance',
     'recipient_name', 'recipient_email', 'purchaser_name',
     'status', 'expiry_date', 'no_expiry', 'usage_history', 'message',
-    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+    'branch_id', 'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
 
   // === Inventory ===
@@ -176,17 +176,17 @@ const SUPABASE_TABLE_COLUMNS = {
   ],
   inventory_movements: [
     'id', 'business_id', 'product_id', 'type', 'quantity', 'date',
-    'reference_id', 'notes',
+    'reference_id', 'notes', 'branch_id',
     'sync_status', 'deleted', 'created_at', 'updated_at'
   ],
   stock_history: [
     'id', 'business_id', 'product_id', 'date', 'type',
-    'quantity_before', 'quantity_after', 'reason', 'user_id',
+    'quantity_before', 'quantity_after', 'reason', 'user_id', 'branch_id',
     'sync_status', 'deleted', 'created_at', 'updated_at'
   ],
   product_consumption: [
     'id', 'business_id', 'product_id', 'date', 'month',
-    'quantity_used', 'transaction_id', 'service_id', 'employee_id',
+    'quantity_used', 'transaction_id', 'service_id', 'employee_id', 'branch_id',
     'sync_status', 'deleted', 'created_at', 'updated_at'
   ],
 
@@ -201,7 +201,7 @@ const SUPABASE_TABLE_COLUMNS = {
   shift_schedules: [
     'id', 'business_id', 'employee_id', 'employee_name', 'employee_position',
     'week_start', 'effective_date', 'is_active', 'schedule', 'weekly_schedule',
-    'notes', 'sync_status', 'created_by', 'created_at', 'updated_at'
+    'notes', 'branch_id', 'sync_status', 'created_by', 'created_at', 'updated_at'
   ],
   payroll_config: [
     'id', 'business_id', 'key', 'value', 'updated_at'
@@ -213,42 +213,42 @@ const SUPABASE_TABLE_COLUMNS = {
   payroll_requests: [
     'id', 'business_id', 'employee_id', 'request_type', 'amount',
     'status', 'requested_date', 'approved_by', 'approved_at', 'notes',
-    'sync_status', 'created_at', 'updated_at'
+    'branch_id', 'sync_status', 'created_at', 'updated_at'
   ],
   time_off_requests: [
     'id', 'business_id', 'employee_id', 'start_date', 'end_date',
-    'type', 'status', 'reason', 'approved_by',
+    'type', 'status', 'reason', 'approved_by', 'branch_id',
     'sync_status', 'created_at', 'updated_at'
   ],
 
   // === HR Requests ===
   ot_requests: [
     'id', 'business_id', 'employee_id', 'employee_name', 'date', 'start_time', 'end_time',
-    'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason',
+    'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason', 'branch_id',
     'created_at', 'updated_at'
   ],
   leave_requests: [
     'id', 'business_id', 'employee_id', 'employee_name', 'type', 'start_date', 'end_date',
-    'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason',
+    'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason', 'branch_id',
     'created_at', 'updated_at'
   ],
   cash_advance_requests: [
     'id', 'business_id', 'employee_id', 'employee_name', 'amount', 'reason',
-    'status', 'approved_by', 'approved_at', 'rejection_reason',
+    'status', 'approved_by', 'approved_at', 'rejection_reason', 'branch_id',
     'created_at', 'updated_at'
   ],
   incident_reports: [
     'id', 'business_id', 'employee_id', 'employee_name', 'title', 'description',
     'incident_date', 'status', 'acknowledged_by', 'acknowledged_at', 'review_notes',
     'resolved_by', 'resolved_at', 'resolution', 'closed_by', 'closed_at', 'closing_notes',
-    'created_at', 'updated_at'
+    'branch_id', 'created_at', 'updated_at'
   ],
 
   // === Financial ===
   cash_drawer_sessions: [
     'id', 'business_id', 'user_id', 'open_time', 'close_time',
     'opening_balance', 'closing_balance', 'expected_balance', 'difference',
-    'status', 'transactions', 'notes',
+    'status', 'transactions', 'notes', 'branch_id',
     'sync_status', 'created_at', 'updated_at'
   ],
 
@@ -267,7 +267,7 @@ const SUPABASE_TABLE_COLUMNS = {
   active_services: [
     'id', 'business_id', 'room_id', 'advance_booking_id', 'customer_id',
     'employee_id', 'service_id', 'status', 'start_time', 'end_time', 'duration',
-    'sync_status', 'created_at', 'updated_at'
+    'branch_id', 'sync_status', 'created_at', 'updated_at'
   ],
   home_services: [
     'id', 'business_id', 'employee_id', 'employee_name', 'transaction_id',
@@ -283,12 +283,12 @@ const SUPABASE_TABLE_COLUMNS = {
   // === Logs & History ===
   activity_logs: [
     'id', 'business_id', 'user_id', 'user_name', 'type', 'action',
-    'entity_type', 'entity_id', 'details', 'ip_address', 'timestamp',
+    'entity_type', 'entity_id', 'details', 'ip_address', 'timestamp', 'branch_id',
     'sync_status', 'deleted', 'created_at', 'updated_at'
   ],
   loyalty_history: [
     'id', 'business_id', 'customer_id', 'date', 'type', 'points',
-    'balance_after', 'reference_id', 'notes',
+    'balance_after', 'reference_id', 'notes', 'branch_id',
     'sync_status', 'deleted', 'created_at', 'updated_at'
   ],
   // All tables are now whitelisted - no more unfiltered pass-through

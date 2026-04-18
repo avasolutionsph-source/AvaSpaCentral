@@ -553,13 +553,36 @@ const BookingPage = () => {
           } catch (err) { console.warn('Failed to fetch shift schedules:', err); }
 
           // Apply initial branch filter if branch already selected.
-          // Therapists: prefer strict branch match; if none match, fall back to
-          // unbranched therapists so legacy/unassigned rows still show on the
-          // customer page until admin stamps a branch on each therapist.
+          // Therapists use a cascading fallback so the Choose Therapist section
+          // never disappears entirely while per-therapist branch_id migration
+          // is in progress:
+          //   1. Strict match (branch_id === activeBranch.id)
+          //   2. Unbranched (branch_id is null/undefined)
+          //   3. All active therapists for the business (last resort)
           if (activeBranch) {
             setServices((servicesData || []).filter(s => !s.branch_id || s.branch_id === activeBranch.id));
             const branched = positionFiltered.filter(t => t.branch_id === activeBranch.id);
-            setTherapists(branched.length > 0 ? branched : positionFiltered.filter(t => !t.branch_id));
+            const unbranched = positionFiltered.filter(t => !t.branch_id);
+            let resolvedTherapists;
+            if (branched.length > 0) {
+              resolvedTherapists = branched;
+            } else if (unbranched.length > 0) {
+              console.warn('[BookingPage] No therapists stamped for branch', activeBranch.name, '— showing unbranched therapists as fallback');
+              resolvedTherapists = unbranched;
+            } else {
+              console.warn('[BookingPage] No therapists match branch or unbranched — showing all therapists as last-resort fallback. Assign branch_id to therapists via Employees page.');
+              resolvedTherapists = positionFiltered;
+            }
+            console.log('[BookingPage] Therapist resolution', {
+              branch: activeBranch.name,
+              branchId: activeBranch.id,
+              totalFromDB: (therapistsData || []).length,
+              afterPositionFilter: positionFiltered.length,
+              strictBranchMatch: branched.length,
+              unbranched: unbranched.length,
+              resolved: resolvedTherapists.length,
+            });
+            setTherapists(resolvedTherapists);
           } else {
             setServices(servicesData || []);
             setTherapists([]);  // No branch = no therapists until branch selected
@@ -594,11 +617,30 @@ const BookingPage = () => {
     if (allServices.length === 0 && allTherapists.length === 0) return;
     if (selectedBranch) {
       setServices(allServices.filter(s => !s.branch_id || s.branch_id === selectedBranch.id));
-      // Strict match first; fall back to unbranched therapists when none are
-      // assigned to this branch yet, so the customer page keeps working during
-      // the rollout of per-therapist branch assignments.
+      // Cascading fallback: strict match → unbranched → all. Mirrors initial
+      // fetch so the Choose Therapist section stays populated while admin
+      // stamps branch_id on each therapist.
       const branched = allTherapists.filter(t => t.branch_id === selectedBranch.id);
-      setTherapists(branched.length > 0 ? branched : allTherapists.filter(t => !t.branch_id));
+      const unbranched = allTherapists.filter(t => !t.branch_id);
+      let resolvedTherapists;
+      if (branched.length > 0) {
+        resolvedTherapists = branched;
+      } else if (unbranched.length > 0) {
+        console.warn('[BookingPage] No therapists stamped for branch', selectedBranch.name, '— showing unbranched therapists as fallback');
+        resolvedTherapists = unbranched;
+      } else {
+        console.warn('[BookingPage] No therapists match branch or unbranched — showing all therapists as last-resort fallback. Assign branch_id to therapists via Employees page.');
+        resolvedTherapists = allTherapists;
+      }
+      console.log('[BookingPage] Therapist rebranch', {
+        branch: selectedBranch.name,
+        branchId: selectedBranch.id,
+        total: allTherapists.length,
+        strictBranchMatch: branched.length,
+        unbranched: unbranched.length,
+        resolved: resolvedTherapists.length,
+      });
+      setTherapists(resolvedTherapists);
     } else {
       setServices(allServices);
       setTherapists([]);  // No branch selected = don't show therapists
@@ -1011,6 +1053,20 @@ const BookingPage = () => {
       return true;
     });
   }, [therapists, selectedDate, selectedTime, shiftSchedules]);
+
+  // Diagnostic: log why the Choose Therapist section may be hidden so the
+  // customer / admin can see the cause in DevTools without source-reading.
+  useEffect(() => {
+    if (!selectedDate) return;
+    if (availableTherapists.length === 0 && therapists.length > 0) {
+      console.warn('[BookingPage] Therapist section hidden — all therapists filtered out by shift schedule for', selectedDate, {
+        therapistsBeforeAvailability: therapists.length,
+        shiftSchedules: shiftSchedules.length,
+      });
+    } else if (therapists.length === 0) {
+      console.warn('[BookingPage] Therapist section hidden — therapists list is empty (check branch assignment / position filter).');
+    }
+  }, [therapists, availableTherapists, selectedDate, shiftSchedules]);
 
   // Scroll-triggered fade-in for booking sections.
   // Fire the reveal when ~25% of a 100vh section is in view so the

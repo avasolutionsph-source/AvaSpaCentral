@@ -2144,7 +2144,11 @@ export const analyticsApi = {
       return typeof d === 'string' && d.startsWith(thisMonth);
     });
 
-    const employeeMetrics = employees.map(emp => {
+    // First pass: compute raw per-employee metrics without productivityScore.
+    // We need the team-wide max revenue and max services before we can
+    // normalize each employee's performance, so productivityScore is filled
+    // in a second pass below.
+    const rawMetrics = employees.map(emp => {
       const empName = `${emp.firstName} ${emp.lastName}`;
       const empTx = transactions.filter(t =>
         t.employee?._id === emp._id || t.employee?.id === emp._id || t.employee?.name === empName
@@ -2164,12 +2168,6 @@ export const analyticsApi = {
       const avgRevenuePerDay = revenue / workingDays;
       const avgServicesPerDay = services / workingDays;
 
-      // Productivity score (0-100) — revenue vs team average
-      const avgTeamRevenue = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0) / (employees.length || 1);
-      const productivityScore = avgTeamRevenue > 0
-        ? Math.min(100, Math.round((revenue / avgTeamRevenue) * 50 + 50))
-        : 50;
-
       // Efficiency — services delivered per working day vs target of 4/day
       const TARGET_SERVICES_PER_DAY = 4;
       const efficiency = Math.min(100, Math.round((avgServicesPerDay / TARGET_SERVICES_PER_DAY) * 100));
@@ -2185,10 +2183,67 @@ export const analyticsApi = {
         : 0;
 
       return {
+        emp,
+        empName,
+        empTx,
+        revenue,
+        services,
+        products,
+        commissions,
+        avgRevenuePerDay,
+        avgServicesPerDay,
+        efficiency,
+        punctualityRate,
+      };
+    });
+
+    // Team-wide maxes for normalization. Using the top performer (rather
+    // than the average) spreads scores across the full 0-100 range instead
+    // of clustering most staff at the 100 ceiling.
+    const maxRevenue = rawMetrics.reduce((m, r) => Math.max(m, r.revenue), 0);
+    const maxServices = rawMetrics.reduce((m, r) => Math.max(m, r.services), 0);
+
+    // A role is "service-delivering" if it actually produces billable
+    // services — Therapists, Masseurs, Attendants. Support roles (Manager,
+    // Receptionist, Rider, Utility, Security, etc.) are graded on
+    // attendance alone because they don't own revenue/services directly.
+    const isServiceRole = (roleOrPosition) => {
+      const s = String(roleOrPosition || '').toLowerCase();
+      return /therap|masseur|massage|attendant|nail|esthet/.test(s);
+    };
+
+    const employeeMetrics = rawMetrics.map(r => {
+      const { emp, empName, empTx, revenue, services, products, commissions,
+              avgRevenuePerDay, avgServicesPerDay, efficiency, punctualityRate } = r;
+
+      const role = emp.role || 'Therapist';
+      const position = emp.position || role;
+      const serviceRole = isServiceRole(role) || isServiceRole(position);
+
+      // Composite productivity score (0-100).
+      //
+      // Service staff: 40% revenue, 25% services, 20% attendance, 15% efficiency.
+      // Support staff: 100% attendance — it's the only metric that maps to
+      // their job. No revenue/services penalty for not being a therapist.
+      const revenueScore = maxRevenue > 0 ? (revenue / maxRevenue) * 100 : 0;
+      const servicesScore = maxServices > 0 ? (services / maxServices) * 100 : 0;
+      const attendanceScore = punctualityRate; // already 0-100
+      const efficiencyScore = efficiency;      // already 0-100
+
+      const productivityScore = serviceRole
+        ? Math.round(
+            revenueScore * 0.40 +
+            servicesScore * 0.25 +
+            attendanceScore * 0.20 +
+            efficiencyScore * 0.15
+          )
+        : Math.round(attendanceScore);
+
+      return {
         employeeId: emp._id,
         name: empName,
-        position: emp.position || emp.role || 'Therapist',
-        role: emp.role || 'Therapist',
+        position,
+        role,
         revenue,
         transactionCount: empTx.length,
         transactions: empTx.length,

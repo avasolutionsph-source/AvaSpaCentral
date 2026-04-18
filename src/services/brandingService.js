@@ -9,6 +9,49 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /**
+ * Read the current access token directly from localStorage.
+ *
+ * supabase.auth.getSession() can hang when the client's internal lock is held
+ * by an in-flight refresh, which freezes every caller waiting on it. Reading
+ * the persisted session directly is synchronous, can't hang, and still gives
+ * us an authenticated-role JWT for RLS-gated writes.
+ *
+ * Returns the anon key if no valid session is found so that RLS-checked
+ * requests fail fast with a 401 rather than hanging.
+ */
+function getAccessTokenSync() {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('spa-erp-auth') : null;
+    if (!raw) return SUPABASE_ANON_KEY;
+    const parsed = JSON.parse(raw);
+    // supabase-js v2 persists as { currentSession: {...} } or { session: {...} }
+    // or the session object directly. Cover the common shapes.
+    const session =
+      parsed?.currentSession ||
+      parsed?.session ||
+      (parsed?.access_token ? parsed : null);
+    if (session?.access_token) return session.access_token;
+    return SUPABASE_ANON_KEY;
+  } catch {
+    return SUPABASE_ANON_KEY;
+  }
+}
+
+/**
+ * fetch() with a hard timeout via AbortController. Guarantees the promise
+ * resolves or rejects within `timeoutMs`, even if the network never responds.
+ */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Apply a custom primary color to the entire app via CSS variables.
  * Pass null or undefined to reset to the default green.
  */
@@ -80,22 +123,17 @@ export async function getBrandingSettings(businessId) {
   if (!businessId || !SUPABASE_URL || !SUPABASE_ANON_KEY) return empty;
 
   try {
-    let accessToken = SUPABASE_ANON_KEY;
-    if (supabase) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session?.access_token) {
-        accessToken = sessionData.session.access_token;
-      }
-    }
+    const accessToken = getAccessTokenSync();
 
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${SUPABASE_URL}/rest/v1/businesses?id=eq.${businessId}&select=logo_url,cover_photo_url,primary_color,name,phone,tagline,hero_video`,
       {
         headers: {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
+      12000,
     );
 
     if (!res.ok) {
@@ -143,19 +181,9 @@ export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl,
   if (heroTagline !== undefined) payload.tagline = heroTagline;
   if (heroVideo !== undefined) payload.hero_video = heroVideo;
 
-  let accessToken = SUPABASE_ANON_KEY;
-  if (supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session?.access_token) {
-        accessToken = sessionData.session.access_token;
-      }
-    } catch (e) {
-      console.warn('[brandingService] getSession failed, using anon key:', e);
-    }
-  }
+  const accessToken = getAccessTokenSync();
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${SUPABASE_URL}/rest/v1/businesses?id=eq.${businessId}`,
     {
       method: 'PATCH',
@@ -166,7 +194,8 @@ export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl,
         Prefer: 'return=minimal',
       },
       body: JSON.stringify(payload),
-    }
+    },
+    12000,
   );
 
   if (!res.ok) {
@@ -185,17 +214,7 @@ export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl,
 export async function upsertSettings(businessId, settings) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
 
-  let accessToken = SUPABASE_ANON_KEY;
-  if (supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session?.access_token) {
-        accessToken = sessionData.session.access_token;
-      }
-    } catch (e) {
-      console.warn('[brandingService] getSession failed, using anon key:', e);
-    }
-  }
+  const accessToken = getAccessTokenSync();
 
   const rows = Object.entries(settings).map(([key, value]) => ({
     business_id: businessId,
@@ -203,7 +222,7 @@ export async function upsertSettings(businessId, settings) {
     value,
   }));
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${SUPABASE_URL}/rest/v1/settings?on_conflict=business_id,key`,
     {
       method: 'POST',
@@ -214,7 +233,8 @@ export async function upsertSettings(businessId, settings) {
         Prefer: 'resolution=merge-duplicates,return=minimal',
       },
       body: JSON.stringify(rows),
-    }
+    },
+    12000,
   );
 
   if (!res.ok) {

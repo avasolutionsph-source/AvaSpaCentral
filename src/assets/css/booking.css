@@ -1088,12 +1088,15 @@ html {
 }
 
 /* ── Luxe full-width section strips ─────────────────────── */
+/* All booking sections share a single unified canvas so the flow from
+   Branch → Services → Date/Time → Location → Details reads as one
+   continuous section instead of alternating stripes. */
 .luxe-section {
   border-radius: 0;
   border: none;
-  border-bottom: 1px solid rgba(0,0,0,0.04);
   box-shadow: none;
-  padding: 5rem 2.5rem;
+  background: #faf8f5;
+  padding: 3rem 2.5rem;
   max-width: 100%;
   margin: 0;
 }
@@ -1103,13 +1106,26 @@ html {
   transform: none;
 }
 
-/* Alternate section backgrounds */
-.luxe-section:nth-child(odd) {
-  background: #fff;
+/* First section keeps extra top padding so the header breathes; last
+   keeps extra bottom padding. Everything in between is tight so the
+   section dividers disappear visually. */
+.luxe-section:first-of-type {
+  padding-top: 5rem;
 }
 
-.luxe-section:nth-child(even) {
-  background: #faf8f5;
+.luxe-section:last-of-type {
+  padding-bottom: 5rem;
+}
+
+/* Soft divider accent between subsections — just the gold hairline, no
+   background color change. */
+.luxe-section + .luxe-section .luxe-section-header::before {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.35), transparent);
+  margin: 0 auto 2rem;
 }
 
 /* Constrain all direct children */

@@ -1117,22 +1117,20 @@ html {
 }
 
 /* ── Luxe full-width section strips ─────────────────────── */
-/* Each booking subsection fills the viewport so the user scrolls once
-   per step (Branch → Services → Date/Time → Location → Details). Content
-   is vertically centered within the viewport. */
+/* Each booking subsection is auto-sized so scrolling between steps
+   is quick. A gold divider + reveal animation signals each new step. */
 .luxe-section {
   border-radius: 0;
   border: none;
   box-shadow: none;
-  padding: 4rem 2.5rem;
+  padding: 3rem 2.5rem;
   max-width: 100%;
   margin: 0;
-  min-height: 100vh;
-  min-height: 100svh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   position: relative;
+  scroll-margin-top: 80px;
 }
 
 /* Alternating backgrounds so sections are clearly separated as you
@@ -1153,23 +1151,36 @@ html {
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: min(240px, 40%);
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.55), transparent);
+  width: min(320px, 55%);
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.85), transparent);
+}
+
+/* Flash overlay that briefly pulses when a section becomes the active
+   "next step" (triggered by auto-scroll). Signals to the user: this is
+   where your attention is now. */
+.luxe-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center top, rgba(212, 175, 55, 0.18), transparent 65%);
+  opacity: 0;
+  z-index: 0;
+}
+.luxe-section.section-pulse::after {
+  animation: sectionPulseGlow 1.6s ease-out;
+}
+.luxe-section > * { position: relative; z-index: 1; }
+@keyframes sectionPulseGlow {
+  0%   { opacity: 0; }
+  25%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .luxe-section:hover {
   box-shadow: none;
   transform: none;
-}
-
-/* On short viewports, fall back to auto height so the content is always
-   reachable even if it's taller than the screen. */
-@media (max-height: 640px) {
-  .luxe-section {
-    min-height: auto;
-    padding: 3rem 2.5rem;
-  }
 }
 
 /* Constrain all direct children */
@@ -1212,7 +1223,7 @@ html {
 /* Luxe Section Header */
 .luxe-section-header {
   text-align: center;
-  margin-bottom: 3.5rem;
+  margin-bottom: 2rem;
   position: relative;
 }
 
@@ -2309,7 +2320,7 @@ html {
   }
 
   .luxe-section {
-    padding: 3rem 1.25rem;
+    padding: 2rem 1.25rem;
   }
 
   .booking-section h2 {
@@ -2360,7 +2371,7 @@ html {
   }
 
   .luxe-section {
-    padding: 2.5rem 1rem;
+    padding: 1.75rem 1rem;
   }
 
   .time-slots {

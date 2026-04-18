@@ -1111,6 +1111,21 @@ const BookingPage = () => {
     }
   };
 
+  // After a single-choice step is completed, smoothly scroll the next
+  // section into view and pulse it so the user registers the transition.
+  const advanceToSection = (id) => {
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.classList.remove('section-pulse');
+      // force reflow so the animation can replay on repeated triggers
+      void el.offsetWidth;
+      el.classList.add('section-pulse');
+      setTimeout(() => el.classList.remove('section-pulse'), 1700);
+    }, 280);
+  };
+
   // Main booking form
   return (
     <div className="booking-page">
@@ -1404,7 +1419,7 @@ const BookingPage = () => {
 
       {/* Branch selector — standalone section */}
       {branches.length > 1 && (
-        <div className="booking-branch-picker booking-section luxe-section">
+        <div id="section-branch" className="booking-branch-picker booking-section luxe-section">
           <div className="luxe-section-inner">
             <div className="luxe-section-header">
               <span className="luxe-section-accent" />
@@ -1416,7 +1431,7 @@ const BookingPage = () => {
                 <div
                   key={branch.id}
                   className={`branch-card ${selectedBranch?.id === branch.id ? 'selected' : ''}`}
-                  onClick={() => { setSelectedBranch(branch); setShowBranchSelector(false); }}
+                  onClick={() => { setSelectedBranch(branch); setShowBranchSelector(false); advanceToSection('section-services'); }}
                 >
                   <div className="branch-card-name">{branch.name}</div>
                   {branch.city && <div className="branch-card-city">{branch.city}</div>}
@@ -1431,7 +1446,7 @@ const BookingPage = () => {
       <div className="booking-container luxe-centered">
         <div className="booking-services">
 
-          <div className="booking-section luxe-section">
+          <div id="section-services" className="booking-section luxe-section">
             <div className="luxe-section-header">
               <span className="luxe-section-accent" />
               <h2>Select Services</h2>
@@ -1565,7 +1580,7 @@ const BookingPage = () => {
           </div>
 
           {/* Date & Time Selection */}
-          <div className="booking-section luxe-section">
+          <div id="section-datetime" className="booking-section luxe-section">
             <div className="luxe-section-header">
               <span className="luxe-section-accent" />
               <h2>Date & Time</h2>
@@ -1620,7 +1635,13 @@ const BookingPage = () => {
                     <span className="luxe-best-time-text">
                       Recommended: <strong>{bestTimeSlot}</strong>
                     </span>
-                    <button onClick={() => setSelectedTime(bestTimeSlot)} className="luxe-best-time-btn">
+                    <button
+                      onClick={() => {
+                        setSelectedTime(bestTimeSlot);
+                        advanceToSection(availableTherapists.length > 0 ? 'section-therapist' : 'section-location');
+                      }}
+                      className="luxe-best-time-btn"
+                    >
                       Select
                     </button>
                   </div>
@@ -1635,7 +1656,11 @@ const BookingPage = () => {
                     return (
                       <button
                         key={time}
-                        onClick={() => { if (!isFull) setSelectedTime(time); }}
+                        onClick={() => {
+                          if (isFull) return;
+                          setSelectedTime(time);
+                          advanceToSection(availableTherapists.length > 0 ? 'section-therapist' : 'section-location');
+                        }}
                         disabled={isFull}
                         className={`luxe-time-slot ${isSelected ? 'selected' : ''} ${isFull ? 'full' : ''} ${isPeak ? 'peak' : ''}`}
                       >
@@ -1656,7 +1681,7 @@ const BookingPage = () => {
 
           {/* Therapist Selection */}
           {availableTherapists.length > 0 && selectedDate && !isDayClosed && (
-          <div className="booking-section luxe-section">
+          <div id="section-therapist" className="booking-section luxe-section">
             <div className="luxe-section-header">
               <span className="luxe-section-accent" />
               <h2>Choose Therapist <span className="optional">(Optional)</span></h2>
@@ -1667,7 +1692,7 @@ const BookingPage = () => {
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
               <button
                 className={`location-option ${therapistMode === 'auto' ? 'selected' : ''}`}
-                onClick={() => { setTherapistMode('auto'); setSelectedTherapist(null); setSelectedTherapists([]); }}
+                onClick={() => { setTherapistMode('auto'); setSelectedTherapist(null); setSelectedTherapists([]); advanceToSection('section-location'); }}
                 style={{ flex: 1, padding: '0.75rem' }}
               >
                 <span className="location-label">Auto-Select</span>
@@ -1818,7 +1843,7 @@ const BookingPage = () => {
           )}
 
           {/* Service Location Selection */}
-          <div className="booking-section luxe-section">
+          <div id="section-location" className="booking-section luxe-section">
             <div className="luxe-section-header">
               <span className="luxe-section-accent" />
               <h2>Service Location</h2>
@@ -1827,7 +1852,7 @@ const BookingPage = () => {
             <div className="service-location-options">
               <button
                 className={`location-option ${serviceLocation === 'in_store' ? 'selected' : ''}`}
-                onClick={() => setServiceLocation('in_store')}
+                onClick={() => { setServiceLocation('in_store'); advanceToSection('section-details'); }}
               >
                 <span className="location-icon">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
@@ -1916,7 +1941,7 @@ const BookingPage = () => {
           {/* Date & Time moved to step 2 above therapist */}
 
           {/* Customer Details */}
-          <div className="booking-section luxe-section">
+          <div id="section-details" className="booking-section luxe-section">
             <div className="luxe-section-header">
               <span className="luxe-section-accent" />
               <h2>Your Details</h2>

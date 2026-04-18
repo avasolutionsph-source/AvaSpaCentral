@@ -63,7 +63,7 @@ const INITIAL_FORM_DATA = {
 };
 
 const Expenses = ({ embedded = false, onDataChange }) => {
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   // Filters
   const [filterCategory, setFilterCategory] = useState('all');
@@ -120,9 +120,9 @@ const Expenses = ({ embedded = false, onDataChange }) => {
 
   // Transform for submit
   const transformForSubmit = useCallback((data, mode) => {
-    const branchId = getUserBranchId();
-    // During edit, preserve the original branchId if the current user has no branch (e.g., Owner role)
-    const effectiveBranchId = branchId || (mode === 'edit' ? data._originalBranchId : null);
+    const branchId = getEffectiveBranchId();
+    // During edit, preserve the original branchId if the current user has no branch (e.g., Owner on All Branches)
+    const resolvedBranchId = branchId || (mode === 'edit' ? data._originalBranchId : null);
     return {
       date: data.date,
       category: data.category,
@@ -135,9 +135,9 @@ const Expenses = ({ embedded = false, onDataChange }) => {
       isRecurring: data.isRecurring,
       recurringFrequency: data.isRecurring ? data.recurringFrequency : undefined,
       receiptAttachment: data.receiptAttachment || undefined,
-      ...(effectiveBranchId && { branchId: effectiveBranchId })
+      ...(resolvedBranchId && { branchId: resolvedBranchId })
     };
-  }, [getUserBranchId]);
+  }, [getEffectiveBranchId]);
 
   // CRUD operations
   const {
@@ -221,9 +221,9 @@ const Expenses = ({ embedded = false, onDataChange }) => {
     let filtered = [...expenses];
 
     // Branch filtering
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
     }
 
     if (filterCategory !== 'all') {
@@ -258,7 +258,7 @@ const Expenses = ({ embedded = false, onDataChange }) => {
 
     // Sort by date descending (create new array to avoid mutation)
     return [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm, getUserBranchId]);
+  }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm, getEffectiveBranchId]);
 
   // Calculate stats
   const stats = useMemo(() => {

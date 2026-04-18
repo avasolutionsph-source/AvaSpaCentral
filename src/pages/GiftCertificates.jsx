@@ -7,7 +7,7 @@ import { supabaseSyncManager } from '../services/supabase';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const GiftCertificates = () => {
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [giftCertificates, setGiftCertificates] = useState([]);
@@ -88,9 +88,9 @@ const GiftCertificates = () => {
     let filtered = [...giftCertificates];
 
     // Apply branch filter
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
     }
 
     // Apply search filter
@@ -176,7 +176,7 @@ const GiftCertificates = () => {
     if (!validateForm()) return;
 
     try {
-      const branchId = getUserBranchId();
+      const branchId = getEffectiveBranchId();
       const gcData = {
         recipientName: formData.recipientName.trim(),
         recipientEmail: formData.recipientEmail.trim(),

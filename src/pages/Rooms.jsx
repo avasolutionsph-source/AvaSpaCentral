@@ -18,7 +18,7 @@ import {
 import { roomValidation, validateWithToast } from '../validation/schemas';
 
 const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderRef }) => {
-  const { user, showToast, isTherapist, canEdit, getUserBranchId } = useApp();
+  const { user, showToast, isTherapist, canEdit, getUserBranchId, getEffectiveBranchId } = useApp();
 
   // Filter state (kept separate as it's page-specific)
   const [filterStatus, setFilterStatus] = useState('show_all');
@@ -172,7 +172,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       status: room.status
     }),
     transformForSubmit: (data) => {
-      const branchId = getUserBranchId();
+      const branchId = getEffectiveBranchId();
       return {
         name: data.name.trim(),
         type: data.type,
@@ -351,9 +351,9 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
     let filtered = rooms;
 
     // Branch filtering
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(r => !r.branchId || r.branchId === userBranchId);
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(r => !r.branchId || r.branchId === effectiveBranchId);
     }
 
     // First filter: Only show rooms with active services by default (pending/occupied)
@@ -377,7 +377,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
     filtered.sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999));
 
     return filtered;
-  }, [rooms, filterStatus, isTherapist, user, getUserBranchId]);
+  }, [rooms, filterStatus, isTherapist, user, getEffectiveBranchId]);
 
   // Handle amenity toggle (custom handler for checkbox array)
   const handleAmenityToggle = (amenity) => {

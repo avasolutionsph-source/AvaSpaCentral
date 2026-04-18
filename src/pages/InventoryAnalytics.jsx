@@ -7,7 +7,7 @@ import { Bar, Line } from 'react-chartjs-2';
 
 const InventoryAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [inventoryData, setInventoryData] = useState(null);
@@ -27,19 +27,19 @@ const InventoryAnalytics = () => {
         mockApi.analytics.getForecasts()
       ]);
       // Filter inventory data by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
         if (inventory?.products) {
-          inventory.products = inventory.products.filter(item => !item.branchId || item.branchId === userBranchId);
+          inventory.products = inventory.products.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
         if (inventory?.alerts?.slowMoving) {
-          inventory.alerts.slowMoving = inventory.alerts.slowMoving.filter(item => !item.branchId || item.branchId === userBranchId);
+          inventory.alerts.slowMoving = inventory.alerts.slowMoving.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
         if (inventory?.alerts?.criticalStock) {
-          inventory.alerts.criticalStock = inventory.alerts.criticalStock.filter(item => !item.branchId || item.branchId === userBranchId);
+          inventory.alerts.criticalStock = inventory.alerts.criticalStock.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
         if (suppliers?.suppliers) {
-          suppliers.suppliers = suppliers.suppliers.filter(item => !item.branchId || item.branchId === userBranchId);
+          suppliers.suppliers = suppliers.suppliers.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
       }
 

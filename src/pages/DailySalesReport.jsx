@@ -45,7 +45,7 @@ const blankManual = () => ({
 });
 
 const DailySalesReport = () => {
-  const { user, getUserBranchId, selectedBranch, showToast } = useApp();
+  const { user, getUserBranchId, getEffectiveBranchId, selectedBranch, showToast } = useApp();
 
   const [view, setView] = useState('current'); // 'current' | 'saved'
   const [period, setPeriod] = useState('today');
@@ -112,7 +112,7 @@ const DailySalesReport = () => {
     }
   }, [period]);
 
-  const branchId = getUserBranchId();
+  const branchId = getEffectiveBranchId();
 
   const loadAll = useCallback(async () => {
     setLoading(true);

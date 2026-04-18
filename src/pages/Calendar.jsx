@@ -21,7 +21,7 @@ import '../assets/css/hub-pages.css';
 
 const Calendar = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // 'month', 'week', 'day'
@@ -144,9 +144,9 @@ const Calendar = () => {
       });
 
       // Filter appointments by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        setAppointments(transformedAppointments.filter(item => !item.branchId || item.branchId === userBranchId));
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        setAppointments(transformedAppointments.filter(item => !item.branchId || item.branchId === effectiveBranchId));
       } else {
         setAppointments(transformedAppointments);
       }
@@ -183,9 +183,9 @@ const Calendar = () => {
       });
 
       // Filter attendance by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        setAttendanceData(transformedAttendance.filter(item => !item.branchId || item.branchId === userBranchId));
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        setAttendanceData(transformedAttendance.filter(item => !item.branchId || item.branchId === effectiveBranchId));
       } else {
         setAttendanceData(transformedAttendance);
       }
@@ -253,9 +253,9 @@ const Calendar = () => {
       }
 
       // Filter shifts by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        setShiftData(transformedShifts.filter(item => !item.branchId || item.branchId === userBranchId));
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        setShiftData(transformedShifts.filter(item => !item.branchId || item.branchId === effectiveBranchId));
       } else {
         setShiftData(transformedShifts);
       }

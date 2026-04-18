@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../components/shared';
 const PurchaseOrders = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -80,9 +80,9 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
     let filtered = [...purchaseOrders];
 
     // Apply branch filter
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {
@@ -243,7 +243,7 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
 
     try {
       const supplier = suppliers.find(s => s._id === formData.supplierId);
-      const branchId = getUserBranchId();
+      const branchId = getEffectiveBranchId();
       const orderData = {
         ...formData,
         supplierName: supplier?.name || '',

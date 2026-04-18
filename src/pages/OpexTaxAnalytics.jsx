@@ -7,7 +7,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 
 const OpexTaxAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [opexData, setOpexData] = useState(null);
@@ -25,9 +25,9 @@ const OpexTaxAnalytics = () => {
         mockApi.analytics.getSalaryHealthMetrics()
       ]);
       // Filter history data by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId && data?.history) {
-        data.history = data.history.filter(item => !item.branchId || item.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId && data?.history) {
+        data.history = data.history.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       setOpexData(data);

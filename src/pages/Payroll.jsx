@@ -119,7 +119,7 @@ const BreakdownPopover = ({ type, payroll, onClose }) => {
 };
 
 const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef }) => {
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -180,9 +180,9 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
         mockApi.payrollConfig.getPayrollConfig()
       ]);
       let activeEmps = emps.filter(e => e.status === 'active');
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === effectiveBranchId);
       }
       setEmployees(activeEmps);
       setAttendance(att);
@@ -481,7 +481,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
 
     const netPay = grossPay - totalDeductions;
 
-    const branchId = getUserBranchId();
+    const branchId = getEffectiveBranchId();
     return {
       employee,
       ...(branchId && { branchId }),

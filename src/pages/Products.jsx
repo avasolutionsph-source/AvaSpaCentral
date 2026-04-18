@@ -69,7 +69,7 @@ const uploadProductImage = async (file, businessId, productName) => {
 };
 
 const Products = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderRef }) => {
-  const { user, showToast, canEdit, canEditProducts, isBranchOwner, getUserBranchId } = useApp();
+  const { user, showToast, canEdit, canEditProducts, isBranchOwner, getUserBranchId, getEffectiveBranchId } = useApp();
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -248,10 +248,10 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrd
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
-    // Branch Owner can only see products from their branch (or shared products with no branch)
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(p => !p.branchId || p.branchId === userBranchId);
+    // Filter by effective branch (Branch Owner: their branch; Owner: dropdown selection)
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(p => !p.branchId || p.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {
@@ -275,7 +275,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrd
     filtered.sort((a, b) => (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999));
 
     return filtered;
-  }, [products, searchTerm, filterType, filterCategory, filterStatus, getUserBranchId]);
+  }, [products, searchTerm, filterType, filterCategory, filterStatus, getEffectiveBranchId]);
 
   // Toggle product status
   const handleToggleStatus = async (product) => {

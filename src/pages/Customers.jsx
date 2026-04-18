@@ -5,7 +5,7 @@ import { format, isToday, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
 
 const Customers = () => {
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);
@@ -52,9 +52,9 @@ const Customers = () => {
     let filtered = [...customers];
 
     // Filter by branch
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {
@@ -70,7 +70,7 @@ const Customers = () => {
       filtered = filtered.filter(c => c.tier === tierFilter);
     }
     return filtered;
-  }, [customers, searchTerm, tierFilter, getUserBranchId]);
+  }, [customers, searchTerm, tierFilter, getEffectiveBranchId]);
 
   // Memoized tier stats for display
   const tierStats = useMemo(() => {
@@ -133,7 +133,7 @@ const Customers = () => {
     if (!validateForm()) return;
 
     try {
-      const branchId = getUserBranchId();
+      const branchId = getEffectiveBranchId();
       const customerData = {
         name: formData.name.trim(),
         email: formData.email.trim(),

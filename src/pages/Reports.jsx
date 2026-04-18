@@ -6,7 +6,7 @@ import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
 // jsPDF is loaded dynamically in handleExportPDF to reduce initial bundle size
 
 const Reports = ({ embedded = false }) => {
-  const { showToast, user, isTherapist, canViewAll, getUserBranchId } = useApp();
+  const { showToast, user, isTherapist, canViewAll, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -110,17 +110,17 @@ const Reports = ({ embedded = false }) => {
       ]);
 
       // Filter data by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        txns = txns.filter(item => !item.branchId || item.branchId === userBranchId);
-        emps = emps.filter(item => !item.branchId || item.branchId === userBranchId);
-        attn = attn.filter(item => !item.branchId || item.branchId === userBranchId);
-        prods = prods.filter(item => !item.branchId || item.branchId === userBranchId);
-        rms = rms.filter(item => !item.branchId || item.branchId === userBranchId);
-        custs = custs.filter(item => !item.branchId || item.branchId === userBranchId);
-        appts = appts.filter(item => !item.branchId || item.branchId === userBranchId);
-        advBookings = advBookings.filter(item => !item.branchId || item.branchId === userBranchId);
-        exps = exps.filter(item => !item.branchId || item.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        txns = txns.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        emps = emps.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        attn = attn.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        prods = prods.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        rms = rms.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        custs = custs.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        appts = appts.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        advBookings = advBookings.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        exps = exps.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       setTransactions(txns);

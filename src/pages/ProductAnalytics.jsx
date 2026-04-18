@@ -7,7 +7,7 @@ import { Bar } from 'react-chartjs-2';
 
 const ProductAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [productData, setProductData] = useState(null);
@@ -24,22 +24,22 @@ const ProductAnalytics = () => {
       const data = await mockApi.analytics.getProductAnalytics();
 
       // Filter product data by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
         if (data?.products) {
-          data.products = data.products.filter(item => !item.branchId || item.branchId === userBranchId);
+          data.products = data.products.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
         if (data?.topByGPM) {
-          data.topByGPM = data.topByGPM.filter(item => !item.branchId || item.branchId === userBranchId);
+          data.topByGPM = data.topByGPM.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
         if (data?.lowMarginProducts) {
-          data.lowMarginProducts = data.lowMarginProducts.filter(item => !item.branchId || item.branchId === userBranchId);
+          data.lowMarginProducts = data.lowMarginProducts.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
         if (data?.cannibalization) {
-          data.cannibalization = data.cannibalization.filter(item => !item.branchId || item.branchId === userBranchId);
+          data.cannibalization = data.cannibalization.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
         if (data?.bundleSuggestions) {
-          data.bundleSuggestions = data.bundleSuggestions.filter(item => !item.branchId || item.branchId === userBranchId);
+          data.bundleSuggestions = data.bundleSuggestions.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
       }
 

@@ -7,7 +7,7 @@ import { Bar, Radar, Doughnut } from 'react-chartjs-2';
 
 const EmployeeAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [employeeData, setEmployeeData] = useState(null);
@@ -23,9 +23,9 @@ const EmployeeAnalytics = () => {
       const data = await mockApi.analytics.getEmployeeProductivityMetrics();
 
       // Filter employees by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId && data?.employees) {
-        data.employees = data.employees.filter(item => !item.branchId || item.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId && data?.employees) {
+        data.employees = data.employees.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       setEmployeeData(data);

@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns';
 import mockApi from '../mockApi';
 
 const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
-  const { showToast, getUserBranchId, user } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId, user } = useApp();
   const [sessions, setSessions] = useState([]);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -64,9 +64,9 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
         transactions: session.transactions || []
       }));
 
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        transformedSessions = transformedSessions.filter(item => !item.branchId || item.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        transformedSessions = transformedSessions.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       const cashierMap = new Map();
@@ -113,7 +113,7 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
         userRole: user?.role || 'Cashier',
         openingFloat: amount,
         expectedCash: amount,
-        branchId: getUserBranchId() || undefined
+        branchId: getEffectiveBranchId() || undefined
       });
       showToast(`Cash drawer opened with ₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} float`, 'success');
       setShowOpenModal(false);

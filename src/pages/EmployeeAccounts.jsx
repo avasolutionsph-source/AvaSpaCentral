@@ -18,7 +18,7 @@ import {
 } from '../components/shared';
 
 const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { user, showToast, isOwner, isManager, isBranchOwner, getUserBranchId } = useApp();
+  const { user, showToast, isOwner, isManager, isBranchOwner, getUserBranchId, getEffectiveBranchId } = useApp();
 
   // Filter state
   const [filterRole, setFilterRole] = useState('all');
@@ -590,10 +590,10 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
   const filteredUsers = useMemo(() => {
     let filtered = users;
 
-    // Branch Owner can only see users from their branch
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(u => u.branchId === userBranchId);
+    // Filter by effective branch (Branch Owner: their branch; Owner: dropdown selection)
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(u => !u.branchId || u.branchId === effectiveBranchId);
     }
 
     if (filterRole !== 'all') {
@@ -612,7 +612,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
 
     return filtered;
-  }, [users, filterRole, filterStatus, searchTerm, getUserBranchId]);
+  }, [users, filterRole, filterStatus, searchTerm, getEffectiveBranchId]);
 
   // Get employees without accounts (for create dropdown)
   const availableEmployees = useMemo(() => {

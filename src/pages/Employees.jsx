@@ -41,7 +41,7 @@ const INITIAL_FORM_DATA = {
 };
 
 const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { showToast, canEdit, canManageEmployees, isManager, getUserBranchId, user } = useApp();
+  const { showToast, canEdit, canManageEmployees, isManager, getUserBranchId, getEffectiveBranchId, user } = useApp();
 
   // Ref to hold current employees list for duplicate-email check inside validateEmployee
   const employeesRef = useRef([]);
@@ -353,9 +353,9 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     let filtered = [...employees];
 
     // Filter by branch - only show employees from the current branch
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(e => !e.branchId || e.branchId === userBranchId);
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(e => !e.branchId || e.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {
@@ -379,7 +379,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     }
 
     return filtered;
-  }, [employees, searchTerm, filterDepartment, filterRole, filterStatus, getUserBranchId]);
+  }, [employees, searchTerm, filterDepartment, filterRole, filterStatus, getEffectiveBranchId]);
 
   // Filter configuration
   const filters = useMemo(() => [

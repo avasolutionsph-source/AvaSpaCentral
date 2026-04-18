@@ -17,7 +17,7 @@ import storageService from '../services/storage';
 import '../assets/css/pos.css';
 
 const POS = () => {
-  const { showToast, user, getUserBranchId } = useApp();
+  const { showToast, user, getUserBranchId, getEffectiveBranchId } = useApp();
 
   // Tab state for switching between POS and Gift Certificates
   const [activeTab, setActiveTab] = useState('pos');
@@ -116,8 +116,8 @@ const POS = () => {
         const visibleProducts = productsData.filter(p => !p.hideFromPOS);
 
         // Filter by branch
-        const userBranchId = getUserBranchId();
-        const branchFilter = (item) => !userBranchId || item.branchId === userBranchId;
+        const effectiveBranchId = getEffectiveBranchId();
+        const branchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
 
         setProducts(visibleProducts.filter(branchFilter));
         setEmployees(employeesData.filter(branchFilter));
@@ -144,12 +144,12 @@ const POS = () => {
         if (!isMounted) return;
 
         // Filter by branch if needed
-        const userBranchId = getUserBranchId();
+        const effectiveBranchId = getEffectiveBranchId();
         let queue = result.queue || [];
-        if (userBranchId) {
+        if (effectiveBranchId) {
           // Get employee branch mapping
           const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
-          const branchEmpIds = new Set(allEmployees.filter(e => e.branchId === userBranchId).map(e => String(e._id || e.id)));
+          const branchEmpIds = new Set(allEmployees.filter(e => e.branchId === effectiveBranchId).map(e => String(e._id || e.id)));
           queue = queue.filter(q => branchEmpIds.has(q.employeeId));
           // Re-number queue positions
           queue.forEach((q, i) => { q.queuePosition = i + 1; });
@@ -225,8 +225,8 @@ const POS = () => {
       const visibleProducts = productsData.filter(p => !p.hideFromPOS);
 
       // Filter by branch
-      const userBranchId = getUserBranchId();
-      const branchFilter = (item) => !userBranchId || item.branchId === userBranchId;
+      const effectiveBranchId = getEffectiveBranchId();
+      const branchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
 
       setProducts(visibleProducts.filter(branchFilter));
       setEmployees(employeesData.filter(branchFilter));
@@ -250,11 +250,11 @@ const POS = () => {
       const result = await mockApi.serviceRotation.getRotationQueue();
 
       // Filter by branch if needed
-      const userBranchId = getUserBranchId();
+      const effectiveBranchId = getEffectiveBranchId();
       let queue = result.queue || [];
-      if (userBranchId) {
+      if (effectiveBranchId) {
         const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
-        const branchEmpIds = new Set(allEmployees.filter(e => e.branchId === userBranchId).map(e => String(e._id || e.id)));
+        const branchEmpIds = new Set(allEmployees.filter(e => e.branchId === effectiveBranchId).map(e => String(e._id || e.id)));
         queue = queue.filter(q => branchEmpIds.has(q.employeeId));
         queue.forEach((q, i) => { q.queuePosition = i + 1; });
       }
@@ -388,15 +388,15 @@ const POS = () => {
       // Reload products
       const productsData = await mockApi.products.getProducts({ active: true });
       const visibleProducts = productsData.filter(p => !p.hideFromPOS);
-      const userBranchId = getUserBranchId();
-      const branchFilter = (item) => !userBranchId || item.branchId === userBranchId;
+      const effectiveBranchId = getEffectiveBranchId();
+      const branchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
       setProducts(visibleProducts.filter(branchFilter));
     } catch (error) {
       showToast('Failed to save order', 'error');
     } finally {
       setSavingOrder(false);
     }
-  }, [showToast, getUserBranchId]);
+  }, [showToast, getEffectiveBranchId]);
 
   const addToCart = useCallback((product) => {
     setCart(prevCart => {
@@ -747,7 +747,7 @@ const POS = () => {
           clientPhone: clientPhone,
           clientEmail: clientEmail,
           clientAddress: isHomeService ? homeServiceAddress : clientAddress,
-          ...(getUserBranchId() && { branchId: getUserBranchId() }),
+          ...(getEffectiveBranchId() && { branchId: getEffectiveBranchId() }),
           paymentMethod: paymentMethod,
           paymentTiming: advanceBookingData.paymentTiming,
           paymentStatus: advanceBookingData.paymentTiming === 'pay-now' ? 'paid' : 'pending',
@@ -780,7 +780,7 @@ const POS = () => {
         // Build transaction
         const transaction = {
           businessId: user?.businessId,
-          ...(getUserBranchId() && { branchId: getUserBranchId() }),
+          ...(getEffectiveBranchId() && { branchId: getEffectiveBranchId() }),
           receiptNumber,
           employeeId: employee._id,
           date: new Date().toISOString(),

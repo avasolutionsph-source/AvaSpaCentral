@@ -7,7 +7,7 @@ import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
 const AnalyticsDashboard = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
@@ -56,10 +56,10 @@ const AnalyticsDashboard = () => {
       ]);
 
       // Filter insights by branch
-      const userBranchId = getUserBranchId();
+      const effectiveBranchId = getEffectiveBranchId();
       let filteredInsights = aiInsights?.insights || [];
-      if (userBranchId) {
-        filteredInsights = filteredInsights.filter(item => !item.branchId || item.branchId === userBranchId);
+      if (effectiveBranchId) {
+        filteredInsights = filteredInsights.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       setBreakEven(bep);

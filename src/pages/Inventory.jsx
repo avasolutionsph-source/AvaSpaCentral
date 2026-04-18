@@ -8,7 +8,7 @@ import { ManageOrder } from '../components/shared';
 
 const Inventory = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
-  const { showToast, canEdit, getUserBranchId } = useApp();
+  const { showToast, canEdit, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState([]);
@@ -128,9 +128,9 @@ const Inventory = ({ embedded = false, onDataChange }) => {
     let filtered = [...inventory];
 
     // Branch filtering
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
     }
 
     // Search filter

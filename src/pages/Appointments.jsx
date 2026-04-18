@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../components/shared';
 
 const Appointments = () => {
   const navigate = useNavigate();
-  const { showToast, user, canViewAll, isTherapist, getUserBranchId } = useApp();
+  const { showToast, user, canViewAll, isTherapist, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState([]);
@@ -158,9 +158,9 @@ const Appointments = () => {
     let filtered = appointments;
 
     // Filter by branch
-    const userBranchId = getUserBranchId();
-    if (userBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === userBranchId);
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
     }
 
     // Filter by therapist if user is therapist
@@ -266,7 +266,7 @@ const Appointments = () => {
     if (!validateForm()) return;
 
     try {
-      const branchId = getUserBranchId();
+      const branchId = getEffectiveBranchId();
       const appointmentData = {
         customerId: formData.customerId || undefined,
         customerName: !formData.customerId ? formData.customerName.trim() : undefined,

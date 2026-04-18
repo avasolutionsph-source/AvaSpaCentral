@@ -5,7 +5,7 @@ import mockApi from '../mockApi';
 
 const SalesHeatmap = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [heatmapData, setHeatmapData] = useState(null);
@@ -65,10 +65,10 @@ const SalesHeatmap = () => {
         mockApi.analytics.getRealtimeProfit()
       ]);
       // Filter heatmap data by branch
-      const userBranchId = getUserBranchId();
+      const effectiveBranchId = getEffectiveBranchId();
       let filteredHeatmap = heatmap;
-      if (userBranchId && Array.isArray(heatmap)) {
-        filteredHeatmap = heatmap.filter(item => !item.branchId || item.branchId === userBranchId);
+      if (effectiveBranchId && Array.isArray(heatmap)) {
+        filteredHeatmap = heatmap.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       setHeatmapData(transformHeatmapData(filteredHeatmap));

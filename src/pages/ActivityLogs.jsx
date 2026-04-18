@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, subDays, startOfDay, endOfDay } from 'date-fns';
 
 const ActivityLogs = () => {
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -39,9 +39,9 @@ const ActivityLogs = () => {
       let apiLogs = await mockApi.activityLogs.getLogs();
 
       // Filter logs by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        apiLogs = apiLogs.filter(item => !item.branchId || item.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        apiLogs = apiLogs.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       setLogs(apiLogs.map((l, i) => ({ ...l, id: l._id || i + 1 })));

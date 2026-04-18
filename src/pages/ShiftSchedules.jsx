@@ -17,7 +17,7 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const ShiftSchedules = () => {
   const navigate = useNavigate();
-  const { showToast, hasManagementAccess, user, getUserBranchId } = useApp();
+  const { showToast, hasManagementAccess, user, getUserBranchId, getEffectiveBranchId } = useApp();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -74,10 +74,10 @@ const ShiftSchedules = () => {
       ]);
 
       // Filter data by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        schedulesData = schedulesData.filter(item => !item.branchId || item.branchId === userBranchId);
-        employeesData = employeesData.filter(item => !item.branchId || item.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        schedulesData = schedulesData.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        employeesData = employeesData.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       setSchedules(schedulesData.filter(s => s.isActive));
@@ -243,7 +243,7 @@ const ShiftSchedules = () => {
         };
       });
 
-      const branchId = getUserBranchId();
+      const branchId = getEffectiveBranchId();
       await mockApi.shiftSchedules.createSchedule({
         employeeId: employee._id,
         employeeName: `${employee.firstName} ${employee.lastName}`,

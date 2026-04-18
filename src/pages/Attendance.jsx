@@ -11,7 +11,7 @@ import { formatTime12Hour, formatTimeRange } from '../utils/dateUtils';
 
 const Attendance = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
-  const { user, showToast, hasManagementAccess, getUserBranchId } = useApp();
+  const { user, showToast, hasManagementAccess, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [todayAttendance, setTodayAttendance] = useState([]);
@@ -114,15 +114,15 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         a => a.date === prevDay && a.clockIn && !a.clockOut && isOvernightShiftActive(a, scheduleMapLocal)
       ) : [];
 
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        todayRecords = todayRecords.filter(a => !a.branchId || a.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        todayRecords = todayRecords.filter(a => !a.branchId || a.branchId === effectiveBranchId);
       }
 
       // Combine today's records with active overnight records for display
       let overnightFiltered = overnightRecords;
-      if (userBranchId) {
-        overnightFiltered = overnightRecords.filter(a => !a.branchId || a.branchId === userBranchId);
+      if (effectiveBranchId) {
+        overnightFiltered = overnightRecords.filter(a => !a.branchId || a.branchId === effectiveBranchId);
       }
       // Only include overnight records for employees who don't already have a today record
       const todayEmpIds = new Set(todayRecords.map(a => String(a.employeeId)));
@@ -133,8 +133,8 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const pending = allVisibleRecords.filter(a => a.status === 'pending_approval');
       setPendingApprovals(pending);
       let activeEmps = emps.filter(e => e.status === 'active');
-      if (userBranchId) {
-        activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === userBranchId);
+      if (effectiveBranchId) {
+        activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === effectiveBranchId);
       }
       setEmployees(activeEmps);
 

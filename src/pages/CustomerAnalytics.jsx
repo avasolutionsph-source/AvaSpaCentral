@@ -7,7 +7,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 
 const CustomerAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId } = useApp();
+  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [customerData, setCustomerData] = useState(null);
@@ -22,14 +22,14 @@ const CustomerAnalytics = () => {
       const data = await mockApi.analytics.getCustomerMetrics();
 
       // Filter customer data by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId && data?.pareto?.top20Customers) {
-        data.pareto.top20Customers = data.pareto.top20Customers.filter(item => !item.branchId || item.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId && data?.pareto?.top20Customers) {
+        data.pareto.top20Customers = data.pareto.top20Customers.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
-      if (userBranchId && data?.segments) {
+      if (effectiveBranchId && data?.segments) {
         Object.keys(data.segments).forEach(key => {
           if (Array.isArray(data.segments[key])) {
-            data.segments[key] = data.segments[key].filter(item => !item.branchId || item.branchId === userBranchId);
+            data.segments[key] = data.segments[key].filter(item => !item.branchId || item.branchId === effectiveBranchId);
           }
         });
       }

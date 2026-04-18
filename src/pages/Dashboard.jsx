@@ -95,13 +95,13 @@ const Dashboard = () => {
         const salaryHealthData = val(10, null);
 
         // Filter data by branch
-        const userBranchId = getUserBranchId();
-        if (userBranchId) {
-          transactions = transactions.filter(item => !item.branchId || item.branchId === userBranchId);
-          appointments = appointments.filter(item => !item.branchId || item.branchId === userBranchId);
-          attendance = attendance.filter(item => !item.branchId || item.branchId === userBranchId);
-          products = products.filter(item => !item.branchId || item.branchId === userBranchId);
-          rooms = rooms.filter(item => !item.branchId || item.branchId === userBranchId);
+        const effectiveBranchId = getEffectiveBranchId();
+        if (effectiveBranchId) {
+          transactions = transactions.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          appointments = appointments.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          attendance = attendance.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          products = products.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          rooms = rooms.filter(item => !item.branchId || item.branchId === effectiveBranchId);
         }
 
         // Check if component is still mounted before updating state
@@ -237,13 +237,13 @@ const Dashboard = () => {
       let todaysBookingsCount = val(9, 0);
 
       // Filter data by branch
-      const userBranchId = getUserBranchId();
-      if (userBranchId) {
-        transactions = transactions.filter(item => !item.branchId || item.branchId === userBranchId);
-        appointments = appointments.filter(item => !item.branchId || item.branchId === userBranchId);
-        attendance = attendance.filter(item => !item.branchId || item.branchId === userBranchId);
-        products = products.filter(item => !item.branchId || item.branchId === userBranchId);
-        rooms = rooms.filter(item => !item.branchId || item.branchId === userBranchId);
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        transactions = transactions.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        appointments = appointments.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        attendance = attendance.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        products = products.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        rooms = rooms.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       // Calculate KPIs

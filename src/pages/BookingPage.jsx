@@ -1701,7 +1701,7 @@ const BookingPage = () => {
                     <button
                       onClick={() => {
                         setSelectedTime(bestTimeSlot);
-                        advanceToSection(availableTherapists.length > 0 ? 'section-therapist' : 'section-location');
+                        advanceToSection(therapists.length > 0 ? 'section-therapist' : 'section-location');
                       }}
                       className="luxe-best-time-btn"
                     >
@@ -1722,7 +1722,7 @@ const BookingPage = () => {
                         onClick={() => {
                           if (isFull) return;
                           setSelectedTime(time);
-                          advanceToSection(availableTherapists.length > 0 ? 'section-therapist' : 'section-location');
+                          advanceToSection(therapists.length > 0 ? 'section-therapist' : 'section-location');
                         }}
                         disabled={isFull}
                         className={`luxe-time-slot ${isSelected ? 'selected' : ''} ${isFull ? 'full' : ''} ${isPeak ? 'peak' : ''}`}
@@ -1742,8 +1742,12 @@ const BookingPage = () => {
             )}
           </div>
 
-          {/* Therapist Selection */}
-          {availableTherapists.length > 0 && selectedDate && !isDayClosed && (
+          {/* Therapist Selection — render gate uses full therapists pool so the
+              section stays visible (and Auto-Select remains reachable) even
+              when the shift schedule filters every specific person out on the
+              selected date. The Choose Preferred grid below handles an empty
+              availableTherapists with an inline message. */}
+          {therapists.length > 0 && selectedDate && !isDayClosed && (
           <div id="section-therapist" className="booking-section luxe-section">
             <div className="luxe-section-header">
               <span className="luxe-section-accent" />
@@ -1822,6 +1826,12 @@ const BookingPage = () => {
                 {selectedTherapists.length > 0 && (
                   <p style={{ fontSize: '0.8rem', color: 'var(--color-accent, #1B5E37)', marginBottom: '0.75rem', fontWeight: '600' }}>
                     {selectedTherapists.length}/3 selected (ranked by preference)
+                  </p>
+                )}
+
+                {availableTherapists.length === 0 && (
+                  <p style={{ fontSize: '0.85rem', color: '#666', padding: '0.75rem 0', margin: 0 }}>
+                    No specific therapist available on {selectedDate}. Pick Auto-Select above and we'll assign the best available on the day.
                   </p>
                 )}
 

@@ -239,10 +239,14 @@ const BookingPage = () => {
   }, [heroFont]);
 
   // Check customer session and auto-fill details
+  // Re-runs once business loads so the bare /book route (no URL slug) can
+  // resolve via the loaded business's booking_slug instead of `undefined`.
   useEffect(() => {
+    const slug = businessIdOrSlug || business?.booking_slug || business?.id;
+    if (!slug) return;
     const checkSession = async () => {
       try {
-        const session = await getCustomerSession(businessIdOrSlug);
+        const session = await getCustomerSession(slug);
         if (session) {
           setCustomerSession(session);
           setCustomerAccount(session.account);
@@ -258,7 +262,7 @@ const BookingPage = () => {
       }
     };
     checkSession();
-  }, [businessIdOrSlug]);
+  }, [businessIdOrSlug, business?.booking_slug, business?.id]);
 
   // Handle customer logout
   const handleCustomerLogout = async () => {
@@ -1111,26 +1115,34 @@ const BookingPage = () => {
         <div className="booking-topbar-content">
           <span className="booking-topbar-name">{business?.name || 'Book Now'}</span>
           <div className="booking-header-auth">
-            {customerSession ? (
-              <div className="customer-logged-in">
-                <Link to={`/book/${businessIdOrSlug}/profile`} className="customer-profile-link">
-                  <span className="customer-avatar">{customerAccount?.name?.charAt(0).toUpperCase() || '?'}</span>
-                  <span className="customer-name">{customerAccount?.name?.split(' ')[0]}</span>
-                </Link>
-                <button onClick={handleCustomerLogout} className="customer-logout-btn">
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <div className="customer-auth-buttons">
-                <Link to={`/book/${businessIdOrSlug}/login`} className="auth-btn login-btn">
-                  Sign In
-                </Link>
-                <Link to={`/book/${businessIdOrSlug}/register`} className="auth-btn register-btn">
-                  Register
-                </Link>
-              </div>
-            )}
+            {(() => {
+              // Prefer the loaded business's slug — when the user lands on
+              // bare /book (no URL slug) we still need a real slug for the
+              // auth routes, otherwise the link becomes /book/undefined/login
+              // and downstream queries get business_id=eq.undefined.
+              const linkSlug = business?.booking_slug || businessIdOrSlug;
+              if (!linkSlug) return null; // no business resolved → hide auth UI
+              return customerSession ? (
+                <div className="customer-logged-in">
+                  <Link to={`/book/${linkSlug}/profile`} className="customer-profile-link">
+                    <span className="customer-avatar">{customerAccount?.name?.charAt(0).toUpperCase() || '?'}</span>
+                    <span className="customer-name">{customerAccount?.name?.split(' ')[0]}</span>
+                  </Link>
+                  <button onClick={handleCustomerLogout} className="customer-logout-btn">
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <div className="customer-auth-buttons">
+                  <Link to={`/book/${linkSlug}/login`} className="auth-btn login-btn">
+                    Sign In
+                  </Link>
+                  <Link to={`/book/${linkSlug}/register`} className="auth-btn register-btn">
+                    Register
+                  </Link>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </header>

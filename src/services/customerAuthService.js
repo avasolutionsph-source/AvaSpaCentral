@@ -18,6 +18,64 @@ const getSupabaseConfig = () => ({
 });
 
 /**
+ * Detect Supabase "email already in auth" errors across response shapes.
+ */
+const isEmailTakenError = (err) => {
+  const msg = (err?.message || '').toLowerCase();
+  const code = (err?.code || '').toLowerCase();
+  return (
+    code === 'user_already_exists' ||
+    code === 'email_exists' ||
+    msg.includes('already registered') ||
+    msg.includes('already exists') ||
+    msg.includes('user already')
+  );
+};
+
+/**
+ * Insert the customer_accounts row tied to a Supabase auth user.
+ * Returns the created account row, or throws on failure.
+ */
+const createCustomerAccountRow = async ({ businessId, authUserId, email, name, phone, accessToken }) => {
+  const { url, key } = getSupabaseConfig();
+  const accountData = {
+    business_id: businessId,
+    auth_id: authUserId,
+    email: email.toLowerCase(),
+    name,
+    phone: phone || null,
+    loyalty_points: 50, // Welcome bonus!
+    tier: 'NEW',
+  };
+
+  const response = await fetch(`${url}/rest/v1/customer_accounts`, {
+    method: 'POST',
+    headers: {
+      'apikey': key,
+      'Authorization': `Bearer ${accessToken || key}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(accountData),
+  });
+
+  if (!response.ok) {
+    let errorBody = {};
+    try { errorBody = await response.json(); } catch {}
+    const msg = errorBody.message || `HTTP ${response.status}`;
+    if (msg.toLowerCase().includes('duplicate')) {
+      const dupErr = new Error('An account with this email already exists for this business.');
+      dupErr.code = 'duplicate';
+      throw dupErr;
+    }
+    throw new Error(msg);
+  }
+
+  const rows = await response.json();
+  return rows[0];
+};
+
+/**
  * Register a new customer account
  * @param {string} businessId - The business UUID
  * @param {object} data - Customer data { email, password, name, phone }
@@ -25,9 +83,7 @@ const getSupabaseConfig = () => ({
  */
 export const registerCustomer = async (businessId, { email, password, name, phone }) => {
   try {
-    const { url, key } = getSupabaseConfig();
-
-    // 1. Create Supabase Auth user
+    // 1. Try to create the Supabase Auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -36,69 +92,102 @@ export const registerCustomer = async (businessId, { email, password, name, phon
           name,
           phone,
           user_type: 'customer',
-          business_id: businessId
+          business_id: businessId,
+        },
+      },
+    });
+
+    let authUserId = authData?.user?.id;
+    let session = authData?.session;
+
+    // 2. If the auth user already exists, attempt a recovery path:
+    //    sign in with the provided password and check whether this
+    //    business is missing a customer_accounts row. This rescues users
+    //    who got orphaned by a previous failed registration AND lets
+    //    existing accounts at other businesses register at this one.
+    if (authError) {
+      if (!isEmailTakenError(authError)) throw authError;
+
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        // Email is in use but the password they entered is wrong —
+        // they must use Sign In with their existing credentials.
+        return {
+          success: false,
+          error: 'This email is already registered. Please sign in with your existing password, or use a different email.',
+        };
+      }
+
+      authUserId = signInData.user?.id;
+      session = signInData.session;
+
+      // Already have a customer_accounts row for this business?
+      const { url, key } = getSupabaseConfig();
+      const checkRes = await fetch(
+        `${url}/rest/v1/customer_accounts?business_id=eq.${businessId}&auth_id=eq.${authUserId}&select=id`,
+        {
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${session?.access_token || key}`,
+          },
+        }
+      );
+      if (checkRes.ok) {
+        const existing = await checkRes.json();
+        if (Array.isArray(existing) && existing.length > 0) {
+          await supabase.auth.signOut();
+          return {
+            success: false,
+            error: 'An account with this email already exists for this business. Please sign in instead.',
+          };
         }
       }
-    });
-
-    if (authError) {
-      // Check for duplicate email
-      if (authError.message.includes('already registered')) {
-        return { success: false, error: 'An account with this email already exists.' };
-      }
-      throw authError;
+      // No row for this business — fall through to create one (recovery).
     }
 
-    // 2. Create customer_account record
-    const accountData = {
-      business_id: businessId,
-      auth_id: authData.user?.id,
-      email: email.toLowerCase(),
-      name,
-      phone: phone || null,
-      loyalty_points: 50, // Welcome bonus!
-      tier: 'NEW'
-    };
-
-    const response = await fetch(`${url}/rest/v1/customer_accounts`, {
-      method: 'POST',
-      headers: {
-        'apikey': key,
-        'Authorization': `Bearer ${authData.session?.access_token || key}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      },
-      body: JSON.stringify(accountData)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      // If account creation fails, we should ideally delete the auth user
-      // but for simplicity we'll just return the error
-      if (errorData.message?.includes('duplicate')) {
-        return { success: false, error: 'An account with this email already exists for this business.' };
-      }
-      throw new Error(errorData.message || 'Failed to create account');
+    if (!authUserId) {
+      throw new Error('Account creation succeeded but no user id was returned.');
     }
 
-    const customerAccount = await response.json();
+    // 3. Create the customer_accounts row.
+    let customerAccount;
+    try {
+      customerAccount = await createCustomerAccountRow({
+        businessId,
+        authUserId,
+        email,
+        name,
+        phone,
+        accessToken: session?.access_token,
+      });
+    } catch (insertErr) {
+      // Surface duplicate as a clean "already exists" message
+      if (insertErr.code === 'duplicate') {
+        return { success: false, error: insertErr.message };
+      }
+      throw insertErr;
+    }
 
-    // Store session info
+    // 4. Persist client-side session info
     localStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify({
       businessId,
-      accountId: customerAccount[0]?.id,
+      accountId: customerAccount?.id,
       email,
       name,
-      session: authData.session
+      session,
     }));
 
     return {
       success: true,
       data: {
-        user: authData.user,
-        account: customerAccount[0],
-        session: authData.session
-      }
+        user: { id: authUserId, email },
+        account: customerAccount,
+        session,
+      },
     };
   } catch (error) {
     console.error('[CustomerAuth] Registration error:', error);

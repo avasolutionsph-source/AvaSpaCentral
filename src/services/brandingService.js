@@ -122,11 +122,17 @@ export async function getBrandingSettings(businessId) {
 
 /**
  * Save branding settings to the businesses table.
+ *
+ * Uses a direct fetch() with an explicit Bearer token instead of supabase.from().
+ * We observed the supabase-js client queueing writes behind a stuck auth refresh,
+ * producing 15s+ hangs with no request ever appearing on the network. The REST
+ * API bypasses the client's internal queue so a 401 comes back fast (triggering
+ * an explicit refresh path) instead of freezing the UI.
  * @param {string} businessId
  * @param {{ logoUrl?, coverPhotoUrl?, primaryColor?, businessName?, contactPhone? }} settings
  */
 export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl, primaryColor, businessName, contactPhone, heroTagline, heroVideo }) {
-  if (!supabase) throw new Error('Supabase not configured');
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
 
   const payload = {};
   if (logoUrl !== undefined) payload.logo_url = logoUrl;
@@ -137,12 +143,82 @@ export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl,
   if (heroTagline !== undefined) payload.tagline = heroTagline;
   if (heroVideo !== undefined) payload.hero_video = heroVideo;
 
-  const { error } = await supabase
-    .from('businesses')
-    .update(payload)
-    .eq('id', businessId);
+  let accessToken = SUPABASE_ANON_KEY;
+  if (supabase) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.access_token) {
+        accessToken = sessionData.session.access_token;
+      }
+    } catch (e) {
+      console.warn('[brandingService] getSession failed, using anon key:', e);
+    }
+  }
 
-  if (error) {
-    throw new Error(error.message || 'Failed to save branding');
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/businesses?id=eq.${businessId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to save branding (${res.status}): ${body}`);
+  }
+}
+
+/**
+ * Upsert multiple key/value rows into the settings table for a business.
+ * Uses direct REST for the same reason as saveBrandingSettings.
+ *
+ * @param {string} businessId
+ * @param {Record<string, string>} settings - map of setting key to value
+ */
+export async function upsertSettings(businessId, settings) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+
+  let accessToken = SUPABASE_ANON_KEY;
+  if (supabase) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.access_token) {
+        accessToken = sessionData.session.access_token;
+      }
+    } catch (e) {
+      console.warn('[brandingService] getSession failed, using anon key:', e);
+    }
+  }
+
+  const rows = Object.entries(settings).map(([key, value]) => ({
+    business_id: businessId,
+    key,
+    value,
+  }));
+
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/settings?on_conflict=business_id,key`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify(rows),
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to upsert settings (${res.status}): ${body}`);
   }
 }

@@ -12,7 +12,7 @@ import ActivityLogsTab from './ActivityLogs';
 import BranchesTab from './BranchesTab';
 import { authService } from '../services/supabase';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
-import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, applyColorTheme } from '../services/brandingService';
+import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, upsertSettings, applyColorTheme } from '../services/brandingService';
 import { HERO_FONTS } from '../pages/BookingPage';
 
 const Settings = () => {
@@ -849,25 +849,12 @@ const Settings = () => {
         if (user?.businessId) {
           try {
             console.log('[SaveBranding] Upserting hero/footer to settings table…');
-            const { supabase } = await import('../services/supabase/supabaseClient');
-            if (supabase) {
-              const rows = Object.entries(localSettings).map(([key, value]) => ({
-                business_id: user.businessId,
-                key,
-                value,
-              }));
-              const { error } = await withTimeout(
-                supabase.from('settings').upsert(rows, { onConflict: 'business_id,key' }),
-                15000,
-                'Hero/footer upsert',
-              );
-              if (error) {
-                console.error('[SaveBranding] Bulk upsert returned error:', error);
-                cloudSyncFailed = true;
-              } else {
-                console.log('[SaveBranding] Hero/footer synced to Supabase.');
-              }
-            }
+            await withTimeout(
+              upsertSettings(user.businessId, localSettings),
+              15000,
+              'Hero/footer upsert',
+            );
+            console.log('[SaveBranding] Hero/footer synced to Supabase.');
           } catch (e) {
             console.error('[SaveBranding] Cloud sync failed:', e);
             cloudSyncFailed = true;

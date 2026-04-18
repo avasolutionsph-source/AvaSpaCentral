@@ -61,7 +61,7 @@ html {
   background: #faf8f5;
 }
 .booking-branch-picker h2 {
-  font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.6rem;
   font-weight: 600;
   margin-bottom: 4px;
@@ -377,7 +377,7 @@ html {
   }
 }
 .luxe-brand {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: inherit;
   font-size: clamp(1.5rem, 4vw, 2.5rem);
   color: #d4af7a;
   letter-spacing: 4px;
@@ -413,7 +413,7 @@ html {
   100% { width: 95%; }
 }
 .luxe-tagline {
-  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-family: inherit;
   font-size: clamp(0.85rem, 2vw, 1.1rem);
   color: rgba(212,175,122,0.5);
   letter-spacing: 2px;
@@ -461,7 +461,7 @@ html {
 }
 
 .booking-success h2 {
-  font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+  font-family: inherit;
   color: var(--color-primary, #800020);
   margin-bottom: 1rem;
   font-size: 1.8rem;
@@ -1202,7 +1202,7 @@ html {
 }
 
 .booking-section h2 {
-  font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.6rem;
   font-weight: 600;
   color: #1a1a1a;
@@ -1248,7 +1248,7 @@ html {
   font-weight: 300;
   letter-spacing: 0.03em;
   font-style: italic;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
 }
 
 /* Filters */
@@ -1433,7 +1433,7 @@ html {
 }
 
 .service-name {
-  font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.2rem;
   font-weight: 600;
   color: #1a1a1a;
@@ -1462,7 +1462,7 @@ html {
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--color-primary, #800020);
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
 }
 
 .service-duration {
@@ -1637,7 +1637,7 @@ html {
 }
 
 .luxe-calendar-month {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
   font-size: 1.3rem;
   font-weight: 600;
   color: #1a1a1a;
@@ -1734,7 +1734,7 @@ html {
   text-align: center;
   padding: 1.5rem;
   font-style: italic;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
   font-size: 1.05rem;
 }
 
@@ -1918,7 +1918,7 @@ html {
 }
 
 .summary-sticky h3 {
-  font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.4rem;
   font-weight: 400;
   margin: 0 0 1.25rem 0;
@@ -2017,7 +2017,7 @@ html {
   font-size: 1.5rem;
   font-weight: 700;
   color: #fff;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
 }
 
 .total-row.deposit {
@@ -2032,7 +2032,7 @@ html {
   font-size: 1.25rem;
   font-weight: 700;
   color: #d4a574;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
 }
 
 /* Summary Schedule */
@@ -2068,7 +2068,7 @@ html {
   transition: all 0.3s ease;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
   font-size: 1.1rem;
 }
 
@@ -2127,7 +2127,7 @@ html {
 }
 
 .luxe-footer-brand {
-  font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+  font-family: inherit;
   font-size: 1.6rem;
   color: #e0e0e0;
   font-weight: 400;
@@ -2140,7 +2140,7 @@ html {
   font-size: 0.9rem;
   color: #777;
   margin-bottom: 1.5rem;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
 }
 
 .luxe-footer-details {
@@ -2193,7 +2193,7 @@ html {
   font-size: 1.15rem;
   font-weight: 700;
   color: #d4a574;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
 }
 
 .mobile-summary-btn {
@@ -2209,7 +2209,7 @@ html {
   transition: all 0.3s ease;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
 }
 
 .mobile-summary-btn:hover {
@@ -2699,7 +2699,7 @@ html {
 }
 
 .luxe-summary-empty p {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
   font-size: 1.3rem;
   color: #777;
   margin: 0 0 0.5rem;
@@ -2766,7 +2766,7 @@ html {
 
 .floating-summary-panel .item-price {
   color: #d4a574;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
   font-size: 1rem;
 }
 
@@ -2843,7 +2843,7 @@ html {
 }
 
 .luxe-total-main span:last-child {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
   font-size: 1.5rem;
 }
 
@@ -2857,7 +2857,7 @@ html {
 }
 
 .luxe-total-deposit span:last-child {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: inherit;
   font-size: 1.2rem;
 }
 
@@ -2980,7 +2980,7 @@ html {
 }
 .floating-summary-panel-header h3 {
   margin: 0;
-  font-family: 'Playfair Display', serif;
+  font-family: inherit;
   color: #f5e9d4;
   font-size: 1.35rem;
   font-weight: 600;

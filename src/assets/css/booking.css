@@ -9,14 +9,43 @@ html {
 }
 
 /* ── Scroll-triggered section animations ──────────────── */
+/* Sections start below their final position with a soft blur. When the
+   observer adds .section-visible, they float up, sharpen, and fade in.
+   The longer duration + bigger translate feels like a real "reveal"
+   rather than a subtle fade that users don't register. */
 .section-animate {
   opacity: 0;
-  transform: translateY(30px);
-  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  transform: translateY(60px);
+  filter: blur(6px);
+  transition:
+    opacity 0.9s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 0.61, 0.36, 1),
+    filter 0.9s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .section-animate.section-visible {
   opacity: 1;
   transform: translateY(0);
+  filter: blur(0);
+}
+/* Stagger the header and body so the reveal feels composed, not dumped. */
+.section-animate .luxe-section-header {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s ease-out 0.15s, transform 0.8s ease-out 0.15s;
+}
+.section-animate.section-visible .luxe-section-header {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-animate,
+  .section-animate .luxe-section-header {
+    transition: none;
+    transform: none;
+    filter: none;
+    opacity: 1;
+  }
 }
 
 /* ── Branch Picker (standalone section) ───────────────── */
@@ -1095,8 +1124,7 @@ html {
   border-radius: 0;
   border: none;
   box-shadow: none;
-  background: #faf8f5;
-  padding: 3rem 2.5rem;
+  padding: 4rem 2.5rem;
   max-width: 100%;
   margin: 0;
   min-height: 100vh;
@@ -1104,22 +1132,35 @@ html {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  position: relative;
+}
+
+/* Alternating backgrounds so sections are clearly separated as you
+   scroll. The cream/off-white pairing keeps the luxe feel but gives
+   a crisp visual cue that one section has ended and another begun. */
+.luxe-section:nth-of-type(odd) {
+  background: #faf8f5;
+}
+.luxe-section:nth-of-type(even) {
+  background: #ffffff;
+}
+
+/* A gold gradient hairline painted across the top of every section
+   after the first, so the boundary reads as intentional and luxe. */
+.luxe-section + .luxe-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(240px, 40%);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.55), transparent);
 }
 
 .luxe-section:hover {
   box-shadow: none;
   transform: none;
-}
-
-/* Soft divider accent between subsections — just the gold hairline, no
-   background color change. */
-.luxe-section + .luxe-section .luxe-section-header::before {
-  content: '';
-  display: block;
-  width: 40px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.35), transparent);
-  margin: 0 auto 2rem;
 }
 
 /* On short viewports, fall back to auto height so the content is always
@@ -1133,18 +1174,18 @@ html {
 
 /* Constrain all direct children */
 .luxe-section > * {
-  max-width: 800px;
+  max-width: 960px;
   margin-left: auto;
   margin-right: auto;
 }
 
 .luxe-section > .luxe-section-header {
-  max-width: 600px;
+  max-width: 720px;
 }
 
 /* Inner content constrainer (explicit) */
 .luxe-section-inner {
-  max-width: 800px;
+  max-width: 960px;
   margin: 0 auto;
   width: 100%;
 }
@@ -1171,13 +1212,14 @@ html {
 /* Luxe Section Header */
 .luxe-section-header {
   text-align: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 3.5rem;
   position: relative;
 }
 
 .luxe-section-header h2 {
   justify-content: center;
-  font-size: 2rem;
+  font-size: clamp(2.25rem, 4vw, 3rem);
+  letter-spacing: 0.01em;
 }
 
 .luxe-section-accent {
@@ -1189,7 +1231,7 @@ html {
 }
 
 .luxe-section-subtitle {
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   color: #999;
   margin: 0.5rem 0 0;
   font-weight: 300;

@@ -1005,7 +1005,10 @@ const BookingPage = () => {
     });
   }, [therapists, selectedDate, selectedTime, shiftSchedules]);
 
-  // Scroll-triggered fade-in for booking sections
+  // Scroll-triggered fade-in for booking sections.
+  // Fire the reveal when ~25% of a 100vh section is in view so the
+  // animation actually plays as the user scrolls INTO the section,
+  // not before they've seen it.
   useEffect(() => {
     if (loading) return;
     const observer = new IntersectionObserver((entries) => {
@@ -1015,7 +1018,7 @@ const BookingPage = () => {
           observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.08 });
+    }, { threshold: 0.25 });
     document.querySelectorAll('.booking-section, .booking-progress, .booking-summary').forEach(el => {
       el.classList.add('section-animate');
       observer.observe(el);

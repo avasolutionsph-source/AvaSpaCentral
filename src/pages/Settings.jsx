@@ -1364,7 +1364,10 @@ const Settings = () => {
         if (savedBookingCapacity) setBookingCapacity(parseInt(savedBookingCapacity));
         if (savedBookingWindow) setBookingWindowMinutes(parseInt(savedBookingWindow));
 
-        // Then try to load from Supabase 'settings' table for cross-device sync
+        // Seed missing-only from cloud. Local is source of truth: if a key
+        // already exists in Dexie, skip the cloud value to preserve unsynced
+        // local edits (see the save-hang history — stale cloud must not
+        // clobber newer local state on remount).
         try {
           const { supabase } = await import('../services/supabase/supabaseClient');
           if (supabase && user?.businessId) {
@@ -1379,32 +1382,30 @@ const Settings = () => {
                 cloudSettings[row.key] = row.value;
               }
 
-              // Cloud data takes priority (latest saved from any device)
-              if (cloudSettings.businessInfo) {
+              if (!savedBusinessInfo && cloudSettings.businessInfo) {
                 setBusinessInfo(cloudSettings.businessInfo);
                 await SettingsRepository.set('businessInfo', cloudSettings.businessInfo);
               }
-              if (cloudSettings.businessHours) {
+              if (!savedBusinessHours && cloudSettings.businessHours) {
                 setBusinessHours(cloudSettings.businessHours);
                 await SettingsRepository.set('businessHours', cloudSettings.businessHours);
               }
-              if (cloudSettings.taxSettings) {
+              if (!savedTaxSettings && cloudSettings.taxSettings) {
                 setTaxSettings(cloudSettings.taxSettings);
                 await SettingsRepository.set('taxSettings', cloudSettings.taxSettings);
               }
-              if (cloudSettings.theme) {
+              if (!savedTheme && cloudSettings.theme) {
                 setTheme(cloudSettings.theme);
                 await SettingsRepository.set('theme', cloudSettings.theme);
               }
-              if (cloudSettings.showReceiptAfterCheckout !== undefined) {
+              if (savedReceiptSetting === undefined && cloudSettings.showReceiptAfterCheckout !== undefined) {
                 setShowReceiptAfterCheckout(cloudSettings.showReceiptAfterCheckout);
                 await SettingsRepository.set('showReceiptAfterCheckout', cloudSettings.showReceiptAfterCheckout);
               }
             }
           }
         } catch (cloudError) {
-          // Cloud load is best-effort — Dexie data already loaded
-          console.warn('[Settings] Cloud settings load failed:', cloudError.message);
+          console.warn('[Settings] Cloud settings seed failed:', cloudError.message);
         }
       } catch (error) {
         // Silent fail for settings load

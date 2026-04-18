@@ -87,6 +87,7 @@ const Settings = () => {
   const [logoPreview, setLogoPreview] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
   const [savingBranding, setSavingBranding] = useState(false);
+  const [brandingLoading, setBrandingLoading] = useState(true);
 
   // Hero preview aspect ratio — needs to predict the visitor's viewport on
   // the live booking page (which is 100svh × 100vw), not the admin's current
@@ -572,138 +573,152 @@ const Settings = () => {
 
   // Load branding settings on mount
   useEffect(() => {
+    let cancelled = false;
     const loadBranding = async () => {
-      if (!user?.businessId) return;
+      if (!user?.businessId) {
+        setBrandingLoading(false);
+        return;
+      }
 
-      // PHASE 1 — Load EVERYTHING from local cache first so the UI shows the
-      // user's saved configuration instantly on remount. This must include
-      // hero/footer fields (not just logo/cover/name) so returning to the
-      // Branding tab doesn't flash defaults while Supabase fetches.
-      let hasLocalHero = false;
+      setBrandingLoading(true);
       try {
-        const keys = [
-          'cachedLogoUrl', 'cachedCoverUrl', 'cachedBusinessName',
-          'heroFont', 'heroFontColor', 'heroTextX', 'heroTextY',
-          'heroAnimation', 'heroFontSize', 'heroAnimDelay', 'heroAnimDuration',
-          'heroLogoEnabled', 'heroLogoX', 'heroLogoY', 'heroLogoSize',
-          'heroLogoAnimation', 'heroLogoAnimDelay', 'heroLogoAnimDuration',
-          'footerLine1', 'footerLine2', 'footerLine3', 'footerLine4',
-          'footerFont', 'footerFontSize',
-        ];
-        const cached = {};
-        for (const k of keys) cached[k] = await SettingsRepository.get(k);
-
-        if (cached.cachedLogoUrl) setLogoPreview(cached.cachedLogoUrl);
-        if (cached.cachedCoverUrl) setCoverPreview(cached.cachedCoverUrl);
-
-        hasLocalHero = !!(cached.heroFont || cached.heroAnimation || cached.heroLogoEnabled);
-
-        setBrandingSettings(prev => ({
-          ...prev,
-          ...(cached.cachedLogoUrl && { logoUrl: cached.cachedLogoUrl }),
-          ...(cached.cachedCoverUrl && { coverPhotoUrl: cached.cachedCoverUrl }),
-          ...(cached.cachedBusinessName && { businessName: cached.cachedBusinessName }),
-          ...(cached.heroFont && { heroFont: cached.heroFont }),
-          ...(cached.heroFontColor && { heroFontColor: cached.heroFontColor }),
-          ...(cached.heroTextX && { heroTextX: parseInt(cached.heroTextX) }),
-          ...(cached.heroTextY && { heroTextY: parseInt(cached.heroTextY) }),
-          ...(cached.heroAnimation && { heroAnimation: cached.heroAnimation }),
-          ...(cached.heroFontSize && { heroFontSize: cached.heroFontSize }),
-          ...(cached.heroAnimDelay && { heroAnimDelay: cached.heroAnimDelay }),
-          ...(cached.heroAnimDuration && { heroAnimDuration: cached.heroAnimDuration }),
-          ...(cached.heroLogoEnabled != null && { heroLogoEnabled: cached.heroLogoEnabled === 'true' }),
-          ...(cached.heroLogoX && { heroLogoX: parseInt(cached.heroLogoX) }),
-          ...(cached.heroLogoY && { heroLogoY: parseInt(cached.heroLogoY) }),
-          ...(cached.heroLogoSize && { heroLogoSize: parseInt(cached.heroLogoSize) }),
-          ...(cached.heroLogoAnimation && { heroLogoAnimation: cached.heroLogoAnimation }),
-          ...(cached.heroLogoAnimDelay && { heroLogoAnimDelay: cached.heroLogoAnimDelay }),
-          ...(cached.heroLogoAnimDuration && { heroLogoAnimDuration: cached.heroLogoAnimDuration }),
-          ...(cached.footerLine1 != null && { footerLine1: cached.footerLine1 }),
-          ...(cached.footerLine2 != null && { footerLine2: cached.footerLine2 }),
-          ...(cached.footerLine3 != null && { footerLine3: cached.footerLine3 }),
-          ...(cached.footerLine4 != null && { footerLine4: cached.footerLine4 }),
-          ...(cached.footerFont && { footerFont: cached.footerFont }),
-          ...(cached.footerFontSize && { footerFontSize: cached.footerFontSize }),
-        }));
-      } catch {}
-
-      // PHASE 2 — Refresh from Supabase businesses table. Only overlay
-      // non-null values so silent failures (RLS block, empty row, stale
-      // session) don't wipe the cached values the user just saw.
-      try {
-        const data = await getBrandingSettings(user.businessId);
-        setBrandingSettings(prev => ({
-          ...prev,
-          ...(data.logoUrl != null && { logoUrl: data.logoUrl }),
-          ...(data.coverPhotoUrl != null && { coverPhotoUrl: data.coverPhotoUrl }),
-          ...(data.primaryColor && { primaryColor: data.primaryColor }),
-          ...(data.businessName && { businessName: data.businessName }),
-          ...(data.contactPhone != null && { contactPhone: data.contactPhone }),
-          ...(data.heroTagline != null && { heroTagline: data.heroTagline }),
-          ...(data.heroVideo != null && { heroVideo: data.heroVideo }),
-        }));
-        if (data.logoUrl) setLogoPreview(data.logoUrl);
-        if (data.coverPhotoUrl) setCoverPreview(data.coverPhotoUrl);
-
+        // PHASE 1 — Load EVERYTHING from local cache first so the UI shows the
+        // user's saved configuration instantly on remount. This must include
+        // hero/footer fields (not just logo/cover/name) so returning to the
+        // Branding tab doesn't flash defaults while Supabase fetches.
         try {
-          if (data.logoUrl) await SettingsRepository.set('cachedLogoUrl', data.logoUrl);
-          if (data.coverPhotoUrl) await SettingsRepository.set('cachedCoverUrl', data.coverPhotoUrl);
-          if (data.businessName) await SettingsRepository.set('cachedBusinessName', data.businessName);
-        } catch {}
-        if (data.primaryColor) applyColorTheme(data.primaryColor);
+          const keys = [
+            'cachedLogoUrl', 'cachedCoverUrl', 'cachedBusinessName',
+            'heroFont', 'heroFontColor', 'heroTextX', 'heroTextY',
+            'heroAnimation', 'heroFontSize', 'heroAnimDelay', 'heroAnimDuration',
+            'heroLogoEnabled', 'heroLogoX', 'heroLogoY', 'heroLogoSize',
+            'heroLogoAnimation', 'heroLogoAnimDelay', 'heroLogoAnimDuration',
+            'footerLine1', 'footerLine2', 'footerLine3', 'footerLine4',
+            'footerFont', 'footerFontSize',
+          ];
+          const cached = {};
+          for (const k of keys) cached[k] = await SettingsRepository.get(k);
+          if (cancelled) return;
 
-        // PHASE 3 — On a fresh device (no local hero cache), pull hero/footer
-        // fields from the Supabase settings table and seed the local cache.
-        if (!hasLocalHero) {
+          if (cached.cachedLogoUrl) setLogoPreview(cached.cachedLogoUrl);
+          if (cached.cachedCoverUrl) setCoverPreview(cached.cachedCoverUrl);
+
+          setBrandingSettings(prev => ({
+            ...prev,
+            ...(cached.cachedLogoUrl && { logoUrl: cached.cachedLogoUrl }),
+            ...(cached.cachedCoverUrl && { coverPhotoUrl: cached.cachedCoverUrl }),
+            ...(cached.cachedBusinessName && { businessName: cached.cachedBusinessName }),
+            ...(cached.heroFont && { heroFont: cached.heroFont }),
+            ...(cached.heroFontColor && { heroFontColor: cached.heroFontColor }),
+            ...(cached.heroTextX && { heroTextX: parseInt(cached.heroTextX) }),
+            ...(cached.heroTextY && { heroTextY: parseInt(cached.heroTextY) }),
+            ...(cached.heroAnimation && { heroAnimation: cached.heroAnimation }),
+            ...(cached.heroFontSize && { heroFontSize: cached.heroFontSize }),
+            ...(cached.heroAnimDelay && { heroAnimDelay: cached.heroAnimDelay }),
+            ...(cached.heroAnimDuration && { heroAnimDuration: cached.heroAnimDuration }),
+            ...(cached.heroLogoEnabled != null && { heroLogoEnabled: cached.heroLogoEnabled === 'true' }),
+            ...(cached.heroLogoX && { heroLogoX: parseInt(cached.heroLogoX) }),
+            ...(cached.heroLogoY && { heroLogoY: parseInt(cached.heroLogoY) }),
+            ...(cached.heroLogoSize && { heroLogoSize: parseInt(cached.heroLogoSize) }),
+            ...(cached.heroLogoAnimation && { heroLogoAnimation: cached.heroLogoAnimation }),
+            ...(cached.heroLogoAnimDelay && { heroLogoAnimDelay: cached.heroLogoAnimDelay }),
+            ...(cached.heroLogoAnimDuration && { heroLogoAnimDuration: cached.heroLogoAnimDuration }),
+            ...(cached.footerLine1 != null && { footerLine1: cached.footerLine1 }),
+            ...(cached.footerLine2 != null && { footerLine2: cached.footerLine2 }),
+            ...(cached.footerLine3 != null && { footerLine3: cached.footerLine3 }),
+            ...(cached.footerLine4 != null && { footerLine4: cached.footerLine4 }),
+            ...(cached.footerFont && { footerFont: cached.footerFont }),
+            ...(cached.footerFontSize && { footerFontSize: cached.footerFontSize }),
+          }));
+        } catch (e) {
+          console.warn('[Branding] Local cache read failed:', e);
+        }
+
+        // PHASE 2 — Refresh from Supabase businesses table. Only overlay
+        // non-null values so silent failures (RLS block, empty row, stale
+        // session) don't wipe the cached values the user just saw.
+        try {
+          const data = await getBrandingSettings(user.businessId);
+          if (cancelled) return;
+          setBrandingSettings(prev => ({
+            ...prev,
+            ...(data.logoUrl != null && { logoUrl: data.logoUrl }),
+            ...(data.coverPhotoUrl != null && { coverPhotoUrl: data.coverPhotoUrl }),
+            ...(data.primaryColor && { primaryColor: data.primaryColor }),
+            ...(data.businessName && { businessName: data.businessName }),
+            ...(data.contactPhone != null && { contactPhone: data.contactPhone }),
+            ...(data.heroTagline != null && { heroTagline: data.heroTagline }),
+            ...(data.heroVideo != null && { heroVideo: data.heroVideo }),
+          }));
+          if (data.logoUrl) setLogoPreview(data.logoUrl);
+          if (data.coverPhotoUrl) setCoverPreview(data.coverPhotoUrl);
+
           try {
-            const { supabase } = await import('../services/supabase/supabaseClient');
-            if (supabase) {
-              const { data: rows } = await supabase
-                .from('settings')
-                .select('key, value')
-                .eq('business_id', user.businessId)
-                .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration','heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize','heroLogoAnimation','heroLogoAnimDelay','heroLogoAnimDuration','footerLine1','footerLine2','footerLine3','footerLine4','footerFont','footerFontSize']);
-              if (rows && rows.length > 0) {
-                const s = {};
-                rows.forEach(r => { s[r.key] = r.value; });
-                setBrandingSettings(prev => ({
-                  ...prev,
-                  ...(s.heroFont && { heroFont: s.heroFont }),
-                  ...(s.heroFontColor && { heroFontColor: s.heroFontColor }),
-                  ...(s.heroTextX && { heroTextX: parseInt(s.heroTextX) }),
-                  ...(s.heroTextY && { heroTextY: parseInt(s.heroTextY) }),
-                  ...(s.heroAnimation && { heroAnimation: s.heroAnimation }),
-                  ...(s.heroFontSize && { heroFontSize: s.heroFontSize }),
-                  ...(s.heroAnimDelay && { heroAnimDelay: s.heroAnimDelay }),
-                  ...(s.heroAnimDuration && { heroAnimDuration: s.heroAnimDuration }),
-                  ...(s.heroLogoEnabled != null && { heroLogoEnabled: s.heroLogoEnabled === 'true' }),
-                  ...(s.heroLogoX && { heroLogoX: parseInt(s.heroLogoX) }),
-                  ...(s.heroLogoY && { heroLogoY: parseInt(s.heroLogoY) }),
-                  ...(s.heroLogoSize && { heroLogoSize: parseInt(s.heroLogoSize) }),
-                  ...(s.heroLogoAnimation && { heroLogoAnimation: s.heroLogoAnimation }),
-                  ...(s.heroLogoAnimDelay && { heroLogoAnimDelay: s.heroLogoAnimDelay }),
-                  ...(s.heroLogoAnimDuration && { heroLogoAnimDuration: s.heroLogoAnimDuration }),
-                  ...(s.footerLine1 != null && { footerLine1: s.footerLine1 }),
-                  ...(s.footerLine2 != null && { footerLine2: s.footerLine2 }),
-                  ...(s.footerLine3 != null && { footerLine3: s.footerLine3 }),
-                  ...(s.footerLine4 != null && { footerLine4: s.footerLine4 }),
-                  ...(s.footerFont && { footerFont: s.footerFont }),
-                  ...(s.footerFontSize && { footerFontSize: s.footerFontSize }),
-                }));
-                for (const r of rows) {
-                  await SettingsRepository.set(r.key, r.value).catch(() => {});
-                }
+            if (data.logoUrl) await SettingsRepository.set('cachedLogoUrl', data.logoUrl);
+            if (data.coverPhotoUrl) await SettingsRepository.set('cachedCoverUrl', data.coverPhotoUrl);
+            if (data.businessName) await SettingsRepository.set('cachedBusinessName', data.businessName);
+          } catch {}
+          if (data.primaryColor) applyColorTheme(data.primaryColor);
+        } catch (err) {
+          console.error('[Branding] Phase 2 (businesses) failed:', err);
+        }
+
+        // PHASE 3 — Always reconcile hero/footer fields from the Supabase
+        // settings table. Running this every load (not just on fresh devices)
+        // keeps the admin UI in sync when another device updated settings.
+        // Local cache still drives instant paint via Phase 1.
+        try {
+          const { supabase } = await import('../services/supabase/supabaseClient');
+          if (supabase) {
+            const { data: rows, error } = await supabase
+              .from('settings')
+              .select('key, value')
+              .eq('business_id', user.businessId)
+              .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration','heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize','heroLogoAnimation','heroLogoAnimDelay','heroLogoAnimDuration','footerLine1','footerLine2','footerLine3','footerLine4','footerFont','footerFontSize']);
+            if (cancelled) return;
+            if (error) {
+              console.error('[Branding] Phase 3 settings query failed:', error);
+            } else if (rows && rows.length > 0) {
+              const s = {};
+              rows.forEach(r => { s[r.key] = r.value; });
+              setBrandingSettings(prev => ({
+                ...prev,
+                ...(s.heroFont && { heroFont: s.heroFont }),
+                ...(s.heroFontColor && { heroFontColor: s.heroFontColor }),
+                ...(s.heroTextX && { heroTextX: parseInt(s.heroTextX) }),
+                ...(s.heroTextY && { heroTextY: parseInt(s.heroTextY) }),
+                ...(s.heroAnimation && { heroAnimation: s.heroAnimation }),
+                ...(s.heroFontSize && { heroFontSize: s.heroFontSize }),
+                ...(s.heroAnimDelay && { heroAnimDelay: s.heroAnimDelay }),
+                ...(s.heroAnimDuration && { heroAnimDuration: s.heroAnimDuration }),
+                ...(s.heroLogoEnabled != null && { heroLogoEnabled: s.heroLogoEnabled === 'true' }),
+                ...(s.heroLogoX && { heroLogoX: parseInt(s.heroLogoX) }),
+                ...(s.heroLogoY && { heroLogoY: parseInt(s.heroLogoY) }),
+                ...(s.heroLogoSize && { heroLogoSize: parseInt(s.heroLogoSize) }),
+                ...(s.heroLogoAnimation && { heroLogoAnimation: s.heroLogoAnimation }),
+                ...(s.heroLogoAnimDelay && { heroLogoAnimDelay: s.heroLogoAnimDelay }),
+                ...(s.heroLogoAnimDuration && { heroLogoAnimDuration: s.heroLogoAnimDuration }),
+                ...(s.footerLine1 != null && { footerLine1: s.footerLine1 }),
+                ...(s.footerLine2 != null && { footerLine2: s.footerLine2 }),
+                ...(s.footerLine3 != null && { footerLine3: s.footerLine3 }),
+                ...(s.footerLine4 != null && { footerLine4: s.footerLine4 }),
+                ...(s.footerFont && { footerFont: s.footerFont }),
+                ...(s.footerFontSize && { footerFontSize: s.footerFontSize }),
+              }));
+              for (const r of rows) {
+                await SettingsRepository.set(r.key, r.value).catch(() => {});
               }
             }
-          } catch (e) {
-            console.warn('[HeroSettings] Supabase fallback failed:', e);
           }
+        } catch (e) {
+          console.warn('[Branding] Phase 3 fallback failed:', e);
         }
-      } catch (err) {
-        console.error('Error loading branding:', err);
+      } finally {
+        if (!cancelled) setBrandingLoading(false);
       }
     };
     loadBranding();
+    return () => { cancelled = true; };
   }, [user?.businessId]);
 
   const handleLogoFileChange = (e) => {
@@ -2112,6 +2127,35 @@ const Settings = () => {
           </div>
           <div className="settings-section-body">
 
+            {brandingLoading && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.25rem',
+                  background: 'rgba(27, 94, 55, 0.06)',
+                  border: '1px solid rgba(27, 94, 55, 0.18)',
+                  borderRadius: '8px',
+                  color: '#1B5E37',
+                  fontSize: '0.9rem',
+                }}
+              >
+                <span
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    border: '2px solid rgba(27, 94, 55, 0.3)',
+                    borderTopColor: '#1B5E37',
+                    animation: 'spin 0.8s linear infinite',
+                  }}
+                />
+                Loading your saved branding configuration… please wait before saving.
+              </div>
+            )}
+
             {/* Color Theme */}
             <div className="branding-sub-section">
               <h3 className="branding-sub-title">Color Theme</h3>
@@ -3070,9 +3114,10 @@ const Settings = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleSaveBranding}
-                  disabled={savingBranding}
+                  disabled={savingBranding || brandingLoading}
+                  title={brandingLoading ? 'Please wait — loading your saved settings...' : undefined}
                 >
-                  {savingBranding ? 'Saving...' : 'Save Branding'}
+                  {brandingLoading ? 'Loading...' : savingBranding ? 'Saving...' : 'Save Branding'}
                 </button>
               </div>
             )}

@@ -98,7 +98,10 @@ export async function getBrandingSettings(businessId) {
       }
     );
 
-    if (!res.ok) return empty;
+    if (!res.ok) {
+      console.error('[brandingService] getBrandingSettings failed:', res.status, await res.text().catch(() => ''));
+      return empty;
+    }
 
     const data = await res.json();
     const row = data[0] || {};
@@ -111,7 +114,8 @@ export async function getBrandingSettings(businessId) {
       heroTagline: row.tagline || null,
       heroVideo: row.hero_video || null,
     };
-  } catch {
+  } catch (err) {
+    console.error('[brandingService] getBrandingSettings threw:', err);
     return empty;
   }
 }

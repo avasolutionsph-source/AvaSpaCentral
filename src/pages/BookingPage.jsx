@@ -204,6 +204,7 @@ const BookingPage = () => {
 
   // Scroll progress for the floating summary bar (0 = hidden on hero, 1 = fully visible)
   const [summaryReveal, setSummaryReveal] = useState(0);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   useEffect(() => {
     const REVEAL_DISTANCE = 220; // px of scroll over which the bar fades in
     const handleScroll = () => {
@@ -1965,126 +1966,6 @@ const BookingPage = () => {
             </div>
           </div>
 
-          {/* Booking Summary — inline at the end */}
-          <div className="booking-section luxe-section luxe-summary-section">
-            <div className="luxe-section-header">
-              <span className="luxe-section-accent" />
-              <h2>Booking Summary</h2>
-              <p className="luxe-section-subtitle">Review your selections before booking</p>
-            </div>
-
-            {selectedServices.length === 0 ? (
-              <div className="luxe-summary-empty">
-                <div className="luxe-summary-empty-icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
-                </div>
-                <p>No services selected yet</p>
-                <small>Choose from the treatments above to get started</small>
-              </div>
-            ) : (
-              <div className="luxe-summary-content">
-                <div className="luxe-summary-grid">
-                  {/* Selected Services */}
-                  <div className="luxe-summary-services">
-                    <h4 className="luxe-summary-label">Selected Services</h4>
-                    <div className="summary-items">
-                      {selectedServices.map(service => (
-                        <div key={service.id} className="summary-item">
-                          <div className="item-info">
-                            <span className="item-name">{service.name}</span>
-                            {service.duration && (
-                              <span className="item-duration">{service.duration} min</span>
-                            )}
-                          </div>
-                          <span className="item-price">₱{service.price?.toLocaleString()}</span>
-                          <button
-                            className="remove-item"
-                            onClick={() => toggleService(service)}
-                            title="Remove"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Schedule & Details */}
-                  <div className="luxe-summary-details">
-                    <h4 className="luxe-summary-label">Appointment Details</h4>
-                    {selectedDate && selectedTime ? (
-                      <div className="luxe-detail-card">
-                        <div className="luxe-detail-row">
-                          <span className="luxe-detail-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                          </span>
-                          <span>{new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                        </div>
-                        <div className="luxe-detail-row">
-                          <span className="luxe-detail-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                          </span>
-                          <span>{selectedTime}</span>
-                        </div>
-                        {selectedBranch && (
-                          <div className="luxe-detail-row">
-                            <span className="luxe-detail-icon">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                            </span>
-                            <span>{selectedBranch.name}</span>
-                          </div>
-                        )}
-                        {serviceLocation !== 'in_store' && serviceAddress && (
-                          <div className="luxe-detail-row">
-                            <span className="luxe-detail-icon">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-                            </span>
-                            <span>{serviceLocation === 'home_service' ? 'Home' : 'Hotel'}: {serviceAddress}</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="luxe-detail-placeholder">Select date & time above</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Totals */}
-                <div className="luxe-summary-totals">
-                  <div className="luxe-total-row">
-                    <span>Services ({selectedServices.length})</span>
-                    <span>₱{servicesTotal.toLocaleString()}</span>
-                  </div>
-                  {transportFee > 0 && (
-                    <div className="luxe-total-row">
-                      <span>{serviceLocation === 'home_service' ? 'Home Service Fee' : 'Hotel Service Fee'}</span>
-                      <span>₱{transportFee.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="luxe-total-row luxe-total-main">
-                    <span>Total</span>
-                    <span>₱{cartTotal.toLocaleString()}</span>
-                  </div>
-                  <div className="luxe-total-row luxe-total-deposit">
-                    <span>Deposit Required (50%)</span>
-                    <span>₱{depositAmount.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <button
-                  className="submit-booking-btn"
-                  onClick={handleSubmitBooking}
-                  disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
-                >
-                  {submitting ? 'Submitting...' : 'Confirm Booking'}
-                </button>
-
-                <p className="booking-note">
-                  We'll contact you to confirm your booking and arrange payment.
-                </p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -2101,20 +1982,166 @@ const BookingPage = () => {
       </footer>
       )}
 
-      {/* Floating booking summary — reveals gradually as the user scrolls past the hero */}
+      {/* Floating booking summary — expands to full summary when clicked */}
+      {summaryExpanded && (
+        <div
+          className="floating-summary-backdrop"
+          onClick={() => setSummaryExpanded(false)}
+          aria-hidden="true"
+        />
+      )}
       <div
-        className="floating-summary-bar"
-        onClick={() => document.querySelector('.luxe-summary-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-        role="button"
+        className={`floating-summary-bar${summaryExpanded ? ' is-expanded' : ''}`}
         tabIndex={summaryReveal > 0.5 ? 0 : -1}
         aria-hidden={summaryReveal < 0.1}
         style={{
-          opacity: summaryReveal,
-          transform: `translateX(-50%) translateY(${(1 - summaryReveal) * 110}%)`,
-          pointerEvents: summaryReveal < 0.2 ? 'none' : 'auto',
+          opacity: summaryExpanded ? 1 : summaryReveal,
+          transform: `translateX(-50%) translateY(${summaryExpanded ? 0 : (1 - summaryReveal) * 110}%)`,
+          pointerEvents: summaryExpanded || summaryReveal >= 0.2 ? 'auto' : 'none',
         }}
       >
-        <div className="floating-summary-inner">
+        {summaryExpanded && (
+          <div className="floating-summary-panel">
+            <div className="floating-summary-panel-header">
+              <div>
+                <h3>Booking Summary</h3>
+                <p>Review your selections before booking</p>
+              </div>
+              <button
+                type="button"
+                className="floating-summary-close"
+                onClick={() => setSummaryExpanded(false)}
+                aria-label="Close summary"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="floating-summary-panel-body">
+              {selectedServices.length === 0 ? (
+                <div className="luxe-summary-empty">
+                  <div className="luxe-summary-empty-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
+                  </div>
+                  <p>No services selected yet</p>
+                  <small>Choose from the treatments above to get started</small>
+                </div>
+              ) : (
+                <div className="luxe-summary-content">
+                  <div className="luxe-summary-grid">
+                    <div className="luxe-summary-services">
+                      <h4 className="luxe-summary-label">Selected Services</h4>
+                      <div className="summary-items">
+                        {selectedServices.map(service => (
+                          <div key={service.id} className="summary-item">
+                            <div className="item-info">
+                              <span className="item-name">{service.name}</span>
+                              {service.duration && (
+                                <span className="item-duration">{service.duration} min</span>
+                              )}
+                            </div>
+                            <span className="item-price">₱{service.price?.toLocaleString()}</span>
+                            <button
+                              className="remove-item"
+                              onClick={() => toggleService(service)}
+                              title="Remove"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="luxe-summary-details">
+                      <h4 className="luxe-summary-label">Appointment Details</h4>
+                      {selectedDate && selectedTime ? (
+                        <div className="luxe-detail-card">
+                          <div className="luxe-detail-row">
+                            <span className="luxe-detail-icon">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                            </span>
+                            <span>{new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                          </div>
+                          <div className="luxe-detail-row">
+                            <span className="luxe-detail-icon">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                            </span>
+                            <span>{selectedTime}</span>
+                          </div>
+                          {selectedBranch && (
+                            <div className="luxe-detail-row">
+                              <span className="luxe-detail-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                              </span>
+                              <span>{selectedBranch.name}</span>
+                            </div>
+                          )}
+                          {serviceLocation !== 'in_store' && serviceAddress && (
+                            <div className="luxe-detail-row">
+                              <span className="luxe-detail-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                              </span>
+                              <span>{serviceLocation === 'home_service' ? 'Home' : 'Hotel'}: {serviceAddress}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="luxe-detail-placeholder">Select date & time above</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="luxe-summary-totals">
+                    <div className="luxe-total-row">
+                      <span>Services ({selectedServices.length})</span>
+                      <span>₱{servicesTotal.toLocaleString()}</span>
+                    </div>
+                    {transportFee > 0 && (
+                      <div className="luxe-total-row">
+                        <span>{serviceLocation === 'home_service' ? 'Home Service Fee' : 'Hotel Service Fee'}</span>
+                        <span>₱{transportFee.toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="luxe-total-row luxe-total-main">
+                      <span>Total</span>
+                      <span>₱{cartTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="luxe-total-row luxe-total-deposit">
+                      <span>Deposit Required (50%)</span>
+                      <span>₱{depositAmount.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    className="submit-booking-btn"
+                    onClick={handleSubmitBooking}
+                    disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
+                  >
+                    {submitting ? 'Submitting...' : 'Confirm Booking'}
+                  </button>
+
+                  <p className="booking-note">
+                    We'll contact you to confirm your booking and arrange payment.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div
+          className="floating-summary-inner"
+          onClick={() => setSummaryExpanded(prev => !prev)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSummaryExpanded(prev => !prev);
+            }
+          }}
+        >
           <div className="floating-summary-left">
             <span className="floating-summary-count">{selectedServices.length}</span>
             <div className="floating-summary-labels">
@@ -2138,8 +2165,20 @@ const BookingPage = () => {
               <span className="floating-summary-total-amount">₱{cartTotal.toLocaleString()}</span>
             </div>
             <span className="floating-summary-cta">
-              View
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              {summaryExpanded ? 'Close' : 'View'}
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ transform: summaryExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease' }}
+              >
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
             </span>
           </div>
         </div>

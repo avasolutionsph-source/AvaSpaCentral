@@ -2615,31 +2615,6 @@ html {
    LUXE SUMMARY SECTION (inline, bottom of page)
    ============================================================================ */
 
-.luxe-summary-section {
-  background: linear-gradient(135deg, #1a1a1a 0%, #252525 100%) !important;
-  border: none;
-  border-bottom: none;
-  color: #d0d0d0;
-  border-radius: 0;
-  padding: 5rem 2.5rem;
-}
-
-.luxe-summary-section:hover {
-  box-shadow: none;
-}
-
-.luxe-summary-section .luxe-section-header h2 {
-  color: #fff;
-}
-
-.luxe-summary-section .luxe-section-subtitle {
-  color: #999;
-}
-
-.luxe-summary-section .luxe-section-accent {
-  background: linear-gradient(90deg, transparent, #d4a574, transparent);
-}
-
 /* Empty state */
 .luxe-summary-empty {
   text-align: center;
@@ -2694,40 +2669,40 @@ html {
 }
 
 /* Summary items (dark themed) */
-.luxe-summary-section .summary-items {
+.floating-summary-panel .summary-items {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 0;
 }
 
-.luxe-summary-section .summary-item {
+.floating-summary-panel .summary-item {
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 10px;
   padding: 0.75rem 1rem;
 }
 
-.luxe-summary-section .item-name {
+.floating-summary-panel .item-name {
   color: #e0e0e0;
   font-size: 0.9rem;
 }
 
-.luxe-summary-section .item-duration {
+.floating-summary-panel .item-duration {
   color: #777;
 }
 
-.luxe-summary-section .item-price {
+.floating-summary-panel .item-price {
   color: #d4a574;
   font-family: 'Cormorant Garamond', serif;
   font-size: 1rem;
 }
 
-.luxe-summary-section .remove-item {
+.floating-summary-panel .remove-item {
   color: #555;
 }
 
-.luxe-summary-section .remove-item:hover {
+.floating-summary-panel .remove-item:hover {
   color: #ef4444;
 }
 
@@ -2814,17 +2789,19 @@ html {
   font-size: 1.2rem;
 }
 
-/* Submit button inside summary section */
-.luxe-summary-section .submit-booking-btn {
+/* Submit button inside summary panel */
+.floating-summary-panel .submit-booking-btn {
   max-width: 400px;
   margin: 0.5rem auto 0;
   display: block;
 }
 
-.luxe-summary-section .booking-note {
+.floating-summary-panel .booking-note {
   color: #666;
   max-width: 400px;
   margin: 0.75rem auto 0;
+  text-align: center;
+  font-size: 0.75rem;
 }
 
 /* Hide old sidebar summary on centered layout */
@@ -2842,11 +2819,11 @@ html {
     max-width: 100%;
   }
 
-  .luxe-summary-section .submit-booking-btn {
+  .floating-summary-panel .submit-booking-btn {
     max-width: 100%;
   }
 
-  .luxe-summary-section .booking-note {
+  .floating-summary-panel .booking-note {
     max-width: 100%;
   }
 }
@@ -2870,13 +2847,16 @@ html {
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  cursor: pointer;
-  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease, opacity 0.25s ease;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease, opacity 0.25s ease;
   padding-bottom: env(safe-area-inset-bottom, 0);
   will-change: transform, opacity;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
 }
-.floating-summary-bar:hover {
-  transform: translateX(-50%) translateY(-4px);
+.floating-summary-bar:not(.is-expanded):hover {
+  transform: translateX(-50%) translateY(-4px) !important;
   box-shadow:
     0 -14px 50px rgba(0, 0, 0, 0.65),
     0 -4px 20px rgba(212, 175, 55, 0.3),
@@ -2887,12 +2867,103 @@ html {
   outline: 2px solid rgba(212, 175, 55, 0.8);
   outline-offset: 2px;
 }
+.floating-summary-bar.is-expanded {
+  width: min(720px, calc(100vw - 24px));
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow:
+    0 -20px 70px rgba(0, 0, 0, 0.75),
+    0 -6px 26px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.floating-summary-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 4, 3, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 998;
+  animation: floatingSummaryFadeIn 0.25s ease;
+}
+@keyframes floatingSummaryFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.floating-summary-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: floatingSummaryPanelIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes floatingSummaryPanelIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.floating-summary-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px 12px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.18);
+}
+.floating-summary-panel-header h3 {
+  margin: 0;
+  font-family: 'Playfair Display', serif;
+  color: #f5e9d4;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.floating-summary-panel-header p {
+  margin: 4px 0 0;
+  color: rgba(245, 233, 212, 0.55);
+  font-size: 0.78rem;
+  font-style: italic;
+  letter-spacing: 0.3px;
+}
+.floating-summary-close {
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  color: #f5e9d4;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.floating-summary-close:hover {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: rgba(212, 175, 55, 0.5);
+  transform: rotate(90deg);
+}
+.floating-summary-panel-body {
+  padding: 18px 22px 8px;
+  overflow-y: auto;
+  max-height: calc(100vh - 220px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.3) transparent;
+}
+.floating-summary-panel-body::-webkit-scrollbar {
+  width: 6px;
+}
+.floating-summary-panel-body::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 3px;
+}
 .floating-summary-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 14px 20px;
+  cursor: pointer;
+}
+.floating-summary-bar.is-expanded .floating-summary-inner {
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
 }
 .floating-summary-left {
   display: flex;

@@ -44,3 +44,7 @@ coverage
 .DS_Store
 Thumbs.db
 nul
+
+# Working assets and scratch files (not for repo)
+Booking Videos/
+Untitled

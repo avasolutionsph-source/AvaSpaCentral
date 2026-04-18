@@ -20,6 +20,8 @@ const PERIODS = [
   { id: 'all', label: 'All Time' },
 ];
 
+const SAVED_KEY = 'savedDailyReports';
+
 const peso = (n) => `₱${(Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const num = (n) => (Number(n) || 0).toLocaleString('en-PH');
 
@@ -30,32 +32,39 @@ const kpiClass = (value, { goodAbove, warnAbove } = {}) => {
   return 'bad';
 };
 
-const DailySalesReport = () => {
-  const { user, getUserBranchId, selectedBranch } = useApp();
+const blankManual = () => ({
+  shift: 'Whole Day',
+  preparedBy: '',
+  approvedBy: '',
+  verifiedBy: '',
+  ownerReview: '',
+  lateTherapist: '',
+  complaints: '',
+  refundReason: '',
+  systemIssues: '',
+});
 
+const DailySalesReport = () => {
+  const { user, getUserBranchId, selectedBranch, showToast } = useApp();
+
+  const [view, setView] = useState('current'); // 'current' | 'saved'
   const [period, setPeriod] = useState('today');
   const [loading, setLoading] = useState(true);
 
-  // Raw data
+  // Raw data (for live view)
   const [transactions, setTransactions] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [cashSessions, setCashSessions] = useState([]);
   const [cashAdvances, setCashAdvances] = useState([]);
 
-  // Manual fields persisted per period key
-  const blankManual = {
-    shift: 'Whole Day',
-    preparedBy: '',
-    approvedBy: '',
-    verifiedBy: '',
-    ownerReview: '',
-    lateTherapist: '',
-    complaints: '',
-    refundReason: '',
-    systemIssues: '',
-  };
-  const [manual, setManual] = useState(blankManual);
+  // Manual fields for live view, keyed by period
+  const [manual, setManual] = useState(blankManual());
+
+  // Saved reports
+  const [savedReports, setSavedReports] = useState([]);
+  const [viewingReport, setViewingReport] = useState(null); // snapshot shown read-only
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   // Compute period bounds and a stable key for manual-field storage
   const { startDate, endDate, periodKey, periodLabel } = useMemo(() => {
@@ -108,12 +117,13 @@ const DailySalesReport = () => {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [txs, exps, emps, sessions, advances] = await Promise.all([
+      const [txs, exps, emps, sessions, advances, saved] = await Promise.all([
         mockApi.transactions.getTransactions(),
         mockApi.expenses.getExpenses(),
         mockApi.employees.getEmployees(),
         mockApi.cashDrawer.getSessions(),
         CashAdvanceRequestRepository.getAll(),
+        SettingsRepository.get(SAVED_KEY),
       ]);
       const branchFilter = (item) => !branchId || !item?.branchId || item.branchId === branchId;
       setTransactions((txs || []).filter(branchFilter));
@@ -121,6 +131,10 @@ const DailySalesReport = () => {
       setEmployees(emps || []);
       setCashSessions((sessions || []).filter(branchFilter));
       setCashAdvances((advances || []).filter(branchFilter));
+      const branchSaved = Array.isArray(saved)
+        ? saved.filter(r => !branchId || !r.branchId || r.branchId === branchId)
+        : [];
+      setSavedReports(branchSaved);
     } catch {
       // Silent — each section renders zeros when data is missing
     } finally {
@@ -137,13 +151,13 @@ const DailySalesReport = () => {
       try {
         const saved = await SettingsRepository.get(`dailySalesReport:${periodKey}`);
         if (cancelled) return;
-        setManual(saved && typeof saved === 'object' ? { ...blankManual, ...saved } : blankManual);
+        setManual(saved && typeof saved === 'object' ? { ...blankManual(), ...saved } : blankManual());
       } catch {
-        if (!cancelled) setManual(blankManual);
+        if (!cancelled) setManual(blankManual());
       }
     })();
     return () => { cancelled = true; };
-  }, [periodKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [periodKey]);
 
   // Debounced persist of manual fields
   useEffect(() => {
@@ -160,28 +174,25 @@ const DailySalesReport = () => {
     return t >= startDate.getTime() && t <= endDate.getTime();
   }, [startDate, endDate]);
 
-  const data = useMemo(() => {
+  const liveData = useMemo(() => {
     const completed = transactions.filter(t => t.status === 'completed' && inRange(t.date));
     const voided = transactions.filter(t => t.status === 'voided' && inRange(t.date));
     const periodExpenses = expenses.filter(e => inRange(e.date || e.createdAt));
     const periodAdvances = cashAdvances.filter(a => a.status === 'approved' && inRange(a.approvedAt || a.createdAt));
     const periodSessions = cashSessions.filter(s => inRange(s.openTime));
 
-    // Sales Summary
     const grossSales = completed.reduce((s, t) => s + (t.subtotal || 0), 0);
     const discounts = completed.reduce((s, t) => s + (t.discount || 0), 0);
     const refunds = voided.reduce((s, t) => s + (t.totalAmount || 0), 0);
     const tax = completed.reduce((s, t) => s + (t.tax || 0), 0);
     const netSales = completed.reduce((s, t) => s + (t.totalAmount || 0), 0);
 
-    // Payments
     const paymentBuckets = {};
     for (const t of completed) {
       const m = t.paymentMethod || 'Other';
       paymentBuckets[m] = (paymentBuckets[m] || 0) + (t.totalAmount || 0);
     }
 
-    // Service sales breakdown
     const serviceMap = new Map();
     for (const t of completed) {
       for (const item of (t.items || [])) {
@@ -197,7 +208,6 @@ const DailySalesReport = () => {
       .sort((a, b) => b.amount - a.amount);
     const serviceTotals = serviceRows.reduce((acc, r) => ({ qty: acc.qty + r.qty, amount: acc.amount + r.amount }), { qty: 0, amount: 0 });
 
-    // Therapist performance — aggregate by employee id
     const empMap = new Map();
     const empNameOf = (id) => {
       const e = employees.find(emp => emp._id === id || emp.id === id);
@@ -224,7 +234,6 @@ const DailySalesReport = () => {
       }))
       .sort((a, b) => b.sales - a.sales);
 
-    // Expenses by category
     const expenseMap = new Map();
     for (const e of periodExpenses) {
       const cat = e.category || 'Other';
@@ -238,7 +247,6 @@ const DailySalesReport = () => {
       .sort((a, b) => b.amount - a.amount);
     const totalExpenses = expenseRows.reduce((s, r) => s + r.amount, 0);
 
-    // Cash Advance rows
     const advanceRows = periodAdvances.map(a => ({
       employee: a.employeeName || empNameOf(a.employeeId),
       amount: a.amount || 0,
@@ -246,7 +254,6 @@ const DailySalesReport = () => {
     }));
     const totalAdvances = advanceRows.reduce((s, r) => s + r.amount, 0);
 
-    // Cash Flow
     const firstSession = [...periodSessions].sort((a, b) => new Date(a.openTime) - new Date(b.openTime))[0];
     const lastClosed = [...periodSessions].filter(s => s.status === 'closed')
       .sort((a, b) => new Date(b.closeTime) - new Date(a.closeTime))[0];
@@ -255,13 +262,11 @@ const DailySalesReport = () => {
     const endingCashActual = lastClosed?.actualCash;
     const endingCashExpected = beginningCash + cashSales - totalExpenses - totalAdvances;
 
-    // KPI
     const totalClients = completed.length;
     const avgTicket = totalClients > 0 ? netSales / totalClients : 0;
     const activeTherapists = employees.filter(e => e.status === 'active').length;
     const therapistsWithSales = empMap.size;
     const utilization = activeTherapists > 0 ? (therapistsWithSales / activeTherapists) * 100 : 0;
-    // Peak hours — bucket by hour, pick top bucket
     const hourBuckets = {};
     for (const t of completed) {
       const h = new Date(t.date).getHours();
@@ -289,277 +294,443 @@ const DailySalesReport = () => {
 
   const handlePrint = () => window.print();
 
+  const handleSaveReport = async () => {
+    const snapshot = {
+      id: `report_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      savedAt: new Date().toISOString(),
+      period,
+      periodLabel,
+      periodKey,
+      branchId: branchId || null,
+      branchName: selectedBranch?.name || user?.branchName || null,
+      savedBy: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || user.email : null,
+      data: liveData,
+      manual,
+    };
+    try {
+      const existing = (await SettingsRepository.get(SAVED_KEY)) || [];
+      const next = [snapshot, ...(Array.isArray(existing) ? existing : [])];
+      await SettingsRepository.set(SAVED_KEY, next);
+      // Refresh local list (branch-filtered the same way as loadAll)
+      setSavedReports(prev => [snapshot, ...prev]);
+      showToast?.('Report saved', 'success');
+    } catch (e) {
+      showToast?.('Failed to save report', 'error');
+    }
+  };
+
+  const handleDeleteReport = async (id) => {
+    try {
+      const existing = (await SettingsRepository.get(SAVED_KEY)) || [];
+      const next = (Array.isArray(existing) ? existing : []).filter(r => r.id !== id);
+      await SettingsRepository.set(SAVED_KEY, next);
+      setSavedReports(prev => prev.filter(r => r.id !== id));
+      setConfirmDeleteId(null);
+      if (viewingReport?.id === id) setViewingReport(null);
+      showToast?.('Saved report deleted', 'success');
+    } catch {
+      showToast?.('Failed to delete report', 'error');
+    }
+  };
+
+  // Decide what to render in the sheet area
+  const sheetSnapshot = viewingReport
+    ? { data: viewingReport.data, manual: viewingReport.manual, periodLabel: viewingReport.periodLabel, readOnly: true }
+    : { data: liveData, manual, periodLabel, readOnly: false };
+
   return (
     <div className="daily-sales-report">
-      {/* Controls */}
-      <div className="dsr-toolbar">
-        <div className="dsr-period-group">
-          {PERIODS.map(p => (
-            <button
-              key={p.id}
-              className={`dsr-period-btn ${period === p.id ? 'active' : ''}`}
-              onClick={() => setPeriod(p.id)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className="dsr-meta">
-          <span className="dsr-range">{periodLabel}</span>
-          <button className="btn btn-secondary" onClick={loadAll} disabled={loading}>Refresh</button>
-          <button className="btn btn-primary" onClick={handlePrint}>Print / Export PDF</button>
-        </div>
+      {/* Sub-tabs: Current Report / Saved Reports */}
+      <div className="dsr-subtabs">
+        <button
+          className={`dsr-subtab ${view === 'current' ? 'active' : ''}`}
+          onClick={() => { setView('current'); setViewingReport(null); }}
+        >
+          Current Report
+        </button>
+        <button
+          className={`dsr-subtab ${view === 'saved' ? 'active' : ''}`}
+          onClick={() => setView('saved')}
+        >
+          Saved Reports
+          {savedReports.length > 0 && <span className="dsr-subtab-count">{savedReports.length}</span>}
+        </button>
       </div>
 
-      <div className="dsr-sheet">
-        <header className="dsr-header">
-          <h1>Daily Sales Report</h1>
-          <p className="dsr-subtitle">{periodLabel}</p>
-        </header>
-
-        {/* 1. Basic Info */}
-        <section className="dsr-section">
-          <h2>1. Basic Info</h2>
-          <div className="dsr-grid-2">
-            <Field label="Date">{periodLabel}</Field>
-            <Field label="Branch">{selectedBranch?.name || user?.branchName || '—'}</Field>
-            {period === 'today' && (
-              <Field label="Shift">
-                <select value={manual.shift} onChange={e => setManual(m => ({ ...m, shift: e.target.value }))}>
-                  <option>AM</option>
-                  <option>PM</option>
-                  <option>Whole Day</option>
-                </select>
-              </Field>
-            )}
-            <Field label="Prepared by">
-              <input value={manual.preparedBy} onChange={e => setManual(m => ({ ...m, preparedBy: e.target.value }))} placeholder="Name" />
-            </Field>
-            <Field label="Approved by">
-              <input value={manual.approvedBy} onChange={e => setManual(m => ({ ...m, approvedBy: e.target.value }))} placeholder="Name" />
-            </Field>
-          </div>
-        </section>
-
-        {/* 2. Sales Summary */}
-        <section className="dsr-section">
-          <h2>2. Sales Summary</h2>
-          <div className="dsr-kv-rows">
-            <KV label="Total Gross Sales" value={peso(data.grossSales)} />
-            <KV label="Less: Discounts" value={`- ${peso(data.discounts)}`} tone={data.discounts > 0 ? 'warn' : ''} />
-            <KV label="Less: Refunds" value={`- ${peso(data.refunds)}`} tone={data.refunds > 0 ? 'bad' : ''} />
-            <KV label="VAT / Tax" value={peso(data.tax)} />
-            <KV label="Net Sales" value={peso(data.netSales)} strong tone="good" />
-          </div>
-        </section>
-
-        {/* 3. Payment Breakdown */}
-        <section className="dsr-section">
-          <h2>3. Payment Breakdown</h2>
-          <table className="dsr-table">
-            <thead>
-              <tr><th>Method</th><th className="right">Amount</th></tr>
-            </thead>
-            <tbody>
-              {Object.keys(data.paymentBuckets).length === 0 && (
-                <tr><td colSpan={2} className="dsr-empty">No collections in this period.</td></tr>
-              )}
-              {Object.entries(data.paymentBuckets).map(([m, amt]) => (
-                <tr key={m}><td>{m}</td><td className="right">{peso(amt)}</td></tr>
+      {view === 'current' && !viewingReport && (
+        <>
+          <div className="dsr-toolbar">
+            <div className="dsr-period-group">
+              {PERIODS.map(p => (
+                <button
+                  key={p.id}
+                  className={`dsr-period-btn ${period === p.id ? 'active' : ''}`}
+                  onClick={() => setPeriod(p.id)}
+                >
+                  {p.label}
+                </button>
               ))}
-              <tr className="dsr-total">
-                <td>Total Collections</td>
-                <td className="right">{peso(Object.values(data.paymentBuckets).reduce((s, v) => s + v, 0))}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        {/* 4. Service Sales */}
-        <section className="dsr-section">
-          <h2>4. Service Sales Breakdown</h2>
-          <table className="dsr-table">
-            <thead>
-              <tr><th>Service</th><th className="right">Qty</th><th className="right">Amount</th></tr>
-            </thead>
-            <tbody>
-              {data.serviceRows.length === 0 && (
-                <tr><td colSpan={3} className="dsr-empty">No service sales.</td></tr>
-              )}
-              {data.serviceRows.map(row => (
-                <tr key={row.name}>
-                  <td>{row.name}</td>
-                  <td className="right">{num(row.qty)}</td>
-                  <td className="right">{peso(row.amount)}</td>
-                </tr>
-              ))}
-              <tr className="dsr-total">
-                <td>Total</td>
-                <td className="right">{num(data.serviceTotals.qty)}</td>
-                <td className="right">{peso(data.serviceTotals.amount)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        {/* 5. Therapist Performance */}
-        <section className="dsr-section">
-          <h2>5. Therapist Performance</h2>
-          <table className="dsr-table">
-            <thead>
-              <tr>
-                <th>Therapist</th>
-                <th className="right">Clients</th>
-                <th>Services Done</th>
-                <th className="right">Sales Generated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.therapistRows.length === 0 && (
-                <tr><td colSpan={4} className="dsr-empty">No therapist activity.</td></tr>
-              )}
-              {data.therapistRows.map(row => (
-                <tr key={row.name}>
-                  <td>{row.name}</td>
-                  <td className="right">{num(row.clients)}</td>
-                  <td className="dsr-small">{row.services || '—'}</td>
-                  <td className="right">{peso(row.sales)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        {/* 6. Expenses */}
-        <section className="dsr-section">
-          <h2>6. Operating Expenses</h2>
-          <table className="dsr-table">
-            <thead>
-              <tr><th>Type</th><th className="right">Amount</th><th>Notes</th></tr>
-            </thead>
-            <tbody>
-              {data.expenseRows.length === 0 && (
-                <tr><td colSpan={3} className="dsr-empty">No expenses recorded.</td></tr>
-              )}
-              {data.expenseRows.map(row => (
-                <tr key={row.category}>
-                  <td>{row.category}</td>
-                  <td className="right">{peso(row.amount)}</td>
-                  <td className="dsr-small">{row.notes}</td>
-                </tr>
-              ))}
-              <tr className="dsr-total">
-                <td>Total Expenses</td>
-                <td className="right">{peso(data.totalExpenses)}</td>
-                <td />
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        {/* 7. Cash Advance / Vale */}
-        <section className="dsr-section">
-          <h2>7. Cash Advance / Vale</h2>
-          <table className="dsr-table">
-            <thead>
-              <tr><th>Employee</th><th className="right">Amount</th><th>Reason</th></tr>
-            </thead>
-            <tbody>
-              {data.advanceRows.length === 0 && (
-                <tr><td colSpan={3} className="dsr-empty">No cash advances.</td></tr>
-              )}
-              {data.advanceRows.map((row, i) => (
-                <tr key={i}>
-                  <td>{row.employee}</td>
-                  <td className="right">{peso(row.amount)}</td>
-                  <td className="dsr-small">{row.reason}</td>
-                </tr>
-              ))}
-              {data.advanceRows.length > 0 && (
-                <tr className="dsr-total">
-                  <td>Total</td>
-                  <td className="right">{peso(data.totalAdvances)}</td>
-                  <td />
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </section>
-
-        {/* 8. Cash Flow */}
-        <section className="dsr-section">
-          <h2>8. Cash Flow Summary</h2>
-          <div className="dsr-kv-rows">
-            <KV label="Beginning Cash" value={peso(data.beginningCash)} />
-            <KV label="Total Cash Sales" value={`+ ${peso(data.cashSales)}`} tone="good" />
-            <KV label="Expenses" value={`- ${peso(data.totalExpenses)}`} />
-            <KV label="Cash Advance" value={`- ${peso(data.totalAdvances)}`} />
-            <KV label="Expected Ending Cash" value={peso(data.endingCashExpected)} strong />
-            {data.endingCashActual != null && (
-              <KV
-                label="Actual Ending Cash"
-                value={peso(data.endingCashActual)}
-                strong
-                tone={Math.abs(data.endingCashActual - data.endingCashExpected) < 1 ? 'good' : 'bad'}
-              />
-            )}
-            {data.endingCashActual != null && (
-              <KV
-                label="Variance"
-                value={peso(data.endingCashActual - data.endingCashExpected)}
-                tone={Math.abs(data.endingCashActual - data.endingCashExpected) < 1 ? 'good' : 'bad'}
-              />
-            )}
+            </div>
+            <div className="dsr-meta">
+              <span className="dsr-range">{periodLabel}</span>
+              <button className="btn btn-secondary" onClick={loadAll} disabled={loading}>Refresh</button>
+              <button className="btn btn-secondary" onClick={handleSaveReport} disabled={loading}>💾 Save Report</button>
+              <button className="btn btn-primary" onClick={handlePrint}>Print / Export PDF</button>
+            </div>
           </div>
-        </section>
+          <ReportSheet
+            {...sheetSnapshot}
+            onManualChange={(patch) => setManual(m => ({ ...m, ...patch }))}
+            showShift={period === 'today'}
+            branchName={selectedBranch?.name || user?.branchName || '—'}
+          />
+        </>
+      )}
 
-        {/* 10. KPI Dashboard */}
-        <section className="dsr-section">
-          <h2>9. KPI Dashboard</h2>
-          <div className="dsr-kpi-grid">
-            <Kpi label="Total Clients" value={num(data.totalClients)} tone={kpiClass(data.totalClients, { goodAbove: 10, warnAbove: 3 })} />
-            <Kpi label="Average Ticket" value={peso(data.avgTicket)} tone={kpiClass(data.avgTicket, { goodAbove: 600, warnAbove: 300 })} />
-            <Kpi label="Therapist Utilization" value={`${data.utilization.toFixed(0)}%`} tone={kpiClass(data.utilization, { goodAbove: 70, warnAbove: 40 })} />
-            <Kpi label="Peak Hours" value={data.peakHoursLabel} tone="good" />
-            <Kpi label="Walk-in vs Booking" value={`${data.walkIns} walk-in / ${data.booked} booked`} tone="good" />
-            <Kpi label="Net Sales" value={peso(data.netSales)} tone={kpiClass(data.netSales, { goodAbove: 10000, warnAbove: 3000 })} />
-          </div>
-        </section>
+      {view === 'saved' && !viewingReport && (
+        <SavedReportsList
+          items={savedReports}
+          onView={setViewingReport}
+          onDelete={(id) => setConfirmDeleteId(id)}
+        />
+      )}
 
-        {/* 11. Notes / Incidents */}
-        <section className="dsr-section">
-          <h2>10. Notes / Incidents</h2>
-          <div className="dsr-grid-2">
-            <Field label="Late Therapist">
-              <textarea rows={2} value={manual.lateTherapist} onChange={e => setManual(m => ({ ...m, lateTherapist: e.target.value }))} placeholder="Names / reasons" />
-            </Field>
-            <Field label="Customer Complaints">
-              <textarea rows={2} value={manual.complaints} onChange={e => setManual(m => ({ ...m, complaints: e.target.value }))} placeholder="What happened / how resolved" />
-            </Field>
-            <Field label="Refund Reason">
-              <textarea rows={2} value={manual.refundReason} onChange={e => setManual(m => ({ ...m, refundReason: e.target.value }))} placeholder="Why a refund was issued" />
-            </Field>
-            <Field label="System Issues">
-              <textarea rows={2} value={manual.systemIssues} onChange={e => setManual(m => ({ ...m, systemIssues: e.target.value }))} placeholder="POS / sync / device issues" />
-            </Field>
+      {viewingReport && (
+        <>
+          <div className="dsr-toolbar">
+            <div>
+              <button className="btn btn-secondary" onClick={() => setViewingReport(null)}>← Back to list</button>
+            </div>
+            <div className="dsr-meta">
+              <span className="dsr-range">
+                Saved {format(new Date(viewingReport.savedAt), 'PPpp')}
+                {viewingReport.savedBy ? ` · ${viewingReport.savedBy}` : ''}
+              </span>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setConfirmDeleteId(viewingReport.id)}
+                style={{ color: '#b91c1c' }}
+              >
+                Delete
+              </button>
+              <button className="btn btn-primary" onClick={handlePrint}>Print / Export PDF</button>
+            </div>
           </div>
-        </section>
+          <ReportSheet
+            {...sheetSnapshot}
+            branchName={viewingReport.branchName || '—'}
+            showShift={viewingReport.period === 'today'}
+          />
+        </>
+      )}
 
-        {/* 12. Sign Off */}
-        <section className="dsr-section dsr-signoff">
-          <h2>11. Sign Off</h2>
-          <div className="dsr-grid-3">
-            <Signature label="Prepared by" value={manual.preparedBy} onChange={v => setManual(m => ({ ...m, preparedBy: v }))} />
-            <Signature label="Verified by" value={manual.verifiedBy} onChange={v => setManual(m => ({ ...m, verifiedBy: v }))} />
-            <Signature label="Owner Review" value={manual.ownerReview} onChange={v => setManual(m => ({ ...m, ownerReview: v }))} />
+      {confirmDeleteId && (
+        <div className="dsr-modal-overlay" onClick={() => setConfirmDeleteId(null)}>
+          <div className="dsr-modal" onClick={e => e.stopPropagation()}>
+            <h3>Delete saved report?</h3>
+            <p>This can't be undone.</p>
+            <div className="dsr-modal-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+              <button className="btn btn-primary" style={{ background: '#b91c1c' }} onClick={() => handleDeleteReport(confirmDeleteId)}>Delete</button>
+            </div>
           </div>
-        </section>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// Small presentational helpers —
+// --- Saved Reports List ---------------------------------------------------
+
+const SavedReportsList = ({ items, onView, onDelete }) => {
+  if (!items.length) {
+    return (
+      <div className="dsr-empty-state">
+        <div className="dsr-empty-icon">📁</div>
+        <h3>No saved reports yet</h3>
+        <p>From the Current Report tab, click "Save Report" to keep a snapshot here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dsr-saved-list">
+      <table className="dsr-table dsr-saved-table">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>Range</th>
+            <th>Saved</th>
+            <th>Saved By</th>
+            <th className="right">Net Sales</th>
+            <th className="right">Clients</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {items.map(r => (
+            <tr key={r.id}>
+              <td><span className="dsr-period-chip">{PERIODS.find(p => p.id === r.period)?.label || r.period}</span></td>
+              <td>{r.periodLabel}</td>
+              <td className="dsr-small">{format(new Date(r.savedAt), 'MMM d, yyyy h:mm a')}</td>
+              <td className="dsr-small">{r.savedBy || '—'}</td>
+              <td className="right">{peso(r.data?.netSales)}</td>
+              <td className="right">{num(r.data?.totalClients)}</td>
+              <td className="right">
+                <button className="dsr-link-btn" onClick={() => onView(r)}>View</button>
+                <button className="dsr-link-btn danger" onClick={() => onDelete(r.id)}>Delete</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// --- Report Sheet (used for both live + snapshot view) --------------------
+
+const ReportSheet = ({ data, manual, periodLabel, branchName, showShift, readOnly, onManualChange }) => {
+  const set = (patch) => !readOnly && onManualChange?.(patch);
+
+  return (
+    <div className={`dsr-sheet ${readOnly ? 'dsr-readonly' : ''}`}>
+      <header className="dsr-header">
+        <h1>Daily Sales Report</h1>
+        <p className="dsr-subtitle">{periodLabel}</p>
+      </header>
+
+      <section className="dsr-section">
+        <h2>1. Basic Info</h2>
+        <div className="dsr-grid-2">
+          <Field label="Date">{periodLabel}</Field>
+          <Field label="Branch">{branchName}</Field>
+          {showShift && (
+            <Field label="Shift">
+              <select value={manual.shift || 'Whole Day'} onChange={e => set({ shift: e.target.value })} disabled={readOnly}>
+                <option>AM</option>
+                <option>PM</option>
+                <option>Whole Day</option>
+              </select>
+            </Field>
+          )}
+          <Field label="Prepared by">
+            <input value={manual.preparedBy || ''} onChange={e => set({ preparedBy: e.target.value })} placeholder="Name" disabled={readOnly} />
+          </Field>
+          <Field label="Approved by">
+            <input value={manual.approvedBy || ''} onChange={e => set({ approvedBy: e.target.value })} placeholder="Name" disabled={readOnly} />
+          </Field>
+        </div>
+      </section>
+
+      <section className="dsr-section">
+        <h2>2. Sales Summary</h2>
+        <div className="dsr-kv-rows">
+          <KV label="Total Gross Sales" value={peso(data.grossSales)} />
+          <KV label="Less: Discounts" value={`- ${peso(data.discounts)}`} tone={data.discounts > 0 ? 'warn' : ''} />
+          <KV label="Less: Refunds" value={`- ${peso(data.refunds)}`} tone={data.refunds > 0 ? 'bad' : ''} />
+          <KV label="VAT / Tax" value={peso(data.tax)} />
+          <KV label="Net Sales" value={peso(data.netSales)} strong tone="good" />
+        </div>
+      </section>
+
+      <section className="dsr-section">
+        <h2>3. Payment Breakdown</h2>
+        <table className="dsr-table">
+          <thead>
+            <tr><th>Method</th><th className="right">Amount</th></tr>
+          </thead>
+          <tbody>
+            {Object.keys(data.paymentBuckets || {}).length === 0 && (
+              <tr><td colSpan={2} className="dsr-empty">No collections in this period.</td></tr>
+            )}
+            {Object.entries(data.paymentBuckets || {}).map(([m, amt]) => (
+              <tr key={m}><td>{m}</td><td className="right">{peso(amt)}</td></tr>
+            ))}
+            <tr className="dsr-total">
+              <td>Total Collections</td>
+              <td className="right">{peso(Object.values(data.paymentBuckets || {}).reduce((s, v) => s + v, 0))}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section className="dsr-section">
+        <h2>4. Service Sales Breakdown</h2>
+        <table className="dsr-table">
+          <thead>
+            <tr><th>Service</th><th className="right">Qty</th><th className="right">Amount</th></tr>
+          </thead>
+          <tbody>
+            {(data.serviceRows || []).length === 0 && (
+              <tr><td colSpan={3} className="dsr-empty">No service sales.</td></tr>
+            )}
+            {(data.serviceRows || []).map(row => (
+              <tr key={row.name}>
+                <td>{row.name}</td>
+                <td className="right">{num(row.qty)}</td>
+                <td className="right">{peso(row.amount)}</td>
+              </tr>
+            ))}
+            <tr className="dsr-total">
+              <td>Total</td>
+              <td className="right">{num(data.serviceTotals?.qty || 0)}</td>
+              <td className="right">{peso(data.serviceTotals?.amount || 0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section className="dsr-section">
+        <h2>5. Therapist Performance</h2>
+        <table className="dsr-table">
+          <thead>
+            <tr>
+              <th>Therapist</th>
+              <th className="right">Clients</th>
+              <th>Services Done</th>
+              <th className="right">Sales Generated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data.therapistRows || []).length === 0 && (
+              <tr><td colSpan={4} className="dsr-empty">No therapist activity.</td></tr>
+            )}
+            {(data.therapistRows || []).map(row => (
+              <tr key={row.name}>
+                <td>{row.name}</td>
+                <td className="right">{num(row.clients)}</td>
+                <td className="dsr-small">{row.services || '—'}</td>
+                <td className="right">{peso(row.sales)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="dsr-section">
+        <h2>6. Operating Expenses</h2>
+        <table className="dsr-table">
+          <thead>
+            <tr><th>Type</th><th className="right">Amount</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            {(data.expenseRows || []).length === 0 && (
+              <tr><td colSpan={3} className="dsr-empty">No expenses recorded.</td></tr>
+            )}
+            {(data.expenseRows || []).map(row => (
+              <tr key={row.category}>
+                <td>{row.category}</td>
+                <td className="right">{peso(row.amount)}</td>
+                <td className="dsr-small">{row.notes}</td>
+              </tr>
+            ))}
+            <tr className="dsr-total">
+              <td>Total Expenses</td>
+              <td className="right">{peso(data.totalExpenses)}</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section className="dsr-section">
+        <h2>7. Cash Advance / Vale</h2>
+        <table className="dsr-table">
+          <thead>
+            <tr><th>Employee</th><th className="right">Amount</th><th>Reason</th></tr>
+          </thead>
+          <tbody>
+            {(data.advanceRows || []).length === 0 && (
+              <tr><td colSpan={3} className="dsr-empty">No cash advances.</td></tr>
+            )}
+            {(data.advanceRows || []).map((row, i) => (
+              <tr key={i}>
+                <td>{row.employee}</td>
+                <td className="right">{peso(row.amount)}</td>
+                <td className="dsr-small">{row.reason}</td>
+              </tr>
+            ))}
+            {(data.advanceRows || []).length > 0 && (
+              <tr className="dsr-total">
+                <td>Total</td>
+                <td className="right">{peso(data.totalAdvances)}</td>
+                <td />
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="dsr-section">
+        <h2>8. Cash Flow Summary</h2>
+        <div className="dsr-kv-rows">
+          <KV label="Beginning Cash" value={peso(data.beginningCash)} />
+          <KV label="Total Cash Sales" value={`+ ${peso(data.cashSales)}`} tone="good" />
+          <KV label="Expenses" value={`- ${peso(data.totalExpenses)}`} />
+          <KV label="Cash Advance" value={`- ${peso(data.totalAdvances)}`} />
+          <KV label="Expected Ending Cash" value={peso(data.endingCashExpected)} strong />
+          {data.endingCashActual != null && (
+            <KV
+              label="Actual Ending Cash"
+              value={peso(data.endingCashActual)}
+              strong
+              tone={Math.abs(data.endingCashActual - data.endingCashExpected) < 1 ? 'good' : 'bad'}
+            />
+          )}
+          {data.endingCashActual != null && (
+            <KV
+              label="Variance"
+              value={peso(data.endingCashActual - data.endingCashExpected)}
+              tone={Math.abs(data.endingCashActual - data.endingCashExpected) < 1 ? 'good' : 'bad'}
+            />
+          )}
+        </div>
+      </section>
+
+      <section className="dsr-section">
+        <h2>9. KPI Dashboard</h2>
+        <div className="dsr-kpi-grid">
+          <Kpi label="Total Clients" value={num(data.totalClients)} tone={kpiClass(data.totalClients, { goodAbove: 10, warnAbove: 3 })} />
+          <Kpi label="Average Ticket" value={peso(data.avgTicket)} tone={kpiClass(data.avgTicket, { goodAbove: 600, warnAbove: 300 })} />
+          <Kpi label="Therapist Utilization" value={`${(data.utilization || 0).toFixed(0)}%`} tone={kpiClass(data.utilization, { goodAbove: 70, warnAbove: 40 })} />
+          <Kpi label="Peak Hours" value={data.peakHoursLabel} tone="good" />
+          <Kpi label="Walk-in vs Booking" value={`${data.walkIns || 0} walk-in / ${data.booked || 0} booked`} tone="good" />
+          <Kpi label="Net Sales" value={peso(data.netSales)} tone={kpiClass(data.netSales, { goodAbove: 10000, warnAbove: 3000 })} />
+        </div>
+      </section>
+
+      <section className="dsr-section">
+        <h2>10. Notes / Incidents</h2>
+        <div className="dsr-grid-2">
+          <Field label="Late Therapist">
+            <textarea rows={2} value={manual.lateTherapist || ''} onChange={e => set({ lateTherapist: e.target.value })} placeholder="Names / reasons" disabled={readOnly} />
+          </Field>
+          <Field label="Customer Complaints">
+            <textarea rows={2} value={manual.complaints || ''} onChange={e => set({ complaints: e.target.value })} placeholder="What happened / how resolved" disabled={readOnly} />
+          </Field>
+          <Field label="Refund Reason">
+            <textarea rows={2} value={manual.refundReason || ''} onChange={e => set({ refundReason: e.target.value })} placeholder="Why a refund was issued" disabled={readOnly} />
+          </Field>
+          <Field label="System Issues">
+            <textarea rows={2} value={manual.systemIssues || ''} onChange={e => set({ systemIssues: e.target.value })} placeholder="POS / sync / device issues" disabled={readOnly} />
+          </Field>
+        </div>
+      </section>
+
+      <section className="dsr-section dsr-signoff">
+        <h2>11. Sign Off</h2>
+        <div className="dsr-grid-3">
+          <Signature label="Prepared by" value={manual.preparedBy || ''} onChange={v => set({ preparedBy: v })} disabled={readOnly} />
+          <Signature label="Verified by" value={manual.verifiedBy || ''} onChange={v => set({ verifiedBy: v })} disabled={readOnly} />
+          <Signature label="Owner Review" value={manual.ownerReview || ''} onChange={v => set({ ownerReview: v })} disabled={readOnly} />
+        </div>
+      </section>
+    </div>
+  );
+};
+
+// --- Small presentational helpers ----------------------------------------
 
 const Field = ({ label, children }) => (
   <div className="dsr-field">
@@ -582,9 +753,9 @@ const Kpi = ({ label, value, tone }) => (
   </div>
 );
 
-const Signature = ({ label, value, onChange }) => (
+const Signature = ({ label, value, onChange, disabled }) => (
   <div className="dsr-sig">
-    <input value={value} onChange={e => onChange(e.target.value)} placeholder="Name" />
+    <input value={value} onChange={e => onChange(e.target.value)} placeholder="Name" disabled={disabled} />
     <div className="dsr-sig-line" />
     <div className="dsr-sig-label">{label}</div>
   </div>

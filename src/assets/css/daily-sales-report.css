@@ -9,6 +9,178 @@
   min-height: 100%;
 }
 
+/* --- Sub-tabs (Current / Saved) ----------------------------------------- */
+
+.dsr-subtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+}
+
+.dsr-subtab {
+  position: relative;
+  background: transparent;
+  border: 0;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gray-600, #6b7280);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dsr-subtab:hover { color: var(--gray-900, #111827); }
+
+.dsr-subtab.active { color: var(--primary, #5f1c1c); }
+
+.dsr-subtab.active::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--primary, #5f1c1c);
+}
+
+.dsr-subtab-count {
+  background: var(--gray-200, #e5e7eb);
+  color: var(--gray-700, #374151);
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.dsr-subtab.active .dsr-subtab-count {
+  background: var(--primary, #5f1c1c);
+  color: #fff;
+}
+
+/* --- Saved reports list ------------------------------------------------- */
+
+.dsr-saved-list {
+  background: #fff;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.dsr-saved-table th,
+.dsr-saved-table td {
+  padding: 12px 16px;
+}
+
+.dsr-period-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gray-700, #374151);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dsr-link-btn {
+  background: transparent;
+  border: 0;
+  color: var(--primary, #5f1c1c);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.dsr-link-btn:hover { text-decoration: underline; }
+
+.dsr-link-btn.danger { color: #b91c1c; }
+
+.dsr-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #fff;
+  border: 1px dashed var(--gray-300, #d1d5db);
+  border-radius: 12px;
+  max-width: 500px;
+  margin: 20px auto;
+}
+
+.dsr-empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+.dsr-empty-state h3 {
+  margin: 0 0 6px;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-empty-state p {
+  margin: 0;
+  color: var(--gray-600, #6b7280);
+  font-size: 0.9rem;
+}
+
+/* --- Modal (delete confirmation) ---------------------------------------- */
+
+.dsr-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.dsr-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
+
+.dsr-modal h3 {
+  margin: 0 0 8px;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-modal p {
+  margin: 0 0 18px;
+  color: var(--gray-600, #6b7280);
+}
+
+.dsr-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* --- Read-only snapshot view (flatten inputs to static text) ----------- */
+
+.dsr-readonly .dsr-field-value input,
+.dsr-readonly .dsr-field-value select,
+.dsr-readonly .dsr-field-value textarea,
+.dsr-readonly .dsr-sig input {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 2px 0 !important;
+  cursor: default;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-readonly .dsr-field-value textarea {
+  resize: none;
+}
+
 /* --- Toolbar (period filter + actions) ---------------------------------- */
 
 .dsr-toolbar {

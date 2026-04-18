@@ -2138,11 +2138,16 @@ export const analyticsApi = {
     const employees = allEmployees.filter(e => e.status === 'active');
     const allTransactions = await getData.transactions();
     const transactions = allTransactions.filter(t => t.date && t.date.startsWith(thisMonth));
+    const allAttendance = await getData.attendance().catch(() => []);
+    const attendance = (allAttendance || []).filter(a => {
+      const d = a.date || a.clockInTime || a.createdAt;
+      return typeof d === 'string' && d.startsWith(thisMonth);
+    });
 
     const employeeMetrics = employees.map(emp => {
       const empName = `${emp.firstName} ${emp.lastName}`;
       const empTx = transactions.filter(t =>
-        t.employee?._id === emp._id || t.employee?.name === empName
+        t.employee?._id === emp._id || t.employee?.id === emp._id || t.employee?.name === empName
       );
 
       const revenue = empTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
@@ -2159,23 +2164,41 @@ export const analyticsApi = {
       const avgRevenuePerDay = revenue / workingDays;
       const avgServicesPerDay = services / workingDays;
 
-      // Productivity score (0-100)
+      // Productivity score (0-100) — revenue vs team average
       const avgTeamRevenue = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0) / (employees.length || 1);
       const productivityScore = avgTeamRevenue > 0
         ? Math.min(100, Math.round((revenue / avgTeamRevenue) * 50 + 50))
         : 50;
 
+      // Efficiency — services delivered per working day vs target of 4/day
+      const TARGET_SERVICES_PER_DAY = 4;
+      const efficiency = Math.min(100, Math.round((avgServicesPerDay / TARGET_SERVICES_PER_DAY) * 100));
+
+      // Punctuality — on-time clock-ins / total present days
+      const empAttendance = attendance.filter(a =>
+        a.employeeId === emp._id || a.employeeId === emp.id
+      );
+      const presentDays = empAttendance.filter(a => a.status === 'present' || a.status === 'late').length;
+      const lateDays = empAttendance.filter(a => a.status === 'late').length;
+      const punctualityRate = presentDays > 0
+        ? Math.round(((presentDays - lateDays) / presentDays) * 100)
+        : 0;
+
       return {
         employeeId: emp._id,
         name: empName,
+        position: emp.position || emp.role || 'Therapist',
         role: emp.role || 'Therapist',
         revenue,
+        transactionCount: empTx.length,
         transactions: empTx.length,
         services,
         productsSold: products,
         commissions,
         avgRevenuePerDay: Math.round(avgRevenuePerDay),
         avgServicesPerDay: avgServicesPerDay.toFixed(1),
+        efficiency,
+        punctualityRate,
         productivityScore,
         rating: productivityScore >= 80 ? 'Excellent' : productivityScore >= 60 ? 'Good' : productivityScore >= 40 ? 'Average' : 'Needs Improvement'
       };

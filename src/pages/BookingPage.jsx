@@ -552,10 +552,14 @@ const BookingPage = () => {
             }
           } catch (err) { console.warn('Failed to fetch shift schedules:', err); }
 
-          // Apply initial branch filter if branch already selected
+          // Apply initial branch filter if branch already selected.
+          // Therapists: prefer strict branch match; if none match, fall back to
+          // unbranched therapists so legacy/unassigned rows still show on the
+          // customer page until admin stamps a branch on each therapist.
           if (activeBranch) {
             setServices((servicesData || []).filter(s => !s.branch_id || s.branch_id === activeBranch.id));
-            setTherapists(positionFiltered.filter(t => t.branch_id === activeBranch.id));
+            const branched = positionFiltered.filter(t => t.branch_id === activeBranch.id);
+            setTherapists(branched.length > 0 ? branched : positionFiltered.filter(t => !t.branch_id));
           } else {
             setServices(servicesData || []);
             setTherapists([]);  // No branch = no therapists until branch selected
@@ -590,8 +594,11 @@ const BookingPage = () => {
     if (allServices.length === 0 && allTherapists.length === 0) return;
     if (selectedBranch) {
       setServices(allServices.filter(s => !s.branch_id || s.branch_id === selectedBranch.id));
-      // Only show therapists assigned to this branch (strict: must have branch_id)
-      setTherapists(allTherapists.filter(t => t.branch_id === selectedBranch.id));
+      // Strict match first; fall back to unbranched therapists when none are
+      // assigned to this branch yet, so the customer page keeps working during
+      // the rollout of per-therapist branch assignments.
+      const branched = allTherapists.filter(t => t.branch_id === selectedBranch.id);
+      setTherapists(branched.length > 0 ? branched : allTherapists.filter(t => !t.branch_id));
     } else {
       setServices(allServices);
       setTherapists([]);  // No branch selected = don't show therapists

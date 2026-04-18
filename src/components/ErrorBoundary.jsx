@@ -1,6 +1,23 @@
 import React from 'react';
 import { captureError } from '../utils/sentry';
 
+// A chunk-load failure usually means the user has an old index.html that
+// references chunk hashes from a previous deploy. Hard-reloading once
+// pulls a fresh index.html which lists the current chunk filenames.
+const CHUNK_RELOAD_KEY = '__chunk_reload_attempted_at';
+const isChunkLoadError = (error) => {
+  const msg = (error?.message || '').toLowerCase();
+  const name = (error?.name || '').toLowerCase();
+  return (
+    name === 'chunkloaderror' ||
+    msg.includes('failed to fetch dynamically imported module') ||
+    msg.includes("loading chunk") ||
+    msg.includes('loading css chunk') ||
+    msg.includes('importing a module script failed') ||
+    msg.includes("expected a javascript module script")
+  );
+};
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -12,6 +29,16 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    if (isChunkLoadError(error)) {
+      // Avoid an infinite reload loop if the new deploy is also broken.
+      const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0);
+      if (Date.now() - last > 30_000) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+        window.location.reload();
+        return;
+      }
+    }
+
     this.setState({
       error: error,
       errorInfo: errorInfo

@@ -10,7 +10,17 @@
   # Base directory - leave empty since package.json is at root
   base = ""
 
-# Redirect all requests to index.html for SPA routing
+# Don't fall through to the SPA shell for missing static assets — return a
+# real 404 so dynamic-import failures (e.g. when a user has an old
+# index.html that references chunk hashes from a previous deploy) reject
+# cleanly instead of being served HTML and triggering the
+# "Expected a JavaScript module script but the server responded with a
+# MIME type of text/html" error in the browser.
+[[redirects]]
+  from = "/assets/*"
+  status = 404
+
+# Redirect all other requests to index.html for SPA routing
 [[redirects]]
   from = "/*"
   to = "/index.html"

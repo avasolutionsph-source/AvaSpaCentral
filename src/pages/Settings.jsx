@@ -1219,14 +1219,16 @@ const Settings = () => {
     setProfileData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveSettings = async () => {
-    // Validate business hours
+  const handleSaveBusinessHours = async () => {
     const enabledHours = businessHours.filter(h => h.enabled);
     if (enabledHours.length === 0) {
       showToast('At least one business day must be enabled', 'error');
       return;
     }
+    await handleSaveSettings();
+  };
 
+  const handleSaveSettings = async () => {
     try {
       const settingsData = {
         businessInfo: businessInfo,
@@ -1241,52 +1243,16 @@ const Settings = () => {
       // Save settings to Dexie (local)
       await SettingsRepository.setMany(settingsData);
 
-      // Sync to Supabase 'settings' table (uuid id, business_id, key varchar, value jsonb, updated_at)
+      // Sync to Supabase 'settings' table via direct REST upsert.
+      // supabase-js hangs behind stuck auth refreshes — see brandingService.js.
       let cloudSynced = false;
-      try {
-        const { supabase } = await import('../services/supabase/supabaseClient');
-        if (supabase && user?.businessId) {
-          const now = new Date().toISOString();
-
-          // Upsert each setting individually to avoid delete+insert race condition
-          let allSuccess = true;
-          for (const [key, value] of Object.entries(settingsData)) {
-            // Check if setting exists
-            const { data: existing } = await supabase
-              .from('settings')
-              .select('id')
-              .eq('business_id', user.businessId)
-              .eq('key', key)
-              .limit(1);
-
-            let error;
-            if (existing && existing.length > 0) {
-              // Update existing
-              ({ error } = await supabase
-                .from('settings')
-                .update({ value, updated_at: now })
-                .eq('id', existing[0].id));
-            } else {
-              // Insert new
-              ({ error } = await supabase
-                .from('settings')
-                .insert({
-                  id: crypto.randomUUID(),
-                  business_id: user.businessId,
-                  key,
-                  value,
-                  updated_at: now
-                }));
-            }
-            if (error) {
-              console.warn(`[Settings] Cloud sync failed for ${key}:`, error.message);
-              allSuccess = false;
-            }
-          }
-          cloudSynced = allSuccess;
+      if (user?.businessId) {
+        try {
+          await upsertSettings(user.businessId, settingsData);
+          cloudSynced = true;
+        } catch (syncError) {
+          console.warn('[Settings] Cloud sync failed:', syncError.message);
         }
-      } catch (syncError) {
-        console.warn('[Settings] Cloud sync failed:', syncError.message);
       }
 
       showToast(cloudSynced
@@ -3319,7 +3285,7 @@ const Settings = () => {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={handleSaveSettings}
+                onClick={handleSaveBusinessHours}
               >
                 Save Business Hours
               </button>
@@ -4087,7 +4053,7 @@ const Settings = () => {
             <div className="settings-save-info">
               Changes will be applied immediately after saving
             </div>
-            <button className="btn btn-primary" onClick={handleSaveSettings}>
+            <button className="btn btn-primary" onClick={handleSaveBusinessHours}>
               💾 Save All Settings
             </button>
           </div>

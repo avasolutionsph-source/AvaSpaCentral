@@ -757,109 +757,124 @@ const Settings = () => {
     if (!user?.businessId) return;
     setSavingBranding(true);
     let cloudSyncFailed = false;
+
+    // Wrap a promise with a timeout so a hung network call (e.g. RLS block,
+    // expired session mid-request, flaky connection) can't freeze the Save
+    // button forever. Reject with a descriptive label so the failing step is
+    // identifiable in the console.
+    const withTimeout = (promise, ms, label) => Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms,
+      )),
+    ]);
+
     try {
       let newLogoUrl = brandingSettings.logoUrl;
       let newCoverUrl = brandingSettings.coverPhotoUrl;
 
       if (logoFile) {
-        newLogoUrl = await uploadBrandingImage(logoFile, user.businessId, 'logo');
+        console.log('[SaveBranding] Uploading logo…');
+        newLogoUrl = await withTimeout(
+          uploadBrandingImage(logoFile, user.businessId, 'logo'),
+          60000,
+          'Logo upload',
+        );
         setLogoFile(null);
         setLogoPreview(newLogoUrl);
         setBrandingSettings(prev => ({ ...prev, logoUrl: newLogoUrl }));
       }
       if (coverFile) {
-        newCoverUrl = await uploadBrandingImage(coverFile, user.businessId, 'cover');
+        console.log('[SaveBranding] Uploading cover…');
+        newCoverUrl = await withTimeout(
+          uploadBrandingImage(coverFile, user.businessId, 'cover'),
+          60000,
+          'Cover upload',
+        );
         setCoverFile(null);
         setCoverPreview(newCoverUrl);
         setBrandingSettings(prev => ({ ...prev, coverPhotoUrl: newCoverUrl }));
       }
 
-      await saveBrandingSettings(user.businessId, {
-        logoUrl: newLogoUrl,
-        coverPhotoUrl: newCoverUrl,
-        primaryColor: brandingSettings.primaryColor,
-        businessName: brandingSettings.businessName || undefined,
-        contactPhone: brandingSettings.contactPhone || undefined,
-        heroVideo: brandingSettings.heroVideo || null,
-      });
+      console.log('[SaveBranding] Updating businesses row…');
+      await withTimeout(
+        saveBrandingSettings(user.businessId, {
+          logoUrl: newLogoUrl,
+          coverPhotoUrl: newCoverUrl,
+          primaryColor: brandingSettings.primaryColor,
+          businessName: brandingSettings.businessName || undefined,
+          contactPhone: brandingSettings.contactPhone || undefined,
+          heroVideo: brandingSettings.heroVideo || null,
+        }),
+        15000,
+        'Branding save (businesses table)',
+      );
 
-      // Save font settings to settings table (best effort - local)
+      // Save font/hero/footer settings — one batched IndexedDB transaction
+      // followed by one Supabase upsert. Previously this was 21 sequential
+      // awaits, any of which could hang without a timeout.
       try {
-        await SettingsRepository.set('footerFont', brandingSettings.footerFont || 'default');
-        await SettingsRepository.set('footerFontSize', brandingSettings.footerFontSize || '14');
-        await SettingsRepository.set('heroFont', brandingSettings.heroFont || "'Playfair Display', serif");
-        await SettingsRepository.set('heroFontColor', brandingSettings.heroFontColor || '#ffffff');
-        await SettingsRepository.set('heroTextX', String(brandingSettings.heroTextX ?? 50));
-        await SettingsRepository.set('heroTextY', String(brandingSettings.heroTextY ?? 50));
-        await SettingsRepository.set('heroAnimation', brandingSettings.heroAnimation || 'none');
-        await SettingsRepository.set('heroFontSize', brandingSettings.heroFontSize || 'default');
-        await SettingsRepository.set('heroAnimDelay', brandingSettings.heroAnimDelay || '0');
-        await SettingsRepository.set('heroAnimDuration', brandingSettings.heroAnimDuration || 'default');
-        await SettingsRepository.set('heroLogoEnabled', brandingSettings.heroLogoEnabled ? 'true' : 'false');
-        await SettingsRepository.set('heroLogoX', String(brandingSettings.heroLogoX ?? 50));
-        await SettingsRepository.set('heroLogoY', String(brandingSettings.heroLogoY ?? 20));
-        await SettingsRepository.set('heroLogoSize', String(brandingSettings.heroLogoSize ?? 80));
-        await SettingsRepository.set('heroLogoAnimation', brandingSettings.heroLogoAnimation || 'none');
-        await SettingsRepository.set('heroLogoAnimDelay', brandingSettings.heroLogoAnimDelay || '0');
-        await SettingsRepository.set('heroLogoAnimDuration', brandingSettings.heroLogoAnimDuration || 'default');
-        await SettingsRepository.set('footerLine1', brandingSettings.footerLine1 || '');
-        await SettingsRepository.set('footerLine2', brandingSettings.footerLine2 || '');
-        await SettingsRepository.set('footerLine3', brandingSettings.footerLine3 || '');
-        await SettingsRepository.set('footerLine4', brandingSettings.footerLine4 || '');
+        const localSettings = {
+          footerFont: brandingSettings.footerFont || 'default',
+          footerFontSize: brandingSettings.footerFontSize || '14',
+          heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
+          heroFontColor: brandingSettings.heroFontColor || '#ffffff',
+          heroTextX: String(brandingSettings.heroTextX ?? 50),
+          heroTextY: String(brandingSettings.heroTextY ?? 50),
+          heroAnimation: brandingSettings.heroAnimation || 'none',
+          heroFontSize: brandingSettings.heroFontSize || 'default',
+          heroAnimDelay: brandingSettings.heroAnimDelay || '0',
+          heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
+          heroLogoEnabled: brandingSettings.heroLogoEnabled ? 'true' : 'false',
+          heroLogoX: String(brandingSettings.heroLogoX ?? 50),
+          heroLogoY: String(brandingSettings.heroLogoY ?? 20),
+          heroLogoSize: String(brandingSettings.heroLogoSize ?? 80),
+          heroLogoAnimation: brandingSettings.heroLogoAnimation || 'none',
+          heroLogoAnimDelay: brandingSettings.heroLogoAnimDelay || '0',
+          heroLogoAnimDuration: brandingSettings.heroLogoAnimDuration || 'default',
+          footerLine1: brandingSettings.footerLine1 || '',
+          footerLine2: brandingSettings.footerLine2 || '',
+          footerLine3: brandingSettings.footerLine3 || '',
+          footerLine4: brandingSettings.footerLine4 || '',
+        };
 
-        // Also save directly to Supabase so booking page can read them
+        console.log('[SaveBranding] Writing hero/footer to local cache…');
+        await withTimeout(
+          SettingsRepository.setMany(localSettings),
+          10000,
+          'Local settings write',
+        );
+
         if (user?.businessId) {
           try {
+            console.log('[SaveBranding] Upserting hero/footer to settings table…');
             const { supabase } = await import('../services/supabase/supabaseClient');
             if (supabase) {
-              const heroSettings = {
-                heroFont: brandingSettings.heroFont || "'Playfair Display', serif",
-                heroFontColor: brandingSettings.heroFontColor || '#ffffff',
-                heroTextX: String(brandingSettings.heroTextX ?? 50),
-                heroTextY: String(brandingSettings.heroTextY ?? 50),
-                heroAnimation: brandingSettings.heroAnimation || 'none',
-                heroFontSize: brandingSettings.heroFontSize || 'default',
-                heroAnimDelay: brandingSettings.heroAnimDelay || '0',
-                heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
-                heroLogoEnabled: brandingSettings.heroLogoEnabled ? 'true' : 'false',
-                heroLogoX: String(brandingSettings.heroLogoX ?? 50),
-                heroLogoY: String(brandingSettings.heroLogoY ?? 20),
-                heroLogoSize: String(brandingSettings.heroLogoSize ?? 80),
-                heroLogoAnimation: brandingSettings.heroLogoAnimation || 'none',
-                heroLogoAnimDelay: brandingSettings.heroLogoAnimDelay || '0',
-                heroLogoAnimDuration: brandingSettings.heroLogoAnimDuration || 'default',
-                footerLine1: brandingSettings.footerLine1 || '',
-                footerLine2: brandingSettings.footerLine2 || '',
-                footerLine3: brandingSettings.footerLine3 || '',
-                footerLine4: brandingSettings.footerLine4 || '',
-                footerFont: brandingSettings.footerFont || 'default',
-                footerFontSize: brandingSettings.footerFontSize || '14',
-              };
-
-              // Single bulk upsert — avoids 21 sequential round-trips
-              const rows = Object.entries(heroSettings).map(([key, value]) => ({
+              const rows = Object.entries(localSettings).map(([key, value]) => ({
                 business_id: user.businessId,
                 key,
                 value,
               }));
-              const { error } = await Promise.race([
+              const { error } = await withTimeout(
                 supabase.from('settings').upsert(rows, { onConflict: 'business_id,key' }),
-                new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 15000)),
-              ]);
+                15000,
+                'Hero/footer upsert',
+              );
               if (error) {
-                console.error('[HeroSettings] Bulk upsert failed:', error);
+                console.error('[SaveBranding] Bulk upsert returned error:', error);
                 cloudSyncFailed = true;
               } else {
-                console.log('[HeroSettings] Saved to Supabase successfully');
+                console.log('[SaveBranding] Hero/footer synced to Supabase.');
               }
             }
           } catch (e) {
-            console.error('[HeroSettings] Save failed:', e);
+            console.error('[SaveBranding] Cloud sync failed:', e);
             cloudSyncFailed = true;
           }
         }
       } catch (fontErr) {
-        console.warn('Font settings save failed:', fontErr);
+        console.warn('[SaveBranding] Local hero/footer write failed:', fontErr);
         cloudSyncFailed = true;
       }
 
@@ -869,8 +884,11 @@ const Settings = () => {
         showToast('Branding saved successfully!', 'success');
       }
     } catch (err) {
-      console.error('Error saving branding:', err);
-      showToast('Failed to save branding. Please try again.', 'error');
+      console.error('[SaveBranding] Failed:', err);
+      const msg = err?.message?.includes('timed out')
+        ? `Save timed out: ${err.message}. Check your connection and try again.`
+        : 'Failed to save branding. Please try again.';
+      showToast(msg, 'error');
     } finally {
       setSavingBranding(false);
     }

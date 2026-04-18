@@ -63,7 +63,7 @@ const INITIAL_FORM_DATA = {
 };
 
 const Expenses = ({ embedded = false, onDataChange }) => {
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   // Filters
   const [filterCategory, setFilterCategory] = useState('all');

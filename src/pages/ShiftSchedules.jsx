@@ -17,7 +17,7 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const ShiftSchedules = () => {
   const navigate = useNavigate();
-  const { showToast, hasManagementAccess, user, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, hasManagementAccess, user, getEffectiveBranchId } = useApp();
 
   // State
   const [loading, setLoading] = useState(true);

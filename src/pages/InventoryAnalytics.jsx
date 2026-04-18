@@ -7,7 +7,7 @@ import { Bar, Line } from 'react-chartjs-2';
 
 const InventoryAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [inventoryData, setInventoryData] = useState(null);

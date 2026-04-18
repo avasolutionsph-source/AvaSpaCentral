@@ -8,7 +8,7 @@ import { ManageOrder } from '../components/shared';
 
 const Inventory = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
-  const { showToast, canEdit, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, canEdit, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState([]);

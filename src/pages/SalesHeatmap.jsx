@@ -5,7 +5,7 @@ import mockApi from '../mockApi';
 
 const SalesHeatmap = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [heatmapData, setHeatmapData] = useState(null);

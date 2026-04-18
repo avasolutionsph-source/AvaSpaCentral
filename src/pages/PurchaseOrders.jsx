@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../components/shared';
 const PurchaseOrders = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [purchaseOrders, setPurchaseOrders] = useState([]);

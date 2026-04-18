@@ -9,7 +9,7 @@ import { DashboardSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

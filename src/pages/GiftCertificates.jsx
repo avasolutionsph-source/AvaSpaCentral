@@ -7,7 +7,7 @@ import { supabaseSyncManager } from '../services/supabase';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const GiftCertificates = () => {
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [giftCertificates, setGiftCertificates] = useState([]);

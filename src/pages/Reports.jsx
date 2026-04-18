@@ -6,7 +6,7 @@ import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
 // jsPDF is loaded dynamically in handleExportPDF to reduce initial bundle size
 
 const Reports = ({ embedded = false }) => {
-  const { showToast, user, isTherapist, canViewAll, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, user, isTherapist, canViewAll, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);

@@ -18,7 +18,7 @@ import {
 import { roomValidation, validateWithToast } from '../validation/schemas';
 
 const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderRef }) => {
-  const { user, showToast, isTherapist, canEdit, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { user, showToast, isTherapist, canEdit, getEffectiveBranchId } = useApp();
 
   // Filter state (kept separate as it's page-specific)
   const [filterStatus, setFilterStatus] = useState('show_all');

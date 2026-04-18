@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns';
 import mockApi from '../mockApi';
 
 const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
-  const { showToast, getUserBranchId, getEffectiveBranchId, user } = useApp();
+  const { showToast, getEffectiveBranchId, user } = useApp();
   const [sessions, setSessions] = useState([]);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');

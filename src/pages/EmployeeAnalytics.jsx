@@ -7,7 +7,7 @@ import { Bar, Radar, Doughnut } from 'react-chartjs-2';
 
 const EmployeeAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [employeeData, setEmployeeData] = useState(null);

@@ -5,7 +5,7 @@ import { format, isToday, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
 
 const Customers = () => {
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState([]);

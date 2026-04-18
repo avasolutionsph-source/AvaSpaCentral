@@ -21,7 +21,7 @@ import '../assets/css/hub-pages.css';
 
 const Calendar = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // 'month', 'week', 'day'

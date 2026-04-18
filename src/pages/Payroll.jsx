@@ -119,7 +119,7 @@ const BreakdownPopover = ({ type, payroll, onClose }) => {
 };
 
 const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef }) => {
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);

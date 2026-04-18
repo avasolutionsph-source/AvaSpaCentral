@@ -19,7 +19,7 @@ import { supplierValidation, validateWithToast } from '../validation/schemas';
 
 const Suppliers = ({ embedded = false }) => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   // Additional state for categories and filters
   const [categories, setCategories] = useState([]);

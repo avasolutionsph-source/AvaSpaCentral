@@ -7,7 +7,7 @@ import { Bar } from 'react-chartjs-2';
 
 const ProductAnalytics = () => {
   const navigate = useNavigate();
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [productData, setProductData] = useState(null);

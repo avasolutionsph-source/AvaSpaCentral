@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../components/shared';
 
 const Appointments = () => {
   const navigate = useNavigate();
-  const { showToast, user, canViewAll, isTherapist, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, user, canViewAll, isTherapist, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState([]);

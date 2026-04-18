@@ -17,7 +17,7 @@ import storageService from '../services/storage';
 import '../assets/css/pos.css';
 
 const POS = () => {
-  const { showToast, user, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, user, getEffectiveBranchId } = useApp();
 
   // Tab state for switching between POS and Gift Certificates
   const [activeTab, setActiveTab] = useState('pos');

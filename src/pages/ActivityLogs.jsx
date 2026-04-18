@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, subDays, startOfDay, endOfDay } from 'date-fns';
 
 const ActivityLogs = () => {
-  const { showToast, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [loading, setLoading] = useState(false);

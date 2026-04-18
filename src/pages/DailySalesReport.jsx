@@ -45,7 +45,7 @@ const blankManual = () => ({
 });
 
 const DailySalesReport = () => {
-  const { user, getUserBranchId, getEffectiveBranchId, selectedBranch, showToast } = useApp();
+  const { user, getEffectiveBranchId, selectedBranch, showToast } = useApp();
 
   const [view, setView] = useState('current'); // 'current' | 'saved'
   const [period, setPeriod] = useState('today');

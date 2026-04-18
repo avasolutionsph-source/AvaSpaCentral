@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, subDays } from 'date-fns';
 
 const ServiceHistory = ({ embedded = false, onDataChange }) => {
-  const { showToast, user, canViewAll, isTherapist, getUserBranchId, getEffectiveBranchId, hasManagementAccess } = useApp();
+  const { showToast, user, canViewAll, isTherapist, getEffectiveBranchId, hasManagementAccess } = useApp();
   const [transactions, setTransactions] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);

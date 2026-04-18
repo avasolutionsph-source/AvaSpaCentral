@@ -1088,9 +1088,9 @@ html {
 }
 
 /* ── Luxe full-width section strips ─────────────────────── */
-/* All booking sections share a single unified canvas so the flow from
-   Branch → Services → Date/Time → Location → Details reads as one
-   continuous section instead of alternating stripes. */
+/* Each booking subsection fills the viewport so the user scrolls once
+   per step (Branch → Services → Date/Time → Location → Details). Content
+   is vertically centered within the viewport. */
 .luxe-section {
   border-radius: 0;
   border: none;
@@ -1099,22 +1099,16 @@ html {
   padding: 3rem 2.5rem;
   max-width: 100%;
   margin: 0;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .luxe-section:hover {
   box-shadow: none;
   transform: none;
-}
-
-/* First section keeps extra top padding so the header breathes; last
-   keeps extra bottom padding. Everything in between is tight so the
-   section dividers disappear visually. */
-.luxe-section:first-of-type {
-  padding-top: 5rem;
-}
-
-.luxe-section:last-of-type {
-  padding-bottom: 5rem;
 }
 
 /* Soft divider accent between subsections — just the gold hairline, no
@@ -1126,6 +1120,15 @@ html {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.35), transparent);
   margin: 0 auto 2rem;
+}
+
+/* On short viewports, fall back to auto height so the content is always
+   reachable even if it's taller than the screen. */
+@media (max-height: 640px) {
+  .luxe-section {
+    min-height: auto;
+    padding: 3rem 2.5rem;
+  }
 }
 
 /* Constrain all direct children */

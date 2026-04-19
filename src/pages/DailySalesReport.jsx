@@ -9,11 +9,14 @@ import {
   startOfWeek, endOfWeek,
   startOfMonth, endOfMonth,
   startOfYear, endOfYear,
+  subDays,
   getISOWeek,
 } from 'date-fns';
 
 const PERIODS = [
   { id: 'today', label: 'Today' },
+  { id: 'yesterday', label: 'Yesterday' },
+  { id: 'last7', label: 'Last 7 Days' },
   { id: 'week', label: 'This Week' },
   { id: 'month', label: 'This Month' },
   { id: 'year', label: 'This Year' },
@@ -77,6 +80,25 @@ const DailySalesReport = () => {
           periodKey: `today:${format(now, 'yyyy-MM-dd')}`,
           periodLabel: format(now, 'MMMM d, yyyy'),
         };
+      case 'yesterday': {
+        const y = subDays(now, 1);
+        return {
+          startDate: startOfDay(y),
+          endDate: endOfDay(y),
+          periodKey: `day:${format(y, 'yyyy-MM-dd')}`,
+          periodLabel: format(y, 'MMMM d, yyyy'),
+        };
+      }
+      case 'last7': {
+        const s = startOfDay(subDays(now, 6));
+        const e = endOfDay(now);
+        return {
+          startDate: s,
+          endDate: e,
+          periodKey: `last7:${format(now, 'yyyy-MM-dd')}`,
+          periodLabel: `${format(s, 'MMM d')} – ${format(e, 'MMM d, yyyy')}`,
+        };
+      }
       case 'week': {
         const s = startOfWeek(now, { weekStartsOn: 1 });
         const e = endOfWeek(now, { weekStartsOn: 1 });

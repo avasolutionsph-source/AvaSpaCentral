@@ -10,6 +10,7 @@ import { db } from '../../db';
 import NetworkDetector from '../sync/NetworkDetector';
 import authService from './authService';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
+import { upsertPayrollConfig, deletePayrollConfigKey } from '../brandingService';
 
 /**
  * Debounce utility for batching rapid data changes
@@ -1397,23 +1398,19 @@ class SupabaseSyncManager {
           continue;
         }
 
-        // payroll_config uses (business_id, key) as its sync identity, not a UUID id,
-        // so create/update collapse into a single upsert and delete targets the key.
+        // payroll_config uses (business_id, key) as its sync identity, not a UUID id.
+        // Route through raw REST helpers — the supabase-js client queues writes behind
+        // a stuck auth refresh, so .from().upsert() hangs 15s+ here. The REST path
+        // in brandingService uses fetchWithTimeout + a synchronous access token
+        // lookup, so the request either lands on the network or fails fast.
         if (tableName === 'payroll_config') {
+          const bizId = authService.currentUser?.businessId;
+          if (!bizId) throw new Error('No businessId in session for payroll_config sync');
           if (item.operation === 'delete') {
-            const bizId = authService.currentUser?.businessId;
-            const { error: delError } = await supabase
-              .from(tableName)
-              .delete()
-              .eq('business_id', bizId)
-              .eq('key', item.entityId);
-            if (delError) throw delError;
+            await deletePayrollConfigKey(bizId, item.entityId);
           } else {
-            console.log(`[SupabaseSyncManager] UPSERT into ${tableName}:`, supabaseRecord);
-            const { error: upsertError } = await supabase
-              .from(tableName)
-              .upsert(supabaseRecord, { onConflict: 'business_id,key' });
-            if (upsertError) throw upsertError;
+            console.log(`[SupabaseSyncManager] UPSERT into ${tableName} via REST:`, supabaseRecord.key);
+            await upsertPayrollConfig(bizId, supabaseRecord.key, supabaseRecord.value);
           }
         } else {
           switch (item.operation) {

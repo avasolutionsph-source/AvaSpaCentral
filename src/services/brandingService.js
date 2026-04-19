@@ -248,3 +248,72 @@ export async function upsertSettings(businessId, settings, opts = {}) {
     throw new Error(`Failed to upsert settings (${res.status}): ${body}`);
   }
 }
+
+/**
+ * Upsert a payroll_config row (business-scoped key/value) via raw REST so it
+ * bypasses the supabase-js write hang. The row is matched on
+ * (business_id, key) which is the table's unique constraint.
+ *
+ * @param {string} businessId
+ * @param {string} key
+ * @param {any} value
+ */
+export async function upsertPayrollConfig(businessId, key, value) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+
+  const accessToken = getAccessTokenSync();
+  const row = {
+    business_id: businessId,
+    key,
+    value,
+    updated_at: new Date().toISOString(),
+  };
+
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/rest/v1/payroll_config?on_conflict=business_id,key`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify([row]),
+    },
+    12000,
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to upsert payroll_config (${res.status}): ${body}`);
+  }
+}
+
+/**
+ * Delete a payroll_config row by (business_id, key) via raw REST.
+ * @param {string} businessId
+ * @param {string} key
+ */
+export async function deletePayrollConfigKey(businessId, key) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+
+  const accessToken = getAccessTokenSync();
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/rest/v1/payroll_config?business_id=eq.${encodeURIComponent(businessId)}&key=eq.${encodeURIComponent(key)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        Prefer: 'return=minimal',
+      },
+    },
+    12000,
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to delete payroll_config (${res.status}): ${body}`);
+  }
+}

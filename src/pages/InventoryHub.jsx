@@ -13,7 +13,7 @@ import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
 const InventoryHub = () => {
-  const { canEdit, canEditProducts } = useApp();
+  const { canEdit, canEditProducts, getEffectiveBranchId } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'rooms';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -34,9 +34,11 @@ const InventoryHub = () => {
     pendingOrders: 0
   });
 
+  const effectiveBranchId = getEffectiveBranchId();
+
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [effectiveBranchId]);
 
   const loadStats = async () => {
     try {
@@ -49,8 +51,12 @@ const InventoryHub = () => {
       const productItems = products.filter(p => p.type === 'product');
       const lowStock = productItems.filter(p => p.stock > 0 && p.stock <= (p.lowStockAlert || 5)).length;
       const outOfStock = productItems.filter(p => p.stock === 0).length;
-      const availableRooms = rooms.filter(r => r.status === 'available').length;
-      const occupiedRooms = rooms.filter(r => r.status === 'occupied').length;
+      // Match the Rooms page filter — only count rooms in the current branch
+      const branchRooms = effectiveBranchId
+        ? rooms.filter(r => r.branchId === effectiveBranchId)
+        : rooms;
+      const availableRooms = branchRooms.filter(r => r.status === 'available').length;
+      const occupiedRooms = branchRooms.filter(r => r.status === 'occupied').length;
 
       setStats({
         availableRooms,

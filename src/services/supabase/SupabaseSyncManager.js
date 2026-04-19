@@ -566,9 +566,9 @@ class SupabaseSyncManager {
       return null;
     }
 
-    // Skip records with non-UUID IDs (old mock data like 'booking_001', 'nightDifferential', etc.)
-    // Exception: serviceRotation uses date strings as IDs
-    if (record._id && !isValidUUID(record._id) && entityType !== 'serviceRotation') {
+    // Skip records with non-UUID IDs (old mock data like 'booking_001', etc.)
+    // Exceptions: serviceRotation uses date strings; payrollConfig uses key strings
+    if (record._id && !isValidUUID(record._id) && entityType !== 'serviceRotation' && entityType !== 'payrollConfig') {
       console.log(`[SupabaseSyncManager] Skipping ${entityType} with non-UUID id: ${record._id}`);
       return null;
     }
@@ -690,6 +690,14 @@ class SupabaseSyncManager {
       }
     }
 
+    // Special handling for payroll_config: strip the string key from id (Supabase
+    // needs UUID) and always attach business_id from the current user. Uniqueness
+    // is enforced via (business_id, key) so push uses upsert on that constraint.
+    if (tableName === 'payroll_config') {
+      delete converted.id;
+      converted.business_id = businessId;
+    }
+
     // Filter to only include valid Supabase columns for this table
     if (validColumns) {
       const filtered = {};
@@ -742,6 +750,13 @@ class SupabaseSyncManager {
         const camelKey = this._toCamelCase(key);
         converted[camelKey] = value;
       }
+    }
+
+    // Special handling for payroll_config: local Dexie keys the table by the
+    // config key string (e.g., "regularOvertime"), not the Supabase UUID, so
+    // the record identity survives round-trips through sync.
+    if (entityType === 'payrollConfig' && converted.key) {
+      converted._id = converted.key;
     }
 
     // Special handling for payroll_config_logs: unpack changes JSONB into individual fields
@@ -1382,44 +1397,64 @@ class SupabaseSyncManager {
           continue;
         }
 
-        switch (item.operation) {
-          case 'create':
-            console.log(`[SupabaseSyncManager] INSERT into ${tableName}:`, supabaseRecord);
-            const { error: createError } = await supabase
+        // payroll_config uses (business_id, key) as its sync identity, not a UUID id,
+        // so create/update collapse into a single upsert and delete targets the key.
+        if (tableName === 'payroll_config') {
+          if (item.operation === 'delete') {
+            const bizId = authService.currentUser?.businessId;
+            const { error: delError } = await supabase
               .from(tableName)
-              .insert(supabaseRecord);
-            if (createError) {
-              // If duplicate key conflict (409), retry as update instead of failing
-              if (createError.code === '23505') {
-                console.log(`[SupabaseSyncManager] Duplicate detected for ${tableName}, retrying as UPDATE`);
-                const { error: fallbackError } = await supabase
-                  .from(tableName)
-                  .update(supabaseRecord)
-                  .eq('id', supabaseRecord.id);
-                if (fallbackError) throw fallbackError;
-              } else {
-                throw createError;
+              .delete()
+              .eq('business_id', bizId)
+              .eq('key', item.entityId);
+            if (delError) throw delError;
+          } else {
+            console.log(`[SupabaseSyncManager] UPSERT into ${tableName}:`, supabaseRecord);
+            const { error: upsertError } = await supabase
+              .from(tableName)
+              .upsert(supabaseRecord, { onConflict: 'business_id,key' });
+            if (upsertError) throw upsertError;
+          }
+        } else {
+          switch (item.operation) {
+            case 'create':
+              console.log(`[SupabaseSyncManager] INSERT into ${tableName}:`, supabaseRecord);
+              const { error: createError } = await supabase
+                .from(tableName)
+                .insert(supabaseRecord);
+              if (createError) {
+                // If duplicate key conflict (409), retry as update instead of failing
+                if (createError.code === '23505') {
+                  console.log(`[SupabaseSyncManager] Duplicate detected for ${tableName}, retrying as UPDATE`);
+                  const { error: fallbackError } = await supabase
+                    .from(tableName)
+                    .update(supabaseRecord)
+                    .eq('id', supabaseRecord.id);
+                  if (fallbackError) throw fallbackError;
+                } else {
+                  throw createError;
+                }
               }
-            }
-            console.log(`[SupabaseSyncManager] INSERT successful for ${tableName}`);
-            break;
+              console.log(`[SupabaseSyncManager] INSERT successful for ${tableName}`);
+              break;
 
-          case 'update':
-            const { error: updateError } = await supabase
-              .from(tableName)
-              .update(supabaseRecord)
-              .eq('id', supabaseRecord.id);
-            if (updateError) throw updateError;
-            break;
+            case 'update':
+              const { error: updateError } = await supabase
+                .from(tableName)
+                .update(supabaseRecord)
+                .eq('id', supabaseRecord.id);
+              if (updateError) throw updateError;
+              break;
 
-          case 'delete':
-            // Soft delete
-            const { error: deleteError } = await supabase
-              .from(tableName)
-              .update({ deleted: true, updated_at: new Date().toISOString() })
-              .eq('id', item.entityId);
-            if (deleteError) throw deleteError;
-            break;
+            case 'delete':
+              // Soft delete
+              const { error: deleteError } = await supabase
+                .from(tableName)
+                .update({ deleted: true, updated_at: new Date().toISOString() })
+                .eq('id', item.entityId);
+              if (deleteError) throw deleteError;
+              break;
+          }
         }
 
         // Remove from queue on success

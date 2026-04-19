@@ -57,7 +57,7 @@ export const generateId = (): string => {
 };
 
 // Tables that don't use multi-tenant filtering
-const noTenantTables = ['settings', 'payrollConfig', 'businessConfig', 'syncQueue', 'syncMetadata'];
+const noTenantTables = ['settings', 'businessConfig', 'syncQueue', 'syncMetadata'];
 
 class BaseRepository<T extends BaseEntity> {
   protected tableName: string;

@@ -7,7 +7,7 @@ import ServiceHistory from './ServiceHistory';
 import '../assets/css/hub-pages.css';
 
 const ServiceHub = () => {
-  const { canEdit } = useApp();
+  const { canEdit, getEffectiveBranchId } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'rooms';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -22,9 +22,11 @@ const ServiceHub = () => {
     todayServices: 0
   });
 
+  const effectiveBranchId = getEffectiveBranchId();
+
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [effectiveBranchId]);
 
   const loadStats = async () => {
     try {
@@ -33,8 +35,12 @@ const ServiceHub = () => {
         mockApi.transactions.getTransactions()
       ]);
 
-      const availableRooms = rooms.filter(r => r.status === 'available').length;
-      const occupiedRooms = rooms.filter(r => r.status === 'occupied').length;
+      // Match the Rooms page filter — only count rooms in the current branch
+      const branchRooms = effectiveBranchId
+        ? rooms.filter(r => r.branchId === effectiveBranchId)
+        : rooms;
+      const availableRooms = branchRooms.filter(r => r.status === 'available').length;
+      const occupiedRooms = branchRooms.filter(r => r.status === 'occupied').length;
 
       // Count today's transactions
       const today = new Date().toDateString();

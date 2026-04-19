@@ -115,14 +115,18 @@ const POS = () => {
         // Filter out products marked as hidden from POS
         const visibleProducts = productsData.filter(p => !p.hideFromPOS);
 
-        // Filter by branch
+        // Filter by branch. Products stay permissive (legacy rows without
+        // branchId still show) so the POS catalog keeps working during the
+        // branch-scoping rollout. Rooms are strict — they are physical spaces
+        // tied to a specific branch, so only rooms matching the branch appear.
         const effectiveBranchId = getEffectiveBranchId();
         const branchFilter = (item) => !effectiveBranchId || !item.branchId || item.branchId === effectiveBranchId;
+        const strictBranchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
 
         setProducts(visibleProducts.filter(branchFilter));
         setEmployees(employeesData.filter(branchFilter));
         setCustomers(customersData.filter(branchFilter));
-        setRooms(roomsData.filter(branchFilter));
+        setRooms(roomsData.filter(strictBranchFilter));
 
         // Extract unique categories from visible products only
         const uniqueCategories = [...new Set(visibleProducts.filter(branchFilter).map(p => p.category))];
@@ -224,14 +228,16 @@ const POS = () => {
       // Filter out products marked as hidden from POS
       const visibleProducts = productsData.filter(p => !p.hideFromPOS);
 
-      // Filter by branch
+      // Filter by branch. Rooms use strict match (physical-space scoping);
+      // products stay permissive to keep legacy unbranched rows available.
       const effectiveBranchId = getEffectiveBranchId();
       const branchFilter = (item) => !effectiveBranchId || !item.branchId || item.branchId === effectiveBranchId;
+      const strictBranchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
 
       setProducts(visibleProducts.filter(branchFilter));
       setEmployees(employeesData.filter(branchFilter));
       setCustomers(customersData.filter(branchFilter));
-      setRooms(roomsData.filter(branchFilter));
+      setRooms(roomsData.filter(strictBranchFilter));
 
       // Extract unique categories from visible products only
       const uniqueCategories = [...new Set(visibleProducts.filter(branchFilter).map(p => p.category))];

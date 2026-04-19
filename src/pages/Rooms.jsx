@@ -350,10 +350,11 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   const filteredRooms = useMemo(() => {
     let filtered = rooms;
 
-    // Branch filtering
+    // Branch filtering — strict match. Rooms are physical spaces tied to a
+    // specific branch, so unbranched rooms only surface under "All Branches".
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(r => !r.branchId || r.branchId === effectiveBranchId);
+      filtered = filtered.filter(r => r.branchId === effectiveBranchId);
     }
 
     // First filter: Only show rooms with active services by default (pending/occupied)

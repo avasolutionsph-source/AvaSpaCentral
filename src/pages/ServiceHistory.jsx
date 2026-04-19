@@ -47,20 +47,57 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
 
       setEmployees(apiEmployees.filter(e => e.status === 'active'));
 
+      // Lookup: employeeId -> commission fraction (e.g. 0.4 for 40%).
+      // Used to back-fill per-item commission when the POS only stored a
+      // transaction-level total (legacy behaviour). Falls back to 0.1 when an
+      // employee record is missing so rows without any linked staff still
+      // render something reasonable.
+      const commissionByEmpId = new Map();
+      apiEmployees.forEach(e => {
+        const type = e.commission?.type;
+        const value = parseFloat(e.commission?.value) || 0;
+        if (type === 'percentage') {
+          commissionByEmpId.set(e._id, { kind: 'percentage', rate: value / 100 });
+        } else if (type === 'fixed') {
+          commissionByEmpId.set(e._id, { kind: 'fixed', amount: value });
+        }
+      });
+
       // Transform API transactions to expected format
-      const formattedTransactions = apiTransactions.map((t, index) => ({
+      const formattedTransactions = apiTransactions.map((t, index) => {
+        const items = (t.items || []).map(item => {
+          const quantity = item.quantity || 1;
+          const price = item.price || item.subtotal || 0;
+          const lineTotal = price * quantity;
+          const empId = t.employee?._id || item.employeeId;
+          let commission = item.commission;
+          if (commission == null) {
+            const cfg = commissionByEmpId.get(empId);
+            if (cfg?.kind === 'percentage') {
+              commission = lineTotal * cfg.rate;
+            } else if (cfg?.kind === 'fixed') {
+              // Distribute fixed amount pro-rata by line total across items
+              const txTotal = (t.items || []).reduce((s, i) => s + ((i.price || i.subtotal || 0) * (i.quantity || 1)), 0);
+              commission = txTotal > 0 ? cfg.amount * (lineTotal / txTotal) : 0;
+            } else {
+              commission = lineTotal * 0.1; // last-resort default
+            }
+          }
+          return {
+            name: item.name,
+            quantity,
+            price,
+            employeeId: empId,
+            employeeName: t.employee?.name || item.employeeName || 'Staff',
+            commission,
+          };
+        });
+        return {
         id: t._id || index + 1,
         receiptNumber: t.receiptNumber || `REC-${new Date(t.date).getFullYear()}-${String(index + 1).padStart(3, '0')}`,
         date: t.date,
         customer: t.customer || { name: 'Walk-in Customer', phone: '' },
-        items: (t.items || []).map(item => ({
-          name: item.name,
-          quantity: item.quantity || 1,
-          price: item.price || item.subtotal || 0,
-          employeeId: t.employee?._id || item.employeeId,
-          employeeName: t.employee?.name || item.employeeName || 'Staff',
-          commission: item.commission || ((item.price || 0) * 0.1)
-        })),
+        items,
         subtotal: t.subtotal || (t.items || []).reduce((sum, i) => sum + (i.subtotal || i.price || 0), 0),
         discount: t.discount || 0,
         tax: t.tax || 0,
@@ -71,7 +108,8 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
         voidedAt: t.voidedAt,
         voidedBy: t.voidedBy,
         voidReason: t.voidReason
-      }));
+        };
+      });
 
       setTransactions(formattedTransactions);
       if (onDataChange) onDataChange();

@@ -69,7 +69,10 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
           const quantity = item.quantity || 1;
           const price = item.price || item.subtotal || 0;
           const lineTotal = price * quantity;
-          const empId = t.employee?._id || item.employeeId;
+          // POS stores the employee reference as `t.employee.id` (see POS.jsx
+          // checkout payload). Keep _id as a defensive fallback in case older
+          // records used the Dexie key directly.
+          const empId = t.employee?.id || t.employee?._id || item.employeeId;
           let commission = item.commission;
           if (commission == null) {
             const cfg = commissionByEmpId.get(empId);

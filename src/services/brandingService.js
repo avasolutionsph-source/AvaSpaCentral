@@ -291,6 +291,74 @@ export async function upsertPayrollConfig(businessId, key, value) {
 }
 
 /**
+ * Upsert a service_rotation row (daily rotation queue) via raw REST. The row
+ * is matched on (business_id, date) which is the table's unique constraint.
+ *
+ * @param {string} businessId
+ * @param {string} date  ISO date string "YYYY-MM-DD"
+ * @param {any} rotationData
+ */
+export async function upsertServiceRotation(businessId, date, rotationData) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+
+  const accessToken = getAccessTokenSync();
+  const row = {
+    business_id: businessId,
+    date,
+    rotation_data: rotationData ?? {},
+    updated_at: new Date().toISOString(),
+  };
+
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/rest/v1/service_rotation?on_conflict=business_id,date`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify([row]),
+    },
+    12000,
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to upsert service_rotation (${res.status}): ${body}`);
+  }
+}
+
+/**
+ * Delete a service_rotation row by (business_id, date) via raw REST.
+ * @param {string} businessId
+ * @param {string} date
+ */
+export async function deleteServiceRotation(businessId, date) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+
+  const accessToken = getAccessTokenSync();
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/rest/v1/service_rotation?business_id=eq.${encodeURIComponent(businessId)}&date=eq.${encodeURIComponent(date)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        Prefer: 'return=minimal',
+      },
+    },
+    12000,
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to delete service_rotation (${res.status}): ${body}`);
+  }
+}
+
+/**
  * Delete a payroll_config row by (business_id, key) via raw REST.
  * @param {string} businessId
  * @param {string} key

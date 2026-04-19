@@ -10,7 +10,12 @@ import { db } from '../../db';
 import NetworkDetector from '../sync/NetworkDetector';
 import authService from './authService';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
-import { upsertPayrollConfig, deletePayrollConfigKey } from '../brandingService';
+import {
+  upsertPayrollConfig,
+  deletePayrollConfigKey,
+  upsertServiceRotation,
+  deleteServiceRotation,
+} from '../brandingService';
 
 /**
  * Debounce utility for batching rapid data changes
@@ -622,7 +627,10 @@ class SupabaseSyncManager {
       }
     }
 
-    // Special handling for service_rotation: wrap rotation fields into rotation_data JSONB
+    // Special handling for service_rotation: wrap rotation fields into rotation_data JSONB.
+    // Local _id is the date string (e.g. "2026-04-20"), but the Supabase id column is
+    // UUID, so strip it and let the server auto-generate one. Uniqueness is enforced
+    // via (business_id, date) so push uses upsert on that constraint.
     if (tableName === 'service_rotation') {
       const rotationFields = ['queue', 'serviceCount', 'service_count',
         'employeeOrder', 'employee_order', 'currentIndex', 'current_index',
@@ -637,6 +645,8 @@ class SupabaseSyncManager {
       if (Object.keys(rotationData).length > 0) {
         converted.rotation_data = rotationData;
       }
+      delete converted.id;
+      converted.business_id = businessId;
     }
 
     // Special handling for employees: flatten commission object and store extras in metadata
@@ -758,6 +768,13 @@ class SupabaseSyncManager {
     // the record identity survives round-trips through sync.
     if (entityType === 'payrollConfig' && converted.key) {
       converted._id = converted.key;
+    }
+
+    // Special handling for service_rotation: local Dexie keys the table by the
+    // date string (e.g., "2026-04-20"), not the Supabase UUID. Same round-trip
+    // reasoning as payroll_config.
+    if (entityType === 'serviceRotation' && converted.date) {
+      converted._id = converted.date;
     }
 
     // Special handling for payroll_config_logs: unpack changes JSONB into individual fields
@@ -1311,10 +1328,12 @@ class SupabaseSyncManager {
     this._isSyncing = true;
     this._notifyListeners({ type: 'sync_start' });
 
-    // Timeout to prevent sync from getting stuck indefinitely
-    const SYNC_TIMEOUT_MS = 30000; // 30 seconds
+    // Timeout to prevent sync from getting stuck indefinitely. A full pull hits
+    // ~30 entity tables, so 30s was tight under any latency; 60s gives headroom
+    // while the REST helpers keep individual writes on their own 12s limits.
+    const SYNC_TIMEOUT_MS = 60000; // 60 seconds
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Sync timed out after 30 seconds')), SYNC_TIMEOUT_MS)
+      setTimeout(() => reject(new Error('Sync timed out after 60 seconds')), SYNC_TIMEOUT_MS)
     );
 
     try {
@@ -1398,11 +1417,11 @@ class SupabaseSyncManager {
           continue;
         }
 
-        // payroll_config uses (business_id, key) as its sync identity, not a UUID id.
-        // Route through raw REST helpers — the supabase-js client queues writes behind
-        // a stuck auth refresh, so .from().upsert() hangs 15s+ here. The REST path
-        // in brandingService uses fetchWithTimeout + a synchronous access token
-        // lookup, so the request either lands on the network or fails fast.
+        // payroll_config and service_rotation both identify rows by a natural key
+        // (business_id,key / business_id,date) rather than a UUID, and both hit the
+        // supabase-js write hang when routed through .from().upsert(). Use the raw
+        // REST helpers in brandingService so the call either lands or times out in
+        // 12s instead of stalling the whole 30s sync budget.
         if (tableName === 'payroll_config') {
           const bizId = authService.currentUser?.businessId;
           if (!bizId) throw new Error('No businessId in session for payroll_config sync');
@@ -1411,6 +1430,17 @@ class SupabaseSyncManager {
           } else {
             console.log(`[SupabaseSyncManager] UPSERT into ${tableName} via REST:`, supabaseRecord.key);
             await upsertPayrollConfig(bizId, supabaseRecord.key, supabaseRecord.value);
+          }
+        } else if (tableName === 'service_rotation') {
+          const bizId = authService.currentUser?.businessId;
+          if (!bizId) throw new Error('No businessId in session for service_rotation sync');
+          // entityId in the queue is the local _id (date string like "2026-04-20")
+          const date = supabaseRecord.date || item.entityId;
+          if (item.operation === 'delete') {
+            await deleteServiceRotation(bizId, date);
+          } else {
+            console.log(`[SupabaseSyncManager] UPSERT into ${tableName} via REST:`, date);
+            await upsertServiceRotation(bizId, date, supabaseRecord.rotation_data);
           }
         } else {
           switch (item.operation) {

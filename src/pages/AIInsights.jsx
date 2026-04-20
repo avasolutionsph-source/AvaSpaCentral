@@ -5,7 +5,7 @@ import { format, subDays, differenceInDays, addDays } from 'date-fns';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
 const AIInsights = () => {
-  const { showToast } = useApp();
+  const { showToast, getEffectiveBranchId, selectedBranch } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -28,13 +28,13 @@ const AIInsights = () => {
 
   useEffect(() => {
     loadAllData();
-  }, []);
+  }, [selectedBranch?.id, selectedBranch?._allBranches]);
 
   const loadAllData = async () => {
     try {
       setLoading(true);
 
-      const [txns, prods, emps, rms, custs, bookings] = await Promise.all([
+      const [rawTxns, rawProds, rawEmps, rawRms, rawCusts, rawBookings] = await Promise.all([
         mockApi.transactions.getTransactions(),
         mockApi.products.getProducts(),
         mockApi.employees.getEmployees(),
@@ -42,6 +42,21 @@ const AIInsights = () => {
         mockApi.customers.getCustomers(),
         mockApi.advanceBooking.listAdvanceBookings()
       ]);
+
+      // Scope every collection to the selected branch before running any
+      // analysis so charts, KPIs, and AI recommendations all reflect the
+      // same dataset the user expects from the branch dropdown.
+      const effectiveBranchId = getEffectiveBranchId();
+      const scope = (items) => effectiveBranchId
+        ? items.filter(item => item.branchId === effectiveBranchId)
+        : items;
+
+      const txns = scope(rawTxns);
+      const prods = scope(rawProds);
+      const emps = scope(rawEmps);
+      const rms = scope(rawRms);
+      const custs = scope(rawCusts);
+      const bookings = scope(rawBookings);
 
       setTransactions(txns);
       setProducts(prods);

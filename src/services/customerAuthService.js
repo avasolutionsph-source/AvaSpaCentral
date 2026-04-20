@@ -426,12 +426,21 @@ export const updateCustomerProfile = async (accountId, data) => {
       return { success: false, error: 'Not authenticated' };
     }
 
-    // Only allow updating certain fields
+    // Only allow updating certain fields. Coerce empty-string values from
+    // the form into nulls so nullable columns like `birthday` (date) don't
+    // blow up Postgres with "invalid input syntax for type date". `name`
+    // stays as-is because it's NOT NULL in the schema and the form already
+    // validates that it's non-empty.
     const allowedFields = ['name', 'phone', 'birthday', 'gender', 'preferences'];
+    const nullableFields = new Set(['phone', 'birthday', 'gender']);
     const updateData = {};
     for (const field of allowedFields) {
-      if (data[field] !== undefined) {
-        updateData[field] = data[field];
+      if (data[field] === undefined) continue;
+      const value = data[field];
+      if (value === '' && nullableFields.has(field)) {
+        updateData[field] = null;
+      } else {
+        updateData[field] = value;
       }
     }
 
@@ -447,7 +456,8 @@ export const updateCustomerProfile = async (accountId, data) => {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to update profile');
+      const errBody = await response.text().catch(() => '');
+      throw new Error(`Failed to update profile (${response.status}): ${errBody.slice(0, 200)}`);
     }
 
     const updated = await response.json();

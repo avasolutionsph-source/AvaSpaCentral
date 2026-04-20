@@ -18,12 +18,20 @@ const CustomerLogin = () => {
   const [businessInfo, setBusinessInfo] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
 
-  // Check if already logged in
+  // Check if already logged in. If the user already has a session and
+  // lands on /login, bounce them back to the booking page they came from
+  // (or the branch home) instead of the profile dashboard.
   useEffect(() => {
     const checkSession = async () => {
       const session = await getCustomerSession(businessId);
       if (session) {
-        navigate(`/book/${businessId}/profile`);
+        const returnUrl = sessionStorage.getItem('customerReturnUrl');
+        if (returnUrl) {
+          sessionStorage.removeItem('customerReturnUrl');
+          navigate(returnUrl, { replace: true });
+        } else {
+          navigate(`/book/${businessId}`, { replace: true });
+        }
       }
       setPageLoading(false);
     };
@@ -75,13 +83,15 @@ const CustomerLogin = () => {
       const result = await loginCustomer(actualBusinessId, email, password);
 
       if (result.success) {
-        // Redirect to profile or back to booking
+        // Send the user back to where they came from. A guest who signed
+        // in from the booking page expects to return there, not be dumped
+        // on the profile dashboard — the dashboard is for explicit visits.
         const returnUrl = sessionStorage.getItem('customerReturnUrl');
         if (returnUrl) {
           sessionStorage.removeItem('customerReturnUrl');
-          navigate(returnUrl);
+          navigate(returnUrl, { replace: true });
         } else {
-          navigate(`/book/${businessId}/profile`);
+          navigate(`/book/${businessId}`, { replace: true });
         }
       } else {
         setError(result.error);
@@ -110,7 +120,7 @@ const CustomerLogin = () => {
         <div className="customer-auth-card">
           {/* Header */}
           <div className="customer-auth-header">
-            <Link to={`/book/${businessId}`} className="back-link">
+            <Link to={`/book/${businessId}`} replace className="back-link">
               Back to Booking
             </Link>
             <h1>{businessInfo?.name || 'Welcome Back'}</h1>
@@ -168,7 +178,7 @@ const CustomerLogin = () => {
               <Link to={`/book/${businessId}/register`}>Create one</Link>
             </p>
             <p className="guest-option">
-              Or <Link to={`/book/${businessId}`}>continue as guest</Link>
+              Or <Link to={`/book/${businessId}`} replace>continue as guest</Link>
             </p>
           </div>
         </div>

@@ -198,6 +198,19 @@ const BookingPage = () => {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingReference, setBookingReference] = useState('');
 
+  // When the success state is shown, anchor browser back to the booking
+  // home. Without this, if the user earlier bounced through /login or
+  // /register, pressing back after submit pops history to that login page
+  // instead of the booking landing page.
+  useEffect(() => {
+    if (!bookingSuccess) return;
+    const bookingHomeUrl = `/book/${businessIdOrSlug}${branchSlug ? `/${branchSlug}` : ''}`;
+    const onPop = () => { window.location.href = bookingHomeUrl; };
+    window.history.pushState({ bookingSuccess: true }, '', window.location.href);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [bookingSuccess, businessIdOrSlug, branchSlug]);
+
   // Customer auth state
   const [customerSession, setCustomerSession] = useState(null);
   const [customerAccount, setCustomerAccount] = useState(null);
@@ -778,10 +791,23 @@ const BookingPage = () => {
       alert('Phone number must be exactly 11 digits (e.g., 09XX XXX XXXX).');
       return;
     }
-    // Validate service location address if home/hotel service
-    if (serviceLocation !== 'in_store' && !serviceAddress.trim()) {
-      alert('Please enter your address for home/hotel service.');
+    // Validate service location fields for home/hotel service.
+    // For hotel bookings the first field is the hotel name and the
+    // "city" slot holds the room number — both are required so front
+    // desk can route the therapist correctly.
+    if (serviceLocation === 'home_service' && !serviceAddress.trim()) {
+      alert('Please enter your address for home service.');
       return;
+    }
+    if (serviceLocation === 'hotel_service') {
+      if (!serviceAddress.trim()) {
+        alert('Please enter the hotel name.');
+        return;
+      }
+      if (!serviceCity.trim()) {
+        alert('Please enter the room number.');
+        return;
+      }
     }
 
     // Re-check capacity before submitting
@@ -1124,9 +1150,18 @@ const BookingPage = () => {
 
   // Success state
   if (bookingSuccess) {
+    const bookingHomeUrl = `/book/${businessIdOrSlug}${branchSlug ? `/${branchSlug}` : ''}`;
     return (
       <div className="booking-page">
         <div className="booking-success">
+          <button
+            type="button"
+            className="booking-success-close"
+            aria-label="Close"
+            onClick={() => { window.location.href = bookingHomeUrl; }}
+          >
+            ×
+          </button>
           <div className="success-icon">✓</div>
           <h2>Booking Submitted!</h2>
           <p className="reference">Reference: <strong>{bookingReference}</strong></p>
@@ -1141,6 +1176,25 @@ const BookingPage = () => {
             <p><strong>Date:</strong> {selectedDate}</p>
             <p><strong>Time:</strong> {selectedTime}</p>
             <p><strong>Total:</strong> ₱{(cartTotal ?? 0).toLocaleString()}</p>
+            {serviceLocation === 'home_service' && serviceAddress && (
+              <>
+                <p><strong>Service:</strong> Home Service</p>
+                <p>
+                  <strong>Address:</strong> {serviceAddress}
+                  {serviceCity ? `, ${serviceCity}` : ''}
+                </p>
+                {serviceLandmark && <p><strong>Landmark:</strong> {serviceLandmark}</p>}
+                {serviceInstructions && <p><strong>Instructions:</strong> {serviceInstructions}</p>}
+              </>
+            )}
+            {serviceLocation === 'hotel_service' && serviceAddress && (
+              <>
+                <p><strong>Service:</strong> Hotel Service</p>
+                <p><strong>Hotel:</strong> {serviceAddress}</p>
+                {serviceCity && <p><strong>Room:</strong> {serviceCity}</p>}
+                {serviceInstructions && <p><strong>Instructions:</strong> {serviceInstructions}</p>}
+              </>
+            )}
           </div>
           <div className="success-note">
             <p>We will contact you at <strong>{customerPhone}</strong> to confirm your appointment.</p>
@@ -1149,6 +1203,13 @@ const BookingPage = () => {
           <p className="business-contact">
             Questions? Contact {business?.name} at {business?.phone}
           </p>
+          <button
+            type="button"
+            className="booking-success-home"
+            onClick={() => { window.location.href = bookingHomeUrl; }}
+          >
+            Back to Home
+          </button>
         </div>
       </div>
     );
@@ -1216,10 +1277,24 @@ const BookingPage = () => {
                 </div>
               ) : (
                 <div className="customer-auth-buttons">
-                  <Link to={`/book/${linkSlug}/login`} className="auth-btn login-btn">
+                  <Link
+                    to={`/book/${linkSlug}/login`}
+                    className="auth-btn login-btn"
+                    onClick={() => {
+                      // Remember where the user came from so CustomerLogin
+                      // can return them here after a successful sign-in.
+                      sessionStorage.setItem('customerReturnUrl', `/book/${linkSlug}`);
+                    }}
+                  >
                     Sign In
                   </Link>
-                  <Link to={`/book/${linkSlug}/register`} className="auth-btn register-btn">
+                  <Link
+                    to={`/book/${linkSlug}/register`}
+                    className="auth-btn register-btn"
+                    onClick={() => {
+                      sessionStorage.setItem('customerReturnUrl', `/book/${linkSlug}`);
+                    }}
+                  >
                     Register
                   </Link>
                 </div>
@@ -1968,7 +2043,7 @@ const BookingPage = () => {
             </div>
 
             {/* Address form for home/hotel service */}
-            {serviceLocation !== 'in_store' && (
+            {serviceLocation === 'home_service' && (
               <div className="service-address-form">
                 <div className="form-group">
                   <label>Address *</label>
@@ -2002,6 +2077,39 @@ const BookingPage = () => {
                   <label>Special Instructions <span className="optional">(Optional)</span></label>
                   <textarea
                     placeholder="Gate code, parking info, etc."
+                    value={serviceInstructions}
+                    onChange={(e) => setServiceInstructions(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+              </div>
+            )}
+            {serviceLocation === 'hotel_service' && (
+              <div className="service-address-form">
+                <div className="form-group">
+                  <label>Hotel Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Daet Seaside Hotel"
+                    value={serviceAddress}
+                    onChange={(e) => setServiceAddress(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Room Number *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 302"
+                    value={serviceCity}
+                    onChange={(e) => setServiceCity(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Special Instructions <span className="optional">(Optional)</span></label>
+                  <textarea
+                    placeholder="Front desk notes, parking info, etc."
                     value={serviceInstructions}
                     onChange={(e) => setServiceInstructions(e.target.value)}
                     rows={2}
@@ -2045,6 +2153,11 @@ const BookingPage = () => {
                   maxLength={11}
                   required
                 />
+                {customerPhone.length > 0 && customerPhone.length < 11 && (
+                  <p className="form-hint form-hint-error">
+                    Please enter an 11-digit phone number.
+                  </p>
+                )}
               </div>
               <div className="form-group">
                 <label>Email <span className="optional">(Optional)</span></label>

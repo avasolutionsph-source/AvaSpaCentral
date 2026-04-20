@@ -62,7 +62,8 @@ class OTRequestRepository extends BaseRepository {
       hours: data.hours,
       reason: data.reason,
       status: 'pending',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      ...(data.branchId && { branchId: data.branchId }),
     });
   }
 

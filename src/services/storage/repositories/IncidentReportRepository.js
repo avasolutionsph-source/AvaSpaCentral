@@ -48,7 +48,8 @@ class IncidentReportRepository extends BaseRepository {
       description: data.description,
       incidentDate: data.incidentDate || new Date().toISOString().split('T')[0],
       status: 'pending',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      ...(data.branchId && { branchId: data.branchId }),
     });
   }
 

@@ -7,7 +7,7 @@ import CashAdvanceRequestRepository from '../services/storage/repositories/CashA
 import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
 
 const MyRequests = ({ embedded = false, onDataChange }) => {
-  const { showToast, user } = useApp();
+  const { showToast, user, getEffectiveBranchId } = useApp();
   const [activeRequestType, setActiveRequestType] = useState('ot');
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -104,11 +104,17 @@ const MyRequests = ({ embedded = false, onDataChange }) => {
 
     try {
       const employeeName = `${user.firstName} ${user.lastName}`;
+      const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before submitting a request', 'error');
+        return;
+      }
       await OTRequestRepository.createRequest(user.employeeId, employeeName, {
         date: otForm.date,
         startTime: otForm.startTime,
         endTime: otForm.endTime,
-        reason: otForm.reason
+        reason: otForm.reason,
+        branchId,
       });
       showToast('OT request submitted successfully!', 'success');
       setShowForm(false);
@@ -133,11 +139,17 @@ const MyRequests = ({ embedded = false, onDataChange }) => {
 
     try {
       const employeeName = `${user.firstName} ${user.lastName}`;
+      const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before submitting a request', 'error');
+        return;
+      }
       await LeaveRequestRepository.createRequest(user.employeeId, employeeName, {
         type: leaveForm.type,
         startDate: leaveForm.startDate,
         endDate: leaveForm.endDate,
-        reason: leaveForm.reason
+        reason: leaveForm.reason,
+        branchId,
       });
       showToast('Leave request submitted successfully!', 'success');
       setShowForm(false);
@@ -163,9 +175,15 @@ const MyRequests = ({ embedded = false, onDataChange }) => {
 
     try {
       const employeeName = `${user.firstName} ${user.lastName}`;
+      const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before submitting a request', 'error');
+        return;
+      }
       await CashAdvanceRequestRepository.createRequest(user.employeeId, employeeName, {
         amount: amount,
-        reason: cashAdvanceForm.reason
+        reason: cashAdvanceForm.reason,
+        branchId,
       });
       showToast('Cash advance request submitted successfully!', 'success');
       setShowForm(false);
@@ -185,10 +203,16 @@ const MyRequests = ({ embedded = false, onDataChange }) => {
 
     try {
       const employeeName = `${user.firstName} ${user.lastName}`;
+      const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before submitting a request', 'error');
+        return;
+      }
       await IncidentReportRepository.createReport(user.employeeId, employeeName, {
         title: incidentForm.title,
         description: incidentForm.description,
-        incidentDate: incidentForm.incidentDate
+        incidentDate: incidentForm.incidentDate,
+        branchId,
       });
       showToast('Incident report submitted successfully!', 'success');
       setShowForm(false);

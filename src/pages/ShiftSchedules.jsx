@@ -73,11 +73,12 @@ const ShiftSchedules = () => {
         mockApi.shiftSchedules.getTimeOffRequests()
       ]);
 
-      // Filter data by branch
+      // Filter data by branch — strict match. Legacy NULL-branchId records
+      // were backfilled to Naga in the shift-schedule branch-scope migration.
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        schedulesData = schedulesData.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        employeesData = employeesData.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        schedulesData = schedulesData.filter(item => item.branchId === effectiveBranchId);
+        employeesData = employeesData.filter(item => item.branchId === effectiveBranchId);
       }
 
       setSchedules(schedulesData.filter(s => s.isActive));
@@ -244,6 +245,10 @@ const ShiftSchedules = () => {
       });
 
       const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before scheduling', 'error');
+        return;
+      }
       await mockApi.shiftSchedules.createSchedule({
         employeeId: employee._id,
         employeeName: `${employee.firstName} ${employee.lastName}`,
@@ -252,7 +257,7 @@ const ShiftSchedules = () => {
         weeklySchedule: defaultWeeklySchedule,
         isActive: true,
         effectiveDate: format(weekStart, 'yyyy-MM-dd'),
-        ...(branchId && { branchId })
+        branchId,
       });
 
       showToast(`${employee.firstName} ${employee.lastName} added to schedule!`, 'success');

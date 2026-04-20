@@ -62,7 +62,8 @@ class LeaveRequestRepository extends BaseRepository {
       type: data.type, // 'vacation', 'sick', 'personal', 'emergency'
       reason: data.reason,
       status: 'pending',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      ...(data.branchId && { branchId: data.branchId }),
     });
   }
 

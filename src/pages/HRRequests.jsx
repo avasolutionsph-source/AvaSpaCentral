@@ -7,7 +7,7 @@ import CashAdvanceRequestRepository from '../services/storage/repositories/CashA
 import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
 
 const HRRequests = ({ embedded = false, onDataChange }) => {
-  const { showToast, user, isOwner, isManager } = useApp();
+  const { showToast, user, isOwner, isManager, getEffectiveBranchId, selectedBranch } = useApp();
   const [activeRequestType, setActiveRequestType] = useState('all');
   const [activeStatus, setActiveStatus] = useState('pending');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,16 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
 
   useEffect(() => {
     loadRequests();
-  }, [activeRequestType, activeStatus]);
+  }, [activeRequestType, activeStatus, selectedBranch?.id, selectedBranch?._allBranches]);
+
+  // Strict branch scoping: legacy NULL-branchId requests were backfilled to
+  // Naga, so any request without branchId after that is treated as out of
+  // scope and hidden. Applied uniformly to the list and the pending counts.
+  const scopeToBranch = (items) => {
+    const effectiveBranchId = getEffectiveBranchId();
+    if (!effectiveBranchId) return items;
+    return items.filter(r => r.branchId === effectiveBranchId);
+  };
 
   const loadRequests = async () => {
     setLoading(true);
@@ -28,19 +37,19 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
 
       // Load based on filter
       if (activeRequestType === 'all' || activeRequestType === 'ot') {
-        const otReqs = await OTRequestRepository.getAll();
+        const otReqs = scopeToBranch(await OTRequestRepository.getAll());
         allRequests = [...allRequests, ...otReqs.map(r => ({ ...r, requestType: 'ot' }))];
       }
       if (activeRequestType === 'all' || activeRequestType === 'leave') {
-        const leaveReqs = await LeaveRequestRepository.getAll();
+        const leaveReqs = scopeToBranch(await LeaveRequestRepository.getAll());
         allRequests = [...allRequests, ...leaveReqs.map(r => ({ ...r, requestType: 'leave' }))];
       }
       if (activeRequestType === 'all' || activeRequestType === 'cashAdvance') {
-        const cashReqs = await CashAdvanceRequestRepository.getAll();
+        const cashReqs = scopeToBranch(await CashAdvanceRequestRepository.getAll());
         allRequests = [...allRequests, ...cashReqs.map(r => ({ ...r, requestType: 'cashAdvance' }))];
       }
       if (activeRequestType === 'all' || activeRequestType === 'incident') {
-        const incidentReqs = await IncidentReportRepository.getAll();
+        const incidentReqs = scopeToBranch(await IncidentReportRepository.getAll());
         allRequests = [...allRequests, ...incidentReqs.map(r => ({ ...r, requestType: 'incident' }))];
       }
 
@@ -70,12 +79,16 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
         CashAdvanceRequestRepository.getPending(),
         IncidentReportRepository.getPending()
       ]);
+      const ot = scopeToBranch(otReqs);
+      const leave = scopeToBranch(leaveReqs);
+      const cash = scopeToBranch(cashReqs);
+      const incident = scopeToBranch(incidentReqs);
       return {
-        ot: otReqs.length,
-        leave: leaveReqs.length,
-        cashAdvance: cashReqs.length,
-        incident: incidentReqs.length,
-        all: otReqs.length + leaveReqs.length + cashReqs.length + incidentReqs.length
+        ot: ot.length,
+        leave: leave.length,
+        cashAdvance: cash.length,
+        incident: incident.length,
+        all: ot.length + leave.length + cash.length + incident.length
       };
     } catch {
       return { ot: 0, leave: 0, cashAdvance: 0, incident: 0, all: 0 };

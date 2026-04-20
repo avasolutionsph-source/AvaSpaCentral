@@ -89,7 +89,8 @@ class ShiftScheduleRepository extends BaseRepository {
       weeklySchedule: scheduleData.weeklySchedule,
       isActive: true,
       notes: scheduleData.notes || '',
-      createdBy: scheduleData.createdBy || getCurrentUserId()
+      createdBy: scheduleData.createdBy || getCurrentUserId(),
+      ...(scheduleData.branchId && { branchId: scheduleData.branchId }),
     };
 
     return this.create(newSchedule);

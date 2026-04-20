@@ -193,14 +193,16 @@ class AuthService {
         throw new Error(error.message);
       }
 
-      // Load profile and update last_login in parallel
-      const [userProfile] = await Promise.all([
-        this._loadUserProfile(data.user.id),
-        supabase
-          .from('users')
-          .update({ last_login: new Date().toISOString() })
-          .eq('auth_id', data.user.id)
-      ]);
+      // Load profile; fire-and-forget last_login update (see signInWithUsername).
+      const userProfile = await this._loadUserProfile(data.user.id);
+      void supabase
+        .from('users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('auth_id', data.user.id)
+        .then(
+          () => {},
+          (err) => console.warn('[AuthService] last_login update failed:', err)
+        );
 
       if (!userProfile) {
         throw new Error('User profile not found. Please contact support.');
@@ -274,14 +276,18 @@ class AuthService {
         throw new Error('Invalid username or password');
       }
 
-      // Load profile and update last_login in parallel
-      const [fullProfile] = await Promise.all([
-        this._loadUserProfile(data.user.id),
-        supabase
-          .from('users')
-          .update({ last_login: new Date().toISOString() })
-          .eq('auth_id', data.user.id)
-      ]);
+      // Load profile; fire-and-forget last_login update. Awaiting the update
+      // can hang under the known supabase-js write-hang pattern (especially on
+      // the first call after sign-out), which would freeze the login.
+      const fullProfile = await this._loadUserProfile(data.user.id);
+      void supabase
+        .from('users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('auth_id', data.user.id)
+        .then(
+          () => {},
+          (err) => console.warn('[AuthService] last_login update failed:', err)
+        );
 
       if (!fullProfile) {
         throw new Error('User profile not found. Please contact support.');

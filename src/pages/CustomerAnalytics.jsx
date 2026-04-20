@@ -24,12 +24,12 @@ const CustomerAnalytics = () => {
       // Filter customer data by branch
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId && data?.pareto?.top20Customers) {
-        data.pareto.top20Customers = data.pareto.top20Customers.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        data.pareto.top20Customers = data.pareto.top20Customers.filter(item => item.branchId === effectiveBranchId);
       }
       if (effectiveBranchId && data?.segments) {
         Object.keys(data.segments).forEach(key => {
           if (Array.isArray(data.segments[key])) {
-            data.segments[key] = data.segments[key].filter(item => !item.branchId || item.branchId === effectiveBranchId);
+            data.segments[key] = data.segments[key].filter(item => item.branchId === effectiveBranchId);
           }
         });
       }

@@ -66,7 +66,7 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
 
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        transformedSessions = transformedSessions.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        transformedSessions = transformedSessions.filter(item => item.branchId === effectiveBranchId);
       }
 
       const cashierMap = new Map();

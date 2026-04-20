@@ -115,13 +115,13 @@ const Attendance = ({ embedded = false, onDataChange }) => {
 
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        todayRecords = todayRecords.filter(a => !a.branchId || a.branchId === effectiveBranchId);
+        todayRecords = todayRecords.filter(a => a.branchId === effectiveBranchId);
       }
 
       // Combine today's records with active overnight records for display
       let overnightFiltered = overnightRecords;
       if (effectiveBranchId) {
-        overnightFiltered = overnightRecords.filter(a => !a.branchId || a.branchId === effectiveBranchId);
+        overnightFiltered = overnightRecords.filter(a => a.branchId === effectiveBranchId);
       }
       // Only include overnight records for employees who don't already have a today record
       const todayEmpIds = new Set(todayRecords.map(a => String(a.employeeId)));
@@ -133,7 +133,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       setPendingApprovals(pending);
       let activeEmps = emps.filter(e => e.status === 'active');
       if (effectiveBranchId) {
-        activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === effectiveBranchId);
+        activeEmps = activeEmps.filter(e => e.branchId === effectiveBranchId);
       }
       setEmployees(activeEmps);
 

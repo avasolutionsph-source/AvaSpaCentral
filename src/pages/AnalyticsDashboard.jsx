@@ -59,7 +59,7 @@ const AnalyticsDashboard = () => {
       const effectiveBranchId = getEffectiveBranchId();
       let filteredInsights = aiInsights?.insights || [];
       if (effectiveBranchId) {
-        filteredInsights = filteredInsights.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        filteredInsights = filteredInsights.filter(item => item.branchId === effectiveBranchId);
       }
 
       setBreakEven(bep);

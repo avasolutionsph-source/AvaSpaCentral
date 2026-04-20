@@ -30,16 +30,16 @@ const InventoryAnalytics = () => {
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
         if (inventory?.products) {
-          inventory.products = inventory.products.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          inventory.products = inventory.products.filter(item => item.branchId === effectiveBranchId);
         }
         if (inventory?.alerts?.slowMoving) {
-          inventory.alerts.slowMoving = inventory.alerts.slowMoving.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          inventory.alerts.slowMoving = inventory.alerts.slowMoving.filter(item => item.branchId === effectiveBranchId);
         }
         if (inventory?.alerts?.criticalStock) {
-          inventory.alerts.criticalStock = inventory.alerts.criticalStock.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          inventory.alerts.criticalStock = inventory.alerts.criticalStock.filter(item => item.branchId === effectiveBranchId);
         }
         if (suppliers?.suppliers) {
-          suppliers.suppliers = suppliers.suppliers.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          suppliers.suppliers = suppliers.suppliers.filter(item => item.branchId === effectiveBranchId);
         }
       }
 

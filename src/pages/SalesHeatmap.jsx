@@ -68,7 +68,7 @@ const SalesHeatmap = () => {
       const effectiveBranchId = getEffectiveBranchId();
       let filteredHeatmap = heatmap;
       if (effectiveBranchId && Array.isArray(heatmap)) {
-        filteredHeatmap = heatmap.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        filteredHeatmap = heatmap.filter(item => item.branchId === effectiveBranchId);
       }
 
       setHeatmapData(transformHeatmapData(filteredHeatmap));

@@ -97,11 +97,11 @@ const Dashboard = () => {
         // Filter data by branch
         const effectiveBranchId = getEffectiveBranchId();
         if (effectiveBranchId) {
-          transactions = transactions.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-          appointments = appointments.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-          attendance = attendance.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-          products = products.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-          rooms = rooms.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          transactions = transactions.filter(item => item.branchId === effectiveBranchId);
+          appointments = appointments.filter(item => item.branchId === effectiveBranchId);
+          attendance = attendance.filter(item => item.branchId === effectiveBranchId);
+          products = products.filter(item => item.branchId === effectiveBranchId);
+          rooms = rooms.filter(item => item.branchId === effectiveBranchId);
         }
 
         // Check if component is still mounted before updating state
@@ -239,11 +239,11 @@ const Dashboard = () => {
       // Filter data by branch
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        transactions = transactions.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        appointments = appointments.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        attendance = attendance.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        products = products.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        rooms = rooms.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        transactions = transactions.filter(item => item.branchId === effectiveBranchId);
+        appointments = appointments.filter(item => item.branchId === effectiveBranchId);
+        attendance = attendance.filter(item => item.branchId === effectiveBranchId);
+        products = products.filter(item => item.branchId === effectiveBranchId);
+        rooms = rooms.filter(item => item.branchId === effectiveBranchId);
       }
 
       // Calculate KPIs

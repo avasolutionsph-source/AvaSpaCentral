@@ -126,10 +126,10 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
   const applyFilters = () => {
     let filtered = [...transactions];
 
-    // Filter by branch
+    // Filter by branch (strict — rows without branchId never leak across branches)
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(t => !t.branchId || t.branchId === effectiveBranchId);
+      filtered = filtered.filter(t => t.branchId === effectiveBranchId);
     }
 
     // Filter by therapist if user is therapist (only show transactions where they performed services)

@@ -160,7 +160,7 @@ const Appointments = () => {
     // Filter by branch
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+      filtered = filtered.filter(item => item.branchId === effectiveBranchId);
     }
 
     // Filter by therapist if user is therapist

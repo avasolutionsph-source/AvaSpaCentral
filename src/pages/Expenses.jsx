@@ -99,8 +99,16 @@ const Expenses = ({ embedded = false, onDataChange }) => {
       showToast('Payment method is required', 'error');
       return false;
     }
+    // Require a specific branch so expenses can never be saved without branchId
+    // (the source of cross-branch data leaks). On edit, the original branchId
+    // is reused via transformForSubmit.
+    const currentBranchId = getEffectiveBranchId();
+    if (!currentBranchId && !data._originalBranchId) {
+      showToast('Please select a specific branch before saving (not "All Branches").', 'error');
+      return false;
+    }
     return true;
-  }, [showToast]);
+  }, [showToast, getEffectiveBranchId]);
 
   // Transform for edit
   const transformForEdit = useCallback((expense) => ({
@@ -223,7 +231,7 @@ const Expenses = ({ embedded = false, onDataChange }) => {
     // Branch filtering
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+      filtered = filtered.filter(item => item.branchId === effectiveBranchId);
     }
 
     if (filterCategory !== 'all') {

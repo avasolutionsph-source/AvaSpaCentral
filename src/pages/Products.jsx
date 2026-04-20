@@ -251,7 +251,7 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrd
     // Filter by effective branch (Branch Owner: their branch; Owner: dropdown selection)
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(p => !p.branchId || p.branchId === effectiveBranchId);
+      filtered = filtered.filter(p => p.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {

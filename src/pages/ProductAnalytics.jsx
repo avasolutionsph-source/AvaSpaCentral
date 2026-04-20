@@ -27,19 +27,19 @@ const ProductAnalytics = () => {
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
         if (data?.products) {
-          data.products = data.products.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          data.products = data.products.filter(item => item.branchId === effectiveBranchId);
         }
         if (data?.topByGPM) {
-          data.topByGPM = data.topByGPM.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          data.topByGPM = data.topByGPM.filter(item => item.branchId === effectiveBranchId);
         }
         if (data?.lowMarginProducts) {
-          data.lowMarginProducts = data.lowMarginProducts.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          data.lowMarginProducts = data.lowMarginProducts.filter(item => item.branchId === effectiveBranchId);
         }
         if (data?.cannibalization) {
-          data.cannibalization = data.cannibalization.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          data.cannibalization = data.cannibalization.filter(item => item.branchId === effectiveBranchId);
         }
         if (data?.bundleSuggestions) {
-          data.bundleSuggestions = data.bundleSuggestions.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+          data.bundleSuggestions = data.bundleSuggestions.filter(item => item.branchId === effectiveBranchId);
         }
       }
 

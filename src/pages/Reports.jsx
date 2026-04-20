@@ -112,15 +112,15 @@ const Reports = ({ embedded = false }) => {
       // Filter data by branch
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        txns = txns.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        emps = emps.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        attn = attn.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        prods = prods.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        rms = rms.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        custs = custs.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        appts = appts.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        advBookings = advBookings.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-        exps = exps.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        txns = txns.filter(item => item.branchId === effectiveBranchId);
+        emps = emps.filter(item => item.branchId === effectiveBranchId);
+        attn = attn.filter(item => item.branchId === effectiveBranchId);
+        prods = prods.filter(item => item.branchId === effectiveBranchId);
+        rms = rms.filter(item => item.branchId === effectiveBranchId);
+        custs = custs.filter(item => item.branchId === effectiveBranchId);
+        appts = appts.filter(item => item.branchId === effectiveBranchId);
+        advBookings = advBookings.filter(item => item.branchId === effectiveBranchId);
+        exps = exps.filter(item => item.branchId === effectiveBranchId);
       }
 
       setTransactions(txns);

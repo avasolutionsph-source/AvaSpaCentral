@@ -114,13 +114,10 @@ const POS = () => {
         // Filter out products marked as hidden from POS
         const visibleProducts = productsData.filter(p => !p.hideFromPOS);
 
-        // Filter by branch. Products stay permissive (legacy rows without
-        // branchId still show) so the POS catalog keeps working during the
-        // branch-scoping rollout. Rooms are strict — they are physical spaces
-        // tied to a specific branch, so only rooms matching the branch appear.
+        // Strict branch scoping: rows without branchId never leak across branches.
         const effectiveBranchId = getEffectiveBranchId();
-        const branchFilter = (item) => !effectiveBranchId || !item.branchId || item.branchId === effectiveBranchId;
-        const strictBranchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
+        const branchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
+        const strictBranchFilter = branchFilter;
 
         setProducts(visibleProducts.filter(branchFilter));
         setEmployees(employeesData.filter(branchFilter));
@@ -227,11 +224,10 @@ const POS = () => {
       // Filter out products marked as hidden from POS
       const visibleProducts = productsData.filter(p => !p.hideFromPOS);
 
-      // Filter by branch. Rooms use strict match (physical-space scoping);
-      // products stay permissive to keep legacy unbranched rows available.
+      // Strict branch scoping: rows without branchId never leak across branches.
       const effectiveBranchId = getEffectiveBranchId();
-      const branchFilter = (item) => !effectiveBranchId || !item.branchId || item.branchId === effectiveBranchId;
-      const strictBranchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
+      const branchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
+      const strictBranchFilter = branchFilter;
 
       setProducts(visibleProducts.filter(branchFilter));
       setEmployees(employeesData.filter(branchFilter));
@@ -394,7 +390,7 @@ const POS = () => {
       const productsData = await mockApi.products.getProducts({ active: true });
       const visibleProducts = productsData.filter(p => !p.hideFromPOS);
       const effectiveBranchId = getEffectiveBranchId();
-      const branchFilter = (item) => !effectiveBranchId || !item.branchId || item.branchId === effectiveBranchId;
+      const branchFilter = (item) => !effectiveBranchId || item.branchId === effectiveBranchId;
       setProducts(visibleProducts.filter(branchFilter));
     } catch (error) {
       showToast('Failed to save order', 'error');
@@ -659,6 +655,14 @@ const POS = () => {
   const processCheckout = async () => {
     if (!validateCheckout()) return;
 
+    // Require a specific branch so transactions/customers can never be saved
+    // without branchId — the source of cross-branch data leaks.
+    const checkoutBranchId = getEffectiveBranchId();
+    if (!checkoutBranchId) {
+      showToast('Please select a specific branch before checking out (not "All Branches").', 'error');
+      return;
+    }
+
     setCheckoutLoading(true);
 
     try {
@@ -675,14 +679,13 @@ const POS = () => {
       let customerData = null;
       if (customerType === 'walk-in' && walkInCustomerData.name && walkInCustomerData.phone) {
         try {
-          const walkInBranchId = getEffectiveBranchId();
           const newCustomer = await mockApi.customers.createCustomer({
             name: walkInCustomerData.name.trim(),
             phone: walkInCustomerData.phone.trim(),
             email: walkInCustomerData.email.trim() || null,
             address: walkInCustomerData.address.trim() || null,
             status: 'active',
-            ...(walkInBranchId && { branchId: walkInBranchId }),
+            branchId: checkoutBranchId,
           });
           customerData = newCustomer;
           showToast('Customer saved to database', 'success');
@@ -754,7 +757,7 @@ const POS = () => {
           clientPhone: clientPhone,
           clientEmail: clientEmail,
           clientAddress: isHomeService ? homeServiceAddress : clientAddress,
-          ...(getEffectiveBranchId() && { branchId: getEffectiveBranchId() }),
+          branchId: checkoutBranchId,
           paymentMethod: paymentMethod,
           paymentTiming: advanceBookingData.paymentTiming,
           paymentStatus: advanceBookingData.paymentTiming === 'pay-now' ? 'paid' : 'pending',
@@ -787,7 +790,7 @@ const POS = () => {
         // Build transaction
         const transaction = {
           businessId: user?.businessId,
-          ...(getEffectiveBranchId() && { branchId: getEffectiveBranchId() }),
+          branchId: checkoutBranchId,
           receiptNumber,
           employeeId: employee._id,
           date: new Date().toISOString(),

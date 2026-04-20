@@ -355,7 +355,7 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
     // Filter by branch - only show employees from the current branch
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(e => !e.branchId || e.branchId === effectiveBranchId);
+      filtered = filtered.filter(e => e.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {

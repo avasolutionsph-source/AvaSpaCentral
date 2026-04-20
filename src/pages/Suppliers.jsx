@@ -111,7 +111,7 @@ const Suppliers = ({ embedded = false }) => {
     // Apply branch filter
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+      filtered = filtered.filter(item => item.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {

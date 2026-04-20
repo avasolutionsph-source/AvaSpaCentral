@@ -25,7 +25,7 @@ const EmployeeAnalytics = () => {
       // Filter employees by branch
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId && data?.employees) {
-        data.employees = data.employees.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        data.employees = data.employees.filter(item => item.branchId === effectiveBranchId);
       }
 
       setEmployeeData(data);

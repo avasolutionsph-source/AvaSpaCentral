@@ -182,7 +182,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       let activeEmps = emps.filter(e => e.status === 'active');
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId) {
-        activeEmps = activeEmps.filter(e => !e.branchId || e.branchId === effectiveBranchId);
+        activeEmps = activeEmps.filter(e => e.branchId === effectiveBranchId);
       }
       setEmployees(activeEmps);
       setAttendance(att);

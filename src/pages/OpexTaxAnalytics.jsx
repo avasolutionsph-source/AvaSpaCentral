@@ -27,7 +27,7 @@ const OpexTaxAnalytics = () => {
       // Filter history data by branch
       const effectiveBranchId = getEffectiveBranchId();
       if (effectiveBranchId && data?.history) {
-        data.history = data.history.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+        data.history = data.history.filter(item => item.branchId === effectiveBranchId);
       }
 
       setOpexData(data);

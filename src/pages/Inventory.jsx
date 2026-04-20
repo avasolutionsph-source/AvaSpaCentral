@@ -127,10 +127,12 @@ const Inventory = ({ embedded = false, onDataChange }) => {
   const applyFilters = () => {
     let filtered = [...inventory];
 
-    // Branch filtering
+    // Branch filtering — strict match so legacy NULL-branchId records don't
+    // leak across branches. Back-office migrations are expected to backfill
+    // branch_id before this filter is relied upon.
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+      filtered = filtered.filter(item => item.branchId === effectiveBranchId);
     }
 
     // Search filter
@@ -180,17 +182,27 @@ const Inventory = ({ embedded = false, onDataChange }) => {
     }
   };
 
+  // Summary + alerts must stay aligned with the list: compute off the
+  // branch-scoped subset so the cards match what the user actually sees.
+  const getBranchScopedInventory = () => {
+    const effectiveBranchId = getEffectiveBranchId();
+    return effectiveBranchId
+      ? inventory.filter(item => item.branchId === effectiveBranchId)
+      : inventory;
+  };
+
   const calculateSummary = () => {
-    const totalValue = inventory.reduce((sum, p) => sum + (p.stock * p.cost), 0);
-    const totalItems = inventory.reduce((sum, p) => sum + p.stock, 0);
-    const lowStock = inventory.filter(p => p.stock <= p.lowStockAlert && p.stock > 0).length;
-    const outOfStock = inventory.filter(p => p.stock === 0).length;
+    const scoped = getBranchScopedInventory();
+    const totalValue = scoped.reduce((sum, p) => sum + (p.stock * p.cost), 0);
+    const totalItems = scoped.reduce((sum, p) => sum + p.stock, 0);
+    const lowStock = scoped.filter(p => p.stock <= p.lowStockAlert && p.stock > 0).length;
+    const outOfStock = scoped.filter(p => p.stock === 0).length;
 
     return { totalValue, totalItems, lowStock, outOfStock };
   };
 
   const getLowStockAlerts = () => {
-    return inventory
+    return getBranchScopedInventory()
       .filter(p => p.stock <= p.lowStockAlert)
       .sort((a, b) => a.stock - b.stock);
   };

@@ -50,12 +50,14 @@ const HRHub = () => {
       ]);
 
       const activeEmployees = employees.filter(e => e.status === 'active').length;
-      const pendingRequests = payrollRequests.filter(r => r.status === 'pending').length;
 
       // Scope account count to the effective branch so the badge matches the
       // Accounts list. Resolve a user's branch from its own branchId or the
       // linked employee — same rule as EmployeeAccounts.filteredUsers.
       const effectiveBranchId = getEffectiveBranchId();
+      const pendingRequests = payrollRequests
+        .filter(r => r.status === 'pending')
+        .filter(r => !effectiveBranchId || r.branchId === effectiveBranchId).length;
       const employeeById = new Map(employees.map(e => [e._id, e]));
       const scopedUsers = effectiveBranchId
         ? users.filter(u => {
@@ -64,7 +66,8 @@ const HRHub = () => {
           })
         : users;
 
-      // Count pending HR requests
+      // Count pending HR requests — scoped to the effective branch so the
+      // tab badge matches what the Requests tab actually lists.
       let pendingHRRequests = 0;
       try {
         const [otReqs, leaveReqs, cashReqs, incidentReqs] = await Promise.all([
@@ -73,7 +76,14 @@ const HRHub = () => {
           CashAdvanceRequestRepository.getPending(),
           IncidentReportRepository.getPending()
         ]);
-        pendingHRRequests = otReqs.length + leaveReqs.length + cashReqs.length + incidentReqs.length;
+        const scopePending = (items) => effectiveBranchId
+          ? items.filter(r => r.branchId === effectiveBranchId)
+          : items;
+        pendingHRRequests =
+          scopePending(otReqs).length +
+          scopePending(leaveReqs).length +
+          scopePending(cashReqs).length +
+          scopePending(incidentReqs).length;
       } catch (e) {
         // Silent fail for HR requests count
       }

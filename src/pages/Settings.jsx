@@ -2142,7 +2142,7 @@ const Settings = () => {
             Branding
           </button>
         )}
-        {hasManagementAccess() && (
+        {isOwnerOrManager() && (
           <button
             className={`settings-tab ${activeTab === 'branches' ? 'active' : ''}`}
             onClick={() => setActiveTab('branches')}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 
 const BranchesTab = () => {
-  const { user, showToast } = useApp();
+  const { user, showToast, isOwner } = useApp();
   const [branches, setBranches] = useState([]);
   const [branchStaff, setBranchStaff] = useState({});
   const [loading, setLoading] = useState(true);
@@ -683,10 +683,12 @@ const BranchesTab = () => {
             </div>
           )}
 
-          {/* Add Branch Button */}
-          <div style={{ marginTop: '1.5rem' }}>
-            <button className="btn btn-primary" onClick={openCreate}>+ Add Branch</button>
-          </div>
+          {/* Add Branch Button — Owner only */}
+          {isOwner() && (
+            <div style={{ marginTop: '1.5rem' }}>
+              <button className="btn btn-primary" onClick={openCreate}>+ Add Branch</button>
+            </div>
+          )}
         </div>
       </div>
 

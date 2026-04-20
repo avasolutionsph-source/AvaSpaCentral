@@ -174,11 +174,23 @@ export const AppProvider = ({ children }) => {
           }
         }
 
-        // Restore selected branch from localStorage
+        // Restore selected branch from localStorage, but only if it still
+        // belongs to the current user. Without this check, logging in as a
+        // different user (especially a branch-locked role) can inherit the
+        // previous user's branch — leaking cross-branch data in the UI.
         const savedBranch = localStorage.getItem('selectedBranch');
         if (savedBranch) {
           try {
-            setSelectedBranch(JSON.parse(savedBranch));
+            const parsed = JSON.parse(savedBranch);
+            const currentUser = authService.currentUser || JSON.parse(localStorage.getItem('user') || 'null');
+            const businessMatch = !currentUser?.businessId || !parsed?.business_id || parsed.business_id === currentUser.businessId;
+            const lockedRoles = ['Branch Owner', 'Manager'];
+            const lockedMismatch = currentUser && lockedRoles.includes(currentUser.role) && currentUser.branchId && parsed?.id !== currentUser.branchId;
+            if (!businessMatch || lockedMismatch) {
+              localStorage.removeItem('selectedBranch');
+            } else {
+              setSelectedBranch(parsed);
+            }
           } catch (e) {
             localStorage.removeItem('selectedBranch');
           }
@@ -189,6 +201,20 @@ export const AppProvider = ({ children }) => {
           console.log('[AppContext] Auth state changed:', event);
           if (event === 'SIGNED_IN' && userProfile) {
             setUser(userProfile);
+            // Clear any stale selectedBranch that doesn't belong to the
+            // newly signed-in user. BranchSelect will auto-assign the right
+            // branch for locked roles (Branch Owner, Manager).
+            const lockedRoles = ['Branch Owner', 'Manager'];
+            setSelectedBranch(prev => {
+              if (!prev) return prev;
+              const businessMismatch = userProfile.businessId && prev.business_id && prev.business_id !== userProfile.businessId;
+              const lockedMismatch = lockedRoles.includes(userProfile.role) && userProfile.branchId && prev.id !== userProfile.branchId;
+              if (businessMismatch || lockedMismatch) {
+                localStorage.removeItem('selectedBranch');
+                return null;
+              }
+              return prev;
+            });
             // Set business context for multi-tenant data isolation
             if (userProfile.businessId) {
               setBusinessContext(userProfile.businessId);

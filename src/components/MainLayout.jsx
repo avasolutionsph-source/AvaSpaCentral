@@ -6,7 +6,11 @@ import OfflineIndicator from './OfflineIndicator';
 import { formatTime12Hour } from '../utils/dateUtils';
 
 const MainLayout = () => {
-  const { user, logout, hasPermission, selectedBranch, clearBranch } = useApp();
+  const { user, logout, hasPermission, selectedBranch, clearBranch, canSeeAllBranches } = useApp();
+  // Branch Owner and Manager are locked to a single branch — they shouldn't
+  // see a switch affordance that would clear their branch and send them to
+  // the picker.
+  const canSwitchBranch = canSeeAllBranches?.() ?? true;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -636,23 +640,35 @@ const MainLayout = () => {
           <div className="brand">
             <span className="brand-text">Daet Massage & Spa</span>
             {sidebarOpen && selectedBranch && (
-              <button
-                className="branch-indicator"
-                onClick={() => { clearBranch(); navigate('/select-branch'); }}
-                title="Switch branch"
-              >
-                <span className="branch-indicator-name">{selectedBranch.name}</span>
-                <span className="branch-indicator-switch">Switch</span>
-              </button>
+              canSwitchBranch ? (
+                <button
+                  className="branch-indicator"
+                  onClick={() => { clearBranch(); navigate('/select-branch'); }}
+                  title="Switch branch"
+                >
+                  <span className="branch-indicator-name">{selectedBranch.name}</span>
+                  <span className="branch-indicator-switch">Switch</span>
+                </button>
+              ) : (
+                <div className="branch-indicator" title={selectedBranch.name} style={{ cursor: 'default' }}>
+                  <span className="branch-indicator-name">{selectedBranch.name}</span>
+                </div>
+              )
             )}
             {!sidebarOpen && selectedBranch && (
-              <button
-                className="branch-indicator-collapsed"
-                onClick={() => { clearBranch(); navigate('/select-branch'); }}
-                title={`${selectedBranch.name} - Click to switch`}
-              >
-                {selectedBranch.name?.charAt(0)}
-              </button>
+              canSwitchBranch ? (
+                <button
+                  className="branch-indicator-collapsed"
+                  onClick={() => { clearBranch(); navigate('/select-branch'); }}
+                  title={`${selectedBranch.name} - Click to switch`}
+                >
+                  {selectedBranch.name?.charAt(0)}
+                </button>
+              ) : (
+                <div className="branch-indicator-collapsed" title={selectedBranch.name} style={{ cursor: 'default' }}>
+                  {selectedBranch.name?.charAt(0)}
+                </div>
+              )
             )}
           </div>
           <button

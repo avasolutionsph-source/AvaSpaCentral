@@ -337,6 +337,19 @@ class SpaDatabase extends Dexie {
         description: 'Added migrationLog table and nextRetryAt index',
       });
     });
+
+    // Version 11: Index branchId on customers + giftCertificates for per-branch scoping.
+    this.version(11).stores({
+      customers: '_id, status, phone, email, name, tier, businessId, branchId',
+      giftCertificates: '_id, code, status, recipientEmail, businessId, branchId',
+    }).upgrade(async (tx) => {
+      console.log('[Dexie] Upgrading to version 11: indexing branchId on customers + giftCertificates');
+      await tx.table('migrationLog').add({
+        version: 11,
+        timestamp: new Date().toISOString(),
+        description: 'Indexed branchId on customers and giftCertificates',
+      });
+    });
   }
 }
 

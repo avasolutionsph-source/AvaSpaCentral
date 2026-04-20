@@ -87,10 +87,12 @@ const GiftCertificates = () => {
   const filterGiftCertificates = () => {
     let filtered = [...giftCertificates];
 
-    // Apply branch filter
+    // Apply branch filter — strict match. Legacy GCs with NULL branchId were
+    // backfilled during the branch-scope migration; any record without
+    // branchId after that is treated as out-of-scope and hidden.
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+      filtered = filtered.filter(item => item.branchId === effectiveBranchId);
     }
 
     // Apply search filter
@@ -177,6 +179,10 @@ const GiftCertificates = () => {
 
     try {
       const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before issuing a gift certificate', 'error');
+        return;
+      }
       const gcData = {
         recipientName: formData.recipientName.trim(),
         recipientEmail: formData.recipientEmail.trim(),
@@ -184,7 +190,7 @@ const GiftCertificates = () => {
         balance: parseFloat(formData.amount),
         expiryDate: formData.noExpiry ? null : formData.expiryDate,
         message: formData.message.trim() || undefined,
-        ...(branchId && { branchId })
+        branchId,
       };
 
       await mockApi.giftCertificates.createGiftCertificate(gcData);

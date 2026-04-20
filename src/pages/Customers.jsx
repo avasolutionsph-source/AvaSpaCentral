@@ -51,10 +51,12 @@ const Customers = () => {
   const filteredCustomers = useMemo(() => {
     let filtered = [...customers];
 
-    // Filter by branch
+    // Filter by branch — strict match. Legacy records without branchId were
+    // backfilled during the customers branch-scope migration; any customer
+    // without branchId after that is treated as out-of-scope and hidden.
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+      filtered = filtered.filter(item => item.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {
@@ -134,13 +136,17 @@ const Customers = () => {
 
     try {
       const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before saving a customer', 'error');
+        return;
+      }
       const customerData = {
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         birthday: formData.birthday || undefined,
         notes: formData.notes.trim() || undefined,
-        ...(branchId && { branchId })
+        branchId,
       };
 
       if (modalMode === 'create') {

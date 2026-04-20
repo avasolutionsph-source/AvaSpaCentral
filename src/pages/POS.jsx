@@ -676,12 +676,14 @@ const POS = () => {
       let customerData = null;
       if (customerType === 'walk-in' && walkInCustomerData.name && walkInCustomerData.phone) {
         try {
+          const walkInBranchId = getEffectiveBranchId();
           const newCustomer = await mockApi.customers.createCustomer({
             name: walkInCustomerData.name.trim(),
             phone: walkInCustomerData.phone.trim(),
             email: walkInCustomerData.email.trim() || null,
             address: walkInCustomerData.address.trim() || null,
-            status: 'active'
+            status: 'active',
+            ...(walkInBranchId && { branchId: walkInBranchId }),
           });
           customerData = newCustomer;
           showToast('Customer saved to database', 'success');

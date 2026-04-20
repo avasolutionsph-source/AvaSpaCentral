@@ -119,7 +119,7 @@ const SUPABASE_TABLE_COLUMNS = {
   customers: [
     'id', 'business_id', 'name', 'first_name', 'last_name', 'email', 'phone',
     'address', 'birthday', 'gender', 'notes', 'status', 'tier', 'total_spent', 'visit_count',
-    'last_visit', 'loyalty_points', 'preferences', 'sync_status',
+    'last_visit', 'loyalty_points', 'preferences', 'branch_id', 'sync_status',
     'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   products: [

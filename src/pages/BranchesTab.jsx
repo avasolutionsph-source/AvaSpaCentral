@@ -17,6 +17,7 @@ const BranchesTab = () => {
   // Without this, a branch with 20+ staff squished the URL pill beside
   // it into a single-character vertical stack.
   const [expandedStaff, setExpandedStaff] = useState({});
+  const [expandedBranches, setExpandedBranches] = useState({});
   const STAFF_COLLAPSED_LIMIT = 5;
 
   const [formData, setFormData] = useState({
@@ -564,90 +565,121 @@ const BranchesTab = () => {
             </div>
           ) : (
             <div className="branches-list">
-              {branches.map((branch) => (
-                <div key={branch.id} className="branch-item">
-                  <div className="branch-item-info">
-                    <div className="branch-item-header">
-                      <h3 className="branch-item-name">{branch.name}</h3>
-                      <span className={`branch-status-badge ${branch.is_active ? 'active' : 'inactive'}`}>
-                        {branch.is_active ? 'ACTIVE' : 'INACTIVE'}
-                      </span>
-                    </div>
-                    <p className="branch-item-slug">/book/{branch.business_id}/{branch.slug}</p>
-                    {branch.address && <p className="branch-item-detail">{branch.address}</p>}
-                    {branch.city && <p className="branch-item-detail">{branch.city}</p>}
-                  </div>
-
-                  <div className="branch-item-fees">
-                    <div className="branch-fee-row">
-                      <span className="branch-fee-label">Home Service:</span>
-                      <span className="branch-fee-value">{formatCurrency(branch.home_service_fee)}</span>
-                    </div>
-                    <div className="branch-fee-row">
-                      <span className="branch-fee-label">Hotel Service:</span>
-                      <span className="branch-fee-value">{formatCurrency(branch.hotel_service_fee)}</span>
-                    </div>
-                  </div>
-
-                  <div className="branch-item-actions">
+              {branches.map((branch) => {
+                const isOpen = !!expandedBranches[branch.id];
+                return (
+                  <div key={branch.id} className="branch-item">
+                    {/* Collapsed row: name + status + See more toggle. Keep this
+                        compact so a long branch list is scannable; details live
+                        behind the expander. */}
                     <button
-                      className={`btn btn-sm ${branch.is_active ? 'btn-warning' : 'btn-success'}`}
-                      onClick={() => toggleActive(branch)}
+                      type="button"
+                      className="branch-item-summary"
+                      onClick={() => setExpandedBranches(prev => ({ ...prev, [branch.id]: !isOpen }))}
+                      aria-expanded={isOpen}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '0.5rem 0',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
                     >
-                      {branch.is_active ? 'Deactivate' : 'Activate'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <h3 className="branch-item-name" style={{ margin: 0 }}>{branch.name}</h3>
+                        <span className={`branch-status-badge ${branch.is_active ? 'active' : 'inactive'}`}>
+                          {branch.is_active ? 'ACTIVE' : 'INACTIVE'}
+                        </span>
+                      </div>
+                      <span style={{ color: 'var(--color-accent, #1B5E37)', fontSize: '0.85rem', fontWeight: 500 }}>
+                        {isOpen ? 'Hide details ▲' : 'See more ▼'}
+                      </span>
                     </button>
-                    <button className="btn btn-sm btn-secondary" onClick={() => openEdit(branch)}>Edit</button>
-                    <button className="btn btn-sm btn-error" onClick={() => setDeleteConfirm(branch)}>Delete</button>
-                  </div>
 
-                  {/* POS Access Info */}
-                  <div className="branch-pos-access">
-                    <h4 style={{ fontSize: '0.85rem', color: '#555', margin: '0 0 0.5rem', borderTop: '1px solid #eee', paddingTop: '0.75rem' }}>POS Access</h4>
-                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
-                      Login URL: <code style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: '3px', fontSize: '0.75rem' }}>{window.location.origin}/login</code>
-                    </div>
-                    {(() => {
-                      const allStaff = branchStaff[branch.id] || [];
-                      if (allStaff.length === 0) {
-                        return <p style={{ fontSize: '0.8rem', color: '#999', fontStyle: 'italic' }}>No staff assigned. Add staff in Staff Management.</p>;
-                      }
-                      const isExpanded = !!expandedStaff[branch.id];
-                      const visibleStaff = isExpanded
-                        ? allStaff
-                        : allStaff.slice(0, STAFF_COLLAPSED_LIMIT);
-                      const hiddenCount = allStaff.length - visibleStaff.length;
-                      return (
-                        <div style={{ fontSize: '0.8rem' }}>
-                          {visibleStaff.map(s => (
-                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #f3f4f6' }}>
-                              <span><strong>{s.first_name} {s.last_name}</strong> <span style={{ color: '#888' }}>({s.role})</span></span>
-                              <span style={{ color: '#555' }}>{s.username || s.email}</span>
-                            </div>
-                          ))}
-                          {allStaff.length > STAFF_COLLAPSED_LIMIT && (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedStaff(prev => ({ ...prev, [branch.id]: !isExpanded }))}
-                              style={{
-                                marginTop: '0.5rem',
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--color-accent, #1B5E37)',
-                                fontSize: '0.8rem',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                                padding: '4px 0',
-                              }}
-                            >
-                              {isExpanded ? 'Show less' : `View ${hiddenCount} more`}
-                            </button>
-                          )}
+                    {isOpen && (
+                      <div className="branch-item-body" style={{ marginTop: '0.75rem' }}>
+                        <div className="branch-item-info">
+                          {branch.address && <p className="branch-item-detail">{branch.address}</p>}
+                          {branch.city && <p className="branch-item-detail">{branch.city}</p>}
                         </div>
-                      );
-                    })()}
+
+                        <div className="branch-item-fees">
+                          <div className="branch-fee-row">
+                            <span className="branch-fee-label">Home Service:</span>
+                            <span className="branch-fee-value">{formatCurrency(branch.home_service_fee)}</span>
+                          </div>
+                          <div className="branch-fee-row">
+                            <span className="branch-fee-label">Hotel Service:</span>
+                            <span className="branch-fee-value">{formatCurrency(branch.hotel_service_fee)}</span>
+                          </div>
+                        </div>
+
+                        <div className="branch-item-actions">
+                          <button
+                            className={`btn btn-sm ${branch.is_active ? 'btn-warning' : 'btn-success'}`}
+                            onClick={() => toggleActive(branch)}
+                          >
+                            {branch.is_active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button className="btn btn-sm btn-secondary" onClick={() => openEdit(branch)}>Edit</button>
+                          <button className="btn btn-sm btn-error" onClick={() => setDeleteConfirm(branch)}>Delete</button>
+                        </div>
+
+                        {/* POS Access Info */}
+                        <div className="branch-pos-access">
+                          <h4 style={{ fontSize: '0.85rem', color: '#555', margin: '0 0 0.5rem', borderTop: '1px solid #eee', paddingTop: '0.75rem' }}>POS Access</h4>
+                          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
+                            Login URL: <code style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: '3px', fontSize: '0.75rem' }}>{window.location.origin}/login</code>
+                          </div>
+                          {(() => {
+                            const allStaff = branchStaff[branch.id] || [];
+                            if (allStaff.length === 0) {
+                              return <p style={{ fontSize: '0.8rem', color: '#999', fontStyle: 'italic' }}>No staff assigned. Add staff in Staff Management.</p>;
+                            }
+                            const isStaffExpanded = !!expandedStaff[branch.id];
+                            const visibleStaff = isStaffExpanded
+                              ? allStaff
+                              : allStaff.slice(0, STAFF_COLLAPSED_LIMIT);
+                            const hiddenCount = allStaff.length - visibleStaff.length;
+                            return (
+                              <div style={{ fontSize: '0.8rem' }}>
+                                {visibleStaff.map(s => (
+                                  <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #f3f4f6' }}>
+                                    <span><strong>{s.first_name} {s.last_name}</strong> <span style={{ color: '#888' }}>({s.role})</span></span>
+                                    <span style={{ color: '#555' }}>{s.username || s.email}</span>
+                                  </div>
+                                ))}
+                                {allStaff.length > STAFF_COLLAPSED_LIMIT && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedStaff(prev => ({ ...prev, [branch.id]: !isStaffExpanded }))}
+                                    style={{
+                                      marginTop: '0.5rem',
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: 'var(--color-accent, #1B5E37)',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 500,
+                                      cursor: 'pointer',
+                                      padding: '4px 0',
+                                    }}
+                                  >
+                                    {isStaffExpanded ? 'Show less' : `View ${hiddenCount} more`}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -680,18 +712,10 @@ const BranchesTab = () => {
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label>URL Slug</label>
-                  <input
-                    type="text"
-                    name="slug"
-                    value={formData.slug}
-                    onChange={handleChange}
-                    className="form-control"
-                    placeholder="auto-generated-from-name"
-                  />
-                  <small style={{ color: '#888' }}>Booking URL: /book/.../{formData.slug || 'slug'}</small>
-                </div>
+                {/* URL slug is no longer user-facing — the public booking URL
+                    is business-wide and customers pick a branch from the
+                    in-page selector. The slug field is still auto-generated
+                    on save for historical record / redirect compatibility. */}
                 <div className="form-group">
                   <label>Address</label>
                   <input

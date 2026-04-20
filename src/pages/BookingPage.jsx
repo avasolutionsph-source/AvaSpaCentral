@@ -1267,10 +1267,15 @@ const BookingPage = () => {
               if (!linkSlug) return null; // no business resolved → hide auth UI
               return customerSession ? (
                 <div className="customer-logged-in">
-                  <Link to={`/book/${linkSlug}/profile`} className="customer-profile-link">
-                    <span className="customer-avatar">{customerAccount?.name?.charAt(0).toUpperCase() || '?'}</span>
-                    <span className="customer-name">{customerAccount?.name?.split(' ')[0]}</span>
-                  </Link>
+                  {/* Only render the profile pill once the account name is
+                      actually loaded — otherwise we flash a raw "?" avatar
+                      that looks like a broken help toggle. */}
+                  {customerAccount?.name && (
+                    <Link to={`/book/${linkSlug}/profile`} className="customer-profile-link">
+                      <span className="customer-avatar">{customerAccount.name.charAt(0).toUpperCase()}</span>
+                      <span className="customer-name">{customerAccount.name.split(' ')[0]}</span>
+                    </Link>
+                  )}
                   <button onClick={handleCustomerLogout} className="customer-logout-btn">
                     Sign Out
                   </button>

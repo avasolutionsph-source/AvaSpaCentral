@@ -12,6 +12,12 @@ const BranchesTab = () => {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [replacingOwner, setReplacingOwner] = useState(false);
+  // Per-branch flag so the staff list can collapse after the first few
+  // entries and only expand when the user explicitly asks to see more.
+  // Without this, a branch with 20+ staff squished the URL pill beside
+  // it into a single-character vertical stack.
+  const [expandedStaff, setExpandedStaff] = useState({});
+  const STAFF_COLLAPSED_LIMIT = 5;
 
   const [formData, setFormData] = useState({
     name: '',
@@ -605,14 +611,37 @@ const BranchesTab = () => {
                       if (allStaff.length === 0) {
                         return <p style={{ fontSize: '0.8rem', color: '#999', fontStyle: 'italic' }}>No staff assigned. Add staff in Staff Management.</p>;
                       }
+                      const isExpanded = !!expandedStaff[branch.id];
+                      const visibleStaff = isExpanded
+                        ? allStaff
+                        : allStaff.slice(0, STAFF_COLLAPSED_LIMIT);
+                      const hiddenCount = allStaff.length - visibleStaff.length;
                       return (
                         <div style={{ fontSize: '0.8rem' }}>
-                          {allStaff.map(s => (
+                          {visibleStaff.map(s => (
                             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #f3f4f6' }}>
                               <span><strong>{s.first_name} {s.last_name}</strong> <span style={{ color: '#888' }}>({s.role})</span></span>
                               <span style={{ color: '#555' }}>{s.username || s.email}</span>
                             </div>
                           ))}
+                          {allStaff.length > STAFF_COLLAPSED_LIMIT && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedStaff(prev => ({ ...prev, [branch.id]: !isExpanded }))}
+                              style={{
+                                marginTop: '0.5rem',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--color-accent, #1B5E37)',
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                padding: '4px 0',
+                              }}
+                            >
+                              {isExpanded ? 'Show less' : `View ${hiddenCount} more`}
+                            </button>
+                          )}
                         </div>
                       );
                     })()}

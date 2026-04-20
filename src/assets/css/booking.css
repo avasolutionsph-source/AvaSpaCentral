@@ -558,19 +558,25 @@ html {
 
 /* Header */
 /* ── Top bar (logo + auth) ───────────────────────────────── */
+/* More opaque background + dark hairline so the bar stays legible
+   when the page below is white (e.g. the Choose Your Branch step).
+   The previous near-transparent white-on-white made the pill vanish. */
 .booking-topbar {
   position: fixed;
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 50px;
   padding: 0.5rem 1.5rem;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
   width: auto;
   max-width: 90%;
 }
@@ -992,27 +998,30 @@ html {
   gap: 0.75rem;
 }
 
+/* Auth elements sit on the light-glass topbar, so use dark-on-light
+   styling instead of the original white-on-dark which disappeared on
+   the new background. */
 .customer-profile-link {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   text-decoration: none;
-  color: white;
+  color: #1a1a1a;
   padding: 0.25rem 0.75rem 0.25rem 0.25rem;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 24px;
   transition: background 0.2s;
 }
 
 .customer-profile-link:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .customer-avatar {
   width: 32px;
   height: 32px;
-  background: white;
-  color: var(--color-accent, #1B5E37);
+  background: var(--color-accent, #1B5E37);
+  color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1024,22 +1033,24 @@ html {
 .customer-name {
   font-weight: 500;
   font-size: 0.875rem;
+  color: #1a1a1a;
 }
 
 .customer-logout-btn {
-  padding: 0.4rem 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.4rem 0.85rem;
+  background: transparent;
+  color: #333;
+  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 6px;
   font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .customer-logout-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.4);
 }
 
 /* Progress Indicator */

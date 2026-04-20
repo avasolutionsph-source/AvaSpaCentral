@@ -906,8 +906,10 @@ const Dashboard = () => {
         </button>
       </div>
 
-      {/* Customer Booking Link */}
-      {user?.businessId && (
+      {/* Customer Booking Link — only shown in All Branches view. Customers
+          pick their branch via the in-page selector on the booking page, so
+          no per-branch suffix is needed. */}
+      {user?.businessId && canSeeAllBranches() && selectedBranch?._allBranches && (
         <div className="booking-link-card">
           <div className="booking-link-header">
             <span className="booking-link-icon">🔗</span>
@@ -918,12 +920,12 @@ const Dashboard = () => {
           </div>
           <div className="booking-link-content">
             <code className="booking-link-url">
-              {`${window.location.origin}/book/${bookingSlug || user.businessId}${selectedBranch?.slug ? '/' + selectedBranch.slug : ''}`}
+              {`${window.location.origin}/book/${bookingSlug || user.businessId}`}
             </code>
             <button
               className="copy-link-btn"
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/book/${bookingSlug || user.businessId}${selectedBranch?.slug ? '/' + selectedBranch.slug : ''}`);
+                navigator.clipboard.writeText(`${window.location.origin}/book/${bookingSlug || user.businessId}`);
                 showToast('Booking link copied to clipboard!', 'success');
               }}
             >

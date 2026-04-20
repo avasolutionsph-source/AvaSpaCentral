@@ -3356,70 +3356,74 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* Customer Booking Link */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <div className="settings-section-icon">🔗</div>
-            <div className="settings-section-title">
-              <h2>Customer Booking Link</h2>
-              <p>Customize your public booking page URL</p>
+        {/* Customer Booking Link — Owner-only. Other roles don't see this
+            section at all; the public URL is business-wide and not a
+            per-branch concern. */}
+        {isOwner() && (
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">🔗</div>
+              <div className="settings-section-title">
+                <h2>Customer Booking Link</h2>
+                <p>Customize your public booking page URL</p>
+              </div>
             </div>
-          </div>
-          <div className="settings-section-body">
-            <div className="settings-form-group">
-              <label>Current Booking Link</label>
-              <div className="booking-link-preview">
-                <code>
-                  {window.location.origin}/book/{bookingSlug || user?.businessId || 'your-id'}
-                </code>
+            <div className="settings-section-body">
+              <div className="settings-form-group">
+                <label>Current Booking Link</label>
+                <div className="booking-link-preview">
+                  <code>
+                    {window.location.origin}/book/{bookingSlug || user?.businessId || 'your-id'}
+                  </code>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      const url = `${window.location.origin}/book/${bookingSlug || user?.businessId}`;
+                      navigator.clipboard.writeText(url);
+                      showToast('Booking link copied!', 'success');
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div className="settings-form-group">
+                <label>Custom Booking Slug</label>
+                <p className="settings-help-text">
+                  Create a memorable, custom URL for your booking page (e.g., "daet-spa" instead of long ID)
+                </p>
+                <div className="booking-slug-input-group">
+                  <span className="booking-slug-prefix">{window.location.origin}/book/</span>
+                  <input
+                    type="text"
+                    value={bookingSlug}
+                    onChange={handleBookingSlugChange}
+                    placeholder="your-custom-name"
+                    disabled={savingSlug}
+                    maxLength={50}
+                  />
+                </div>
+                {bookingSlugError && (
+                  <p className="settings-error-text">{bookingSlugError}</p>
+                )}
+                <p className="settings-help-text" style={{ marginTop: '0.5rem' }}>
+                  Only lowercase letters, numbers, and hyphens. 3-50 characters.
+                </p>
+              </div>
+              <div className="settings-actions">
                 <button
                   type="button"
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => {
-                    const url = `${window.location.origin}/book/${bookingSlug || user?.businessId}`;
-                    navigator.clipboard.writeText(url);
-                    showToast('Booking link copied!', 'success');
-                  }}
+                  className="btn btn-primary"
+                  onClick={handleSaveBookingSlug}
+                  disabled={savingSlug || !!bookingSlugError}
                 >
-                  Copy
+                  {savingSlug ? 'Saving...' : 'Save Booking Link'}
                 </button>
               </div>
             </div>
-            <div className="settings-form-group">
-              <label>Custom Booking Slug</label>
-              <p className="settings-help-text">
-                Create a memorable, custom URL for your booking page (e.g., "daet-spa" instead of long ID)
-              </p>
-              <div className="booking-slug-input-group">
-                <span className="booking-slug-prefix">{window.location.origin}/book/</span>
-                <input
-                  type="text"
-                  value={bookingSlug}
-                  onChange={handleBookingSlugChange}
-                  placeholder="your-custom-name"
-                  disabled={!canEdit() || savingSlug}
-                  maxLength={50}
-                />
-              </div>
-              {bookingSlugError && (
-                <p className="settings-error-text">{bookingSlugError}</p>
-              )}
-              <p className="settings-help-text" style={{ marginTop: '0.5rem' }}>
-                Only lowercase letters, numbers, and hyphens. 3-50 characters.
-              </p>
-            </div>
-            <div className="settings-actions">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleSaveBookingSlug}
-                disabled={!canEdit() || savingSlug || !!bookingSlugError}
-              >
-                {savingSlug ? 'Saving...' : 'Save Booking Link'}
-              </button>
-            </div>
           </div>
-        </div>
+        )}
 
         {/* Business Hours */}
         <div className="settings-section">

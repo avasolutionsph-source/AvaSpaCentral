@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
@@ -191,6 +191,11 @@ const CatchAllRedirect = () => {
   return <Navigate to="/" replace />;
 };
 
+const BookingBranchRedirect = () => {
+  const { businessId } = useParams();
+  return <Navigate to={`/book/${businessId}`} replace />;
+};
+
 function AppRoutes() {
   return (
     <Router>
@@ -231,15 +236,10 @@ function AppRoutes() {
             </Suspense>
           }
         />
-        {/* Branch-specific booking page */}
-        <Route
-          path="/book/:businessId/:branchSlug"
-          element={
-            <Suspense fallback={<PageLoader />}>
-              <BookingPage />
-            </Suspense>
-          }
-        />
+        {/* Legacy per-branch booking URL — redirect to the main booking link so
+            the customer picks a branch via the in-page selector. Keeps old
+            shared links and QR codes working. */}
+        <Route path="/book/:businessId/:branchSlug" element={<BookingBranchRedirect />} />
 
         {/* Customer Portal Routes (Public - customer auth handled internally) */}
         <Route

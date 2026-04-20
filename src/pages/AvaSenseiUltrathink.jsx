@@ -7,7 +7,7 @@ import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
 import '../assets/css/daet-insights.css';
 
 const AvaSenseiUltrathink = () => {
-  const { showToast } = useApp();
+  const { showToast, selectedBranch } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('executive');
@@ -51,7 +51,7 @@ const AvaSenseiUltrathink = () => {
 
   useEffect(() => {
     loadAllData();
-  }, [period]);
+  }, [period, selectedBranch?.id, selectedBranch?._allBranches]);
 
   // Real-time profit update every 30 seconds
   useEffect(() => {

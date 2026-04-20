@@ -52,58 +52,81 @@ const clearCacheIfStale = () => {
   }
 };
 
-// Get data from Dexie with caching
+// Branch filter for analytics. When set, every getData.* helper returns only
+// records matching this branchId. Callers (e.g. Business Insights pages) set
+// this before loading so all downstream analytics respect the user's branch
+// dropdown without each analytics method needing its own branchId param.
+let analyticsBranchFilter = null;
+
+export const setAnalyticsBranchFilter = (branchId) => {
+  if (analyticsBranchFilter !== (branchId || null)) {
+    analyticsBranchFilter = branchId || null;
+    // Invalidate cached datasets so the next read is re-filtered.
+    Object.keys(analyticsCache).forEach(key => {
+      if (key !== 'timestamp') analyticsCache[key] = null;
+    });
+    analyticsCache.timestamp = Date.now();
+  }
+};
+
+const applyBranchFilter = (items) => {
+  if (!analyticsBranchFilter) return items;
+  return (items || []).filter(item => item && item.branchId === analyticsBranchFilter);
+};
+
+// Get data from Dexie with caching + optional branch scoping
 const getData = {
   async products() {
     clearCacheIfStale();
     if (!analyticsCache.products) {
       analyticsCache.products = await storageService.products.getAll();
     }
-    return analyticsCache.products || [];
+    return applyBranchFilter(analyticsCache.products);
   },
   async customers() {
     clearCacheIfStale();
     if (!analyticsCache.customers) {
       analyticsCache.customers = await storageService.customers.getAll();
     }
-    return analyticsCache.customers || [];
+    return applyBranchFilter(analyticsCache.customers);
   },
   async employees() {
     clearCacheIfStale();
     if (!analyticsCache.employees) {
       analyticsCache.employees = await storageService.employees.getAll();
     }
-    return analyticsCache.employees || [];
+    return applyBranchFilter(analyticsCache.employees);
   },
   async transactions() {
     clearCacheIfStale();
     if (!analyticsCache.transactions) {
       analyticsCache.transactions = await storageService.transactions.getAll();
     }
-    return analyticsCache.transactions || [];
+    return applyBranchFilter(analyticsCache.transactions);
   },
   async expenses() {
     clearCacheIfStale();
     if (!analyticsCache.expenses) {
       analyticsCache.expenses = await storageService.expenses.getAll();
     }
-    return analyticsCache.expenses || [];
+    return applyBranchFilter(analyticsCache.expenses);
   },
   async appointments() {
     clearCacheIfStale();
     if (!analyticsCache.appointments) {
       analyticsCache.appointments = await storageService.appointments.getAll();
     }
-    return analyticsCache.appointments || [];
+    return applyBranchFilter(analyticsCache.appointments);
   },
   async rooms() {
     clearCacheIfStale();
     if (!analyticsCache.rooms) {
       analyticsCache.rooms = await storageService.rooms.getAll();
     }
-    return analyticsCache.rooms || [];
+    return applyBranchFilter(analyticsCache.rooms);
   },
   async suppliers() {
+    // Suppliers are business-wide, not branch-scoped.
     clearCacheIfStale();
     if (!analyticsCache.suppliers) {
       analyticsCache.suppliers = await storageService.suppliers.getAll();
@@ -115,21 +138,21 @@ const getData = {
     if (!analyticsCache.purchaseOrders) {
       analyticsCache.purchaseOrders = await storageService.purchaseOrders.getAll();
     }
-    return analyticsCache.purchaseOrders || [];
+    return applyBranchFilter(analyticsCache.purchaseOrders);
   },
   async attendance() {
     clearCacheIfStale();
     if (!analyticsCache.attendance) {
       analyticsCache.attendance = await storageService.attendance.getAll();
     }
-    return analyticsCache.attendance || [];
+    return applyBranchFilter(analyticsCache.attendance);
   },
   async shiftSchedules() {
     clearCacheIfStale();
     if (!analyticsCache.shiftSchedules) {
       analyticsCache.shiftSchedules = await storageService.shiftSchedules.getAll();
     }
-    return analyticsCache.shiftSchedules || [];
+    return applyBranchFilter(analyticsCache.shiftSchedules);
   },
   async inventoryMovements() {
     clearCacheIfStale();
@@ -140,7 +163,7 @@ const getData = {
         analyticsCache.inventoryMovements = [];
       }
     }
-    return analyticsCache.inventoryMovements || [];
+    return applyBranchFilter(analyticsCache.inventoryMovements);
   }
 };
 

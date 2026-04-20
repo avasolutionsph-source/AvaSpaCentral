@@ -5,6 +5,7 @@ import { setUserContext, clearUserContext } from '../utils/sentry';
 import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
 import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 import { db } from '../db';
+import { setAnalyticsBranchFilter } from '../mockApi/mockApi';
 
 // Sentinel representing "view data from all branches" for Owner/Manager users.
 // Stored in the same selectedBranch slot (so localStorage persistence Just Works).
@@ -454,6 +455,13 @@ export const AppProvider = ({ children }) => {
     if (selectedBranch?._allBranches) return null;
     return selectedBranch?.id || null;
   };
+
+  // Push the effective branch into the mockApi analytics layer whenever it
+  // changes, so pre-computed metrics (Business Insights, Analytics pages)
+  // see a branch-scoped dataset without each page having to wire it up.
+  useEffect(() => {
+    setAnalyticsBranchFilter(getEffectiveBranchId());
+  }, [user?.role, user?.branchId, selectedBranch?.id, selectedBranch?._allBranches]);
 
   // Select a branch (called from BranchSelect page)
   const selectBranch = (branch) => {

@@ -116,10 +116,14 @@ const GiftCertificates = () => {
   };
 
   const getStatistics = () => {
-    const active = giftCertificates.filter(gc => getGCStatus(gc) === 'active').length;
-    const redeemed = giftCertificates.filter(gc => gc.status === 'redeemed').length;
-    const expired = giftCertificates.filter(gc => getGCStatus(gc) === 'expired' && gc.status !== 'redeemed').length;
-    const totalValue = giftCertificates
+    const effectiveBranchId = getEffectiveBranchId();
+    const scoped = effectiveBranchId
+      ? giftCertificates.filter(gc => gc.branchId === effectiveBranchId)
+      : giftCertificates;
+    const active = scoped.filter(gc => getGCStatus(gc) === 'active').length;
+    const redeemed = scoped.filter(gc => gc.status === 'redeemed').length;
+    const expired = scoped.filter(gc => getGCStatus(gc) === 'expired' && gc.status !== 'redeemed').length;
+    const totalValue = scoped
       .filter(gc => getGCStatus(gc) === 'active')
       .reduce((sum, gc) => sum + (gc.balance || 0), 0);
 

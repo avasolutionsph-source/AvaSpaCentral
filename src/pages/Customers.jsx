@@ -74,14 +74,18 @@ const Customers = () => {
     return filtered;
   }, [customers, searchTerm, tierFilter, getEffectiveBranchId]);
 
-  // Memoized tier stats for display
+  // Memoized tier stats for display — branch-scoped so counts match the list.
   const tierStats = useMemo(() => {
+    const effectiveBranchId = getEffectiveBranchId();
+    const scoped = effectiveBranchId
+      ? customers.filter(c => c.branchId === effectiveBranchId)
+      : customers;
     return {
-      VIP: customers.filter(c => c.tier === 'VIP').length,
-      REGULAR: customers.filter(c => c.tier === 'REGULAR').length,
-      NEW: customers.filter(c => c.tier === 'NEW').length
+      VIP: scoped.filter(c => c.tier === 'VIP').length,
+      REGULAR: scoped.filter(c => c.tier === 'REGULAR').length,
+      NEW: scoped.filter(c => c.tier === 'NEW').length
     };
-  }, [customers]);
+  }, [customers, getEffectiveBranchId]);
 
   // Get spend tier badge styling
   const getSpendTierBadge = (tier) => {

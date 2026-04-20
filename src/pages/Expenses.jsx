@@ -268,26 +268,34 @@ const Expenses = ({ embedded = false, onDataChange }) => {
     return [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [expenses, filterCategory, filterPayment, filterExpenseType, filterDateFrom, filterDateTo, searchTerm, getEffectiveBranchId]);
 
+  // Branch-scoped expenses for stats (ignores UI filters like date/search so the
+  // summary cards always reflect the full branch totals, not the current view).
+  const branchScopedExpenses = useMemo(() => {
+    const effectiveBranchId = getEffectiveBranchId();
+    if (!effectiveBranchId) return expenses;
+    return expenses.filter(e => e.branchId === effectiveBranchId);
+  }, [expenses, getEffectiveBranchId]);
+
   // Calculate stats
   const stats = useMemo(() => {
-    const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const total = branchScopedExpenses.reduce((sum, e) => sum + e.amount, 0);
     const now = new Date();
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
-    const monthlyExpenses = expenses.filter(e => {
+    const monthlyExpenses = branchScopedExpenses.filter(e => {
       const expenseDate = parseISO(e.date);
       return isWithinInterval(expenseDate, { start: monthStart, end: monthEnd });
     });
     const monthly = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const uniqueCategories = new Set(expenses.map(e => e.category));
+    const uniqueCategories = new Set(branchScopedExpenses.map(e => e.category));
 
     return {
       total,
       monthly,
       categories: uniqueCategories.size,
-      count: expenses.length
+      count: branchScopedExpenses.length
     };
-  }, [expenses]);
+  }, [branchScopedExpenses]);
 
   // Clear filters
   const clearFilters = useCallback(() => {

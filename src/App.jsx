@@ -111,17 +111,50 @@ const ProtectedLayout = ({ children }) => {
 // Require both branch selection AND login before accessing main app
 // Public users see BookingPage at "/", staff get auto-selected branch
 const RequireBranch = ({ children }) => {
-  const { user, loading, selectedBranch, selectBranch } = useApp();
+  const { user, loading, selectedBranch, selectBranch, logout } = useApp();
   const [autoSelecting, setAutoSelecting] = React.useState(false);
+  const [autoSelectError, setAutoSelectError] = React.useState(null);
 
   React.useEffect(() => {
     const autoSelectBranch = async () => {
       if (user && !selectedBranch && !autoSelecting) {
         setAutoSelecting(true);
+        setAutoSelectError(null);
         try {
           const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
           const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
           if (!supabaseUrl || !supabaseKey || !user.businessId) return;
+
+          // Branch-locked roles (Branch Owner, Manager) must ONLY be auto-assigned
+          // their own branchId — never fall back to the first branch, which would
+          // leak another branch's data into the UI for a user who can't switch.
+          const lockedRoles = ['Branch Owner', 'Manager'];
+          const isLocked = lockedRoles.includes(user.role);
+
+          if (isLocked) {
+            if (!user.branchId) {
+              setAutoSelectError('Your account has no branch assigned. Please contact your administrator.');
+              return;
+            }
+            const res = await fetch(
+              `${supabaseUrl}/rest/v1/branches?id=eq.${user.branchId}&business_id=eq.${user.businessId}&is_active=eq.true&limit=1`,
+              { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } }
+            );
+            if (!res.ok) {
+              setAutoSelectError('Could not load your assigned branch. Please try again.');
+              return;
+            }
+            const branches = await res.json();
+            if (branches.length === 0) {
+              setAutoSelectError('Your assigned branch is unavailable. Please contact your administrator.');
+              return;
+            }
+            selectBranch(branches[0]);
+            return;
+          }
+
+          // Non-locked roles (Owner, Receptionist, Therapist, etc.) fall back to
+          // the first active branch so the app can boot without forcing picker UX.
           const res = await fetch(
             `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order.asc&limit=1`,
             { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } }
@@ -139,6 +172,30 @@ const RequireBranch = ({ children }) => {
     };
     autoSelectBranch();
   }, [user, selectedBranch, autoSelecting, selectBranch]);
+
+  if (autoSelectError) {
+    return (
+      <div className="branch-select-page">
+        <div className="branch-select-overlay">
+          <div className="branch-select-container">
+            <div className="branch-select-header">
+              <h1>Daet Massage &amp; Spa</h1>
+              <p className="branch-select-subtitle">We can’t open your branch</p>
+            </div>
+            <div className="branch-select-error">
+              <p>{autoSelectError}</p>
+              <button className="btn btn-primary" onClick={() => window.location.reload()}>
+                Try Again
+              </button>
+              <button className="btn-link" onClick={() => logout()} style={{ marginTop: '0.75rem' }}>
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || (user && !selectedBranch)) {
     return <LoadingScreen />;

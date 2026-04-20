@@ -7,7 +7,7 @@ import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
 import '../assets/css/daet-insights.css';
 
 const AvaSenseiUltrathink = () => {
-  const { showToast, selectedBranch } = useApp();
+  const { showToast, selectedBranch, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('executive');
@@ -95,7 +95,7 @@ const AvaSenseiUltrathink = () => {
       setUtilizationMetrics(utilization);
 
       // Load AI Insights Data
-      const [txns, prods, emps, rms, custs, bookings] = await Promise.all([
+      const [rawTxns, rawProds, rawEmps, rawRms, rawCusts, rawBookings] = await Promise.all([
         mockApi.transactions.getTransactions(),
         mockApi.products.getProducts(),
         mockApi.employees.getEmployees(),
@@ -103,6 +103,21 @@ const AvaSenseiUltrathink = () => {
         mockApi.customers.getCustomers(),
         mockApi.advanceBooking.listAdvanceBookings()
       ]);
+
+      // Scope every collection to the selected branch so charts, KPIs, and
+      // AI recommendations all reflect the dropdown selection. Without this
+      // the analyses run on every branch's data and leak cross-branch totals.
+      const effectiveBranchId = getEffectiveBranchId();
+      const scope = (items) => effectiveBranchId
+        ? (items || []).filter(item => item && item.branchId === effectiveBranchId)
+        : (items || []);
+
+      const txns = scope(rawTxns);
+      const prods = scope(rawProds);
+      const emps = scope(rawEmps);
+      const rms = scope(rawRms);
+      const custs = scope(rawCusts);
+      const bookings = scope(rawBookings);
 
       setTransactions(txns);
       setProducts(prods);

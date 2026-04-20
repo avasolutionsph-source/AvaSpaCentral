@@ -410,33 +410,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         startTime: startTime
       });
 
-      // Log service start event
-      await mockApi.activityLogs.createLog({
-        type: 'service',
-        action: 'Service Started',
-        description: `${room.serviceNames?.join(', ') || 'Service'} started in ${room.name}`,
-        user: {
-          firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
-          lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
-          role: user?.role || 'therapist'
-        },
-        ipAddress: 'localhost',
-        details: {
-          roomId: room._id,
-          roomName: room.name,
-          therapistId: room.assignedEmployeeId,
-          therapistName: room.assignedEmployeeName,
-          customerName: room.customerName,
-          customerPhone: room.customerPhone,
-          serviceNames: room.serviceNames,
-          plannedDuration: room.serviceDuration,
-          startTime: startTime,
-          status: 'started',
-          transactionId: room.transactionId
-        },
-        severity: 'info'
-      });
-
       showToast('Service started! Timer is now running.', 'success');
       loadRooms();
     } catch (error) {
@@ -503,28 +476,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         }
       }
 
-      await mockApi.activityLogs.createLog({
-        type: 'service',
-        action: 'Service Upgraded',
-        description: `Service upgraded in ${room.name}: ${newServiceNames.join(', ')}`,
-        user: {
-          firstName: user?.firstName || 'Unknown',
-          lastName: user?.lastName || '',
-          role: user?.role || 'staff'
-        },
-        ipAddress: 'localhost',
-        details: {
-          roomId: room._id,
-          roomName: room.name,
-          previousServices: room.serviceNames,
-          newServices: newServiceNames,
-          previousDuration: room.serviceDuration,
-          newDuration: upgradeDuration || newDuration,
-          newPrice
-        },
-        severity: 'info'
-      });
-
       setUpgradeModal({ isOpen: false, room: null });
       showToast(`Service upgraded to: ${newServiceNames.join(', ')}`, 'success');
       loadRooms();
@@ -549,33 +500,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         });
       }
 
-      // Log home service start event
-      await mockApi.activityLogs.createLog({
-        type: 'service',
-        action: 'Home Service Started',
-        description: `Home service started for ${service.customerName} at ${service.address}`,
-        user: {
-          firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
-          lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
-          role: user?.role || 'therapist'
-        },
-        ipAddress: 'localhost',
-        details: {
-          homeServiceId: service._id,
-          therapistId: service.employeeId,
-          therapistName: service.employeeName,
-          customerName: service.customerName,
-          customerPhone: service.customerPhone,
-          address: service.address,
-          serviceNames: service.serviceNames,
-          plannedDuration: service.serviceDuration,
-          startTime: startTime,
-          status: 'started',
-          transactionId: service.transactionId,
-          isAdvanceBooking: service.isAdvanceBooking || false
-        },
-        severity: 'info'
-      });
 
       showToast('Home service started! Timer is now running.', 'success');
       loadHomeServices();
@@ -594,34 +518,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             try {
               const endTime = new Date().toISOString();
 
-              // Log service completion event
-              await mockApi.activityLogs.createLog({
-                type: 'service',
-                action: 'Service Completed',
-                description: `${room.serviceNames?.join(', ') || 'Service'} completed in ${room.name}`,
-                user: {
-                  firstName: 'System',
-                  lastName: '',
-                  role: 'System'
-                },
-                ipAddress: 'localhost',
-                details: {
-                  roomId: room._id,
-                  roomName: room.name,
-                  therapistId: room.assignedEmployeeId,
-                  therapistName: room.assignedEmployeeName,
-                  customerName: room.customerName,
-                  customerPhone: room.customerPhone,
-                  serviceNames: room.serviceNames,
-                  plannedDuration: room.serviceDuration,
-                  actualDuration: room.serviceDuration,
-                  startTime: room.startTime,
-                  endTime: endTime,
-                  status: 'completed',
-                  transactionId: room.transactionId
-                },
-                severity: 'info'
-              });
 
               // Handle pay-after advance booking room services
               if (room.advanceBookingId && room.paymentTiming === 'pay-after') {
@@ -664,34 +560,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             try {
               const endTime = new Date().toISOString();
 
-              // Log home service completion event
-              await mockApi.activityLogs.createLog({
-                type: 'service',
-                action: 'Home Service Completed',
-                description: `Home service completed for ${service.customerName} at ${service.address}`,
-                user: {
-                  firstName: 'System',
-                  lastName: '',
-                  role: 'System'
-                },
-                ipAddress: 'localhost',
-                details: {
-                  homeServiceId: service._id,
-                  therapistId: service.employeeId,
-                  therapistName: service.employeeName,
-                  customerName: service.customerName,
-                  customerPhone: service.customerPhone,
-                  address: service.address,
-                  serviceNames: service.serviceNames,
-                  plannedDuration: service.serviceDuration,
-                  actualDuration: service.serviceDuration,
-                  startTime: service.startTime,
-                  endTime: endTime,
-                  status: 'completed',
-                  transactionId: service.transactionId
-                },
-                severity: 'info'
-              });
 
               // Handle advance booking home services - create transaction for pay-after
               if (service.isAdvanceBooking) {
@@ -787,37 +655,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       }
 
       if (isHomeService) {
-        // Handle home service stop
-        await mockApi.activityLogs.createLog({
-          type: 'service',
-          action: status === 'ended_early' ? 'Home Service Ended Early' : 'Home Service Cancelled',
-          description: `Home service for ${room.customerName} ${status === 'ended_early' ? 'ended early' : 'cancelled'}: ${stopReason}`,
-          user: {
-            firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
-            lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
-            role: user?.role || 'therapist'
-          },
-          ipAddress: 'localhost',
-          details: {
-            homeServiceId: room._id,
-            therapistId: room.employeeId,
-            therapistName: room.employeeName,
-            customerName: room.customerName,
-            customerPhone: room.customerPhone,
-            address: room.address,
-            serviceNames: room.serviceNames,
-            plannedDuration: room.serviceDuration,
-            actualDuration: actualDuration,
-            startTime: room.startTime,
-            endTime: now.toISOString(),
-            status: status,
-            reason: stopReason,
-            transactionId: room.transactionId,
-            isAdvanceBooking: room.isAdvanceBooking || false
-          },
-          severity: 'warning'
-        });
-
         // Handle advance booking home services vs regular home services
         if (room.isAdvanceBooking) {
           // If service was in progress (ended early), create transaction for pay-after and complete
@@ -848,36 +685,6 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         }
         loadHomeServices();
       } else {
-        // Handle room service stop
-        await mockApi.activityLogs.createLog({
-          type: 'service',
-          action: status === 'ended_early' ? 'Service Ended Early' : 'Service Cancelled',
-          description: `${room.serviceNames?.join(', ') || 'Service'} ${status === 'ended_early' ? 'ended early' : 'cancelled'}: ${stopReason}`,
-          user: {
-            firstName: user?.firstName || user?.name?.split(' ')[0] || 'Unknown',
-            lastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '',
-            role: user?.role || 'therapist'
-          },
-          ipAddress: 'localhost',
-          details: {
-            roomId: room._id,
-            roomName: room.name,
-            therapistId: room.assignedEmployeeId,
-            therapistName: room.assignedEmployeeName,
-            customerName: room.customerName,
-            customerPhone: room.customerPhone,
-            serviceNames: room.serviceNames,
-            plannedDuration: room.serviceDuration,
-            actualDuration: actualDuration,
-            startTime: room.startTime,
-            endTime: now.toISOString(),
-            status: status,
-            reason: stopReason,
-            transactionId: room.transactionId
-          },
-          severity: 'warning'
-        });
-
         // Handle pay-after advance booking room services
         if (room.advanceBookingId && room.paymentTiming === 'pay-after' && status === 'ended_early') {
           try {

@@ -5,7 +5,6 @@ import mockApi from '../mockApi';
 import { format, parseISO, differenceInMinutes, isAfter, startOfDay, subDays, addDays } from 'date-fns';
 import CameraCapture from '../components/CameraCapture';
 import { LazyImage } from '../components/OptimizedImage';
-import { logClockIn, logClockOut } from '../utils/activityLogger';
 import { SettingsRepository } from '../services/storage/repositories';
 import { formatTime12Hour, formatTimeRange } from '../utils/dateUtils';
 
@@ -318,7 +317,6 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         } else if (!result?.missedClockOut) {
           showToast('Clocked in successfully with photo!', 'success');
         }
-        logClockIn(user, employeeName);
       } else {
         await mockApi.attendance.clockOut(employeeId, captureWithBranch);
         if (isOutOfRange) {
@@ -326,7 +324,6 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         } else {
           showToast('Clocked out successfully with photo!', 'success');
         }
-        logClockOut(user, employeeName);
       }
 
       // Reset states

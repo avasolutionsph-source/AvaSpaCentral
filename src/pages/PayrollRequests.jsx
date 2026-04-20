@@ -157,16 +157,6 @@ Generated: ${format(new Date(), 'yyyy-MM-dd h:mm:ss a')}
         amount: requestForm.amount ? parseFloat(requestForm.amount) : null
       });
 
-      // Log activity
-      await mockApi.activityLogs.createLog({
-        type: 'payroll',
-        action: 'Payroll Request Submitted',
-        description: `${user?.firstName} ${user?.lastName} submitted a ${requestForm.type} request: ${requestForm.subject}`,
-        userId: user?._id,
-        userName: `${user?.firstName} ${user?.lastName}`,
-        severity: 'info'
-      });
-
       showToast('Request submitted successfully! Your manager will review it shortly.', 'success');
       setShowRequestForm(false);
       setRequestForm({

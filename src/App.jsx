@@ -39,7 +39,6 @@ const MySchedule = lazy(() => import('./pages/MySchedule'));
 const ShiftSchedules = lazy(() => import('./pages/ShiftSchedules'));
 const PayrollRequests = lazy(() => import('./pages/PayrollRequests'));
 const CashDrawerHistory = lazy(() => import('./pages/CashDrawerHistory'));
-const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
 const ServiceHistory = lazy(() => import('./pages/ServiceHistory'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
@@ -307,7 +306,6 @@ function AppRoutes() {
           <Route path="shift-schedules" element={<ProtectedRoute page="shift-schedules"><Suspense fallback={<PageLoader />}><ShiftSchedules /></Suspense></ProtectedRoute>} />
           <Route path="payroll-requests" element={<ProtectedRoute page="payroll-requests"><Suspense fallback={<PageLoader />}><PayrollRequests /></Suspense></ProtectedRoute>} />
           <Route path="cash-drawer-history" element={<ProtectedRoute page="cash-drawer-history"><Suspense fallback={<PageLoader />}><CashDrawerHistory /></Suspense></ProtectedRoute>} />
-          <Route path="activity-logs" element={<ProtectedRoute page="activity-logs"><Suspense fallback={<PageLoader />}><ActivityLogs /></Suspense></ProtectedRoute>} />
           <Route path="service-history" element={<ProtectedRoute page="service-history"><Suspense fallback={<PageLoader />}><ServiceHistory /></Suspense></ProtectedRoute>} />
           <Route path="inventory" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><Inventory /></Suspense></ProtectedRoute>} />
           <Route path="suppliers" element={<ProtectedRoute page="inventory"><Suspense fallback={<PageLoader />}><Suppliers /></Suspense></ProtectedRoute>} />

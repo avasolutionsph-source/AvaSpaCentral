@@ -296,14 +296,6 @@ const Inventory = ({ embedded = false, onDataChange }) => {
       );
       setStockHistory([historyEntry, ...stockHistory]);
 
-      // Log activity
-      await mockApi.activityLogs.createLog({
-        type: 'inventory',
-        action: 'Stock Adjustment',
-        description: `${adjustmentType === 'add' ? 'Added' : 'Subtracted'} ${quantity} units of ${selectedProduct.name}. Reason: ${adjustmentReason}`,
-        severity: 'info'
-      });
-
       // Update inventory
       const updatedInventory = inventory.map(p =>
         p._id === selectedProduct._id ? { ...p, stock: newStock, servicesSinceLastAdjustment: adjustmentType === 'subtract' ? 0 : p.servicesSinceLastAdjustment } : p
@@ -413,14 +405,6 @@ const Inventory = ({ embedded = false, onDataChange }) => {
         );
       }
       setStockHistory([...newHistoryEntries, ...stockHistory]);
-
-      // Log activity
-      await mockApi.activityLogs.createLog({
-        type: 'inventory',
-        action: 'Purchase Order Created',
-        description: `Purchase order from ${poSupplier} with ${validItems.length} item(s). Total: ₱${calculatePOTotal().toLocaleString()}`,
-        severity: 'info'
-      });
 
       showToast('Purchase order processed successfully!', 'success');
       setShowPurchaseOrderModal(false);

@@ -4,7 +4,6 @@ import mockApi from '../mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
 import { getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog, ManageOrder } from '../components/shared';
-import { logTransaction } from '../utils/activityLogger';
 import { formatTimeRange, formatTime12Hour } from '../utils/dateUtils';
 import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
@@ -864,9 +863,6 @@ const POS = () => {
             console.warn('Cash drawer transaction logging failed:', err);
           }
         }
-
-        // Log the transaction activity
-        logTransaction(user, transaction.receiptNumber, transaction.totalAmount, transaction.paymentMethod);
 
         // If gift certificate was used, redeem it
         if (discountType === 'gc' && appliedGC) {

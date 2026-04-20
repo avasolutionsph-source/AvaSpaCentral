@@ -8,7 +8,6 @@ import { SettingsRepository } from '../services/storage/repositories';
 import { NetworkDetector } from '../services/sync';
 import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
 import db from '../db';
-import ActivityLogsTab from './ActivityLogs';
 import BranchesTab from './BranchesTab';
 import { authService } from '../services/supabase';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
@@ -2159,17 +2158,9 @@ const Settings = () => {
             GPS
           </button>
         )}
-        <button
-          className={`settings-tab ${activeTab === 'logs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('logs')}
-        >
-          Activity Logs
-        </button>
       </div>
 
-      {activeTab === 'logs' ? (
-        <ActivityLogsTab />
-      ) : activeTab === 'gps' ? (
+      {activeTab === 'gps' ? (
         <div className="settings-content">
           <div className="settings-section">
             <div className="settings-section-header">

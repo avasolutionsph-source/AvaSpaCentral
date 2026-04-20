@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService, supabaseSyncManager, isSupabaseConfigured } from '../services/supabase';
-import { logLogin, logLogout } from '../utils/activityLogger';
 import { setUserContext, clearUserContext } from '../utils/sentry';
 import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
 import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
@@ -280,8 +279,6 @@ export const AppProvider = ({ children }) => {
         });
       }
 
-      // Log the login activity
-      logLogin(response.user);
       return response;
     } catch (error) {
       showToast(error.message, 'error');
@@ -290,11 +287,6 @@ export const AppProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    // Log the logout activity before clearing user
-    if (user) {
-      logLogout(user);
-    }
-
     // Helper to add timeout to promises - prevents logout from hanging
     const withTimeout = (promise, ms, operation) => {
       return Promise.race([

@@ -12,7 +12,6 @@ import LeaveRequestRepository from '../services/storage/repositories/LeaveReques
 import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
 import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
 import { SettingsRepository } from '../services/storage/repositories';
-import { logClockIn, logClockOut } from '../utils/activityLogger';
 import { formatTime12Hour } from '../utils/dateUtils';
 import { format } from 'date-fns';
 import '../assets/css/hub-pages.css';
@@ -314,7 +313,6 @@ const MyPortal = () => {
         } else if (!result?.missedClockOut) {
           showToast('Clocked in successfully!', 'success');
         }
-        logClockIn(user, employeeName);
       } else {
         await mockApi.attendance.clockOut(employeeId, captureWithBranch);
         if (isOutOfRange) {
@@ -322,7 +320,6 @@ const MyPortal = () => {
         } else {
           showToast('Clocked out successfully!', 'success');
         }
-        logClockOut(user, employeeName);
       }
 
       setShowCamera(false);

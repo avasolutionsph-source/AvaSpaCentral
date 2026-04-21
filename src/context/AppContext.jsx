@@ -233,8 +233,11 @@ export const AppProvider = ({ children }) => {
           }
         });
 
-        // Initialize sync manager if user is already logged in and Supabase is configured
-        // Non-blocking: don't hold up loading screen for sync
+        // Initialize sync manager when a session is restored. The helper
+        // handles both paths:
+        //   - Dexie has data → fire-and-forget (loading screen flips off
+        //     immediately).
+        //   - Dexie empty → show the full-screen loader and await the pull.
         if (authService.currentUser && isSupabaseConfigured()) {
           // Subscribe to sync status updates (debounced to avoid re-renders while user is typing)
           let syncDebounce = null;
@@ -251,10 +254,7 @@ export const AppProvider = ({ children }) => {
             }, 500);
           });
 
-          // Initialize sync in background
-          supabaseSyncManager.initialize().catch(err => {
-            console.warn('[AppContext] Sync manager init error:', err);
-          });
+          await initializeSyncAfterLogin();
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);

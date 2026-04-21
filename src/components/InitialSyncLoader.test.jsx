@@ -21,8 +21,9 @@ describe('InitialSyncLoader', () => {
     expect(status).toHaveAttribute('aria-live', 'polite');
   });
 
-  it('renders a spinner element', () => {
+  it('renders the spinning ring indicator', () => {
     const { container } = render(<InitialSyncLoader />);
-    expect(container.querySelector('.spinner')).toBeInTheDocument();
+    expect(container.querySelector('.initial-sync-ring-outer')).toBeInTheDocument();
+    expect(container.querySelector('.initial-sync-ring-inner')).toBeInTheDocument();
   });
 });

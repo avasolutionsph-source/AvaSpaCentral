@@ -1515,12 +1515,53 @@ export const usersAdapter = {
     if (isSupabaseConfigured() && authService.currentUser?.businessId) {
       try {
         const businessId = authService.currentUser.businessId;
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
-        const queryPromise = supabase
-          .from('users')
-          .select('*')
-          .eq('business_id', businessId);
-        const { data: supabaseUsers, error } = await Promise.race([queryPromise, timeoutPromise]);
+        // Use direct REST instead of supabase.from() — the supabase-js client
+        // intermittently hangs after auth state transitions (sign-out/sign-in
+        // races), causing this read to time out and the surrounding component
+        // to re-trigger the call on every re-render. AbortController gives us
+        // a hard 5s ceiling that actually fires.
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        let accessToken = supabaseKey;
+        try {
+          const raw = localStorage.getItem('spa-erp-auth');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const session =
+              parsed?.currentSession ||
+              parsed?.session ||
+              (parsed?.access_token ? parsed : null);
+            if (session?.access_token) accessToken = session.access_token;
+          }
+        } catch {
+          // Fall back to anon key if the cached session is unreadable.
+        }
+
+        const controller = new AbortController();
+        const abortTimer = setTimeout(() => controller.abort(), 5000);
+        let supabaseUsers = null;
+        let error = null;
+        try {
+          const res = await fetch(
+            `${supabaseUrl}/rest/v1/users?business_id=eq.${businessId}&select=*`,
+            {
+              headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${accessToken}`,
+              },
+              signal: controller.signal,
+            }
+          );
+          if (!res.ok) {
+            error = new Error(`HTTP ${res.status}`);
+          } else {
+            supabaseUsers = await res.json();
+          }
+        } catch (fetchErr) {
+          error = fetchErr.name === 'AbortError' ? new Error('timeout') : fetchErr;
+        } finally {
+          clearTimeout(abortTimer);
+        }
 
         if (!error && supabaseUsers && supabaseUsers.length > 0) {
           // Get pending deletes from sync queue to avoid re-adding deleted users

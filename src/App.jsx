@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import InitialSyncLoader from './components/InitialSyncLoader';
 
 // Development tools - sync test utility (only in dev mode)
 if (import.meta.env.DEV) {
@@ -253,9 +254,11 @@ const BookingBranchRedirect = () => {
 };
 
 function AppRoutes() {
+  const { initialSyncing } = useApp();
   return (
     <Router>
       <Toast />
+      {initialSyncing && <InitialSyncLoader />}
       <Routes>
         {/* Public Routes */}
         <Route

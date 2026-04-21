@@ -842,6 +842,18 @@ class SupabaseSyncManager {
    * Initialize sync manager
    */
   async initialize() {
+    // De-duplicate concurrent callers. Without this, login() + the
+    // authService.subscribe(SIGNED_IN) handler both call initialize() at
+    // nearly the same instant, which races twice through _isLocalDataEmpty
+    // and can trigger duplicate forcePulls.
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = this._runInitialize().finally(() => {
+      this._initPromise = null;
+    });
+    return this._initPromise;
+  }
+
+  async _runInitialize() {
     if (!isSupabaseConfigured()) {
       console.log('[SupabaseSyncManager] Supabase not configured, sync disabled');
       return;

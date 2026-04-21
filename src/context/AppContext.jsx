@@ -293,8 +293,9 @@ export const AppProvider = ({ children }) => {
   //      timeout so a supabase-js hang (see project_supabase_hang memory)
   //      can't strand the user.
   // A second call to supabaseSyncManager.initialize() also fires via the
-  // authService.subscribe(SIGNED_IN) handler inside initApp — the SyncManager's
-  // _initialized re-entrancy guard is what prevents duplicate forcePulls.
+  // authService.subscribe(SIGNED_IN) handler inside initApp. Concurrent
+  // callers are de-duplicated by SyncManager.initialize()'s in-flight
+  // promise cache, so both awaits see the same pull.
   // Keep that invariant in mind if you ever touch either call site.
   const initializeSyncAfterLogin = async () => {
     if (!isSupabaseConfigured()) return;

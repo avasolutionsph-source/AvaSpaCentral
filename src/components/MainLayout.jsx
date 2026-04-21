@@ -103,7 +103,7 @@ const MainLayout = () => {
                 .select('value')
                 .eq('business_id', user.businessId)
                 .eq('key', 'businessHours')
-                .single();
+                .maybeSingle();
               if (!error && data?.value) {
                 savedHours = data.value;
                 await SettingsRepo.set('businessHours', savedHours);

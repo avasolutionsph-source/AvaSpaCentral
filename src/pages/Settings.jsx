@@ -77,15 +77,14 @@ const Settings = () => {
   // another branch's values.
   const [configuredKeys, setConfiguredKeys] = useState(() => new Set());
 
-  // Business Info. Only `name` is business-wide; address/phone/email/website
-  // live in the branch-scoped `businessContact` record so every branch can
-  // expose its own storefront details.
+  // Business Info. Only `name` is business-wide; address/phone/email live
+  // in the branch-scoped `businessContact` record so every branch can expose
+  // its own storefront details.
   const [businessInfo, setBusinessInfo] = useState({
     name: 'Daet Massage & Spa',
     address: '',
     phone: '',
-    email: '',
-    website: ''
+    email: ''
   });
 
   // Booking Capacity
@@ -1286,7 +1285,11 @@ const Settings = () => {
     await handleSaveSettings(['businessHours']);
   };
 
-  const handleSaveBusinessInfo = () => handleSaveSettings(['businessInfo', 'businessContact']);
+  // Business name is Owner-only; everyone else saves just the branch-scoped
+  // contact so a disabled-but-forged name field can't slip through.
+  const handleSaveBusinessInfo = () => handleSaveSettings(
+    isOwner() ? ['businessInfo', 'businessContact'] : ['businessContact']
+  );
   const handleSaveCapacity = () => handleSaveSettings(['bookingCapacity', 'bookingWindowMinutes']);
   const handleSaveTaxSettings = () => handleSaveSettings(['taxSettings']);
   const handleSavePOSSettings = () => handleSaveSettings(['showReceiptAfterCheckout']);
@@ -1298,14 +1301,13 @@ const Settings = () => {
   const handleSaveSettings = async (onlyKeys = null) => {
     try {
       // Business Information splits by scope: the display name stays global
-      // (one brand across branches), while address/phone/email/website are
-      // stored per-branch as `businessContact` so each location has its own.
+      // (one brand across branches), while address/phone/email are stored
+      // per-branch as `businessContact` so every location has its own.
       const businessInfoWide = { name: businessInfo.name };
       const businessContact = {
         address: businessInfo.address,
         phone: businessInfo.phone,
         email: businessInfo.email,
-        website: businessInfo.website,
       };
 
       const allSettings = {
@@ -1501,7 +1503,7 @@ const Settings = () => {
               setConfiguredKeys(configured);
 
               // Business Information: name comes from the wide `businessInfo`
-              // row; address/phone/email/website come from the branch-scoped
+              // row; address/phone/email come from the branch-scoped
               // `businessContact` row and stay blank if the branch hasn't
               // configured its storefront yet.
               const cloudWideInfo = wideValue('businessInfo') || {};
@@ -1511,7 +1513,6 @@ const Settings = () => {
                 address: cloudContact.address ?? '',
                 phone: cloudContact.phone ?? '',
                 email: cloudContact.email ?? '',
-                website: cloudContact.website ?? '',
               };
               if (!savedBusinessInfo || savedBusinessInfo.name !== mergedInfo.name || !configured.has('businessContact')) {
                 setBusinessInfo(mergedInfo);
@@ -1520,7 +1521,6 @@ const Settings = () => {
                   address: mergedInfo.address,
                   phone: mergedInfo.phone,
                   email: mergedInfo.email,
-                  website: mergedInfo.website,
                 });
               }
 
@@ -1659,9 +1659,8 @@ const Settings = () => {
           address: contact?.address ?? '',
           phone: contact?.phone ?? '',
           email: contact?.email ?? '',
-          website: contact?.website ?? '',
         }));
-        SettingsRepository.set('businessContact', contact || { address: '', phone: '', email: '', website: '' }).catch(() => {});
+        SettingsRepository.set('businessContact', contact || { address: '', phone: '', email: '' }).catch(() => {});
 
         const hours = branchValue('businessHours');
         if (hours) {
@@ -3417,7 +3416,7 @@ const Settings = () => {
             </div>
           </div>
           <div className="settings-section-body">
-            {renderConfigureNow('businessContact', 'Business Information (address, phone, email, website)')}
+            {renderConfigureNow('businessContact', 'Business Information (address, phone, email)')}
             <div className="settings-form-group">
               <label>Business Name</label>
               <input
@@ -3426,8 +3425,14 @@ const Settings = () => {
                 value={businessInfo.name}
                 onChange={handleBusinessInfoChange}
                 placeholder="Enter business name"
-                disabled={!canEdit()}
+                disabled={!isOwner()}
+                title={!isOwner() ? 'Only the Owner can change the business name' : undefined}
               />
+              {!isOwner() && (
+                <small style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                  Only the Owner can change the business name.
+                </small>
+              )}
             </div>
             <div className="settings-form-group">
               <label>Address</label>
@@ -3463,17 +3468,6 @@ const Settings = () => {
                   disabled={!canEdit()}
                 />
               </div>
-            </div>
-            <div className="settings-form-group">
-              <label>Website</label>
-              <input
-                type="url"
-                name="website"
-                value={businessInfo.website}
-                onChange={handleBusinessInfoChange}
-                placeholder="www.yourbusiness.com"
-                disabled={!canEdit()}
-              />
             </div>
             {canEdit() && (
               <div className="settings-actions">

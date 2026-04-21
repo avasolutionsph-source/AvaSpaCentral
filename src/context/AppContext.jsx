@@ -254,6 +254,8 @@ export const AppProvider = ({ children }) => {
             }, 500);
           });
 
+          // initializeSyncAfterLogin is declared later in the component body;
+          // safe to call here because useEffect callbacks run post-render.
           await initializeSyncAfterLogin();
         }
       } catch (error) {
@@ -290,8 +292,10 @@ export const AppProvider = ({ children }) => {
   //      account) → await initialize behind a full-screen loader, with a 15s
   //      timeout so a supabase-js hang (see project_supabase_hang memory)
   //      can't strand the user.
-  // Exactly one call to supabaseSyncManager.initialize() happens per login —
-  // concurrent calls would trigger duplicate forcePulls.
+  // A second call to supabaseSyncManager.initialize() also fires via the
+  // authService.subscribe(SIGNED_IN) handler inside initApp — the SyncManager's
+  // _initialized re-entrancy guard is what prevents duplicate forcePulls.
+  // Keep that invariant in mind if you ever touch either call site.
   const initializeSyncAfterLogin = async () => {
     if (!isSupabaseConfigured()) return;
 

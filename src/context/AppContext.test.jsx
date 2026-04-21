@@ -54,6 +54,7 @@ const Probe = () => {
   return (
     <div>
       <span data-testid="initial-syncing">{String(ctx.initialSyncing)}</span>
+      <span data-testid="toast-msg">{ctx.toast?.message || ''}</span>
       <button
         onClick={() => ctx.login('user', 'pass', false)}
         data-testid="login-btn"
@@ -141,5 +142,61 @@ describe('AppContext — initial sync on first login', () => {
     // initialize() is still called (fire-and-forget) so sync infrastructure
     // — realtime subs, periodic sync — still spins up for returning users.
     expect(supabaseSyncManager.initialize).toHaveBeenCalled();
+  });
+
+  it('hides the loader and shows a warning toast after the 15s timeout', async () => {
+    vi.useFakeTimers();
+
+    try {
+      supabaseSyncManager.isLocalDataEmpty.mockResolvedValue(true);
+      supabaseSyncManager.initialize.mockImplementation(
+        () => new Promise(() => { /* never resolves */ })
+      );
+      authService.signInWithUsername.mockResolvedValue({
+        user: { _id: 'u1', role: 'Owner', businessId: 'biz1' },
+      });
+
+      render(
+        <AppProvider>
+          <Probe />
+        </AppProvider>
+      );
+
+      // Drain initApp() — flush all pending timers + microtasks.
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // initApp() should have completed; initialSyncing starts false.
+      expect(screen.getByTestId('initial-syncing').textContent).toBe('false');
+
+      // Kick off login (do NOT await — we want to observe the in-flight state).
+      act(() => {
+        screen.getByTestId('login-btn').click();
+      });
+
+      // Drain microtasks so isLocalDataEmpty resolves and setInitialSyncing fires.
+      await act(async () => {
+        // Multiple flushes to let the async chain progress:
+        // login → signInWithUsername resolves → initializeSyncAfterLogin called
+        // → isLocalDataEmpty resolves → setInitialSyncing(true)
+        for (let i = 0; i < 10; i++) {
+          await Promise.resolve();
+        }
+      });
+
+      expect(screen.getByTestId('initial-syncing').textContent).toBe('true');
+
+      // Fire the 15s timeout.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15001);
+      });
+
+      // After the timeout the catch block runs setInitialSyncing(false) + showToast.
+      expect(screen.getByTestId('initial-syncing').textContent).toBe('false');
+      expect(screen.getByTestId('toast-msg').textContent).toMatch(/pull to refresh/i);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

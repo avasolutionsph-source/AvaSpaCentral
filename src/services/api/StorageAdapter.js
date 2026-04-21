@@ -1766,7 +1766,7 @@ export const shiftSchedulesAdapter = {
             .select('value')
             .eq('business_id', businessId)
             .eq('key', 'shiftConfig')
-            .single();
+            .maybeSingle();
 
           if (!error && data?.value) {
             savedConfig = data.value;

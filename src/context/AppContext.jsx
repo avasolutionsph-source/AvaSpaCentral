@@ -116,6 +116,7 @@ export const AppProvider = ({ children }) => {
   const [toast, setToast] = useState(null);
   const [syncStatus, setSyncStatus] = useState({ isOnline: false, isSyncing: false });
   const [selectedBranch, setSelectedBranch] = useState(null); // { id, name, slug, ... } or null
+  const [initialSyncing, setInitialSyncing] = useState(false);
 
   // Initialize app - check for existing session
   // Load and apply branding (color theme) from Supabase
@@ -281,6 +282,61 @@ export const AppProvider = ({ children }) => {
     }, 4000);
   };
 
+  // Initialize the Supabase sync manager after a user is signed in.
+  // Two paths:
+  //   1. Dexie already has data (returning user) → fire-and-forget initialize.
+  //      Login navigation proceeds immediately.
+  //   2. Dexie is empty (first login on a fresh browser / incognito / device /
+  //      account) → await initialize behind a full-screen loader, with a 15s
+  //      timeout so a supabase-js hang (see project_supabase_hang memory)
+  //      can't strand the user.
+  // Exactly one call to supabaseSyncManager.initialize() happens per login —
+  // concurrent calls would trigger duplicate forcePulls.
+  const initializeSyncAfterLogin = async () => {
+    if (!isSupabaseConfigured()) return;
+
+    let isEmpty = false;
+    try {
+      isEmpty = await supabaseSyncManager.isLocalDataEmpty();
+    } catch (e) {
+      console.warn('[AppContext] isLocalDataEmpty check failed:', e);
+      // Fall through to fire-and-forget path on the cautious assumption the
+      // DB has data (we'd rather skip the loader than hang on a false empty).
+      isEmpty = false;
+    }
+
+    if (!isEmpty) {
+      // Returning user: background init, no UI block.
+      supabaseSyncManager.initialize().catch(err => {
+        console.warn('[AppContext] Sync manager init error:', err);
+      });
+      return;
+    }
+
+    // First login: block on initial pull behind the loader.
+    setInitialSyncing(true);
+    try {
+      const timeoutMs = 15000;
+      await Promise.race([
+        supabaseSyncManager.initialize(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('initial-sync-timeout')), timeoutMs)
+        ),
+      ]);
+    } catch (err) {
+      if (err?.message === 'initial-sync-timeout') {
+        showToast(
+          'Some data may still be loading — pull to refresh if needed.',
+          'warning'
+        );
+      } else {
+        console.warn('[AppContext] Initial sync error:', err);
+      }
+    } finally {
+      setInitialSyncing(false);
+    }
+  };
+
   const login = async (username, password, rememberMe) => {
     try {
       // Use Supabase auth service with username-based login
@@ -297,13 +353,11 @@ export const AppProvider = ({ children }) => {
 
       showToast('Login successful!', 'success');
 
-      // Initialize sync manager after login (non-blocking)
-      // This runs in background so login doesn't freeze while syncing
-      if (isSupabaseConfigured()) {
-        supabaseSyncManager.initialize().catch(err => {
-          console.warn('[AppContext] Sync manager initialization error:', err);
-        });
-      }
+      // Initialize sync after login. This is awaited so first-login (empty
+      // Dexie) blocks behind the loader before login() returns; returning
+      // users resolve near-instantly because the helper uses fire-and-forget
+      // on that path.
+      await initializeSyncAfterLogin();
 
       return response;
     } catch (error) {
@@ -521,6 +575,7 @@ export const AppProvider = ({ children }) => {
     user,
     setUser,
     loading,
+    initialSyncing,
     toast,
     showToast,
     login,

@@ -11,7 +11,7 @@ import db from '../db';
 import BranchesTab from './BranchesTab';
 import { authService } from '../services/supabase';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
-import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, upsertSettings, applyColorTheme } from '../services/brandingService';
+import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, upsertSettings, applyColorTheme, getSettingsByKeys } from '../services/brandingService';
 import { HERO_FONTS } from '../pages/BookingPage';
 
 const derivePayrollLogChanges = (log) => {
@@ -724,47 +724,47 @@ const Settings = () => {
         // settings table. Running this every load (not just on fresh devices)
         // keeps the admin UI in sync when another device updated settings.
         // Local cache still drives instant paint via Phase 1.
+        //
+        // Uses getSettingsByKeys (raw REST) instead of the supabase-js client
+        // so this read can't hang behind the client's stuck auth queue —
+        // which was making the Branding tab spin for 10s+ on first load.
         try {
-          const { supabase } = await import('../services/supabase/supabaseClient');
-          if (supabase) {
-            const { data: rows, error } = await supabase
-              .from('settings')
-              .select('key, value')
-              .eq('business_id', user.businessId)
-              .in('key', ['heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation','heroFontSize','heroAnimDelay','heroAnimDuration','heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize','heroLogoAnimation','heroLogoAnimDelay','heroLogoAnimDuration','footerLine1','footerLine2','footerLine3','footerLine4','footerFont','footerFontSize']);
-            if (cancelled) return;
-            if (error) {
-              console.error('[Branding] Phase 3 settings query failed:', error);
-            } else if (rows && rows.length > 0) {
-              const s = {};
-              rows.forEach(r => { s[r.key] = r.value; });
-              setBrandingSettings(prev => ({
-                ...prev,
-                ...(s.heroFont && { heroFont: s.heroFont }),
-                ...(s.heroFontColor && { heroFontColor: s.heroFontColor }),
-                ...(s.heroTextX && { heroTextX: parseInt(s.heroTextX) }),
-                ...(s.heroTextY && { heroTextY: parseInt(s.heroTextY) }),
-                ...(s.heroAnimation && { heroAnimation: s.heroAnimation }),
-                ...(s.heroFontSize && { heroFontSize: s.heroFontSize }),
-                ...(s.heroAnimDelay && { heroAnimDelay: s.heroAnimDelay }),
-                ...(s.heroAnimDuration && { heroAnimDuration: s.heroAnimDuration }),
-                ...(s.heroLogoEnabled != null && { heroLogoEnabled: s.heroLogoEnabled === 'true' }),
-                ...(s.heroLogoX && { heroLogoX: parseInt(s.heroLogoX) }),
-                ...(s.heroLogoY && { heroLogoY: parseInt(s.heroLogoY) }),
-                ...(s.heroLogoSize && { heroLogoSize: parseInt(s.heroLogoSize) }),
-                ...(s.heroLogoAnimation && { heroLogoAnimation: s.heroLogoAnimation }),
-                ...(s.heroLogoAnimDelay && { heroLogoAnimDelay: s.heroLogoAnimDelay }),
-                ...(s.heroLogoAnimDuration && { heroLogoAnimDuration: s.heroLogoAnimDuration }),
-                ...(s.footerLine1 != null && { footerLine1: s.footerLine1 }),
-                ...(s.footerLine2 != null && { footerLine2: s.footerLine2 }),
-                ...(s.footerLine3 != null && { footerLine3: s.footerLine3 }),
-                ...(s.footerLine4 != null && { footerLine4: s.footerLine4 }),
-                ...(s.footerFont && { footerFont: s.footerFont }),
-                ...(s.footerFontSize && { footerFontSize: s.footerFontSize }),
-              }));
-              for (const r of rows) {
-                await SettingsRepository.set(r.key, r.value).catch(() => {});
-              }
+          const s = await getSettingsByKeys(user.businessId, [
+            'heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation',
+            'heroFontSize','heroAnimDelay','heroAnimDuration',
+            'heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize',
+            'heroLogoAnimation','heroLogoAnimDelay','heroLogoAnimDuration',
+            'footerLine1','footerLine2','footerLine3','footerLine4',
+            'footerFont','footerFontSize',
+          ]);
+          if (cancelled) return;
+          if (Object.keys(s).length > 0) {
+            setBrandingSettings(prev => ({
+              ...prev,
+              ...(s.heroFont && { heroFont: s.heroFont }),
+              ...(s.heroFontColor && { heroFontColor: s.heroFontColor }),
+              ...(s.heroTextX && { heroTextX: parseInt(s.heroTextX) }),
+              ...(s.heroTextY && { heroTextY: parseInt(s.heroTextY) }),
+              ...(s.heroAnimation && { heroAnimation: s.heroAnimation }),
+              ...(s.heroFontSize && { heroFontSize: s.heroFontSize }),
+              ...(s.heroAnimDelay && { heroAnimDelay: s.heroAnimDelay }),
+              ...(s.heroAnimDuration && { heroAnimDuration: s.heroAnimDuration }),
+              ...(s.heroLogoEnabled != null && { heroLogoEnabled: s.heroLogoEnabled === 'true' }),
+              ...(s.heroLogoX && { heroLogoX: parseInt(s.heroLogoX) }),
+              ...(s.heroLogoY && { heroLogoY: parseInt(s.heroLogoY) }),
+              ...(s.heroLogoSize && { heroLogoSize: parseInt(s.heroLogoSize) }),
+              ...(s.heroLogoAnimation && { heroLogoAnimation: s.heroLogoAnimation }),
+              ...(s.heroLogoAnimDelay && { heroLogoAnimDelay: s.heroLogoAnimDelay }),
+              ...(s.heroLogoAnimDuration && { heroLogoAnimDuration: s.heroLogoAnimDuration }),
+              ...(s.footerLine1 != null && { footerLine1: s.footerLine1 }),
+              ...(s.footerLine2 != null && { footerLine2: s.footerLine2 }),
+              ...(s.footerLine3 != null && { footerLine3: s.footerLine3 }),
+              ...(s.footerLine4 != null && { footerLine4: s.footerLine4 }),
+              ...(s.footerFont && { footerFont: s.footerFont }),
+              ...(s.footerFontSize && { footerFontSize: s.footerFontSize }),
+            }));
+            for (const [key, value] of Object.entries(s)) {
+              await SettingsRepository.set(key, value).catch(() => {});
             }
           }
         } catch (e) {

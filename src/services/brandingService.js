@@ -205,6 +205,53 @@ export async function saveBrandingSettings(businessId, { logoUrl, coverPhotoUrl,
 }
 
 /**
+ * Read a set of key/value rows from the `settings` table for a business via
+ * direct REST. Same reasoning as the other raw-fetch helpers in this file:
+ * supabase-js reads queue behind a stuck auth refresh and can freeze for 10s+.
+ *
+ * Returns an object mapping each present key to its value. Missing keys are
+ * simply absent from the result (no throw). Keys that don't exist in the
+ * table resolve to undefined on the consumer side.
+ *
+ * @param {string} businessId
+ * @param {string[]} keys - list of setting keys to fetch
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function getSettingsByKeys(businessId, keys) {
+  const empty = {};
+  if (!businessId || !SUPABASE_URL || !SUPABASE_ANON_KEY || !keys?.length) return empty;
+
+  const accessToken = getAccessTokenSync();
+  const keyList = keys.map(encodeURIComponent).join(',');
+
+  try {
+    const res = await fetchWithTimeout(
+      `${SUPABASE_URL}/rest/v1/settings?business_id=eq.${businessId}&key=in.(${keyList})&select=key,value`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+      12000,
+    );
+
+    if (!res.ok) {
+      console.error('[brandingService] getSettingsByKeys failed:', res.status, await res.text().catch(() => ''));
+      return empty;
+    }
+
+    const rows = await res.json();
+    const out = {};
+    for (const r of rows) out[r.key] = r.value;
+    return out;
+  } catch (err) {
+    console.error('[brandingService] getSettingsByKeys threw:', err);
+    return empty;
+  }
+}
+
+/**
  * Upsert multiple key/value rows into the settings table for a business.
  * Uses direct REST for the same reason as saveBrandingSettings.
  *

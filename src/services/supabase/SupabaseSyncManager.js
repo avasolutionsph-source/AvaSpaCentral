@@ -962,6 +962,14 @@ class SupabaseSyncManager {
   }
 
   /**
+   * Public wrapper for local-data-empty check. Used by AppContext to decide
+   * whether to show the initial-sync loader on first login.
+   */
+  async isLocalDataEmpty() {
+    return this._isLocalDataEmpty();
+  }
+
+  /**
    * Check if local data tables are empty (indicating logout cleanup occurred)
    * Used to determine if we need to force pull from Supabase
    */

@@ -315,13 +315,17 @@ export const AppProvider = ({ children }) => {
 
     // First login: block on initial pull behind the loader.
     setInitialSyncing(true);
+    let timeoutHandle;
     try {
       const timeoutMs = 15000;
       await Promise.race([
         supabaseSyncManager.initialize(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('initial-sync-timeout')), timeoutMs)
-        ),
+        new Promise((_, reject) => {
+          timeoutHandle = setTimeout(
+            () => reject(new Error('initial-sync-timeout')),
+            timeoutMs
+          );
+        }),
       ]);
     } catch (err) {
       if (err?.message === 'initial-sync-timeout') {
@@ -333,6 +337,7 @@ export const AppProvider = ({ children }) => {
         console.warn('[AppContext] Initial sync error:', err);
       }
     } finally {
+      clearTimeout(timeoutHandle);
       setInitialSyncing(false);
     }
   };

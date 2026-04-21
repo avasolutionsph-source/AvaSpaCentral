@@ -1,18 +1,72 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, ALL_BRANCHES } from '../context/AppContext';
 import mockApi from '../mockApi';
 import OfflineIndicator from './OfflineIndicator';
 import { formatTime12Hour } from '../utils/dateUtils';
 
 const MainLayout = () => {
-  const { user, logout, hasPermission, selectedBranch, clearBranch, canSeeAllBranches } = useApp();
+  const { user, logout, hasPermission, selectedBranch, selectBranch, canSeeAllBranches } = useApp();
   // Branch Owner and Manager are locked to a single branch — they shouldn't
   // see a switch affordance that would clear their branch and send them to
   // the picker.
   const canSwitchBranch = canSeeAllBranches?.() ?? true;
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Inline branch switcher — renders a dropdown of branches anchored under the
+  // sidebar brand header. Replaces the old "clear + navigate to /select-branch"
+  // flow because that path redirects through RequireBranch, which silently
+  // reselects the first branch and never shows the picker for the Owner.
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [branchOptionsLoading, setBranchOptionsLoading] = useState(false);
+  const branchMenuRef = React.useRef(null);
+
+  useEffect(() => {
+    if (!branchMenuOpen || !canSwitchBranch || !user?.businessId) return;
+    let cancelled = false;
+    const loadBranches = async () => {
+      try {
+        setBranchOptionsLoading(true);
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order.asc,name.asc`,
+          { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setBranchOptions(data || []);
+      } catch (err) {
+        console.warn('[MainLayout] Branch menu load failed:', err);
+      } finally {
+        if (!cancelled) setBranchOptionsLoading(false);
+      }
+    };
+    loadBranches();
+    return () => { cancelled = true; };
+  }, [branchMenuOpen, canSwitchBranch, user?.businessId]);
+
+  // Close the dropdown when clicking anywhere outside it.
+  useEffect(() => {
+    if (!branchMenuOpen) return;
+    const handleClick = (e) => {
+      if (branchMenuRef.current && !branchMenuRef.current.contains(e.target)) {
+        setBranchMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [branchMenuOpen]);
+
+  const handlePickBranch = (branch) => {
+    setBranchMenuOpen(false);
+    if (!branch) return;
+    if (selectedBranch?._allBranches && branch._allBranches) return;
+    if (selectedBranch?.id === branch.id) return;
+    selectBranch(branch);
+  };
 
   // Check if we're on mobile/tablet
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
@@ -637,17 +691,19 @@ const MainLayout = () => {
         aria-label="Main navigation"
       >
         <div className="sidebar-header">
-          <div className="brand">
+          <div className="brand" ref={branchMenuRef} style={{ position: 'relative' }}>
             <span className="brand-text">Daet Massage & Spa</span>
             {sidebarOpen && selectedBranch && (
               canSwitchBranch ? (
                 <button
                   className="branch-indicator"
-                  onClick={() => { clearBranch(); navigate('/select-branch'); }}
+                  onClick={() => setBranchMenuOpen(o => !o)}
                   title="Switch branch"
+                  aria-haspopup="listbox"
+                  aria-expanded={branchMenuOpen}
                 >
                   <span className="branch-indicator-name">{selectedBranch.name}</span>
-                  <span className="branch-indicator-switch">Switch</span>
+                  <span className="branch-indicator-switch">{branchMenuOpen ? '▴' : 'Switch'}</span>
                 </button>
               ) : (
                 <div className="branch-indicator" title={selectedBranch.name} style={{ cursor: 'default' }}>
@@ -659,8 +715,10 @@ const MainLayout = () => {
               canSwitchBranch ? (
                 <button
                   className="branch-indicator-collapsed"
-                  onClick={() => { clearBranch(); navigate('/select-branch'); }}
+                  onClick={() => setBranchMenuOpen(o => !o)}
                   title={`${selectedBranch.name} - Click to switch`}
+                  aria-haspopup="listbox"
+                  aria-expanded={branchMenuOpen}
                 >
                   {selectedBranch.name?.charAt(0)}
                 </button>
@@ -669,6 +727,74 @@ const MainLayout = () => {
                   {selectedBranch.name?.charAt(0)}
                 </div>
               )
+            )}
+            {canSwitchBranch && branchMenuOpen && (
+              <div
+                role="listbox"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '0.5rem',
+                  right: '0.5rem',
+                  marginTop: '0.25rem',
+                  background: '#ffffff',
+                  color: '#1f2937',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                  zIndex: 1000,
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  padding: '0.25rem 0',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {canSeeAllBranches() && (
+                  <button
+                    role="option"
+                    aria-selected={!!selectedBranch?._allBranches}
+                    onClick={() => handlePickBranch(ALL_BRANCHES)}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      textAlign: 'left',
+                      background: selectedBranch?._allBranches ? '#fef2f2' : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: selectedBranch?._allBranches ? 600 : 400,
+                    }}
+                  >
+                    All Branches
+                  </button>
+                )}
+                {branchOptionsLoading && (
+                  <div style={{ padding: '0.5rem 0.75rem', color: '#6b7280' }}>Loading…</div>
+                )}
+                {!branchOptionsLoading && branchOptions.map(b => (
+                  <button
+                    key={b.id}
+                    role="option"
+                    aria-selected={selectedBranch?.id === b.id}
+                    onClick={() => handlePickBranch(b)}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      textAlign: 'left',
+                      background: selectedBranch?.id === b.id ? '#fef2f2' : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: selectedBranch?.id === b.id ? 600 : 400,
+                    }}
+                  >
+                    {b.name}
+                  </button>
+                ))}
+                {!branchOptionsLoading && branchOptions.length === 0 && !canSeeAllBranches() && (
+                  <div style={{ padding: '0.5rem 0.75rem', color: '#6b7280' }}>No branches found</div>
+                )}
+              </div>
             )}
           </div>
           <button

@@ -970,6 +970,7 @@ html {
   font-weight: 500;
   text-decoration: none;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .login-btn {
@@ -2299,13 +2300,20 @@ html {
 
 @media (max-width: 768px) {
   .booking-topbar {
-    padding: 0.4rem 1rem;
+    padding: 0.35rem 0.9rem;
     top: 8px;
-    max-width: 95%;
+    max-width: calc(100% - 16px);
+  }
+
+  .booking-topbar-content {
+    gap: 0.75rem;
   }
 
   .booking-topbar-name {
     font-size: 0.85rem;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .booking-hero {
@@ -2348,13 +2356,22 @@ html {
   }
 
   .customer-auth-buttons {
-    width: 100%;
-    justify-content: center;
+    width: auto;
+    justify-content: flex-end;
+    gap: 0.4rem;
   }
 
   .auth-btn {
-    padding: 0.4rem 0.875rem;
+    padding: 0.35rem 0.75rem;
     font-size: 0.8rem;
+  }
+
+  .booking-topbar .auth-btn.login-btn {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .booking-topbar .auth-btn.register-btn {
+    padding: 0.35rem 0.85rem;
   }
 
   .customer-logged-in {

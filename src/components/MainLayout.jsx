@@ -6,7 +6,7 @@ import OfflineIndicator from './OfflineIndicator';
 import { formatTime12Hour } from '../utils/dateUtils';
 
 const MainLayout = () => {
-  const { user, logout, hasPermission, selectedBranch, selectBranch, canSeeAllBranches } = useApp();
+  const { user, logout, hasPermission, selectedBranch, selectBranch, canSeeAllBranches, getEffectiveBranchId } = useApp();
   // Branch Owner and Manager are locked to a single branch — they shouldn't
   // see a switch affordance that would clear their branch and send them to
   // the picker.
@@ -259,8 +259,18 @@ const MainLayout = () => {
         // 3. ATTENDANCE & HR ALERTS
         // ===========================================
         try {
-          const attendance = await mockApi.attendance.getAttendance();
-          const employees = await mockApi.employees.getEmployees();
+          const attendanceAll = await mockApi.attendance.getAttendance();
+          const employeesAll = await mockApi.employees.getEmployees();
+
+          // Scope to active branch so the panel mirrors the Attendance page.
+          // null = All Branches sentinel → no filter.
+          const effectiveBranchId = getEffectiveBranchId();
+          const attendance = effectiveBranchId
+            ? attendanceAll.filter(a => a.branchId === effectiveBranchId)
+            : attendanceAll;
+          const employees = effectiveBranchId
+            ? employeesAll.filter(e => e.branchId === effectiveBranchId)
+            : employeesAll;
 
           // Late arrivals today - use stored status from attendance record
           const lateArrivals = attendance.filter(a => {
@@ -529,7 +539,9 @@ const MainLayout = () => {
     // Check every 5 minutes
     const interval = setInterval(checkNotifications, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+    // Re-run when the user switches branch so attendance counts re-scope
+    // (mirrors the Attendance page's effectiveBranchId filter).
+  }, [selectedBranch?.id, selectedBranch?._allBranches, user?.role, user?.branchId]);
 
   // Close notification dropdown when clicking outside
   useEffect(() => {

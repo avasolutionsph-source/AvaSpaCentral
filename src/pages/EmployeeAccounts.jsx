@@ -336,6 +336,17 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     }
   }, [showModal, hasSingleBranch]);
 
+  // Owners can assign any branch. Branch-scoped roles (Branch Owner /
+  // Manager) get locked to the branch they're signed into — they should
+  // see the other branches in the dropdown but can't pick them. The
+  // assigned branch auto-fills with their own branch on open.
+  const lockedBranchId = !isOwner() ? getEffectiveBranchId() : null;
+  useEffect(() => {
+    if (showModal && lockedBranchId && formData.branchId !== lockedBranchId) {
+      setFieldValue('branchId', lockedBranchId);
+    }
+  }, [showModal, lockedBranchId]);
+
   // Wrap confirmDelete to also delete from Supabase (profile + auth)
   const handleConfirmDelete = async () => {
     const item = deleteConfirm.item;
@@ -971,14 +982,23 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
                     className={`form-control ${formErrors.branchId ? 'error' : ''}`}
                     required
                   >
-                    <option value="">Select a branch...</option>
+                    {!lockedBranchId && <option value="">Select a branch...</option>}
                     {activeBranches.map(branch => (
-                      <option key={branch.id} value={branch.id}>
+                      <option
+                        key={branch.id}
+                        value={branch.id}
+                        disabled={!!lockedBranchId && branch.id !== lockedBranchId}
+                      >
                         {branch.name} {branch.city ? `(${branch.city})` : ''}
+                        {!!lockedBranchId && branch.id !== lockedBranchId ? ' — locked to your branch' : ''}
                       </option>
                     ))}
                   </select>
-                  <small className="form-hint">{activeBranches.length} branches available</small>
+                  <small className="form-hint">
+                    {lockedBranchId
+                      ? 'Locked to your assigned branch — only Owners can assign across branches.'
+                      : `${activeBranches.length} branches available`}
+                  </small>
                 </>
               ) : hasSingleBranch ? (
                 <div className="branch-auto-selected">

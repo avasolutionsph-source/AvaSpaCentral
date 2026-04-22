@@ -69,7 +69,7 @@ const uploadProductImage = async (file, businessId, productName) => {
 };
 
 const Products = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderRef }) => {
-  const { user, showToast, canEdit, canEditProducts, isBranchOwner, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { user, showToast, canEdit, canEditProducts, getEffectiveBranchId } = useApp();
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -172,8 +172,11 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrd
       itemsUsed: data.type === 'service' ? data.itemsUsed : [],
       hideFromPOS: data.hideFromPOS || false,
       imageUrl: data.imageUrl || undefined,
-      // Auto-assign branchId when Branch Owner creates a product
-      branchId: isBranchOwner() ? getUserBranchId() : undefined
+      // Capture the active branch for any role (locked roles → their assigned
+      // branch; Owner → dropdown selection). Without this an Owner working
+      // inside a branch would create products with branchId=undefined and the
+      // strict branch filter below would hide them from the list.
+      branchId: getEffectiveBranchId() || undefined
     }),
     validateForm: validateProduct,
     onSuccess: () => {

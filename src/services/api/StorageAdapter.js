@@ -1063,9 +1063,17 @@ export const purchaseOrdersAdapter = {
     // omit it.
     const today = new Date();
     const orderDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    // Pre-compute totalAmount so the list/details renders don't have to guard
+    // against undefined (.toLocaleString() crashed the whole tab before).
+    const items = Array.isArray(data.items) ? data.items : [];
+    const totalAmount = items.reduce(
+      (sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0),
+      0
+    );
     const order = await storageService.purchaseOrders.createWithNumber({
       businessId: getRequiredBusinessId(),
       orderDate,
+      totalAmount,
       ...data
     });
     return { success: true, purchaseOrder: clone(order) };
@@ -1073,7 +1081,15 @@ export const purchaseOrdersAdapter = {
 
   async updatePurchaseOrder(id, data) {
     await delay();
-    const order = await storageService.purchaseOrders.update(id, data);
+    // Recompute totalAmount when items change so the list stays consistent.
+    const updates = { ...data };
+    if (Array.isArray(data.items)) {
+      updates.totalAmount = data.items.reduce(
+        (sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0),
+        0
+      );
+    }
+    const order = await storageService.purchaseOrders.update(id, updates);
     if (!order) throw new Error('Purchase order not found');
     return { success: true, purchaseOrder: clone(order) };
   },

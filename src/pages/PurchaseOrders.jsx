@@ -504,7 +504,7 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
                     <span className="item-count">{order.items.length} items</span>
                   </td>
                   <td>
-                    <span className="order-total">₱{order.totalAmount.toLocaleString()}</span>
+                    <span className="order-total">₱{(order.totalAmount || 0).toLocaleString()}</span>
                   </td>
                   <td>
                     <span className={`status-badge ${getStatusColor(order.status)}`}>
@@ -747,15 +747,15 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
                       <tr key={index}>
                         <td>{item.productName}</td>
                         <td>{item.quantity}</td>
-                        <td>₱{item.unitPrice.toLocaleString()}</td>
-                        <td>₱{(item.quantity * item.unitPrice).toLocaleString()}</td>
+                        <td>₱{(item.unitPrice || 0).toLocaleString()}</td>
+                        <td>₱{((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr>
                       <td colSpan="3"><strong>Total</strong></td>
-                      <td><strong>₱{detailsOrder.totalAmount.toLocaleString()}</strong></td>
+                      <td><strong>₱{(detailsOrder.totalAmount || 0).toLocaleString()}</strong></td>
                     </tr>
                   </tfoot>
                 </table>

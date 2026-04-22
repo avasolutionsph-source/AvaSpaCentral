@@ -16,6 +16,7 @@ CREATE POLICY "Public can view hero settings" ON settings
     USING (key IN (
         'heroFont', 'heroFontColor', 'heroTextX', 'heroTextY',
         'heroAnimation', 'heroFontSize', 'heroAnimDelay', 'heroAnimDuration',
+        'heroTextEnabled',
         'heroLogoEnabled', 'heroLogoX', 'heroLogoY', 'heroLogoSize',
         'heroLogoAnimation', 'heroLogoAnimDelay', 'heroLogoAnimDuration',
         'footerLine1', 'footerLine2', 'footerLine3', 'footerLine4',

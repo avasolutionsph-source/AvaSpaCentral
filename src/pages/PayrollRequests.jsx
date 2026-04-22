@@ -3,6 +3,20 @@ import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
 import mockApi from '../mockApi';
 
+// Safely format an ISO date string. parseISO throws on undefined/null/empty
+// (it calls .split on its argument), which was crashing the whole page when
+// a payroll record came back with a missing date field.
+const fmtDate = (value, pattern, fallback = '—') => {
+  if (!value || typeof value !== 'string') return fallback;
+  try {
+    const d = parseISO(value);
+    if (isNaN(d.getTime())) return fallback;
+    return format(d, pattern);
+  } catch {
+    return fallback;
+  }
+};
+
 const PayrollRequests = ({ embedded = false, onDataChange, onOpenSubmitRef }) => {
   const { showToast, user } = useApp();
   const [payrollHistory, setPayrollHistory] = useState([]);
@@ -88,7 +102,7 @@ PAY SLIP
 
 Employee: ${user?.firstName} ${user?.lastName}
 Period: ${payroll.period}
-Pay Date: ${format(parseISO(payroll.payDate), 'MMMM dd, yyyy')}
+Pay Date: ${fmtDate(payroll.payDate, 'MMMM dd, yyyy')}
 
 EARNINGS:
 Regular Pay (${payroll.regularHours}h):        ₱${payroll.regularPay.toFixed(2)}
@@ -295,7 +309,7 @@ Generated: ${format(new Date(), 'yyyy-MM-dd h:mm:ss a')}
             <tbody>
               {payrollRequests.map(request => (
                 <tr key={request._id}>
-                  <td>{format(parseISO(request.createdAt), 'MMM dd, yyyy')}</td>
+                  <td>{fmtDate(request.createdAt, 'MMM dd, yyyy')}</td>
                   <td style={{ textTransform: 'capitalize' }}>{request.type}</td>
                   <td>
                     <div>{request.subject}</div>
@@ -363,11 +377,11 @@ Generated: ${format(new Date(), 'yyyy-MM-dd h:mm:ss a')}
                       <div className="payroll-period-cell">
                         <div className="payroll-period-label">{payroll.period}</div>
                         <div className="payroll-period-dates">
-                          {format(parseISO(payroll.startDate), 'MMM dd')} - {format(parseISO(payroll.endDate), 'MMM dd, yyyy')}
+                          {fmtDate(payroll.startDate, 'MMM dd')} - {fmtDate(payroll.endDate, 'MMM dd, yyyy')}
                         </div>
                       </div>
                     </td>
-                    <td>{format(parseISO(payroll.payDate), 'MMM dd, yyyy')}</td>
+                    <td>{fmtDate(payroll.payDate, 'MMM dd, yyyy')}</td>
                     <td className="number">
                       {payroll.regularHours + payroll.overtimeHours}h
                       {payroll.overtimeHours > 0 && (
@@ -447,7 +461,7 @@ Generated: ${format(new Date(), 'yyyy-MM-dd h:mm:ss a')}
                   <div className="breakdown-item">
                     <span className="breakdown-item-label">Pay Date:</span>
                     <span className="breakdown-item-value">
-                      {format(parseISO(selectedPayslip.payDate), 'MMMM dd, yyyy')}
+                      {fmtDate(selectedPayslip.payDate, 'MMMM dd, yyyy')}
                     </span>
                   </div>
                 </div>

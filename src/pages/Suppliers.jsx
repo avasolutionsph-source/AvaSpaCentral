@@ -19,7 +19,7 @@ import { supplierValidation, validateWithToast } from '../validation/schemas';
 
 const Suppliers = ({ embedded = false }) => {
   const navigate = useNavigate();
-  const { showToast, getEffectiveBranchId } = useApp();
+  const { showToast } = useApp();
 
   // Additional state for categories and filters
   const [categories, setCategories] = useState([]);
@@ -81,13 +81,7 @@ const Suppliers = ({ embedded = false }) => {
       category: supplier.category,
       paymentTerms: supplier.paymentTerms
     }),
-    transformForSubmit: (data, mode) => {
-      if (mode === 'create') {
-        const branchId = getEffectiveBranchId();
-        return { ...data, ...(branchId && { branchId }) };
-      }
-      return data;
-    },
+    transformForSubmit: (data) => data,
     validateForm: (data) => validateWithToast(supplierValidation, data, showToast)
   });
 
@@ -106,17 +100,12 @@ const Suppliers = ({ embedded = false }) => {
 
   // Filter suppliers
   const filteredSuppliers = useMemo(() => {
+    // Suppliers are business-scoped — the Supabase suppliers table has no
+    // branch_id column and the sync layer strips any locally-set branchId on
+    // push. Trying to narrow by branch here only created a stats↔list mismatch
+    // (and made newly-created suppliers vanish after the first sync round-trip
+    // overwrote their local branchId).
     let filtered = [...suppliers];
-
-    // Suppliers are business-scoped (the suppliers table has no branch_id
-    // column), so only narrow by branch when a record actually carries a
-    // branchId. Records without one are treated as shared across branches —
-    // otherwise every branch-scoped user would see an empty list even though
-    // the summary cards report suppliers exist.
-    const effectiveBranchId = getEffectiveBranchId();
-    if (effectiveBranchId) {
-      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
-    }
 
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();

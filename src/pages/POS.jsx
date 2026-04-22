@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
+import { ConfirmDialog, ManageOrder, EmptyState } from '../components/shared';
 import { getTherapists } from '../utils/employeeFilters';
-import { ConfirmDialog, ManageOrder } from '../components/shared';
 import { formatTimeRange, formatTime12Hour } from '../utils/dateUtils';
 import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
@@ -16,6 +17,7 @@ import storageService from '../services/storage';
 import '../assets/css/pos.css';
 
 const POS = () => {
+  const navigate = useNavigate();
   const { showToast, user, getEffectiveBranchId } = useApp();
 
   // Tab state for switching between POS and Gift Certificates
@@ -1148,9 +1150,15 @@ const POS = () => {
           {/* Products Grid */}
           <div className="pos-products-grid">
             {filteredProducts.length === 0 ? (
-              <div className="empty-state">
-                <p>No products found</p>
-              </div>
+              <EmptyState
+                icon="📦"
+                title="No products found"
+                description="Try adjusting your filters or search term"
+                action={{
+                  label: '+ Add Your First Product',
+                  onClick: () => navigate('/inventory-hub?tab=products')
+                }}
+              />
             ) : (
               filteredProducts.map(product => (
                 <div

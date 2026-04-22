@@ -3068,6 +3068,53 @@ const Settings = () => {
                   background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.55) 100%)',
                   pointerEvents: 'none',
                 }} />
+                {/* Center guides — highlight when the text is snapped to the
+                    horizontal or vertical midline, so owners can tell at a
+                    glance whether the hero text is centered. */}
+                {(brandingSettings.heroTextX ?? 50) === 50 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: '50%',
+                    width: '1px',
+                    background: 'repeating-linear-gradient(to bottom, rgba(255,153,51,0.95) 0 6px, transparent 6px 12px)',
+                    pointerEvents: 'none',
+                    zIndex: 3,
+                  }} />
+                )}
+                {(brandingSettings.heroTextY ?? 50) === 50 && (
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: '50%',
+                    height: '1px',
+                    background: 'repeating-linear-gradient(to right, rgba(255,153,51,0.95) 0 6px, transparent 6px 12px)',
+                    pointerEvents: 'none',
+                    zIndex: 3,
+                  }} />
+                )}
+                {(brandingSettings.heroTextX ?? 50) === 50 && (brandingSettings.heroTextY ?? 50) === 50 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(255,153,51,0.95)',
+                    color: '#1a1a1a',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.5px',
+                    padding: '3px 10px',
+                    borderRadius: '999px',
+                    pointerEvents: 'none',
+                    zIndex: 4,
+                    textTransform: 'uppercase',
+                  }}>
+                    Centered
+                  </div>
+                )}
                 {/* Animation keyframes are in settings.css */}
                 {/* Position wrapper (draggable) */}
                 <div
@@ -3087,9 +3134,13 @@ const Settings = () => {
                     const container = e.currentTarget.parentElement;
                     const rect = container.getBoundingClientRect();
                     const onMove = (ev) => {
-                      const x = Math.max(5, Math.min(95, ((ev.clientX - rect.left) / rect.width) * 100));
-                      const y = Math.max(5, Math.min(95, ((ev.clientY - rect.top) / rect.height) * 100));
-                      setBrandingSettings(prev => ({ ...prev, heroTextX: Math.round(x), heroTextY: Math.round(y) }));
+                      const rawX = Math.max(5, Math.min(95, ((ev.clientX - rect.left) / rect.width) * 100));
+                      const rawY = Math.max(5, Math.min(95, ((ev.clientY - rect.top) / rect.height) * 100));
+                      // Snap to horizontal/vertical center when within 2% — gives
+                      // a tactile "click" onto 50/50 without trapping the drag.
+                      const x = Math.abs(rawX - 50) <= 2 ? 50 : Math.round(rawX);
+                      const y = Math.abs(rawY - 50) <= 2 ? 50 : Math.round(rawY);
+                      setBrandingSettings(prev => ({ ...prev, heroTextX: x, heroTextY: y }));
                     };
                     const onUp = () => {
                       document.removeEventListener('mousemove', onMove);
@@ -3103,9 +3154,11 @@ const Settings = () => {
                     const rect = container.getBoundingClientRect();
                     const onMove = (ev) => {
                       const touch = ev.touches[0];
-                      const x = Math.max(5, Math.min(95, ((touch.clientX - rect.left) / rect.width) * 100));
-                      const y = Math.max(5, Math.min(95, ((touch.clientY - rect.top) / rect.height) * 100));
-                      setBrandingSettings(prev => ({ ...prev, heroTextX: Math.round(x), heroTextY: Math.round(y) }));
+                      const rawX = Math.max(5, Math.min(95, ((touch.clientX - rect.left) / rect.width) * 100));
+                      const rawY = Math.max(5, Math.min(95, ((touch.clientY - rect.top) / rect.height) * 100));
+                      const x = Math.abs(rawX - 50) <= 2 ? 50 : Math.round(rawX);
+                      const y = Math.abs(rawY - 50) <= 2 ? 50 : Math.round(rawY);
+                      setBrandingSettings(prev => ({ ...prev, heroTextX: x, heroTextY: y }));
                     };
                     const onEnd = () => {
                       document.removeEventListener('touchmove', onMove);

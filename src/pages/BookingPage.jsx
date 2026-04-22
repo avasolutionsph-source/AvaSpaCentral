@@ -1127,7 +1127,6 @@ const BookingPage = () => {
             {business?.logo_url && (
               <img src={business.logo_url} alt="" className="luxe-logo" />
             )}
-            <div className="luxe-brand">{business?.name || 'Loading'}</div>
             <div className="luxe-progress-track">
               <div className="luxe-progress-bar" />
             </div>

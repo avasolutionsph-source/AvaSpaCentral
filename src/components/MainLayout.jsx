@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useApp, ALL_BRANCHES } from '../context/AppContext';
 import mockApi from '../mockApi';
 import OfflineIndicator from './OfflineIndicator';
+import { useSyncStatus } from '../hooks';
 import { formatTime12Hour } from '../utils/dateUtils';
 
 const MainLayout = () => {
@@ -76,6 +77,60 @@ const MainLayout = () => {
   const [loggingOut, setLoggingOut] = useState(false);
   const notificationRef = React.useRef(null);
 
+  // Sync queue lives inside the bell so users have a single place to see
+  // every alert (replaces the old persistent "1 failed" toolbar).
+  const { isSyncing, pendingCount, failedCount, triggerSync, retryFailed, getQueueItems, deleteQueueItem } = useSyncStatus();
+  const [showQueueViewer, setShowQueueViewer] = useState(false);
+  const [queueItems, setQueueItems] = useState([]);
+  const [loadingQueue, setLoadingQueue] = useState(false);
+  const hasSyncAlert = pendingCount > 0 || failedCount > 0;
+  const bellBadgeCount = notifications.length + (hasSyncAlert ? 1 : 0);
+
+  const loadQueueItems = async () => {
+    setLoadingQueue(true);
+    try { setQueueItems(await getQueueItems()); }
+    catch (err) { console.error('Failed to load queue items:', err); }
+    setLoadingQueue(false);
+  };
+  const handleOpenQueueViewer = () => {
+    setShowNotifications(false);
+    setShowQueueViewer(true);
+    loadQueueItems();
+  };
+  const handleDeleteQueueItem = async (id) => {
+    await deleteQueueItem(id);
+    loadQueueItems();
+  };
+  const handleDeleteAllQueue = async () => {
+    for (const item of queueItems) await deleteQueueItem(item.id);
+    loadQueueItems();
+  };
+  const formatQueueDate = (dateStr) => {
+    if (!dateStr) return '-';
+    try {
+      return new Date(dateStr).toLocaleString('en-PH', {
+        month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    } catch { return dateStr; }
+  };
+  const renderQueueStatusBadge = (status) => {
+    const colors = {
+      pending: { bg: '#fff3cd', color: '#856404', border: '#ffc107' },
+      processing: { bg: '#cce5ff', color: '#004085', border: '#007bff' },
+      failed: { bg: '#f8d7da', color: '#721c24', border: '#dc3545' },
+    };
+    const s = colors[status] || colors.pending;
+    return (
+      <span style={{
+        padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
+        backgroundColor: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      }}>
+        {status}
+      </span>
+    );
+  };
+
   // Setup check — persistent banner for unconfigured settings
   const [setupIssues, setSetupIssues] = useState([]);
 
@@ -148,6 +203,13 @@ const MainLayout = () => {
         const today = new Date();
         const todayStr = today.toDateString();
 
+        // Active branch for the panel (null = All Branches sentinel → no filter).
+        // Branch-aware sections use this to mirror the corresponding feature
+        // page so a user on Test Branch never sees other branches' alerts.
+        const effectiveBranchId = getEffectiveBranchId();
+        const scopeByBranch = (items) =>
+          effectiveBranchId ? items.filter(x => x.branchId === effectiveBranchId) : items;
+
         // ===========================================
         // 1. INVENTORY ALERTS
         // ===========================================
@@ -217,7 +279,7 @@ const MainLayout = () => {
         // 2. APPOINTMENT ALERTS
         // ===========================================
         try {
-          const appointments = await mockApi.appointments.getAppointments();
+          const appointments = scopeByBranch(await mockApi.appointments.getAppointments());
 
           // Today's appointments
           const todayAppointments = appointments.filter(a =>
@@ -259,18 +321,8 @@ const MainLayout = () => {
         // 3. ATTENDANCE & HR ALERTS
         // ===========================================
         try {
-          const attendanceAll = await mockApi.attendance.getAttendance();
-          const employeesAll = await mockApi.employees.getEmployees();
-
-          // Scope to active branch so the panel mirrors the Attendance page.
-          // null = All Branches sentinel → no filter.
-          const effectiveBranchId = getEffectiveBranchId();
-          const attendance = effectiveBranchId
-            ? attendanceAll.filter(a => a.branchId === effectiveBranchId)
-            : attendanceAll;
-          const employees = effectiveBranchId
-            ? employeesAll.filter(e => e.branchId === effectiveBranchId)
-            : employeesAll;
+          const attendance = scopeByBranch(await mockApi.attendance.getAttendance());
+          const employees = scopeByBranch(await mockApi.employees.getEmployees());
 
           // Late arrivals today - use stored status from attendance record
           const lateArrivals = attendance.filter(a => {
@@ -323,7 +375,7 @@ const MainLayout = () => {
         // 4. PAYROLL ALERTS
         // ===========================================
         try {
-          const payrollRequests = await mockApi.payrollRequests.getRequests();
+          const payrollRequests = scopeByBranch(await mockApi.payrollRequests.getRequests());
 
           // Pending payroll requests
           const pendingRequests = payrollRequests.filter(r => r.status === 'pending');
@@ -347,29 +399,32 @@ const MainLayout = () => {
         // 5. PURCHASE ORDER ALERTS
         // ===========================================
         try {
-          const poSummary = await mockApi.purchaseOrders.getSummary();
+          // Pull raw POs and scope by branch so the panel matches the
+          // Purchase Orders page (which renders only the active branch).
+          const orders = scopeByBranch(await mockApi.purchaseOrders.getPurchaseOrders());
+          const pendingOrders = orders.filter(o => o.status === 'pending').length;
+          const approvedOrders = orders.filter(o => o.status === 'approved').length;
+          const pendingPayments = orders.filter(o => o.status === 'received' && !o.paid).length;
 
-          // Pending purchase orders
-          if (poSummary.pendingOrders > 0) {
+          if (pendingOrders > 0) {
             newNotifications.push({
               id: 'pending-po',
               type: 'info',
               title: 'Pending Purchase Orders',
-              message: `${poSummary.pendingOrders} PO${poSummary.pendingOrders > 1 ? 's' : ''} awaiting approval`,
-              details: [`Total pending: ${poSummary.pendingOrders}`, `Approved: ${poSummary.approvedOrders}`],
+              message: `${pendingOrders} PO${pendingOrders > 1 ? 's' : ''} awaiting approval`,
+              details: [`Total pending: ${pendingOrders}`, `Approved: ${approvedOrders}`],
               action: '/purchase-orders',
               actionLabel: 'View POs',
               time: new Date()
             });
           }
 
-          // Pending payments on received orders
-          if (poSummary.pendingPayments > 0) {
+          if (pendingPayments > 0) {
             newNotifications.push({
               id: 'pending-payments',
               type: 'warning',
               title: 'PO Payments Due',
-              message: `${poSummary.pendingPayments} order${poSummary.pendingPayments > 1 ? 's' : ''} with pending payment`,
+              message: `${pendingPayments} order${pendingPayments > 1 ? 's' : ''} with pending payment`,
               details: ['Orders received but unpaid'],
               action: '/purchase-orders',
               actionLabel: 'View Payments',
@@ -384,7 +439,7 @@ const MainLayout = () => {
         // 6. EXPENSE ALERTS
         // ===========================================
         try {
-          const expenses = await mockApi.expenses.getExpenses();
+          const expenses = scopeByBranch(await mockApi.expenses.getExpenses());
 
           // Pending expense approvals
           const pendingExpenses = expenses.filter(e => e.status === 'pending');
@@ -409,7 +464,9 @@ const MainLayout = () => {
         // 7. GIFT CERTIFICATE ALERTS
         // ===========================================
         try {
-          const giftCerts = await mockApi.giftCertificates.getGiftCertificates();
+          // GCs use strict branch matching (legacy null branchId is treated as
+          // out-of-scope) — mirrors the Gift Certificates page behavior.
+          const giftCerts = scopeByBranch(await mockApi.giftCertificates.getGiftCertificates());
 
           // Expiring gift certificates (within 30 days)
           const expiringCerts = giftCerts.filter(gc => {
@@ -438,7 +495,7 @@ const MainLayout = () => {
         // 8. ROOM AVAILABILITY ALERTS
         // ===========================================
         try {
-          const rooms = await mockApi.rooms.getRooms();
+          const rooms = scopeByBranch(await mockApi.rooms.getRooms());
 
           // Rooms under maintenance
           const maintenanceRooms = rooms.filter(r => r.status === 'maintenance');
@@ -479,9 +536,12 @@ const MainLayout = () => {
         // ===========================================
         try {
           const cashDrawer = await mockApi.cashDrawer.getCurrentDrawer();
+          // Suppress if the open drawer belongs to a different branch.
+          const drawerInScope = !cashDrawer || !effectiveBranchId
+            || !cashDrawer.branchId || cashDrawer.branchId === effectiveBranchId;
 
           // Cash drawer still open from previous day
-          if (cashDrawer && cashDrawer.status === 'open') {
+          if (drawerInScope && cashDrawer && cashDrawer.status === 'open') {
             const openedDate = new Date(cashDrawer.openedAt);
             if (openedDate.toDateString() !== todayStr) {
               newNotifications.push({
@@ -903,15 +963,15 @@ const MainLayout = () => {
               <button
                 className="notification-bell"
                 onClick={() => setShowNotifications(!showNotifications)}
-                aria-label={`Notifications ${notifications.length > 0 ? `(${notifications.length} new)` : ''}`}
+                aria-label={`Notifications ${bellBadgeCount > 0 ? `(${bellBadgeCount} new)` : ''}`}
                 aria-expanded={showNotifications}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                 </svg>
-                {notifications.length > 0 && (
-                  <span className="notification-badge">{notifications.length}</span>
+                {bellBadgeCount > 0 && (
+                  <span className="notification-badge">{bellBadgeCount}</span>
                 )}
               </button>
 
@@ -930,7 +990,40 @@ const MainLayout = () => {
                     )}
                   </div>
                   <div className="notification-list">
-                    {notifications.length === 0 ? (
+                    {/* Sync queue — pinned to top so failed/pending sync is visible
+                        alongside business alerts instead of as a separate toolbar. */}
+                    {hasSyncAlert && (
+                      <div className={`notification-item notification-${failedCount > 0 ? 'critical' : 'info'}`}>
+                        <div className="notification-icon">
+                          {isSyncing ? '⟳' : (failedCount > 0 ? '●' : '◆')}
+                        </div>
+                        <div className="notification-content">
+                          <div className="notification-title">Sync Queue</div>
+                          <div className="notification-message">
+                            {isSyncing
+                              ? 'Syncing changes…'
+                              : `${pendingCount} pending${failedCount > 0 ? `, ${failedCount} failed` : ''}`}
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                            {!isSyncing && pendingCount > 0 && (
+                              <button className="notification-action-btn" onClick={triggerSync}>
+                                Sync Now
+                              </button>
+                            )}
+                            {!isSyncing && failedCount > 0 && (
+                              <button className="notification-action-btn" onClick={retryFailed}>
+                                Retry Failed
+                              </button>
+                            )}
+                            <button className="notification-action-btn" onClick={handleOpenQueueViewer}>
+                              View Queue
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {notifications.length === 0 && !hasSyncAlert ? (
                       <div className="notification-empty">
                         <span className="empty-icon">✓</span>
                         <p>No new notifications</p>
@@ -977,6 +1070,135 @@ const MainLayout = () => {
                         </div>
                       ))
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Sync Queue Viewer Modal — moved from OfflineIndicator so the
+                  bell is the single entry point for sync diagnostics. */}
+              {showQueueViewer && (
+                <div style={{
+                  position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10000,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '20px',
+                }} onClick={(e) => { if (e.target === e.currentTarget) setShowQueueViewer(false); }}>
+                  <div style={{
+                    backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '800px',
+                    maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                  }}>
+                    <div style={{
+                      padding: '16px 20px', borderBottom: '1px solid #e5e7eb',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Sync Queue</h3>
+                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>
+                          {queueItems.length} item{queueItems.length !== 1 ? 's' : ''} in queue
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button onClick={loadQueueItems} disabled={loadingQueue} style={{
+                          padding: '6px 12px', borderRadius: '6px', border: '1px solid #d1d5db',
+                          background: '#fff', cursor: 'pointer', fontSize: '12px',
+                        }}>
+                          {loadingQueue ? 'Loading...' : 'Refresh'}
+                        </button>
+                        {queueItems.length > 0 && (
+                          <button onClick={handleDeleteAllQueue} style={{
+                            padding: '6px 12px', borderRadius: '6px', border: '1px solid #dc3545',
+                            background: '#fff', color: '#dc3545', cursor: 'pointer', fontSize: '12px',
+                          }}>
+                            Clear All
+                          </button>
+                        )}
+                        <button onClick={() => setShowQueueViewer(false)} style={{
+                          padding: '4px 8px', borderRadius: '6px', border: 'none',
+                          background: 'transparent', cursor: 'pointer', fontSize: '18px', color: '#6b7280',
+                        }}>
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }}>
+                      {loadingQueue ? (
+                        <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>Loading...</div>
+                      ) : queueItems.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                          <p style={{ fontSize: '14px' }}>Sync queue is empty</p>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {queueItems.map((item) => (
+                            <div key={item.id} style={{
+                              border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px',
+                              backgroundColor: item.status === 'failed' ? '#fef2f2' : '#fff',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{
+                                    padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
+                                    backgroundColor: '#f3f4f6', color: '#374151', fontFamily: 'monospace',
+                                  }}>
+                                    {item.entityType}
+                                  </span>
+                                  <span style={{
+                                    padding: '2px 6px', borderRadius: '4px', fontSize: '11px',
+                                    backgroundColor: item.operation === 'create' ? '#d1fae5' : item.operation === 'delete' ? '#fee2e2' : '#dbeafe',
+                                    color: item.operation === 'create' ? '#065f46' : item.operation === 'delete' ? '#991b1b' : '#1e40af',
+                                  }}>
+                                    {item.operation}
+                                  </span>
+                                  {renderQueueStatusBadge(item.status)}
+                                </div>
+                                <button onClick={() => handleDeleteQueueItem(item.id)} style={{
+                                  padding: '2px 8px', borderRadius: '4px', border: '1px solid #e5e7eb',
+                                  background: '#fff', cursor: 'pointer', fontSize: '11px', color: '#6b7280',
+                                  flexShrink: 0,
+                                }} title="Remove from queue">
+                                  ✕
+                                </button>
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+                                <span>ID: <code style={{ fontSize: '10px' }}>{item.entityId?.substring(0, 8)}...</code></span>
+                                <span style={{ margin: '0 8px' }}>|</span>
+                                <span>Created: {formatQueueDate(item.createdAt)}</span>
+                                {item.retryCount > 0 && (
+                                  <>
+                                    <span style={{ margin: '0 8px' }}>|</span>
+                                    <span>Retries: {item.retryCount}</span>
+                                  </>
+                                )}
+                              </div>
+                              {item.error && (
+                                <div style={{
+                                  fontSize: '11px', color: '#dc3545', backgroundColor: '#fff5f5',
+                                  padding: '6px 8px', borderRadius: '4px', marginTop: '4px',
+                                  fontFamily: 'monospace', wordBreak: 'break-all',
+                                }}>
+                                  {item.error}
+                                </div>
+                              )}
+                              {item.data && (
+                                <details style={{ marginTop: '6px' }}>
+                                  <summary style={{ fontSize: '11px', color: '#6b7280', cursor: 'pointer' }}>
+                                    View Data
+                                  </summary>
+                                  <pre style={{
+                                    fontSize: '10px', backgroundColor: '#f9fafb', padding: '8px',
+                                    borderRadius: '4px', overflow: 'auto', maxHeight: '150px',
+                                    marginTop: '4px', border: '1px solid #e5e7eb',
+                                  }}>
+                                    {JSON.stringify(item.data, null, 2)}
+                                  </pre>
+                                </details>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

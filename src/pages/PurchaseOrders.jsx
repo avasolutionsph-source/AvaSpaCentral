@@ -2,9 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import '../assets/css/purchase-orders.css';
 import { ConfirmDialog } from '../components/shared';
+
+// Guard against records that lost a required date (e.g. legacy rows missing
+// orderDate) — date-fns format() throws RangeError on Invalid Date and that
+// crash propagates to the ErrorBoundary, taking the whole Orders tab down.
+const safeFormat = (value, pattern, fallback = '—') => {
+  if (!value) return fallback;
+  const d = value instanceof Date ? value : new Date(value);
+  return isValid(d) ? format(d, pattern) : fallback;
+};
 
 const PurchaseOrders = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
@@ -131,7 +140,7 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
     setSelectedOrder(order);
     setFormData({
       supplierId: order.supplierId,
-      expectedDeliveryDate: format(new Date(order.expectedDeliveryDate), 'yyyy-MM-dd'),
+      expectedDeliveryDate: safeFormat(order.expectedDeliveryDate, 'yyyy-MM-dd', ''),
       notes: order.notes || '',
       items: order.items.map(item => ({
         productId: item.productId,
@@ -489,8 +498,8 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
                   <td>
                     <span className="supplier-name">{order.supplierName}</span>
                   </td>
-                  <td>{format(new Date(order.orderDate), 'MMM d, yyyy')}</td>
-                  <td>{format(new Date(order.expectedDeliveryDate), 'MMM d, yyyy')}</td>
+                  <td>{safeFormat(order.orderDate, 'MMM d, yyyy')}</td>
+                  <td>{safeFormat(order.expectedDeliveryDate, 'MMM d, yyyy')}</td>
                   <td>
                     <span className="item-count">{order.items.length} items</span>
                   </td>
@@ -707,16 +716,16 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Order Date</span>
-                    <span className="detail-value">{format(new Date(detailsOrder.orderDate), 'MMMM d, yyyy')}</span>
+                    <span className="detail-value">{safeFormat(detailsOrder.orderDate, 'MMMM d, yyyy')}</span>
                   </div>
                   <div className="detail-item">
                     <span className="detail-label">Expected Delivery</span>
-                    <span className="detail-value">{format(new Date(detailsOrder.expectedDeliveryDate), 'MMMM d, yyyy')}</span>
+                    <span className="detail-value">{safeFormat(detailsOrder.expectedDeliveryDate, 'MMMM d, yyyy')}</span>
                   </div>
                   {detailsOrder.receivedDate && (
                     <div className="detail-item">
                       <span className="detail-label">Received Date</span>
-                      <span className="detail-value">{format(new Date(detailsOrder.receivedDate), 'MMMM d, yyyy')}</span>
+                      <span className="detail-value">{safeFormat(detailsOrder.receivedDate, 'MMMM d, yyyy')}</span>
                     </div>
                   )}
                 </div>

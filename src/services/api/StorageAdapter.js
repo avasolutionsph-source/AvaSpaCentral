@@ -1058,8 +1058,14 @@ export const purchaseOrdersAdapter = {
 
   async createPurchaseOrder(data) {
     await delay();
+    // orderDate is NOT NULL in Supabase (column "order_date") and the PO list
+    // crashes if a record renders without it. Default to today when callers
+    // omit it.
+    const today = new Date();
+    const orderDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const order = await storageService.purchaseOrders.createWithNumber({
       businessId: getRequiredBusinessId(),
+      orderDate,
       ...data
     });
     return { success: true, purchaseOrder: clone(order) };

@@ -1206,18 +1206,25 @@ export const attendanceAdapter = {
     const allRecords = await storageService.attendance.find(
       a => String(a.employeeId) === empId
     );
+    // Scope the duplicate / missed-clock-out checks to the branch the user
+    // is clocking into. Without this, a dangling record in a sibling branch
+    // (which the Attendance UI filters out by branchId) blocks clock-in
+    // here while the table still shows the employee as ABSENT.
+    const targetBranchId = captureData.branchId || null;
+    const sameBranch = (a) => !targetBranchId || !a.branchId || a.branchId === targetBranchId;
+
     const previousRecords = allRecords
-      .filter(a => a.date !== today && a.clockIn && !a.clockOut)
+      .filter(a => sameBranch(a) && a.date !== today && a.clockIn && !a.clockOut)
       .sort((a, b) => b.date.localeCompare(a.date));
     if (previousRecords.length > 0) {
       const missed = previousRecords[0];
       missedClockOut = { date: missed.date, clockIn: missed.clockIn };
     }
 
-    // Check if already clocked in today
-    const existing = allRecords.filter(a => a.date === today);
+    // Check if already clocked in today (same branch only)
+    const existing = allRecords.filter(a => sameBranch(a) && a.date === today);
 
-    console.log('[AttendanceAdapter] clockIn - existing records for today:', existing.length);
+    console.log('[AttendanceAdapter] clockIn - existing records for today:', existing.length, 'branch:', targetBranchId);
 
     if (existing.length > 0) {
       // Already have a record for today

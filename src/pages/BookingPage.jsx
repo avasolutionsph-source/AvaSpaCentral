@@ -129,6 +129,7 @@ const BookingPage = () => {
   const [heroAnimDelay, setHeroAnimDelay] = useState('0');
   const [heroAnimDuration, setHeroAnimDuration] = useState('default');
   const [heroSettingsLoaded, setHeroSettingsLoaded] = useState(false);
+  const [heroTextEnabled, setHeroTextEnabled] = useState(true);
   const [heroLogoEnabled, setHeroLogoEnabled] = useState(false);
   const [heroLogoX, setHeroLogoX] = useState(50);
   const [heroLogoY, setHeroLogoY] = useState(20);
@@ -360,7 +361,7 @@ const BookingPage = () => {
 
           // Load hero font settings
           try {
-            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration,heroLogoEnabled,heroLogoX,heroLogoY,heroLogoSize,heroLogoAnimation,heroLogoAnimDelay,heroLogoAnimDuration,footerLine1,footerLine2,footerLine3,footerLine4)&select=key,value`;
+            const fontSettingsUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(heroFont,heroFontColor,heroTextX,heroTextY,heroAnimation,heroFontSize,heroAnimDelay,heroAnimDuration,heroTextEnabled,heroLogoEnabled,heroLogoX,heroLogoY,heroLogoSize,heroLogoAnimation,heroLogoAnimDelay,heroLogoAnimDuration,footerLine1,footerLine2,footerLine3,footerLine4)&select=key,value`;
             const fontRes = await fetch(fontSettingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } });
             if (fontRes.ok) {
               const fontData = await fontRes.json();
@@ -376,6 +377,7 @@ const BookingPage = () => {
                 if (s.key === 'heroFontSize' && s.value) setHeroFontSize(s.value);
                 if (s.key === 'heroAnimDelay' && s.value) setHeroAnimDelay(s.value);
                 if (s.key === 'heroAnimDuration' && s.value) setHeroAnimDuration(s.value);
+                if (s.key === 'heroTextEnabled') setHeroTextEnabled(s.value !== 'false');
                 if (s.key === 'heroLogoEnabled') setHeroLogoEnabled(s.value === 'true');
                 if (s.key === 'heroLogoX' && s.value) setHeroLogoX(parseInt(s.value));
                 if (s.key === 'heroLogoY' && s.value) setHeroLogoY(parseInt(s.value));
@@ -1380,7 +1382,7 @@ const BookingPage = () => {
             maxWidth: '90%',
           }}>
             {/* Animated inner content */}
-            {heroSettingsLoaded && (
+            {heroSettingsLoaded && heroTextEnabled && (
               <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
                   fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(14, parseInt(heroFontSize) * 0.4)}px, ${parseInt(heroFontSize) / 10}cqw, ${parseInt(heroFontSize) * 2.5}px)`
@@ -1481,7 +1483,7 @@ const BookingPage = () => {
             maxWidth: '90%',
           }}>
             {/* Animated inner content */}
-            {heroSettingsLoaded && (
+            {heroSettingsLoaded && heroTextEnabled && (
               <div ref={animateHeroRef(heroAnimation, heroAnimDelay, heroAnimDuration)}>
                 <h2 style={{
                   fontSize: !isNaN(parseInt(heroFontSize)) ? `clamp(${Math.max(14, parseInt(heroFontSize) * 0.4)}px, ${parseInt(heroFontSize) / 10}cqw, ${parseInt(heroFontSize) * 2.5}px)`

@@ -127,6 +127,7 @@ const Settings = () => {
     heroFontColor: '#ffffff',
     heroTextX: 50,
     heroTextY: 50,
+    heroTextEnabled: true,
     heroLogoEnabled: false,
     heroLogoX: 50,
     heroLogoY: 20,
@@ -648,6 +649,7 @@ const Settings = () => {
             'cachedLogoUrl', 'cachedCoverUrl', 'cachedBusinessName',
             'heroFont', 'heroFontColor', 'heroTextX', 'heroTextY',
             'heroAnimation', 'heroFontSize', 'heroAnimDelay', 'heroAnimDuration',
+            'heroTextEnabled',
             'heroLogoEnabled', 'heroLogoX', 'heroLogoY', 'heroLogoSize',
             'heroLogoAnimation', 'heroLogoAnimDelay', 'heroLogoAnimDuration',
             'footerLine1', 'footerLine2', 'footerLine3', 'footerLine4',
@@ -673,6 +675,7 @@ const Settings = () => {
             ...(cached.heroFontSize && { heroFontSize: cached.heroFontSize }),
             ...(cached.heroAnimDelay && { heroAnimDelay: cached.heroAnimDelay }),
             ...(cached.heroAnimDuration && { heroAnimDuration: cached.heroAnimDuration }),
+            ...(cached.heroTextEnabled != null && { heroTextEnabled: cached.heroTextEnabled !== 'false' }),
             ...(cached.heroLogoEnabled != null && { heroLogoEnabled: cached.heroLogoEnabled === 'true' }),
             ...(cached.heroLogoX && { heroLogoX: parseInt(cached.heroLogoX) }),
             ...(cached.heroLogoY && { heroLogoY: parseInt(cached.heroLogoY) }),
@@ -732,6 +735,7 @@ const Settings = () => {
           const s = await getSettingsByKeys(user.businessId, [
             'heroFont','heroFontColor','heroTextX','heroTextY','heroAnimation',
             'heroFontSize','heroAnimDelay','heroAnimDuration',
+            'heroTextEnabled',
             'heroLogoEnabled','heroLogoX','heroLogoY','heroLogoSize',
             'heroLogoAnimation','heroLogoAnimDelay','heroLogoAnimDuration',
             'footerLine1','footerLine2','footerLine3','footerLine4',
@@ -749,6 +753,7 @@ const Settings = () => {
               ...(s.heroFontSize && { heroFontSize: s.heroFontSize }),
               ...(s.heroAnimDelay && { heroAnimDelay: s.heroAnimDelay }),
               ...(s.heroAnimDuration && { heroAnimDuration: s.heroAnimDuration }),
+              ...(s.heroTextEnabled != null && { heroTextEnabled: s.heroTextEnabled !== 'false' }),
               ...(s.heroLogoEnabled != null && { heroLogoEnabled: s.heroLogoEnabled === 'true' }),
               ...(s.heroLogoX && { heroLogoX: parseInt(s.heroLogoX) }),
               ...(s.heroLogoY && { heroLogoY: parseInt(s.heroLogoY) }),
@@ -883,6 +888,7 @@ const Settings = () => {
           heroFontSize: brandingSettings.heroFontSize || 'default',
           heroAnimDelay: brandingSettings.heroAnimDelay || '0',
           heroAnimDuration: brandingSettings.heroAnimDuration || 'default',
+          heroTextEnabled: brandingSettings.heroTextEnabled === false ? 'false' : 'true',
           heroLogoEnabled: brandingSettings.heroLogoEnabled ? 'true' : 'false',
           heroLogoX: String(brandingSettings.heroLogoX ?? 50),
           heroLogoY: String(brandingSettings.heroLogoY ?? 20),
@@ -2756,8 +2762,49 @@ const Settings = () => {
 
             {/* Hero Text Style */}
             <div className="branding-sub-section">
-              <h3 className="branding-sub-title">Hero Text Style</h3>
-              <p className="branding-sub-desc">Customize the business name font, size, and color on your booking page hero.</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                <div>
+                  <h3 className="branding-sub-title">Hero Text Style</h3>
+                  <p className="branding-sub-desc">Customize the business name font, size, and color on your booking page hero.</p>
+                </div>
+                <div style={{ display: 'inline-flex', border: '1px solid rgba(0,0,0,0.15)', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    disabled={!canEdit()}
+                    onClick={() => setBrandingSettings(prev => ({ ...prev, heroTextEnabled: true }))}
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      border: 'none',
+                      background: brandingSettings.heroTextEnabled !== false ? 'var(--color-accent, #1B5E37)' : 'transparent',
+                      color: brandingSettings.heroTextEnabled !== false ? '#fff' : '#555',
+                      cursor: canEdit() ? 'pointer' : 'not-allowed',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    Show
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canEdit()}
+                    onClick={() => setBrandingSettings(prev => ({ ...prev, heroTextEnabled: false }))}
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      border: 'none',
+                      borderLeft: '1px solid rgba(0,0,0,0.15)',
+                      background: brandingSettings.heroTextEnabled === false ? 'var(--color-accent, #1B5E37)' : 'transparent',
+                      color: brandingSettings.heroTextEnabled === false ? '#fff' : '#555',
+                      cursor: canEdit() ? 'pointer' : 'not-allowed',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
               <div className="settings-row">
                 <div className="settings-form-group">
                   <label>Business Name</label>
@@ -3122,8 +3169,9 @@ const Settings = () => {
                       document.addEventListener('touchmove', onMove, { passive: false });
                       document.addEventListener('touchend', onUp);
                     };
+                    const textHidden = brandingSettings.heroTextEnabled === false;
                     return (
-                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <div style={{ position: 'relative', display: 'inline-block', opacity: textHidden ? 0.35 : 1 }} title={textHidden ? 'Hero text is set to None — it will not appear on the live booking page.' : undefined}>
                         <div
                           key={brandingSettings._animKey || brandingSettings.heroAnimation || 'init'}
                           className={brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' ? `pv-anim-${brandingSettings.heroAnimation}` : ''}
@@ -3135,7 +3183,7 @@ const Settings = () => {
                             letterSpacing: '2px',
                             textShadow: '0 2px 16px rgba(0,0,0,0.5)',
                             margin: 0,
-                            outline: '2px solid rgba(26,115,232,0.6)',
+                            outline: textHidden ? '2px dashed rgba(255,255,255,0.4)' : '2px solid rgba(26,115,232,0.6)',
                             ...(brandingSettings.heroAnimation && brandingSettings.heroAnimation !== 'none' && {
                               '--anim-delay': `${brandingSettings.heroAnimDelay || 0}s`,
                               ...(brandingSettings.heroAnimDuration && brandingSettings.heroAnimDuration !== 'default' && {

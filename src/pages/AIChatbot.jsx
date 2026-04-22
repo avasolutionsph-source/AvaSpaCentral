@@ -231,7 +231,15 @@ const AIChatbot = () => {
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll only the chat list, not the page. The default scrollIntoView()
+    // bubbles up to the page viewport and yanks the whole window down each
+    // time the user sends a message; pin the scroll to the messages
+    // container instead.
+    const end = messagesEndRef.current;
+    const container = end?.parentElement;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   };
 
   useEffect(() => {

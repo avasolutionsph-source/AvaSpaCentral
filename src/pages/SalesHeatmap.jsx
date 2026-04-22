@@ -64,11 +64,13 @@ const SalesHeatmap = () => {
         mockApi.analytics.getSalesHeatmapData(),
         mockApi.analytics.getRealtimeProfit()
       ]);
-      // Filter heatmap data by branch
+      // Filter heatmap data by branch (lenient: keep branchless legacy rows
+      // so a fresh branch view doesn't go blank just because aggregated
+      // mock/seed data was written without a branchId).
       const effectiveBranchId = getEffectiveBranchId();
       let filteredHeatmap = heatmap;
       if (effectiveBranchId && Array.isArray(heatmap)) {
-        filteredHeatmap = heatmap.filter(item => item.branchId === effectiveBranchId);
+        filteredHeatmap = heatmap.filter(item => !item.branchId || item.branchId === effectiveBranchId);
       }
 
       setHeatmapData(transformHeatmapData(filteredHeatmap));

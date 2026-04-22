@@ -46,9 +46,12 @@ const AIInsights = () => {
       // Scope every collection to the selected branch before running any
       // analysis so charts, KPIs, and AI recommendations all reflect the
       // same dataset the user expects from the branch dropdown.
+      // Lenient match: include branchless legacy records so a fresh branch
+      // doesn't render every metric as 0 just because older POS rows were
+      // written before branchId was attached.
       const effectiveBranchId = getEffectiveBranchId();
       const scope = (items) => effectiveBranchId
-        ? items.filter(item => item.branchId === effectiveBranchId)
+        ? items.filter(item => !item.branchId || item.branchId === effectiveBranchId)
         : items;
 
       const txns = scope(rawTxns);
@@ -243,25 +246,32 @@ const AIInsights = () => {
 
   // Customer Insights
   const analyzeCustomers = (custs, txns) => {
+    // Transactions can carry the customer link in either shape (current POS
+    // writes a nested `customer.id` object; older / sync-pulled rows expose a
+    // flat `customerId`). Match against both so the metrics aren't silently
+    // 0 when a row uses the other shape.
+    const txnCustomerId = (t) => t.customer?.id || t.customerId;
+
     const totalCustomers = custs.length;
     const activeCustomers = custs.filter(c => {
-      const lastVisit = txns.find(t => t.customer?.id === c._id);
+      const lastVisit = txns.find(t => txnCustomerId(t) === c._id);
       if (!lastVisit) return false;
       const daysSince = differenceInDays(new Date(), new Date(lastVisit.date || lastVisit.createdAt));
       return daysSince <= 30;
     }).length;
 
     const avgLifetimeValue = custs.reduce((sum, c) => {
-      const customerTxns = txns.filter(t => t.customer?.id === c._id);
+      const customerTxns = txns.filter(t => txnCustomerId(t) === c._id);
       const totalSpent = customerTxns.reduce((s, t) => s + (t.totalAmount || t.total || 0), 0);
       return sum + totalSpent;
     }, 0) / (totalCustomers || 1);
 
     const retentionRate = (activeCustomers / (totalCustomers || 1)) * 100;
 
-    // Top 3 customers
+    // Top 3 customers — only those with actual spend, so the chart doesn't
+    // render names with ₱0 bars when no transactions match.
     const topCustomers = custs.map(c => {
-      const customerTxns = txns.filter(t => t.customer?.id === c._id);
+      const customerTxns = txns.filter(t => txnCustomerId(t) === c._id);
       const totalSpent = customerTxns.reduce((s, t) => s + (t.totalAmount || t.total || 0), 0);
       return {
         name: c.name,
@@ -269,6 +279,7 @@ const AIInsights = () => {
         totalSpent
       };
     })
+      .filter(c => c.totalSpent > 0)
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 3);
 

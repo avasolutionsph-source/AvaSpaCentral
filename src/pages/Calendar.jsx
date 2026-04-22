@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
@@ -108,6 +108,19 @@ const Calendar = () => {
       // Silent fail for dropdown data
     }
   };
+
+  // Scope every dropdown source to the active branch so a brand-new branch
+  // does not surface customers / employees / rooms that belong to a sibling
+  // branch (cross-branch leak in the New Appointment modal).
+  const effectiveBranchIdForDropdowns = getEffectiveBranchId();
+  const branchScoped = (items) => {
+    if (!effectiveBranchIdForDropdowns) return items;
+    return items.filter(item => !item.branchId || item.branchId === effectiveBranchIdForDropdowns);
+  };
+  const branchCustomers = useMemo(() => branchScoped(customers), [customers, effectiveBranchIdForDropdowns]);
+  const branchEmployees = useMemo(() => branchScoped(employees), [employees, effectiveBranchIdForDropdowns]);
+  const branchServices  = useMemo(() => branchScoped(services),  [services,  effectiveBranchIdForDropdowns]);
+  const branchRooms     = useMemo(() => branchScoped(rooms),     [rooms,     effectiveBranchIdForDropdowns]);
 
   const loadAppointments = async (isMounted = true) => {
     try {
@@ -1072,7 +1085,7 @@ const Calendar = () => {
                     className="form-control"
                   >
                     <option value="">Walk-in (or select existing)</option>
-                    {customers.map(c => (
+                    {branchCustomers.map(c => (
                       <option key={c._id} value={c._id}>{c.name}</option>
                     ))}
                   </select>
@@ -1102,7 +1115,7 @@ const Calendar = () => {
                     required
                   >
                     <option value="">Select service...</option>
-                    {services.map(s => (
+                    {branchServices.map(s => (
                       <option key={s._id} value={s._id}>{s.name} - ₱{s.price}</option>
                     ))}
                   </select>
@@ -1119,7 +1132,7 @@ const Calendar = () => {
                       required
                     >
                       <option value="">Select therapist...</option>
-                      {employees.filter(e => e.department === 'Massage' || e.department === 'Facial' || e.department === 'Body Treatments' || e.position?.toLowerCase().includes('therapist')).map(e => (
+                      {branchEmployees.filter(e => e.department === 'Massage' || e.department === 'Facial' || e.department === 'Body Treatments' || e.position?.toLowerCase().includes('therapist')).map(e => (
                         <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>
                       ))}
                     </select>
@@ -1133,7 +1146,7 @@ const Calendar = () => {
                       className="form-control"
                     >
                       <option value="">No room</option>
-                      {rooms.filter(r => r.status !== 'maintenance').map(r => (
+                      {branchRooms.filter(r => r.status !== 'maintenance').map(r => (
                         <option key={r._id} value={r._id}>{r.name}</option>
                       ))}
                     </select>

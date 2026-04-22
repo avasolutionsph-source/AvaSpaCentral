@@ -154,6 +154,19 @@ const Appointments = () => {
     return () => clearTimeout(timeoutId);
   }, [formData.employeeId, formData.roomId, formData.date, formData.time, formData.duration, modalMode, selectedAppointment]);
 
+  // Scope every dropdown source to the active branch so a brand-new branch
+  // does not surface customers / employees / rooms that belong to a sibling
+  // branch (cross-branch leak in the New Appointment modal).
+  const branchScoped = (items) => {
+    const effectiveBranchId = getEffectiveBranchId();
+    if (!effectiveBranchId) return items;
+    return items.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+  };
+  const branchCustomers = useMemo(() => branchScoped(customers), [customers, getEffectiveBranchId()]);
+  const branchEmployees = useMemo(() => branchScoped(employees), [employees, getEffectiveBranchId()]);
+  const branchServices  = useMemo(() => branchScoped(services),  [services,  getEffectiveBranchId()]);
+  const branchRooms     = useMemo(() => branchScoped(rooms),     [rooms,     getEffectiveBranchId()]);
+
   const getFilteredAppointments = () => {
     let filtered = appointments;
 
@@ -642,7 +655,7 @@ const Appointments = () => {
                   <label>Customer *</label>
                   <select name="customerId" value={formData.customerId} onChange={(e) => {
                     const val = e.target.value;
-                    const customer = customers.find(c => c._id === val);
+                    const customer = branchCustomers.find(c => c._id === val);
                     setFormData(prev => ({
                       ...prev,
                       customerId: val,
@@ -650,7 +663,7 @@ const Appointments = () => {
                     }));
                   }} className="form-control">
                     <option value="">Walk-in (or select existing)</option>
-                    {customers.map(c => (
+                    {branchCustomers.map(c => (
                       <option key={c._id} value={c._id}>
                         {c.name} {(c.noShowCount || 0) >= 2 ? '⚠️' : ''}
                       </option>
@@ -658,7 +671,7 @@ const Appointments = () => {
                   </select>
                   {/* No-Show Warning for selected customer */}
                   {formData.customerId && (() => {
-                    const selectedCustomer = customers.find(c => c._id === formData.customerId);
+                    const selectedCustomer = branchCustomers.find(c => c._id === formData.customerId);
                     const noShowCount = selectedCustomer?.noShowCount || 0;
                     if (noShowCount >= 2) {
                       return (
@@ -690,7 +703,7 @@ const Appointments = () => {
                   <label>Service *</label>
                   <select name="serviceId" value={formData.serviceId} onChange={handleInputChange} className="form-control" required>
                     <option value="">Select service...</option>
-                    {services.map(s => <option key={s._id} value={s._id}>{s.name} - ₱{s.price}</option>)}
+                    {branchServices.map(s => <option key={s._id} value={s._id}>{s.name} - ₱{s.price}</option>)}
                   </select>
                 </div>
                 <div className="form-row">
@@ -699,10 +712,10 @@ const Appointments = () => {
                     <select name="employeeId" value={formData.employeeId} onChange={handleInputChange} className="form-control" required>
                       <option value="">Select therapist...</option>
                       {(() => {
-                        const selectedService = services.find(s => s._id === formData.serviceId);
+                        const selectedService = branchServices.find(s => s._id === formData.serviceId);
                         const availableTherapists = formData.serviceId
-                          ? getEmployeesForService(employees, selectedService)
-                          : getTherapists(employees);
+                          ? getEmployeesForService(branchEmployees, selectedService)
+                          : getTherapists(branchEmployees);
                         return availableTherapists.map(e => (
                           <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>
                         ));
@@ -713,7 +726,7 @@ const Appointments = () => {
                     <label>Room</label>
                     <select name="roomId" value={formData.roomId} onChange={handleInputChange} className="form-control">
                       <option value="">No room</option>
-                      {rooms.filter(r => r.status !== 'maintenance').map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
+                      {branchRooms.filter(r => r.status !== 'maintenance').map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
                     </select>
                   </div>
                 </div>

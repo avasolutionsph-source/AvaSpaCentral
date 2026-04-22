@@ -108,10 +108,14 @@ const Suppliers = ({ embedded = false }) => {
   const filteredSuppliers = useMemo(() => {
     let filtered = [...suppliers];
 
-    // Apply branch filter
+    // Suppliers are business-scoped (the suppliers table has no branch_id
+    // column), so only narrow by branch when a record actually carries a
+    // branchId. Records without one are treated as shared across branches —
+    // otherwise every branch-scoped user would see an empty list even though
+    // the summary cards report suppliers exist.
     const effectiveBranchId = getEffectiveBranchId();
     if (effectiveBranchId) {
-      filtered = filtered.filter(item => item.branchId === effectiveBranchId);
+      filtered = filtered.filter(item => !item.branchId || item.branchId === effectiveBranchId);
     }
 
     if (searchTerm.trim()) {

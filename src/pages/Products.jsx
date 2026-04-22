@@ -224,11 +224,17 @@ const Products = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrd
     handleSubmit();
   };
 
-  // Get retail products for items used dropdown
-  const retailProducts = useMemo(() =>
-    products.filter(p => p.type === 'product' && p.active),
-    [products]
-  );
+  // Get retail products for items used dropdown — same branch scoping as the
+  // main list, otherwise an Owner working inside a branch would see (and
+  // accidentally link) retail products from other branches.
+  const retailProducts = useMemo(() => {
+    const effectiveBranchId = getEffectiveBranchId();
+    return products.filter(p => {
+      if (p.type !== 'product' || !p.active) return false;
+      if (effectiveBranchId && p.branchId !== effectiveBranchId) return false;
+      return true;
+    });
+  }, [products, getEffectiveBranchId]);
 
   // Save reordered products
   const handleSaveOrder = async (reorderedItems) => {

@@ -11,7 +11,7 @@ https://yourdomain.com/book/daet-spa
 
 ## How It Works
 
-1. **Root domain** (`daetmassage.com`) loads the **default** business based on `VITE_DEFAULT_BUSINESS_SLUG` env variable (falls back to `daet-spa`)
+1. **Root domain** (`daetmassage.com`) loads the **default** business based on `VITE_DEFAULT_BUSINESS_SLUG` env variable (falls back to `nagabranch`)
 2. **Slug URL** (`/book/customer-slug`) loads the specific owner's business
 3. Customers see branch selection (if multiple branches), then services, therapist, date/time, details
 
@@ -45,7 +45,7 @@ VITE_DEFAULT_BUSINESS_SLUG=their-slug-here
 
 This controls what `yourdomain.com` (root URL with no path) shows.
 
-If not set, falls back to `daet-spa`.
+If not set, falls back to `nagabranch`.
 
 ### Step 3: Custom domain (optional)
 

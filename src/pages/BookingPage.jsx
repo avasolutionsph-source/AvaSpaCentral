@@ -311,7 +311,7 @@ const BookingPage = () => {
         try {
           // Determine the query URL based on what we have
           let testUrl;
-          const defaultSlug = import.meta.env.VITE_DEFAULT_BUSINESS_SLUG || 'daet-spa';
+          const defaultSlug = import.meta.env.VITE_DEFAULT_BUSINESS_SLUG || 'nagabranch';
           if (!businessIdOrSlug) {
             // No businessId in URL — use default business slug for this domain
             testUrl = `${supabaseUrl}/rest/v1/businesses?booking_slug=eq.${defaultSlug}&select=id,name,tagline,address,phone,email,booking_slug,logo_url,cover_photo_url,primary_color,hero_video`;

@@ -97,6 +97,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
         });
         return {
         id: t._id || index + 1,
+        branchId: t.branchId,
         receiptNumber: t.receiptNumber || `REC-${new Date(t.date).getFullYear()}-${String(index + 1).padStart(3, '0')}`,
         date: t.date,
         customer: t.customer || { name: 'Walk-in Customer', phone: '' },

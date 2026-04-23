@@ -1,7 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
-import { format, parseISO, subDays } from 'date-fns';
+import {
+  format, parseISO, subDays,
+  startOfDay, endOfDay,
+  startOfWeek, endOfWeek,
+  startOfMonth, endOfMonth,
+  startOfYear, endOfYear,
+} from 'date-fns';
+
+const PERIODS = [
+  { id: 'today', label: 'Today' },
+  { id: 'yesterday', label: 'Yesterday' },
+  { id: 'last7', label: 'Last 7 Days' },
+  { id: 'last30', label: 'Last 30 Days' },
+  { id: 'week', label: 'This Week' },
+  { id: 'month', label: 'This Month' },
+  { id: 'year', label: 'This Year' },
+  { id: 'all', label: 'All Time' },
+];
+
+const computePeriodRange = (period) => {
+  const now = new Date();
+  switch (period) {
+    case 'today':
+      return { start: startOfDay(now), end: endOfDay(now) };
+    case 'yesterday': {
+      const y = subDays(now, 1);
+      return { start: startOfDay(y), end: endOfDay(y) };
+    }
+    case 'last7':
+      return { start: startOfDay(subDays(now, 6)), end: endOfDay(now) };
+    case 'last30':
+      return { start: startOfDay(subDays(now, 29)), end: endOfDay(now) };
+    case 'week':
+      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+    case 'month':
+      return { start: startOfMonth(now), end: endOfMonth(now) };
+    case 'year':
+      return { start: startOfYear(now), end: endOfYear(now) };
+    case 'all':
+    default:
+      return { start: null, end: null };
+  }
+};
 
 const ServiceHistory = ({ embedded = false, onDataChange }) => {
   const { showToast, user, canViewAll, isTherapist, getEffectiveBranchId, hasManagementAccess } = useApp();
@@ -18,12 +60,20 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
   const [voidLoading, setVoidLoading] = useState(false);
 
   // Filters
+  const [period, setPeriod] = useState('all');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterEmployee, setFilterEmployee] = useState('all');
   const [filterService, setFilterService] = useState('all');
   const [filterPayment, setFilterPayment] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handlePeriodClick = (id) => {
+    setPeriod(id);
+    const { start, end } = computePeriodRange(id);
+    setFilterStartDate(start ? format(start, 'yyyy-MM-dd') : '');
+    setFilterEndDate(end ? format(end, 'yyyy-MM-dd') : '');
+  };
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -140,16 +190,16 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
       );
     }
 
-    // Date range filter
+    // Date range filter — compare against the LOCAL day bounds so an end-date
+    // like "2026-04-23" includes transactions that happen later on that day
+    // (naively `new Date('yyyy-mm-dd')` parses at UTC midnight).
     if (filterStartDate) {
-      filtered = filtered.filter(t =>
-        new Date(t.date) >= new Date(filterStartDate)
-      );
+      const startBound = startOfDay(new Date(filterStartDate));
+      filtered = filtered.filter(t => new Date(t.date) >= startBound);
     }
     if (filterEndDate) {
-      filtered = filtered.filter(t =>
-        new Date(t.date) <= new Date(filterEndDate)
-      );
+      const endBound = endOfDay(new Date(filterEndDate));
+      filtered = filtered.filter(t => new Date(t.date) <= endBound);
     }
 
     // Employee filter
@@ -189,6 +239,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
   };
 
   const handleClearFilters = () => {
+    setPeriod('all');
     setFilterStartDate('');
     setFilterEndDate('');
     setFilterEmployee('all');
@@ -387,6 +438,18 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
 
       {/* Filters */}
       <div className="service-filters">
+        <div className="service-period-group">
+          {PERIODS.map(p => (
+            <button
+              key={p.id}
+              type="button"
+              className={`service-period-btn ${period === p.id ? 'active' : ''}`}
+              onClick={() => handlePeriodClick(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
         <div className="filters-grid">
           <div className="filter-group">
             <label>Search</label>
@@ -402,7 +465,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
             <input
               type="date"
               value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
+              onChange={(e) => { setPeriod(''); setFilterStartDate(e.target.value); }}
             />
           </div>
           <div className="filter-group">
@@ -410,7 +473,7 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
             <input
               type="date"
               value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
+              onChange={(e) => { setPeriod(''); setFilterEndDate(e.target.value); }}
             />
           </div>
           {canViewAll() && (

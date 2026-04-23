@@ -82,6 +82,38 @@
   margin-bottom: var(--spacing-lg);
 }
 
+.service-period-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  background: var(--gray-50, #f9fafb);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 10px;
+  padding: 4px;
+  gap: 2px;
+  margin-bottom: var(--spacing-md);
+}
+
+.service-period-btn {
+  border: 0;
+  background: transparent;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-700, #374151);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.service-period-btn:hover {
+  background: var(--gray-100, #f3f4f6);
+}
+
+.service-period-btn.active {
+  background: var(--primary, #5f1c1c);
+  color: #fff;
+}
+
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

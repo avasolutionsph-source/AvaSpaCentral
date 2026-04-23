@@ -19,7 +19,10 @@ export default defineConfig(({ mode }) => ({
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
-        start_url: '/',
+        // Installed PWA is the employee app — open it straight at /login so
+        // logout (which navigates to /login) and cold launches share the
+        // same entry point.
+        start_url: '/login',
         icons: [
           {
             src: 'pwa-192x192.png',

@@ -4,7 +4,6 @@ import { AppProvider, useApp } from './context/AppContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
-import PWAInstallPrompt from './components/PWAInstallPrompt';
 import InitialSyncLoader from './components/InitialSyncLoader';
 
 // Development tools - sync test utility (only in dev mode)
@@ -25,6 +24,7 @@ const BookingPage = lazy(() => import('./pages/BookingPage'));
 const CustomerLogin = lazy(() => import('./pages/CustomerLogin'));
 const CustomerRegister = lazy(() => import('./pages/CustomerRegister'));
 const CustomerProfile = lazy(() => import('./pages/CustomerProfile'));
+const Install = lazy(() => import('./pages/Install'));
 
 // Lazy loaded pages (code splitting for better initial load)
 const Products = lazy(() => import('./pages/Products'));
@@ -300,6 +300,17 @@ function AppRoutes() {
             shared links and QR codes working. */}
         <Route path="/book/:businessId/:branchSlug" element={<BookingBranchRedirect />} />
 
+        {/* PWA install landing — replaces the auto-popup so employees can
+            install on demand from a shared link. */}
+        <Route
+          path="/install"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Install />
+            </Suspense>
+          }
+        />
+
         {/* Customer Portal Routes (Public - customer auth handled internally) */}
         <Route
           path="/book/:businessId/login"
@@ -402,7 +413,6 @@ function App() {
     <ErrorBoundary>
       <AppProvider>
         <AppRoutes />
-        <PWAInstallPrompt />
       </AppProvider>
     </ErrorBoundary>
   );

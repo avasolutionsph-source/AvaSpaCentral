@@ -117,6 +117,42 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     return base.substring(0, 20);
   };
 
+  // Run the actual availability check now, with no debounce. Returns the
+  // resolved status object so handleCreateAccount can await it on submit
+  // instead of silently bailing while the debounce is still pending —
+  // which is what made users click Create twice.
+  const runUsernameCheckNow = async (username) => {
+    if (!username || username.length < 3) {
+      return { checking: false, available: null, message: '' };
+    }
+    try {
+      const localUsers = await db.users.where('username').equals(username.toLowerCase()).toArray();
+      if (localUsers.length > 0) {
+        return { checking: false, available: false, message: 'Username already taken' };
+      }
+      if (isSupabaseConfigured()) {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 5000)
+        );
+        try {
+          const isAvailable = await Promise.race([
+            authService.isUsernameAvailable(username),
+            timeoutPromise
+          ]);
+          return isAvailable
+            ? { checking: false, available: true, message: 'Username available' }
+            : { checking: false, available: false, message: 'Username already taken' };
+        } catch (e) {
+          return { checking: false, available: true, message: 'Username available (offline check)' };
+        }
+      }
+      return { checking: false, available: true, message: 'Username available (offline)' };
+    } catch (error) {
+      console.error('Username check error:', error);
+      return { checking: false, available: null, message: 'Could not verify username' };
+    }
+  };
+
   // Check username availability (debounced)
   const checkUsernameAvailability = async (username) => {
     if (!username || username.length < 3) {
@@ -416,13 +452,18 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       return;
     }
 
-    // Check if username is still being checked or is taken
-    if (usernameStatus.checking) {
-      showToast('Please wait for username check to complete', 'warning');
-      return;
+    // If the debounced username check is still in flight (or hasn't resolved
+    // yet because the user clicked Create within the 500ms window after
+    // selecting the employee), run a fresh check inline instead of bailing.
+    // Bailing is what required users to click Create a second time.
+    let usernameCheck = usernameStatus;
+    if (usernameStatus.checking || usernameStatus.available === null) {
+      if (usernameCheckTimeout.current) clearTimeout(usernameCheckTimeout.current);
+      usernameCheck = await runUsernameCheckNow(formData.username.trim());
+      setUsernameStatus(usernameCheck);
     }
 
-    if (usernameStatus.available === false) {
+    if (usernameCheck.available === false) {
       showToast('Username is already taken. Please choose a different one.', 'error');
       return;
     }

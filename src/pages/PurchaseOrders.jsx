@@ -74,9 +74,17 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
         mockApi.products.getProducts(),
         mockApi.purchaseOrders.getSummary()
       ]);
+      // Scope the product dropdown to the selected branch so an empty Stock
+      // tab can't sit next to a Purchase Order picker that lists another
+      // branch's inventory. Suppliers stay business-scoped on purpose — the
+      // Supabase suppliers table has no branch_id column.
+      const effectiveBranchId = getEffectiveBranchId();
+      const scopedProducts = effectiveBranchId
+        ? (productsData || []).filter(p => p.branchId === effectiveBranchId)
+        : (productsData || []);
       setPurchaseOrders(ordersData);
       setSuppliers(suppliersData);
-      setProducts(productsData);
+      setProducts(scopedProducts);
       setSummary(summaryData);
       setLoading(false);
     } catch (error) {

@@ -420,7 +420,7 @@ const Suppliers = ({ embedded = false }) => {
 
         <div className="form-row">
           <div className="form-group">
-            <label>Category</label>
+            <label>Category *</label>
             <input
               type="text"
               name="category"
@@ -429,6 +429,7 @@ const Suppliers = ({ embedded = false }) => {
               className="form-control"
               placeholder="e.g., Spa Products"
               list="category-list"
+              required
             />
             <datalist id="category-list">
               {categories.map(cat => (

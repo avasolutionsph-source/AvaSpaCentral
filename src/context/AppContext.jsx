@@ -11,6 +11,20 @@ import { setAnalyticsBranchFilter } from '../mockApi/mockApi';
 // Callers should treat `selectedBranch?._allBranches === true` as "no branch filter".
 export const ALL_BRANCHES = Object.freeze({ id: null, name: 'All Branches', _allBranches: true });
 
+// Roles locked to a single assigned branch. Owner is the only role that can
+// roam across branches via the dropdown — every other role is staff that the
+// Edit Account UI promises will "only see data from their assigned branch."
+// Single source of truth so App.jsx and AppContext stay in sync.
+export const BRANCH_LOCKED_ROLES = Object.freeze([
+  'Manager',
+  'Branch Owner',
+  'Therapist',
+  'Receptionist',
+  'Rider',
+  'Utility',
+]);
+export const isBranchLockedRole = (role) => BRANCH_LOCKED_ROLES.includes(role);
+
 /**
  * Migrate all local data to current business context
  * This handles:
@@ -185,8 +199,7 @@ export const AppProvider = ({ children }) => {
             const parsed = JSON.parse(savedBranch);
             const currentUser = authService.currentUser || JSON.parse(localStorage.getItem('user') || 'null');
             const businessMatch = !currentUser?.businessId || !parsed?.business_id || parsed.business_id === currentUser.businessId;
-            const lockedRoles = ['Branch Owner', 'Manager'];
-            const lockedMismatch = currentUser && lockedRoles.includes(currentUser.role) && currentUser.branchId && parsed?.id !== currentUser.branchId;
+            const lockedMismatch = currentUser && isBranchLockedRole(currentUser.role) && currentUser.branchId && parsed?.id !== currentUser.branchId;
             if (!businessMatch || lockedMismatch) {
               localStorage.removeItem('selectedBranch');
             } else {
@@ -204,12 +217,11 @@ export const AppProvider = ({ children }) => {
             setUser(userProfile);
             // Clear any stale selectedBranch that doesn't belong to the
             // newly signed-in user. BranchSelect will auto-assign the right
-            // branch for locked roles (Branch Owner, Manager).
-            const lockedRoles = ['Branch Owner', 'Manager'];
+            // branch for any locked role (everyone except Owner).
             setSelectedBranch(prev => {
               if (!prev) return prev;
               const businessMismatch = userProfile.businessId && prev.business_id && prev.business_id !== userProfile.businessId;
-              const lockedMismatch = lockedRoles.includes(userProfile.role) && userProfile.branchId && prev.id !== userProfile.branchId;
+              const lockedMismatch = isBranchLockedRole(userProfile.role) && userProfile.branchId && prev.id !== userProfile.branchId;
               if (businessMismatch || lockedMismatch) {
                 localStorage.removeItem('selectedBranch');
                 return null;
@@ -273,15 +285,19 @@ export const AppProvider = ({ children }) => {
     };
   }, []);
 
-  // Toast notification system
-  const showToast = (message, type = 'info') => {
+  // Toast notification system. `options.action` adds a clickable button to
+  // the toast — { label, onClick } — and extends the auto-dismiss so the user
+  // has time to act on it.
+  const showToast = (message, type = 'info', options = {}) => {
     const id = Date.now();
-    setToast({ id, message, type });
+    const action = options.action && options.action.label && options.action.onClick
+      ? options.action
+      : null;
+    setToast({ id, message, type, action });
 
-    // Auto-dismiss after 4 seconds
     setTimeout(() => {
-      setToast(null);
-    }, 4000);
+      setToast((current) => (current && current.id === id ? null : current));
+    }, action ? 8000 : 4000);
   };
 
   // Initialize the Supabase sync manager after a user is signed in.
@@ -509,13 +525,9 @@ export const AppProvider = ({ children }) => {
     return user?.role === 'Branch Owner';
   };
 
-  // Roles locked to a single assigned branch (cannot toggle the UI dropdown).
-  // Manager and Branch Owner manage one branch; Owner sees everything.
-  const BRANCH_LOCKED_ROLES = ['Branch Owner', 'Manager'];
-
   // Get user's branch ID (for branch-locked roles)
   const getUserBranchId = () => {
-    if (BRANCH_LOCKED_ROLES.includes(user?.role)) {
+    if (isBranchLockedRole(user?.role)) {
       return user.branchId || null;
     }
     return null; // Owner sees all branches
@@ -531,7 +543,7 @@ export const AppProvider = ({ children }) => {
   // Returns null when no branch filter should apply (All Branches sentinel, or
   // a locked-role user with no branchId yet).
   const getEffectiveBranchId = () => {
-    if (BRANCH_LOCKED_ROLES.includes(user?.role)) {
+    if (isBranchLockedRole(user?.role)) {
       return user.branchId || null;
     }
     if (selectedBranch?._allBranches) return null;

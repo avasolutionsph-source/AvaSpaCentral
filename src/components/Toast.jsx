@@ -6,6 +6,14 @@ const Toast = () => {
 
   if (!toast) return null;
 
+  const handleAction = () => {
+    try {
+      toast.action?.onClick?.();
+    } finally {
+      // Action taken — let the next showToast or the timer clear it.
+    }
+  };
+
   return (
     <div
       className={`toast toast-${toast.type}`}
@@ -20,6 +28,11 @@ const Toast = () => {
         {toast.type === 'info' && 'ℹ'}
       </div>
       <div className="toast-message">{toast.message}</div>
+      {toast.action && (
+        <button type="button" className="toast-action" onClick={handleAction}>
+          {toast.action.label}
+        </button>
+      )}
     </div>
   );
 };

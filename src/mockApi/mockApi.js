@@ -71,7 +71,12 @@ export const setAnalyticsBranchFilter = (branchId) => {
 
 const applyBranchFilter = (items) => {
   if (!analyticsBranchFilter) return items;
-  return (items || []).filter(item => item && item.branchId === analyticsBranchFilter);
+  // Permissive on purpose: pre-c28497d records have no branchId, and the
+  // strict equality used by operational pages would zero-out every chart on
+  // this analytics layer. Operational writes (POS, attendance) already
+  // require branchId, so this only surfaces legacy orphans — counting them
+  // in the current branch's analytics is better than silently dropping them.
+  return (items || []).filter(item => item && (!item.branchId || item.branchId === analyticsBranchFilter));
 };
 
 // Get data from Dexie with caching + optional branch scoping

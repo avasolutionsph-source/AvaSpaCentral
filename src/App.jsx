@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
-import { AppProvider, useApp } from './context/AppContext';
+import { AppProvider, useApp, isBranchLockedRole } from './context/AppContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -126,13 +126,10 @@ const RequireBranch = ({ children }) => {
           const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
           if (!supabaseUrl || !supabaseKey || !user.businessId) return;
 
-          // Branch-locked roles (Branch Owner, Manager) must ONLY be auto-assigned
+          // Branch-locked roles (everyone except Owner) must ONLY be auto-assigned
           // their own branchId — never fall back to the first branch, which would
           // leak another branch's data into the UI for a user who can't switch.
-          const lockedRoles = ['Branch Owner', 'Manager'];
-          const isLocked = lockedRoles.includes(user.role);
-
-          if (isLocked) {
+          if (isBranchLockedRole(user.role)) {
             if (!user.branchId) {
               setAutoSelectError('Your account has no branch assigned. Please contact your administrator.');
               return;
@@ -154,8 +151,8 @@ const RequireBranch = ({ children }) => {
             return;
           }
 
-          // Non-locked roles (Owner, Receptionist, Therapist, etc.) fall back to
-          // the first active branch so the app can boot without forcing picker UX.
+          // Owner is the only role that can roam — fall back to the first
+          // active branch so the app can boot without forcing picker UX.
           const res = await fetch(
             `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order.asc&limit=1`,
             { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } }

@@ -18,7 +18,7 @@ import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
 const MyPortal = () => {
-  const { user, showToast, hasManagementAccess, getUserBranchId } = useApp();
+  const { user, showToast, hasManagementAccess, getEffectiveBranchId } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'today';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -255,11 +255,18 @@ const MyPortal = () => {
     setClockLoading(true);
 
     try {
-      const captureWithBranch = { ...captureData };
-      const activeBranchId = getUserBranchId();
-      if (activeBranchId) {
-        captureWithBranch.branchId = activeBranchId;
+      // Stamp the record with the branch the employee is currently working at.
+      // Must match the read filter (getEffectiveBranchId), or the new record
+      // becomes an orphan that's invisible to both employee and manager views.
+      const activeBranchId = getEffectiveBranchId();
+      if (!activeBranchId) {
+        showToast('No branch is selected. Please contact your manager.', 'error');
+        setShowCamera(false);
+        setPendingClockAction(null);
+        setClockLoading(false);
+        return;
       }
+      const captureWithBranch = { ...captureData, branchId: activeBranchId };
 
       // GPS geofencing check - requires proper setup
       let isOutOfRange = false;
@@ -327,6 +334,12 @@ const MyPortal = () => {
       loadTodayAttendance();
     } catch (error) {
       showToast(`Failed to clock ${type}: ${error.message}`, 'error');
+      setShowCamera(false);
+      setPendingClockAction(null);
+      // Refresh on error — the validation may have healed an orphan record
+      // (legacy rows missing branchId), and we want it to surface so the
+      // user can see and act on it (e.g. Clock Out instead of Clock In).
+      loadTodayAttendance();
     } finally {
       setClockLoading(false);
     }

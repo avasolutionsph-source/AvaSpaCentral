@@ -176,6 +176,10 @@ export const supplierValidation = {
     required: true,
     requiredMessage: 'Phone number is required',
     phone: true
+  },
+  category: {
+    required: true,
+    requiredMessage: 'Category is required'
   }
 };
 

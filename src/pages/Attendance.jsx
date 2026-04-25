@@ -10,7 +10,7 @@ import { formatTime12Hour, formatTimeRange } from '../utils/dateUtils';
 
 const Attendance = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
-  const { user, showToast, hasManagementAccess, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { user, showToast, hasManagementAccess, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [todayAttendance, setTodayAttendance] = useState([]);
@@ -259,13 +259,21 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       const employee = employees.find(e => e._id === employeeId);
       const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown';
 
-      // Include branchId in capture data for branch filtering
-      const branchId = getUserBranchId();
-      const captureWithBranch = { ...captureData, ...(branchId && { branchId }) };
+      // Stamp the record with the branch the user is currently viewing.
+      // Must match the read filter in loadData() (getEffectiveBranchId), or
+      // the new record gets filtered out and the table still shows ABSENT.
+      const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before clocking in (not "All Branches").', 'error');
+        setShowCamera(false);
+        setPendingClockAction(null);
+        return;
+      }
+      const captureWithBranch = { ...captureData, branchId };
 
       // 2. Check GPS geofencing - requires proper setup
       let isOutOfRange = false;
-      const activeBranchId = branchId || user?.branchId;
+      const activeBranchId = branchId;
 
       try {
         const gpsConfig = await SettingsRepository.get('gpsConfig');
@@ -336,9 +344,17 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       setSelectedEmployeeId('');
       loadData();
     } catch (error) {
-      showToast(error.message || 'Failed to clock', 'error');
+      const msg = error.message || 'Failed to clock';
+      const needsSchedule = msg.includes('No shift schedule set up');
+      showToast(msg, 'error', needsSchedule && hasManagementAccess() ? {
+        action: { label: 'Go to Shift Schedules', onClick: () => navigate('/shift-schedules') }
+      } : undefined);
       setShowCamera(false);
       setPendingClockAction(null);
+      // Refresh the table even on error — the validation may have healed an
+      // orphan record (legacy rows missing branchId), and we want it to
+      // become visible so the user sees what they're up against.
+      loadData();
     }
   };
 

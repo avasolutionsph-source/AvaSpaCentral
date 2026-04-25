@@ -1248,6 +1248,19 @@ export const attendanceAdapter = {
 
     console.log('[AttendanceAdapter] clockIn - existing records for today:', existing.length, 'branch:', targetBranchId);
 
+    // Heal orphan rows from before strict branch stamping was enforced.
+    // The strict read filter hides records without branchId, so the user
+    // can hit "Already clocked in" against a row they can't see. Adopt the
+    // current branch so the row becomes visible and actionable.
+    if (targetBranchId) {
+      for (const a of existing) {
+        if (!a.branchId) {
+          await storageService.attendance.update(a._id, { branchId: targetBranchId });
+          a.branchId = targetBranchId;
+        }
+      }
+    }
+
     if (existing.length > 0) {
       // Already have a record for today
       if (existing[0].clockIn && !existing[0].clockOut) {
@@ -1380,7 +1393,11 @@ export const attendanceAdapter = {
       clockOut: nowTime,
       clockOutPhoto: captureData.photo || null,
       clockOutGps: captureData.location || null,
-      isOutOfRange: captureData.isOutOfRange || false
+      isOutOfRange: captureData.isOutOfRange || false,
+      // Heal orphan rows from before strict branch stamping was enforced —
+      // the strict read filter hides records without branchId, so adopt the
+      // current branch here so the row becomes visible.
+      ...(!record.branchId && captureData.branchId ? { branchId: captureData.branchId } : {})
     });
 
     // Get employee info

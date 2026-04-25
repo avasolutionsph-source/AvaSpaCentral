@@ -105,11 +105,13 @@ const AvaSenseiUltrathink = () => {
       ]);
 
       // Scope every collection to the selected branch so charts, KPIs, and
-      // AI recommendations all reflect the dropdown selection. Without this
-      // the analyses run on every branch's data and leak cross-branch totals.
+      // AI recommendations all reflect the dropdown selection. Permissive on
+      // unbranched legacy records (pre-c28497d) — strict equality would zero
+      // every chart, and operational writes already require branchId so no
+      // new orphans get created here.
       const effectiveBranchId = getEffectiveBranchId();
       const scope = (items) => effectiveBranchId
-        ? (items || []).filter(item => item && item.branchId === effectiveBranchId)
+        ? (items || []).filter(item => item && (!item.branchId || item.branchId === effectiveBranchId))
         : (items || []);
 
       const txns = scope(rawTxns);

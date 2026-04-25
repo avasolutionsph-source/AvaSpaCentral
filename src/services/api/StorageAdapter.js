@@ -1144,19 +1144,23 @@ export const purchaseOrdersAdapter = {
     await delay();
     const products = await storageService.products.getAll();
 
-    // Filter products that need reordering
+    // The Inventory UI reads name/category/stock/lowStockAlert directly off
+    // each suggestion item, so spread the full product and layer the computed
+    // fields on top instead of returning a renamed projection.
+    const threshold = (p) => p.lowStockAlert ?? p.reorderLevel ?? 10;
     const suggestions = products
       .filter(p => p.type === 'product' && p.active)
-      .filter(p => (p.stock || 0) <= (p.reorderLevel || 10))
-      .map(p => ({
-        productId: p._id,
-        productName: p.name,
-        currentStock: p.stock || 0,
-        reorderLevel: p.reorderLevel || 10,
-        suggestedQuantity: Math.max(20, (p.reorderLevel || 10) * 2 - (p.stock || 0)),
-        estimatedCost: (p.cost || 0) * Math.max(20, (p.reorderLevel || 10) * 2 - (p.stock || 0)),
-        priority: (p.stock || 0) === 0 ? 'critical' : (p.stock || 0) < (p.reorderLevel || 10) / 2 ? 'high' : 'medium'
-      }))
+      .filter(p => (p.stock || 0) <= threshold(p))
+      .map(p => {
+        const t = threshold(p);
+        const suggestedQuantity = Math.max(20, t * 2 - (p.stock || 0));
+        return {
+          ...p,
+          suggestedQuantity,
+          estimatedCost: (p.cost || 0) * suggestedQuantity,
+          priority: (p.stock || 0) === 0 ? 'critical' : (p.stock || 0) < t / 2 ? 'high' : 'medium'
+        };
+      })
       .sort((a, b) => {
         const priorityOrder = { critical: 0, high: 1, medium: 2 };
         return priorityOrder[a.priority] - priorityOrder[b.priority];

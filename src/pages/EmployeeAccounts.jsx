@@ -385,12 +385,22 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
       const emp = employees.find(e => e._id === empId);
       if (emp) {
         const suggestedUsername = generateUsername(emp.firstName, emp.lastName);
+        // Pull the role off the employee record so the dropdown matches the
+        // account being created. Fall back to position (which the option label
+        // shows) and finally to the existing default if neither is a known role.
+        const empRole = roles.includes(emp.role)
+          ? emp.role
+          : roles.includes(emp.position)
+            ? emp.position
+            : null;
         setFormData(prev => ({
           ...prev,
           employeeId: empId,
           firstName: emp.firstName || '',
           lastName: emp.lastName || '',
-          username: suggestedUsername
+          username: suggestedUsername,
+          ...(empRole ? { role: empRole } : {}),
+          ...(emp.branchId ? { branchId: emp.branchId } : {})
         }));
         // Check if suggested username is available
         checkUsernameAvailability(suggestedUsername);

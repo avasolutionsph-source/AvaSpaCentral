@@ -52,6 +52,9 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, schedule: null });
 
+  // Which stat card is showing its per-employee breakdown ('day' | 'night' | 'off' | null)
+  const [expandedStat, setExpandedStat] = useState(null);
+
   // Week navigation
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -387,21 +390,17 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
   const stats = calculateStats();
   const pendingRequests = timeOffRequests.filter(r => r.status === 'pending').length;
 
-  // TEMP DIAGNOSTIC — rendered on-page (not console) so the per-employee
-  // breakdown is visible regardless of build minification or browser
-  // console behaviour. Remove once the "22 day shifts for 4 employees"
-  // report is resolved.
-  const debugRows = filteredSchedules.map(s => {
-    const counts = { day: 0, night: 0, off: 0, other: 0 };
-    const perDay = DAYS.map(d => {
-      const sh = s.weeklySchedule?.[d]?.shift ?? 'NONE';
+  // Per-employee shift counts so each stat card can expand into a
+  // breakdown the user can verify (e.g. "22 day shifts" -> 6+6+4+6).
+  const perEmployeeCounts = filteredSchedules.map(s => {
+    const counts = { day: 0, night: 0, off: 0 };
+    DAYS.forEach(d => {
+      const sh = s.weeklySchedule?.[d]?.shift;
       if (sh === 'day' || sh === 'wholeDay') counts.day++;
       else if (sh === 'night') counts.night++;
       else if (sh === 'off') counts.off++;
-      else counts.other++;
-      return `${d.slice(0, 3)}=${sh}`;
-    }).join(' ');
-    return { name: s.employeeName || s.employeeId, perDay, counts };
+    });
+    return { name: s.employeeName || 'Unknown', employeeId: s.employeeId, ...counts };
   });
 
   if (loading) {
@@ -536,52 +535,108 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards — day/night/off cards are clickable to reveal a
+          per-employee breakdown of where the count comes from. */}
       <div className="schedule-stats-grid">
         <div className="schedule-stat-card">
           <div className="stat-value">{filteredSchedules.length}</div>
           <div className="stat-label">Employees</div>
         </div>
-        <div className="schedule-stat-card day">
-          <div className="stat-value">{stats.dayShifts}</div>
-          <div className="stat-label">Day Shifts</div>
-        </div>
-        <div className="schedule-stat-card night">
-          <div className="stat-value">{stats.nightShifts}</div>
-          <div className="stat-label">Night Shifts</div>
-        </div>
-        <div className="schedule-stat-card off">
-          <div className="stat-value">{stats.daysOff}</div>
-          <div className="stat-label">Days Off</div>
-        </div>
+        {[
+          { key: 'day', label: 'Day Shifts', value: stats.dayShifts, className: 'day' },
+          { key: 'night', label: 'Night Shifts', value: stats.nightShifts, className: 'night' },
+          { key: 'off', label: 'Days Off', value: stats.daysOff, className: 'off' },
+        ].map(card => {
+          const isOpen = expandedStat === card.key;
+          return (
+            <div
+              key={card.key}
+              className={`schedule-stat-card ${card.className}${isOpen ? ' expanded' : ''}`}
+              onClick={() => setExpandedStat(isOpen ? null : card.key)}
+              style={{ cursor: 'pointer', position: 'relative' }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setExpandedStat(isOpen ? null : card.key);
+                }
+              }}
+              aria-expanded={isOpen}
+              aria-label={`${card.label}: ${card.value}. Click to ${isOpen ? 'hide' : 'show'} breakdown`}
+            >
+              <div className="stat-value">{card.value}</div>
+              <div className="stat-label">
+                {card.label}
+                <span style={{
+                  marginLeft: '6px',
+                  fontSize: '10px',
+                  opacity: 0.7,
+                  display: 'inline-block',
+                  transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.15s ease',
+                }}>▾</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* TEMP DEBUG PANEL — remove once the count discrepancy is resolved */}
-      <div style={{
-        background: '#fff8dc',
-        border: '2px solid #d4a017',
-        borderRadius: '8px',
-        padding: '12px 16px',
-        margin: '16px 0',
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        lineHeight: '1.6',
-        color: '#333',
-        overflowX: 'auto',
-      }}>
-        <div style={{ fontWeight: 700, marginBottom: '8px', color: '#7a1c1c' }}>
-          DEBUG (temporary): schedules={schedules.length} · filteredSchedules={filteredSchedules.length} · dayShifts={stats.dayShifts} · night={stats.nightShifts} · off={stats.daysOff} · totalSlots={filteredSchedules.length * 7}
+      {/* Per-employee breakdown for the currently expanded stat card */}
+      {expandedStat && (
+        <div style={{
+          background: 'var(--color-surface, #fff)',
+          border: '1px solid var(--color-border, #e0e0e0)',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          margin: '12px 0 0',
+          fontSize: '13px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <strong>
+              {expandedStat === 'day' && 'Day Shifts breakdown'}
+              {expandedStat === 'night' && 'Night Shifts breakdown'}
+              {expandedStat === 'off' && 'Days Off breakdown'}
+            </strong>
+            <button
+              onClick={() => setExpandedStat(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '18px',
+                lineHeight: 1,
+                color: '#666',
+              }}
+              aria-label="Close breakdown"
+            >
+              ×
+            </button>
+          </div>
+          {perEmployeeCounts.length === 0 ? (
+            <div style={{ color: '#777' }}>No employees with schedules in this branch.</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                {perEmployeeCounts.map((r) => (
+                  <tr key={r.employeeId} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                    <td style={{ padding: '6px 0' }}>{r.name}</td>
+                    <td style={{ padding: '6px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {r[expandedStat]} {r[expandedStat] === 1 ? 'day' : 'days'}
+                    </td>
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 700 }}>
+                  <td style={{ padding: '6px 0' }}>Total</td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {perEmployeeCounts.reduce((sum, r) => sum + r[expandedStat], 0)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
         </div>
-        {debugRows.length === 0 ? (
-          <div>No filtered schedules to display.</div>
-        ) : (
-          debugRows.map((r, i) => (
-            <div key={i} style={{ whiteSpace: 'nowrap' }}>
-              <strong>{r.name}</strong> — day:{r.counts.day} night:{r.counts.night} off:{r.counts.off} other:{r.counts.other} | {r.perDay}
-            </div>
-          ))
-        )}
-      </div>
+      )}
 
       {/* Filters */}
       <div className="filters-section">

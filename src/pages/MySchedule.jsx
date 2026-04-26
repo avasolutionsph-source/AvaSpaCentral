@@ -111,6 +111,8 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
             employeeName: myEmployee
               ? `${myEmployee.firstName} ${myEmployee.lastName}`
               : null,
+            employeeBranchId: myEmployee?.branchId || null,
+            userBranchId: user?.branchId || null,
             totalSchedules: allSchedules.length,
             schedulesForMe: matching.length,
             employeesWithSchedules: [...new Set(employeesWithSchedules)],
@@ -472,15 +474,25 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
             // employeeId valid, but no schedule for it — the linked employee
             // simply doesn't have a schedule. Show who DOES so the manager
             // can spot mis-assignment immediately.
+            const branchMismatch =
+              d.userBranchId && d.employeeBranchId && d.userBranchId !== d.employeeBranchId;
             return (
               <>
                 <strong>ℹ️ No shift schedule has been assigned to {d.employeeName}.</strong>
-                {d.employeesWithSchedules.length > 0 ? (
+                {branchMismatch && (
+                  <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 500 }}>
+                    ⚠️ Branch mismatch: your employee record sits in branch …{String(d.employeeBranchId).slice(-6)},
+                    but your user account is locked to branch …{String(d.userBranchId).slice(-6)}.
+                    A Branch-Owner manager in the employee's branch — or an Owner-role user — must create the schedule.
+                  </span>
+                )}
+                {d.employeesWithSchedules.length > 0 && (
                   <span style={{ fontSize: '0.85rem', color: '#666' }}>
                     {d.totalSchedules} schedule(s) exist on this device, for: {d.employeesWithSchedules.join(', ')}.
                     {' '}If your account should be linked to one of those employees, ask your manager to fix the link in <em>Employees → Accounts</em>.
                   </span>
-                ) : (
+                )}
+                {!d.employeesWithSchedules.length && (
                   <span>Ask your manager to create a schedule for you in the Shift Schedules page.</span>
                 )}
               </>

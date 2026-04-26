@@ -44,17 +44,29 @@ export const getTherapists = (employees) =>
  * @returns {Array} Therapists qualified for the service
  */
 export const getEmployeesForService = (employees, service) => {
-  if (!service) return getTherapists(employees);
+  const therapists = getTherapists(employees);
+  if (!service) return therapists;
 
-  return employees.filter(e => {
-    if (!isActive(e) || !isServiceProvider(e)) return false;
-    // If employee has skills array, check if service category matches
-    if (e.skills && e.skills.length > 0) {
-      return e.skills.includes(service.category);
-    }
-    // Default: therapist can perform any service
-    return true;
+  // Try to narrow to therapists who are explicitly compatible:
+  // - their `department` matches the service's high-level category
+  //   (e.g. department 'Massage' for category 'Massage'), OR
+  // - their `skills` array contains the service's category as a literal
+  //   entry (rare — service categories are high-level like 'Massage'
+  //   while skills are specific techniques like 'Swedish Massage' — but
+  //   honour it when it does line up).
+  //
+  // If the narrow filter yields nothing, fall back to all active
+  // therapists. The previous behaviour returned an empty list whenever
+  // the skill/category vocabularies didn't overlap, which made the
+  // Therapist dropdown disappear the moment a service was picked and
+  // blocked appointment creation entirely.
+  const compatible = therapists.filter(e => {
+    if (service.category && e.department === service.category) return true;
+    if (Array.isArray(e.skills) && e.skills.includes(service.category)) return true;
+    return false;
   });
+
+  return compatible.length > 0 ? compatible : therapists;
 };
 
 /**

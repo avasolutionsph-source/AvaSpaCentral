@@ -47,31 +47,41 @@ const resolveActiveSchedule = async (employeeId) => {
   if (direct?.weeklySchedule) return { schedule: direct, reason: 'direct' };
 
   const targetId = String(employeeId);
+  // Pull every schedule, ignore tenant + soft-delete filters. Treat
+  // `isActive !== false` as active — synced rows occasionally lose the
+  // field on round-trip and would otherwise be filtered out incorrectly.
   const allSchedules = await storageService.shiftSchedules.getAll({ skipTenantFilter: true });
-  const tolerant = allSchedules.find(
-    (s) => String(s.employeeId) === targetId && s.isActive && s.weeklySchedule
-  );
-  if (tolerant) {
+  const forEmployee = allSchedules.filter((s) => String(s.employeeId) === targetId);
+  const usable = forEmployee.find((s) => s.weeklySchedule && s.isActive !== false);
+  if (usable) {
     console.warn(
       '[ShiftSchedule] Direct lookup failed; recovered via tolerant scan.',
-      { employeeId, scheduleId: tolerant._id, scheduleBusinessId: tolerant.businessId }
+      {
+        employeeId,
+        scheduleId: usable._id,
+        scheduleBusinessId: usable.businessId,
+        scheduleIsActive: usable.isActive,
+      }
     );
-    return { schedule: tolerant, reason: 'tolerant' };
+    return { schedule: usable, reason: 'tolerant' };
   }
 
-  // Last resort: any inactive schedule for this employee at all? Helps the
-  // error message distinguish "never set up" from "got deactivated".
-  const anySchedule = allSchedules.find((s) => String(s.employeeId) === targetId);
   return {
     schedule: null,
-    reason: anySchedule ? 'inactive_only' : 'not_found',
-    debug: { employeeId, totalSchedules: allSchedules.length, anyForEmployee: !!anySchedule },
+    reason: forEmployee.length > 0 ? 'inactive_only' : 'not_found',
+    debug: {
+      employeeId,
+      totalSchedules: allSchedules.length,
+      schedulesForEmployee: forEmployee.length,
+      sampleEmployeeIds: allSchedules.slice(0, 5).map((s) => s.employeeId),
+    },
   };
 };
 
 /**
  * Throw a contextual error for a missing schedule. Centralises the message
- * so clockIn / clockOut stay in sync.
+ * so clockIn / clockOut stay in sync. Embeds diagnostic info directly in the
+ * thrown message so support tickets don't require a DevTools console capture.
  */
 const throwScheduleMissingError = (resolution) => {
   if (resolution.reason === 'no_employee_id') {
@@ -85,8 +95,13 @@ const throwScheduleMissingError = (resolution) => {
     );
   }
   console.warn('[ShiftSchedule] No schedule found.', resolution.debug);
+  const dbg = resolution.debug || {};
+  const idTail = dbg.employeeId ? String(dbg.employeeId).slice(-6) : 'unknown';
   throw new Error(
-    'No shift schedule set up for this employee. Please set up a shift schedule first in the Shift Schedules page.'
+    `No shift schedule found for your employee record (id …${idTail}). ` +
+    `${dbg.totalSchedules ?? 0} schedule(s) exist on this device, ` +
+    `${dbg.schedulesForEmployee ?? 0} for your employee. ` +
+    `Ask your manager to create one in the Shift Schedules page, or verify your account is linked to the right employee.`
   );
 };
 

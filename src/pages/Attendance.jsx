@@ -345,7 +345,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       loadData();
     } catch (error) {
       const msg = error.message || 'Failed to clock';
-      const needsSchedule = msg.includes('No shift schedule set up');
+      const needsSchedule = msg.includes('No shift schedule') || msg.includes('shift schedule was deactivated');
       showToast(msg, 'error', needsSchedule && hasManagementAccess() ? {
         action: { label: 'Go to Shift Schedules', onClick: () => navigate('/shift-schedules') }
       } : undefined);

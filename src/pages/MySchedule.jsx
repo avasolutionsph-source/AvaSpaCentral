@@ -28,6 +28,9 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
   const [mySchedule, setMySchedule] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [shiftConfig, setShiftConfig] = useState(null);
+  // When no schedule resolves, this captures *why* — surfaced inline so the
+  // therapist (and their manager) can self-diagnose without DevTools.
+  const [scheduleDiagnostic, setScheduleDiagnostic] = useState(null);
 
   // Time Off Request Modal State
   const [showTimeOffModal, setShowTimeOffModal] = useState(false);
@@ -82,6 +85,44 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
         );
         setAppointments(myAppointments);
       }
+
+      // No schedule? Build a diagnostic so the therapist can see exactly
+      // why — they can then take it to their manager or fix Account linkage.
+      if (!scheduleData) {
+        try {
+          const [allSchedules, allEmployees] = await Promise.all([
+            mockApi.shiftSchedules.getAllSchedules(),
+            mockApi.employees.getEmployees(),
+          ]);
+          const myEmpId = user?.employeeId || null;
+          const myEmployee = myEmpId
+            ? allEmployees.find((e) => String(e._id) === String(myEmpId))
+            : null;
+          const matching = myEmpId
+            ? allSchedules.filter((s) => String(s.employeeId) === String(myEmpId))
+            : [];
+          const employeesWithSchedules = allSchedules
+            .map((s) => allEmployees.find((e) => String(e._id) === String(s.employeeId)))
+            .filter(Boolean)
+            .map((e) => `${e.firstName} ${e.lastName}`);
+
+          setScheduleDiagnostic({
+            employeeId: myEmpId,
+            employeeName: myEmployee
+              ? `${myEmployee.firstName} ${myEmployee.lastName}`
+              : null,
+            totalSchedules: allSchedules.length,
+            schedulesForMe: matching.length,
+            employeesWithSchedules: [...new Set(employeesWithSchedules)],
+          });
+        } catch (e) {
+          // Non-fatal — diagnostic is best-effort.
+          setScheduleDiagnostic(null);
+        }
+      } else {
+        setScheduleDiagnostic(null);
+      }
+
       if (onDataChange) onDataChange();
     } catch (error) {
       showToast('Failed to load schedule', 'error');
@@ -394,9 +435,57 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
 
       {/* No Schedule Warning */}
       {!mySchedule && (
-        <div className="alert alert-info" style={{ marginBottom: '16px' }}>
-          <span>ℹ️</span>
-          <span>No shift schedule has been assigned to you yet. Contact your manager to set up your schedule.</span>
+        <div className="alert alert-info" style={{ marginBottom: '16px', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+          {(() => {
+            const d = scheduleDiagnostic;
+            if (!d) {
+              return (
+                <span>
+                  <span style={{ marginRight: '6px' }}>ℹ️</span>
+                  No shift schedule has been assigned to you yet. Contact your manager to set up your schedule.
+                </span>
+              );
+            }
+            // No employeeId on the user record — account isn't linked at all.
+            if (!d.employeeId) {
+              return (
+                <>
+                  <strong>⚠️ Your account is not linked to an employee record.</strong>
+                  <span>
+                    Ask your manager to open <em>Employees → Accounts</em>, edit your account, and assign it to your employee record. Until then, your schedule, attendance and clock-in won't work.
+                  </span>
+                </>
+              );
+            }
+            // employeeId set, but no employee record matches — broken link.
+            if (!d.employeeName) {
+              return (
+                <>
+                  <strong>⚠️ Your account links to an employee record that no longer exists.</strong>
+                  <span style={{ fontSize: '0.85rem', color: '#666' }}>
+                    Linked id: …{String(d.employeeId).slice(-8)}. Total schedules on this device: {d.totalSchedules}.
+                  </span>
+                  <span>Ask your manager to re-assign you in <em>Employees → Accounts</em>.</span>
+                </>
+              );
+            }
+            // employeeId valid, but no schedule for it — the linked employee
+            // simply doesn't have a schedule. Show who DOES so the manager
+            // can spot mis-assignment immediately.
+            return (
+              <>
+                <strong>ℹ️ No shift schedule has been assigned to {d.employeeName}.</strong>
+                {d.employeesWithSchedules.length > 0 ? (
+                  <span style={{ fontSize: '0.85rem', color: '#666' }}>
+                    {d.totalSchedules} schedule(s) exist on this device, for: {d.employeesWithSchedules.join(', ')}.
+                    {' '}If your account should be linked to one of those employees, ask your manager to fix the link in <em>Employees → Accounts</em>.
+                  </span>
+                ) : (
+                  <span>Ask your manager to create a schedule for you in the Shift Schedules page.</span>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 

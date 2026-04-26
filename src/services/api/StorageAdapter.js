@@ -23,6 +23,73 @@ const delay = () => Promise.resolve();
 // Clone helper
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
+/**
+ * Resolve the active shift schedule for an employee.
+ *
+ * The repository's strict equality + multi-tenant filter occasionally misses
+ * legitimate schedules — most often because:
+ *   1. employeeId drifted between number and string somewhere in the sync
+ *      pipeline (Supabase column type change, JSON re-serialization, etc.)
+ *   2. The synced schedule row is missing businessId, so the tenant filter
+ *      hides it from the lookup that *did* set businessId
+ *   3. The therapist's user record isn't linked (user.employeeId is null) — a
+ *      data-setup mistake that needs a clearer error than "no schedule"
+ *
+ * This helper tries the strict path first, then a tolerant scan, and returns
+ * a structured result so the caller can surface the right error.
+ */
+const resolveActiveSchedule = async (employeeId) => {
+  if (!employeeId) {
+    return { schedule: null, reason: 'no_employee_id' };
+  }
+
+  const direct = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
+  if (direct?.weeklySchedule) return { schedule: direct, reason: 'direct' };
+
+  const targetId = String(employeeId);
+  const allSchedules = await storageService.shiftSchedules.getAll({ skipTenantFilter: true });
+  const tolerant = allSchedules.find(
+    (s) => String(s.employeeId) === targetId && s.isActive && s.weeklySchedule
+  );
+  if (tolerant) {
+    console.warn(
+      '[ShiftSchedule] Direct lookup failed; recovered via tolerant scan.',
+      { employeeId, scheduleId: tolerant._id, scheduleBusinessId: tolerant.businessId }
+    );
+    return { schedule: tolerant, reason: 'tolerant' };
+  }
+
+  // Last resort: any inactive schedule for this employee at all? Helps the
+  // error message distinguish "never set up" from "got deactivated".
+  const anySchedule = allSchedules.find((s) => String(s.employeeId) === targetId);
+  return {
+    schedule: null,
+    reason: anySchedule ? 'inactive_only' : 'not_found',
+    debug: { employeeId, totalSchedules: allSchedules.length, anyForEmployee: !!anySchedule },
+  };
+};
+
+/**
+ * Throw a contextual error for a missing schedule. Centralises the message
+ * so clockIn / clockOut stay in sync.
+ */
+const throwScheduleMissingError = (resolution) => {
+  if (resolution.reason === 'no_employee_id') {
+    throw new Error(
+      'Your account is not linked to an employee record. Ask your manager to assign your employee in Employee Accounts.'
+    );
+  }
+  if (resolution.reason === 'inactive_only') {
+    throw new Error(
+      'Your shift schedule was deactivated. Ask your manager to re-activate it in the Shift Schedules page.'
+    );
+  }
+  console.warn('[ShiftSchedule] No schedule found.', resolution.debug);
+  throw new Error(
+    'No shift schedule set up for this employee. Please set up a shift schedule first in the Shift Schedules page.'
+  );
+};
+
 // Get current user's businessId (from Supabase auth or localStorage)
 const getCurrentBusinessId = () => {
   // First try authService (Supabase auth)
@@ -1286,10 +1353,11 @@ export const attendanceAdapter = {
     let shiftWarning = null;
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-    const schedule = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
-    if (!schedule?.weeklySchedule) {
-      throw new Error('No shift schedule set up for this employee. Please set up a shift schedule first in the Shift Schedules page.');
+    const scheduleResolution = await resolveActiveSchedule(employeeId);
+    if (!scheduleResolution.schedule) {
+      throwScheduleMissingError(scheduleResolution);
     }
+    const schedule = scheduleResolution.schedule;
 
     const dayShift = schedule.weeklySchedule[todayDay];
 
@@ -1354,10 +1422,10 @@ export const attendanceAdapter = {
     const nowTime = now.toTimeString().slice(0, 5); // HH:mm format
     const empId = String(employeeId);
 
-    // Validate shift schedule exists
-    const schedule = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
-    if (!schedule?.weeklySchedule) {
-      throw new Error('No shift schedule set up for this employee. Please set up a shift schedule first in the Shift Schedules page.');
+    // Validate shift schedule exists (uses tolerant lookup — see helper)
+    const scheduleResolution = await resolveActiveSchedule(employeeId);
+    if (!scheduleResolution.schedule) {
+      throwScheduleMissingError(scheduleResolution);
     }
 
     // First try today's records

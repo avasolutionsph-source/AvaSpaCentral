@@ -7,7 +7,7 @@ import AdvanceBookingsTab from '../components/AdvanceBookingsTab';
 import { getEmployeesForService, getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog } from '../components/shared';
 
-const Appointments = () => {
+const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast, user, canViewAll, isTherapist, getEffectiveBranchId } = useApp();
@@ -19,15 +19,26 @@ const Appointments = () => {
   const [services, setServices] = useState([]);
   const [rooms, setRooms] = useState([]);
 
-  // Honor ?tab=advance from the URL so the Schedule hub can deep-link
-  // straight to the Advance Bookings view (the Regular/Advance tabs are
-  // surfaced as top-level Schedule entries, not buried inside Appointments).
-  const initialTab = searchParams.get('tab') === 'advance' ? 'advance-bookings' : 'appointments';
+  // Embedded inside Schedule hub: the parent owns the Regular/Advance tab
+  // selection via defaultInnerTab. Standalone: honor ?tab=advance from URL.
+  const initialTab = embedded
+    ? (defaultInnerTab || 'appointments')
+    : (searchParams.get('tab') === 'advance' ? 'advance-bookings' : 'appointments');
   const [activeTab, setActiveTab] = useState(initialTab); // 'appointments' or 'advance-bookings'
 
-  // Keep the URL in sync when the inner tab changes so links/back-button work.
+  // When embedded, follow the parent's tab selection on subsequent renders.
+  useEffect(() => {
+    if (embedded && defaultInnerTab && defaultInnerTab !== activeTab) {
+      setActiveTab(defaultInnerTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, defaultInnerTab]);
+
+  // Keep the URL in sync when the inner tab changes — only on the standalone
+  // route, never when embedded (parent owns the URL).
   const switchTab = (tab) => {
     setActiveTab(tab);
+    if (embedded) return;
     if (tab === 'advance-bookings') {
       setSearchParams({ tab: 'advance' });
     } else {
@@ -587,39 +598,51 @@ const Appointments = () => {
     return <div className="page-loading"><div className="spinner"></div><p>Loading appointments...</p></div>;
   }
 
-  return (
-    <div className="appointments-page">
-      <div className="page-header">
-        <div>
-          <button
-            className="btn btn-secondary btn-sm back-to-calendar"
-            onClick={() => navigate('/calendar')}
-          >
-            ← Back to Calendar
-          </button>
-          <h1>Appointments</h1>
-          <p>{isTherapist() ? 'View your appointments' : 'Manage bookings and schedules'}</p>
-        </div>
-        {canViewAll() && activeTab === 'appointments' && (
-          <button className="btn btn-primary" onClick={() => openCreateModal()}>+ New Appointment</button>
-        )}
-      </div>
+  // Expose openCreateModal to the parent hub so the embedded view can be
+  // triggered from the hub's "+ New Appointment" button.
+  useEffect(() => {
+    if (onCreateRef) onCreateRef.current = () => openCreateModal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCreateRef]);
 
-      {/* Tabs */}
-      <div className="tabs-container mb-lg">
-        <button
-          className={`tab ${activeTab === 'appointments' ? 'active' : ''}`}
-          onClick={() => switchTab('appointments')}
-        >
-          Regular Appointments
-        </button>
-        <button
-          className={`tab ${activeTab === 'advance-bookings' ? 'active' : ''}`}
-          onClick={() => switchTab('advance-bookings')}
-        >
-          Advance Bookings
-        </button>
-      </div>
+  return (
+    <div className={`appointments-page ${embedded ? 'embedded' : ''}`}>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <button
+              className="btn btn-secondary btn-sm back-to-calendar"
+              onClick={() => navigate('/calendar')}
+            >
+              ← Back to Calendar
+            </button>
+            <h1>Appointments</h1>
+            <p>{isTherapist() ? 'View your appointments' : 'Manage bookings and schedules'}</p>
+          </div>
+          {canViewAll() && activeTab === 'appointments' && (
+            <button className="btn btn-primary" onClick={() => openCreateModal()}>+ New Appointment</button>
+          )}
+        </div>
+      )}
+
+      {/* Inner Regular/Advance tabs — hidden when embedded because the parent
+          Schedule hub already surfaces these as top-level tabs. */}
+      {!embedded && (
+        <div className="tabs-container mb-lg">
+          <button
+            className={`tab ${activeTab === 'appointments' ? 'active' : ''}`}
+            onClick={() => switchTab('appointments')}
+          >
+            Regular Appointments
+          </button>
+          <button
+            className={`tab ${activeTab === 'advance-bookings' ? 'active' : ''}`}
+            onClick={() => switchTab('advance-bookings')}
+          >
+            Advance Bookings
+          </button>
+        </div>
+      )}
 
       {activeTab === 'appointments' ? (
         <>

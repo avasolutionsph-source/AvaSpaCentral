@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import Appointments from './Appointments';
+import Attendance from './Attendance';
 import {
   format,
   startOfMonth,
@@ -20,8 +22,28 @@ import { formatTime12Hour } from '../utils/dateUtils';
 import '../assets/css/hub-pages.css';
 
 const Calendar = () => {
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showToast, getEffectiveBranchId } = useApp();
+
+  // Schedule hub tabs swap content inline instead of navigating away.
+  // Persisted in the URL so refresh / share-link / back-button all work.
+  const VALID_TABS = ['calendar', 'appointments', 'advance', 'attendance'];
+  const initialHubTab = VALID_TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'calendar';
+  const [activeHubTab, setActiveHubTab] = useState(initialHubTab);
+  const appointmentsCreateRef = useRef(null);
+  const switchHubTab = (tab) => {
+    setActiveHubTab(tab);
+    if (tab === 'calendar') setSearchParams({});
+    else setSearchParams({ tab });
+  };
+
+  // Keep state in sync with URL changes (back/forward buttons, deep-link nav).
+  useEffect(() => {
+    const urlTab = searchParams.get('tab');
+    const next = VALID_TABS.includes(urlTab) ? urlTab : 'calendar';
+    if (next !== activeHubTab) setActiveHubTab(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState('month'); // 'month', 'week', 'day'
@@ -935,39 +957,72 @@ const Calendar = () => {
             </div>
           </div>
           <div className="hub-header-actions">
-            <button className="btn btn-primary" onClick={() => openCreateModal(selectedDate || currentDate)}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (activeHubTab === 'appointments' || activeHubTab === 'advance') {
+                  appointmentsCreateRef.current?.();
+                } else {
+                  openCreateModal(selectedDate || currentDate);
+                }
+              }}
+            >
               + New Appointment
             </button>
           </div>
         </div>
 
-        {/* Schedule hub navigation. Regular Appointments and Advance Bookings
-            are top-level entries here so users don't have to dig through the
-            Appointments page's inner tabs. Shift Schedules moved to the
+        {/* Schedule hub navigation. Tabs swap content inline so users stay on
+            this page (no full navigation). Shift Schedules moved to the
             Employees hub since they're employee-management. */}
         <div className="sales-tabs">
           <button
-            className="sales-tab"
-            onClick={() => navigate('/appointments')}
+            className={`sales-tab ${activeHubTab === 'calendar' ? 'active' : ''}`}
+            onClick={() => switchHubTab('calendar')}
+          >
+            <span>Calendar</span>
+          </button>
+          <button
+            className={`sales-tab ${activeHubTab === 'appointments' ? 'active' : ''}`}
+            onClick={() => switchHubTab('appointments')}
           >
             <span>Regular Appointments</span>
           </button>
           <button
-            className="sales-tab"
-            onClick={() => navigate('/appointments?tab=advance')}
+            className={`sales-tab ${activeHubTab === 'advance' ? 'active' : ''}`}
+            onClick={() => switchHubTab('advance')}
           >
             <span>Advance Bookings</span>
           </button>
           <button
-            className="sales-tab"
-            onClick={() => navigate('/attendance')}
+            className={`sales-tab ${activeHubTab === 'attendance' ? 'active' : ''}`}
+            onClick={() => switchHubTab('attendance')}
           >
             <span>Attendance</span>
           </button>
         </div>
       </div>
 
+      {/* Hub content swaps based on active tab. Calendar lives at the root;
+          Appointments / Attendance render embedded so the parent header stays. */}
+      {activeHubTab === 'appointments' && (
+        <div className="hub-content">
+          <Appointments embedded defaultInnerTab="regular" onCreateRef={appointmentsCreateRef} />
+        </div>
+      )}
+      {activeHubTab === 'advance' && (
+        <div className="hub-content">
+          <Appointments embedded defaultInnerTab="advance" onCreateRef={appointmentsCreateRef} />
+        </div>
+      )}
+      {activeHubTab === 'attendance' && (
+        <div className="hub-content">
+          <Attendance embedded />
+        </div>
+      )}
+
       {/* Calendar Controls */}
+      {activeHubTab === 'calendar' && (
       <div className="hub-content">
         <div className="calendar-controls">
           <div className="calendar-nav">
@@ -1035,7 +1090,8 @@ const Calendar = () => {
         {view === 'week' && renderWeekView()}
         {view === 'day' && renderDayView()}
       </div>
-      </div>{/* end hub-content */}
+      </div>
+      )}{/* end hub-content / calendar tab */}
 
       {/* Event Detail Modal */}
       {showDetailModal && selectedEvent && (

@@ -11569,3 +11569,117 @@ a:focus:not(:focus-visible),
     padding: 8px 10px;
   }
 }
+
+/* ============================================================================
+   GLOBAL MOBILE FIXES
+   Catch-all rules for patterns that show up across many feature pages — wide
+   tables that have a `min-width` set but whose wrapper forgot `overflow-x`,
+   modals with fixed pixel widths exceeding the viewport, heatmap grids that
+   blow out horizontally, and dropdowns that stick out past the right edge.
+   Lives after every page-specific block so it wins specificity ties when
+   the page-specific rules forgot to handle the small-screen case.
+   ============================================================================ */
+@media (max-width: 768px) {
+  /* 1. Wide tables — let their container scroll horizontally instead of
+        forcing the whole page to scroll (which usually hides actions/headers
+        off-screen). Covers every wrapper variant we use in practice. */
+  .table-container,
+  .payroll-table-container,
+  .po-table-container,
+  .expenses-table-container,
+  .attendance-table-section,
+  .suppliers-table-container,
+  .data-table-wrapper,
+  .schedule-grid-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* If a `<table>` has a min-width but isn't wrapped, give it its own scroll
+     by promoting it to a block-level scroll container. Keeps semantic
+     headers but stops it from pushing the page wider than the viewport. */
+  table.attendance-table,
+  table.payroll-table,
+  table.po-table,
+  table.suppliers-table,
+  table.expenses-table,
+  table.data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* 2. Modal / dialog max-widths — many specific modals (variance-modal,
+        payslip-detail-modal, dsr-modal, edit modals) hard-code 500-700px.
+        Cap them to nearly the viewport so they're usable on phones. */
+  .modal,
+  .modal-content,
+  .modal-overlay > div,
+  .variance-modal,
+  .payslip-detail-modal,
+  .payslip-detail-modal .modal-content,
+  .dsr-modal,
+  .edit-modal,
+  .form-modal,
+  .config-modal,
+  .schedule-edit-modal {
+    max-width: calc(100vw - 24px) !important;
+    width: auto;
+  }
+
+  /* 3. Heatmap grids — the analytics heatmaps set min-width: 600-800px on
+        the inner grid. Wrap them in a horizontal scroller so the rest of
+        the page stays at viewport width. */
+  .heatmap-grid,
+  .schedule-grid-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* 4. Filter rows that forgot to wrap. Force flex-wrap so 4-5 chips/inputs
+        across stack onto multiple rows instead of bleeding off-screen. */
+  .filters-section,
+  .filters-row,
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+
+  /* 5. Any popover / dropdown menu wider than the viewport gets capped. */
+  .dropdown-menu,
+  .popover,
+  .filter-popover,
+  .calendar-popover {
+    max-width: calc(100vw - 24px);
+  }
+
+  /* 6. Forms — make sure 2/3-column form rows reflow to single column on
+        phones. Many feature pages set their own grid-template-columns and
+        forgot to override. */
+  .form-row,
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Very narrow phones (<= 414px) — extra tightening for the worst offenders. */
+@media (max-width: 414px) {
+  /* 7-column calendars (booking, appointments, shift schedules) get cramped
+     below 1fr-per-column. Allow horizontal scroll instead of microscopic
+     cells so users can still tap days. */
+  .luxe-calendar-grid,
+  .calendar-grid,
+  .schedule-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Cap modals to leave a 12px gutter so they don't kiss the screen edge. */
+  .modal,
+  .modal-content {
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto;
+  }
+}

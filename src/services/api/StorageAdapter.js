@@ -1437,11 +1437,11 @@ export const attendanceAdapter = {
     const nowTime = now.toTimeString().slice(0, 5); // HH:mm format
     const empId = String(employeeId);
 
-    // Validate shift schedule exists (uses tolerant lookup — see helper)
-    const scheduleResolution = await resolveActiveSchedule(employeeId);
-    if (!scheduleResolution.schedule) {
-      throwScheduleMissingError(scheduleResolution);
-    }
+    // Clock-out is intentionally permissive: as long as the employee has an
+    // open clock-in record, they're allowed to clock out. We don't gate on
+    // an active shift schedule (the row to close already exists) and we
+    // don't compare clock-out time to clock-in time — clock skew and
+    // overnight shifts otherwise wrongly blocked legitimate clock-outs.
 
     // First try today's records
     let existing = await storageService.attendance.find(
@@ -1449,7 +1449,6 @@ export const attendanceAdapter = {
     );
 
     // If not found, try yesterday (overnight shift - e.g., clocked in at 8PM, clocking out at 2AM)
-    let isOvernightClockOut = false;
     if (existing.length === 0) {
       const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
@@ -1457,7 +1456,6 @@ export const attendanceAdapter = {
       existing = await storageService.attendance.find(
         a => String(a.employeeId) === empId && a.date === yesterdayStr && a.clockIn && !a.clockOut
       );
-      if (existing.length > 0) isOvernightClockOut = true;
     }
 
     if (existing.length === 0) {
@@ -1465,16 +1463,6 @@ export const attendanceAdapter = {
     }
 
     const record = existing[0];
-
-    // Validate clock out is after clock in (only for same-day shifts)
-    if (!isOvernightClockOut) {
-      const clockInParts = record.clockIn.split(':');
-      const clockInMinutes = parseInt(clockInParts[0]) * 60 + parseInt(clockInParts[1]);
-      const clockOutMinutes = now.getHours() * 60 + now.getMinutes();
-      if (clockOutMinutes <= clockInMinutes) {
-        throw new Error('Clock out time must be after clock in time');
-      }
-    }
 
     const updated = await storageService.attendance.update(record._id, {
       clockOut: nowTime,

@@ -53,8 +53,17 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
   const loadData = async () => {
     setLoading(true);
     try {
+      // Prefer the direct employeeId link from the user profile. The legacy
+      // getMySchedule(userId) path scans employees for a `userId` reverse
+      // link that isn't actually populated by Employee Accounts, so the
+      // schedule never resolves for therapists. Fall back to it only when
+      // the profile is missing employeeId.
+      const schedulePromise = user?.employeeId
+        ? mockApi.shiftSchedules.getScheduleByEmployee(user.employeeId)
+        : (user?._id ? mockApi.shiftSchedules.getMySchedule(user._id) : Promise.resolve(null));
+
       const [scheduleData, configData, appointmentsData, timeOffData] = await Promise.all([
-        user?._id ? mockApi.shiftSchedules.getMySchedule(user._id) : Promise.resolve(null),
+        schedulePromise,
         mockApi.shiftSchedules.getShiftConfig(),
         mockApi.appointments.getAppointments(),
         user?.employeeId

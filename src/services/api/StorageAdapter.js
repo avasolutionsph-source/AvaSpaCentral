@@ -2010,16 +2010,31 @@ export const shiftSchedulesAdapter = {
 
   async getScheduleByEmployee(employeeId) {
     await delay();
-    const schedule = await storageService.shiftSchedules.getScheduleByEmployee(employeeId);
-    return schedule ? clone(schedule) : null;
+    const resolution = await resolveActiveSchedule(employeeId);
+    return resolution.schedule ? clone(resolution.schedule) : null;
   },
 
   async getMySchedule(userId) {
     await delay();
-    // Get employees to find user's employee record
-    const employees = await storageService.employees.getAll();
-    const schedule = await storageService.shiftSchedules.getMySchedule(userId, employees);
-    return schedule ? clone(schedule) : null;
+    // Resolve the user's linked employeeId. Employee Accounts only populates
+    // the forward link (`users.employeeId`), not the reverse `employees.userId`,
+    // so the original employees-scan path never finds a match.
+    let employeeId = null;
+    try {
+      const userRecord = await storageService.users.getById(userId);
+      if (userRecord?.employeeId) employeeId = userRecord.employeeId;
+    } catch (e) {
+      // users repo may not be available in some test contexts — fall through
+    }
+    if (!employeeId) {
+      const employees = await storageService.employees.getAll();
+      const fallback = employees.find((e) => e.userId === userId);
+      if (fallback) employeeId = fallback._id;
+    }
+    if (!employeeId) return null;
+
+    const resolution = await resolveActiveSchedule(employeeId);
+    return resolution.schedule ? clone(resolution.schedule) : null;
   },
 
   async createSchedule(scheduleData) {

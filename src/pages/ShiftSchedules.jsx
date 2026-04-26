@@ -375,14 +375,15 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
         </div>
         )}
         <div className="header-actions">
-          {employeesWithoutSchedules.length > 0 && (
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowAddEmployeeModal(true)}
-            >
-              + Add Employee
-            </button>
-          )}
+          {/* Always show the button — the modal's empty state explains when
+              every employee in this branch already has a schedule. Hiding it
+              led managers to think they couldn't schedule anyone new. */}
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowAddEmployeeModal(true)}
+          >
+            + Add Employee
+          </button>
           <button
             className="btn btn-success"
             onClick={async () => {
@@ -854,9 +855,27 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
             </div>
             <div className="modal-body">
               {employeesWithoutSchedules.length === 0 ? (
-                <div className="empty-state">
+                <div className="empty-state" style={{ textAlign: 'center', padding: '24px 12px' }}>
                   <h3>No Employees Available</h3>
-                  <p>All active employees already have schedules</p>
+                  <p style={{ marginBottom: '12px' }}>
+                    All active employees in this branch already have a schedule.
+                  </p>
+                  <p style={{ fontSize: '0.9rem', color: '#666', lineHeight: 1.5 }}>
+                    To schedule someone new, first add them as an employee in
+                    <strong> Employees → Employees</strong>. Branch Owners can only see
+                    employees in their own branch — if the person you're trying to
+                    schedule is in a different branch, an Owner-role user must do it.
+                  </p>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ marginTop: '16px' }}
+                    onClick={() => {
+                      setShowAddEmployeeModal(false);
+                      navigate('/employees');
+                    }}
+                  >
+                    Go to Employees
+                  </button>
                 </div>
               ) : (
                 <div className="employee-select-list">

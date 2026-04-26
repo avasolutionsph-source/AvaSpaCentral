@@ -360,37 +360,24 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
     );
   }
 
-  return (
-    <div className={`shift-schedules-page ${embedded ? 'embedded' : ''}`}>
-      {/* Header — when embedded inside HRHub the hub owns the page title and
-          back navigation, so we drop the heading block and keep just the
-          action buttons (Add Employee / Sync All / Configure / Time-Off). */}
-      <div className="page-header">
-        {!embedded && (
-        <div>
-          <button
-            className="btn btn-secondary btn-sm back-to-calendar"
-            onClick={() => navigate('/calendar')}
-          >
-            ← Back to Calendar
-          </button>
-          <h1>Shift Schedules</h1>
-          <p>Manage employee work schedules and shifts</p>
-        </div>
-        )}
-        <div className="header-actions">
-          {/* Always show the button — the modal's empty state explains when
-              every employee in this branch already has a schedule. Hiding it
-              led managers to think they couldn't schedule anyone new. */}
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowAddEmployeeModal(true)}
-          >
-            + Add Employee
-          </button>
-          <button
-            className="btn btn-success"
-            onClick={async () => {
+  // Action buttons are extracted so they can be rendered inside .page-header
+  // when standalone, OR inside a separate container when embedded — the hub's
+  // global CSS rule `.hub-content .page-header { display: none }` would
+  // otherwise hide them entirely along with the title block.
+  const actionButtons = (
+    <div className="header-actions">
+      {/* Always show the button — the modal's empty state explains when
+          every employee in this branch already has a schedule. Hiding it
+          led managers to think they couldn't schedule anyone new. */}
+      <button
+        className="btn btn-primary"
+        onClick={() => setShowAddEmployeeModal(true)}
+      >
+        + Add Employee
+      </button>
+      <button
+        className="btn btn-success"
+        onClick={async () => {
               try {
                 showToast('Syncing all schedules...', 'info');
                 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -437,19 +424,45 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
           >
             Configure Shifts
           </button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowTimeOffModal(true)}
-          >
-            Time-Off Requests
-            {pendingRequests > 0 && (
-              <span className="badge badge-warning" style={{ marginLeft: '8px' }}>
-                {pendingRequests}
-              </span>
-            )}
-          </button>
+      <button
+        className="btn btn-secondary"
+        onClick={() => setShowTimeOffModal(true)}
+      >
+        Time-Off Requests
+        {pendingRequests > 0 && (
+          <span className="badge badge-warning" style={{ marginLeft: '8px' }}>
+            {pendingRequests}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+
+  return (
+    <div className={`shift-schedules-page ${embedded ? 'embedded' : ''}`}>
+      {/* Standalone: title + actions inside page-header (CSS centers/spaces them).
+          Embedded inside HRHub: hub owns the title; render actions in a
+          separate container so the hub's `.hub-content .page-header { display: none }`
+          rule doesn't accidentally hide the buttons too. */}
+      {!embedded ? (
+        <div className="page-header">
+          <div>
+            <button
+              className="btn btn-secondary btn-sm back-to-calendar"
+              onClick={() => navigate('/calendar')}
+            >
+              ← Back to Calendar
+            </button>
+            <h1>Shift Schedules</h1>
+            <p>Manage employee work schedules and shifts</p>
+          </div>
+          {actionButtons}
         </div>
-      </div>
+      ) : (
+        <div className="shift-schedules-embedded-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--spacing-lg)', flexWrap: 'wrap' }}>
+          {actionButtons}
+        </div>
+      )}
 
       {/* Week Navigation */}
       <div className="week-navigation">

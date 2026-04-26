@@ -387,23 +387,22 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
   const stats = calculateStats();
   const pendingRequests = timeOffRequests.filter(r => r.status === 'pending').length;
 
-  // TEMP DIAGNOSTIC — remove once the "22 day shifts for 4 employees" report
-  // is resolved. Each schedule's per-day breakdown is logged inline (one
-  // line per employee) so it's readable in the console without expanding
-  // group trees, which sometimes don't render the inner contents in
-  // production bundles.
-  if (typeof window !== 'undefined') {
-    /* eslint-disable no-console */
-    console.log(
-      `[ShiftSchedules debug] schedules=${schedules.length} filtered=${filteredSchedules.length} ` +
-      `dayShifts=${stats.dayShifts} night=${stats.nightShifts} off=${stats.daysOff}`
-    );
-    filteredSchedules.forEach(s => {
-      const perDay = DAYS.map(d => `${d.slice(0, 3)}=${s.weeklySchedule?.[d]?.shift ?? 'NONE'}`).join(' ');
-      console.log(`[ShiftSchedules debug] ${s.employeeName || s.employeeId}: ${perDay}`);
-    });
-    /* eslint-enable no-console */
-  }
+  // TEMP DIAGNOSTIC — rendered on-page (not console) so the per-employee
+  // breakdown is visible regardless of build minification or browser
+  // console behaviour. Remove once the "22 day shifts for 4 employees"
+  // report is resolved.
+  const debugRows = filteredSchedules.map(s => {
+    const counts = { day: 0, night: 0, off: 0, other: 0 };
+    const perDay = DAYS.map(d => {
+      const sh = s.weeklySchedule?.[d]?.shift ?? 'NONE';
+      if (sh === 'day' || sh === 'wholeDay') counts.day++;
+      else if (sh === 'night') counts.night++;
+      else if (sh === 'off') counts.off++;
+      else counts.other++;
+      return `${d.slice(0, 3)}=${sh}`;
+    }).join(' ');
+    return { name: s.employeeName || s.employeeId, perDay, counts };
+  });
 
   if (loading) {
     return (
@@ -555,6 +554,33 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
           <div className="stat-value">{stats.daysOff}</div>
           <div className="stat-label">Days Off</div>
         </div>
+      </div>
+
+      {/* TEMP DEBUG PANEL — remove once the count discrepancy is resolved */}
+      <div style={{
+        background: '#fff8dc',
+        border: '2px solid #d4a017',
+        borderRadius: '8px',
+        padding: '12px 16px',
+        margin: '16px 0',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        lineHeight: '1.6',
+        color: '#333',
+        overflowX: 'auto',
+      }}>
+        <div style={{ fontWeight: 700, marginBottom: '8px', color: '#7a1c1c' }}>
+          DEBUG (temporary): schedules={schedules.length} · filteredSchedules={filteredSchedules.length} · dayShifts={stats.dayShifts} · night={stats.nightShifts} · off={stats.daysOff} · totalSlots={filteredSchedules.length * 7}
+        </div>
+        {debugRows.length === 0 ? (
+          <div>No filtered schedules to display.</div>
+        ) : (
+          debugRows.map((r, i) => (
+            <div key={i} style={{ whiteSpace: 'nowrap' }}>
+              <strong>{r.name}</strong> — day:{r.counts.day} night:{r.counts.night} off:{r.counts.off} other:{r.counts.other} | {r.perDay}
+            </div>
+          ))
+        )}
       </div>
 
       {/* Filters */}

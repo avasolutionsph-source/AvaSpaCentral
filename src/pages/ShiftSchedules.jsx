@@ -15,7 +15,7 @@ import {
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-const ShiftSchedules = () => {
+const ShiftSchedules = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
   const { showToast, hasManagementAccess, user, getEffectiveBranchId } = useApp();
 
@@ -357,9 +357,12 @@ const ShiftSchedules = () => {
   }
 
   return (
-    <div className="shift-schedules-page">
-      {/* Header */}
+    <div className={`shift-schedules-page ${embedded ? 'embedded' : ''}`}>
+      {/* Header — when embedded inside HRHub the hub owns the page title and
+          back navigation, so we drop the heading block and keep just the
+          action buttons (Add Employee / Sync All / Configure / Time-Off). */}
       <div className="page-header">
+        {!embedded && (
         <div>
           <button
             className="btn btn-secondary btn-sm back-to-calendar"
@@ -370,6 +373,7 @@ const ShiftSchedules = () => {
           <h1>Shift Schedules</h1>
           <p>Manage employee work schedules and shifts</p>
         </div>
+        )}
         <div className="header-actions">
           {employeesWithoutSchedules.length > 0 && (
             <button

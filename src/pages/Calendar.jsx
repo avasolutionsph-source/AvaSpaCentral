@@ -941,25 +941,28 @@ const Calendar = () => {
           </div>
         </div>
 
-        {/* Manage navigation buttons */}
+        {/* Schedule hub navigation. Regular Appointments and Advance Bookings
+            are top-level entries here so users don't have to dig through the
+            Appointments page's inner tabs. Shift Schedules moved to the
+            Employees hub since they're employee-management. */}
         <div className="sales-tabs">
           <button
             className="sales-tab"
             onClick={() => navigate('/appointments')}
           >
-            <span>Appointments</span>
+            <span>Regular Appointments</span>
+          </button>
+          <button
+            className="sales-tab"
+            onClick={() => navigate('/appointments?tab=advance')}
+          >
+            <span>Advance Bookings</span>
           </button>
           <button
             className="sales-tab"
             onClick={() => navigate('/attendance')}
           >
             <span>Attendance</span>
-          </button>
-          <button
-            className="sales-tab"
-            onClick={() => navigate('/shift-schedules')}
-          >
-            <span>Shift Schedules</span>
           </button>
         </div>
       </div>

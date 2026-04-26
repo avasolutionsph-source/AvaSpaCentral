@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO } from 'date-fns';
@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/shared';
 
 const Appointments = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showToast, user, canViewAll, isTherapist, getEffectiveBranchId } = useApp();
 
   const [loading, setLoading] = useState(true);
@@ -18,7 +19,21 @@ const Appointments = () => {
   const [services, setServices] = useState([]);
   const [rooms, setRooms] = useState([]);
 
-  const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' or 'advance-bookings'
+  // Honor ?tab=advance from the URL so the Schedule hub can deep-link
+  // straight to the Advance Bookings view (the Regular/Advance tabs are
+  // surfaced as top-level Schedule entries, not buried inside Appointments).
+  const initialTab = searchParams.get('tab') === 'advance' ? 'advance-bookings' : 'appointments';
+  const [activeTab, setActiveTab] = useState(initialTab); // 'appointments' or 'advance-bookings'
+
+  // Keep the URL in sync when the inner tab changes so links/back-button work.
+  const switchTab = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'advance-bookings') {
+      setSearchParams({ tab: 'advance' });
+    } else {
+      setSearchParams({});
+    }
+  };
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'list'
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [filterStatus, setFilterStatus] = useState('all');
@@ -594,13 +609,13 @@ const Appointments = () => {
       <div className="tabs-container mb-lg">
         <button
           className={`tab ${activeTab === 'appointments' ? 'active' : ''}`}
-          onClick={() => setActiveTab('appointments')}
+          onClick={() => switchTab('appointments')}
         >
           Regular Appointments
         </button>
         <button
           className={`tab ${activeTab === 'advance-bookings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('advance-bookings')}
+          onClick={() => switchTab('advance-bookings')}
         >
           Advance Bookings
         </button>

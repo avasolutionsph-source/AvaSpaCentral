@@ -8,6 +8,7 @@ import Attendance from './Attendance';
 import Payroll from './Payroll';
 import EmployeeAccounts from './EmployeeAccounts';
 import HRRequests from './HRRequests';
+import ShiftSchedules from './ShiftSchedules';
 import OTRequestRepository from '../services/storage/repositories/OTRequestRepository';
 import LeaveRequestRepository from '../services/storage/repositories/LeaveRequestRepository';
 import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
@@ -118,6 +119,11 @@ const HRHub = () => {
       badge: null
     },
     {
+      id: 'shift-schedules',
+      label: 'Shift Schedules',
+      badge: null
+    },
+    {
       id: 'requests',
       label: 'Requests',
       badge: stats.pendingHRRequests > 0 ? stats.pendingHRRequests : null,
@@ -218,6 +224,7 @@ const HRHub = () => {
       <div className="hub-content">
         {activeTab === 'employees' && <Employees embedded onDataChange={loadStats} onOpenCreateRef={employeesOpenCreateRef} />}
         {activeTab === 'attendance' && <Attendance embedded onDataChange={loadStats} />}
+        {activeTab === 'shift-schedules' && <ShiftSchedules embedded onDataChange={loadStats} />}
         {activeTab === 'requests' && <HRRequests embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} onCalculateRef={payrollCalculateRef} onRemittancesRef={payrollRemittancesRef} onPayslipsRef={payrollPayslipsRef} />}
         {activeTab === 'accounts' && (isOwner() || isManager() || isBranchOwner()) && <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />}

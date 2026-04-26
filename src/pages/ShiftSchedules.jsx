@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, isBranchLockedRole } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { formatTime12Hour, formatTimeRange } from '../utils/dateUtils';
 import {
@@ -57,10 +57,13 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  // Load data
+  // Load data — re-runs when the active branch changes so a switch to
+  // another branch (or a delayed branch-context init on first mount)
+  // doesn't leave stale all-business schedules in state.
   useEffect(() => {
     loadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?._id, user?.branchId, getEffectiveBranchId()]);
 
   const loadData = async () => {
     setLoading(true);
@@ -73,12 +76,23 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
         mockApi.shiftSchedules.getTimeOffRequests()
       ]);
 
-      // Filter data by branch — strict match. Legacy NULL-branchId records
-      // were backfilled to Naga in the shift-schedule branch-scope migration.
-      const effectiveBranchId = getEffectiveBranchId();
+      // Resolve the branch we should scope to. For branch-locked roles
+      // (Manager / Branch Owner / Receptionist / Therapist / Rider / Utility)
+      // fall back to user.branchId — never leave the filter off, because
+      // omitting it leaks every other branch's schedules and employees into
+      // this view's stat cards.
+      let effectiveBranchId = getEffectiveBranchId();
+      if (!effectiveBranchId && isBranchLockedRole(user?.role) && user?.branchId) {
+        effectiveBranchId = user.branchId;
+      }
       if (effectiveBranchId) {
         schedulesData = schedulesData.filter(item => item.branchId === effectiveBranchId);
         employeesData = employeesData.filter(item => item.branchId === effectiveBranchId);
+      } else if (isBranchLockedRole(user?.role)) {
+        // Branch-locked user but no resolvable branch — fail safe, show empty
+        // rather than silently leak the entire business worth of schedules.
+        schedulesData = [];
+        employeesData = [];
       }
 
       setSchedules(schedulesData.filter(s => s.isActive));

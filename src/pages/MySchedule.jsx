@@ -98,6 +98,9 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
           const myEmployee = myEmpId
             ? allEmployees.find((e) => String(e._id) === String(myEmpId))
             : null;
+          // Match against ALL schedules — including inactive ones — so we can
+          // tell apart "no schedule" from "schedule exists but isActive=false"
+          // from "schedule exists but weeklySchedule is empty".
           const matching = myEmpId
             ? allSchedules.filter((s) => String(s.employeeId) === String(myEmpId))
             : [];
@@ -106,15 +109,54 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
             .filter(Boolean)
             .map((e) => `${e.firstName} ${e.lastName}`);
 
+          // Dump everything to the console so we have a paste-able record
+          // that pinpoints the exact mismatch.
+          // eslint-disable-next-line no-console
+          console.log('[MySchedule] Diagnostic:', {
+            user: {
+              _id: user?._id,
+              employeeId: user?.employeeId,
+              branchId: user?.branchId,
+              role: user?.role,
+              firstName: user?.firstName,
+              lastName: user?.lastName,
+            },
+            linkedEmployee: myEmployee ? {
+              _id: myEmployee._id,
+              firstName: myEmployee.firstName,
+              lastName: myEmployee.lastName,
+              branchId: myEmployee.branchId,
+              status: myEmployee.status,
+              userId: myEmployee.userId,
+            } : null,
+            schedulesForMyEmployeeId: matching.map((s) => ({
+              _id: s._id,
+              employeeId: s.employeeId,
+              employeeName: s.employeeName,
+              isActive: s.isActive,
+              hasWeeklySchedule: !!s.weeklySchedule,
+              branchId: s.branchId,
+              businessId: s.businessId,
+            })),
+            totalSchedules: allSchedules.length,
+            totalEmployees: allEmployees.length,
+          });
+
           setScheduleDiagnostic({
             employeeId: myEmpId,
             employeeName: myEmployee
               ? `${myEmployee.firstName} ${myEmployee.lastName}`
               : null,
             employeeBranchId: myEmployee?.branchId || null,
+            employeeStatus: myEmployee?.status || null,
             userBranchId: user?.branchId || null,
             totalSchedules: allSchedules.length,
             schedulesForMe: matching.length,
+            // What's wrong with the matching schedules, if any exist?
+            matchingDetail: matching.map((s) => ({
+              isActive: s.isActive !== false,
+              hasWeekly: !!s.weeklySchedule,
+            })),
             employeesWithSchedules: [...new Set(employeesWithSchedules)],
           });
         } catch (e) {
@@ -476,10 +518,28 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
             // can spot mis-assignment immediately.
             const branchMismatch =
               d.userBranchId && d.employeeBranchId && d.userBranchId !== d.employeeBranchId;
+            // If schedules DO exist for this employeeId but the resolver
+            // rejected them, name the rejection reason.
+            const brokenSchedules = (d.matchingDetail || []).length > 0;
+            const inactiveOnly = brokenSchedules && d.matchingDetail.every((m) => !m.isActive);
+            const emptyWeekly = brokenSchedules && d.matchingDetail.every((m) => !m.hasWeekly);
             return (
               <>
                 <strong>ℹ️ No shift schedule has been assigned to {d.employeeName}.</strong>
-                {branchMismatch && (
+                {brokenSchedules && (
+                  <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 500 }}>
+                    ⚠️ {d.schedulesForMe} schedule record(s) DO exist for your employee, but they were rejected:
+                    {inactiveOnly && ' all are marked inactive — manager needs to re-activate.'}
+                    {emptyWeekly && ' the weekly schedule data is empty — manager needs to fill in the days.'}
+                    {!inactiveOnly && !emptyWeekly && ' some other data issue — open the browser console for the full dump.'}
+                  </span>
+                )}
+                {!brokenSchedules && d.employeeStatus && d.employeeStatus !== 'active' && (
+                  <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 500 }}>
+                    ⚠️ Your employee record is marked <strong>{d.employeeStatus}</strong>. Managers won't see it in their employees list until it's set back to active.
+                  </span>
+                )}
+                {!brokenSchedules && branchMismatch && (
                   <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 500 }}>
                     ⚠️ Branch mismatch: your employee record sits in branch …{String(d.employeeBranchId).slice(-6)},
                     but your user account is locked to branch …{String(d.userBranchId).slice(-6)}.

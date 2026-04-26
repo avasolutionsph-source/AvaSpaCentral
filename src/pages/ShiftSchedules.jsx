@@ -119,6 +119,8 @@ const ShiftSchedules = () => {
         return { color: '#666666', label: 'Night Shift', abbr: 'N' };
       case 'wholeDay':
         return { color: '#1B5E37', label: 'Full Day', abbr: 'F' };
+      case 'custom':
+        return { color: '#7a1c1c', label: 'Custom', abbr: 'C' };
       case 'off':
         return { color: '#999999', label: 'Day Off', abbr: 'OFF' };
       default:
@@ -138,27 +140,40 @@ const ShiftSchedules = () => {
 
   // Update day shift
   const handleDayChange = (day, field, value) => {
-    setEditingSchedule(prev => ({
-      ...prev,
-      weeklySchedule: {
-        ...prev.weeklySchedule,
-        [day]: {
-          ...prev.weeklySchedule[day],
-          [field]: value,
-          // Auto-fill times when shift type changes
-          ...(field === 'shift' && shiftConfig ? {
-            startTime: value === 'off' ? null :
-              value === 'day' ? shiftConfig.dayShift.startTime :
-              value === 'night' ? shiftConfig.nightShift.startTime :
-              value === 'wholeDay' ? shiftConfig.wholeDayShift.startTime : null,
-            endTime: value === 'off' ? null :
-              value === 'day' ? shiftConfig.dayShift.endTime :
-              value === 'night' ? shiftConfig.nightShift.endTime :
-              value === 'wholeDay' ? shiftConfig.wholeDayShift.endTime : null
-          } : {})
+    setEditingSchedule(prev => {
+      const prevDay = prev.weeklySchedule[day] || {};
+      let timeOverrides = {};
+      if (field === 'shift' && shiftConfig) {
+        if (value === 'off') {
+          timeOverrides = { startTime: null, endTime: null };
+        } else if (value === 'day') {
+          timeOverrides = { startTime: shiftConfig.dayShift.startTime, endTime: shiftConfig.dayShift.endTime };
+        } else if (value === 'night') {
+          timeOverrides = { startTime: shiftConfig.nightShift.startTime, endTime: shiftConfig.nightShift.endTime };
+        } else if (value === 'wholeDay') {
+          timeOverrides = { startTime: shiftConfig.wholeDayShift.startTime, endTime: shiftConfig.wholeDayShift.endTime };
+        } else if (value === 'custom') {
+          // Seed with whatever times were already on the row (so switching from
+          // Day Shift -> Custom keeps that day's start/end editable instead of
+          // blanking them); fall back to a reasonable default.
+          timeOverrides = {
+            startTime: prevDay.startTime || '09:00',
+            endTime: prevDay.endTime || '18:00'
+          };
         }
       }
-    }));
+      return {
+        ...prev,
+        weeklySchedule: {
+          ...prev.weeklySchedule,
+          [day]: {
+            ...prevDay,
+            [field]: value,
+            ...timeOverrides
+          }
+        }
+      };
+    });
   };
 
   // Save schedule
@@ -662,25 +677,31 @@ const ShiftSchedules = () => {
                         <option value="day">Day Shift</option>
                         <option value="night">Night Shift</option>
                         <option value="wholeDay">Whole Day</option>
+                        <option value="custom">Custom</option>
                         <option value="off">Day Off</option>
                       </select>
-                      {daySchedule?.shift !== 'off' && (
-                        <>
-                          <input
-                            type="time"
-                            value={daySchedule?.startTime || ''}
-                            readOnly
-                            className="form-control time-input time-input-locked"
-                          />
-                          <span className="time-separator">to</span>
-                          <input
-                            type="time"
-                            value={daySchedule?.endTime || ''}
-                            readOnly
-                            className="form-control time-input time-input-locked"
-                          />
-                        </>
-                      )}
+                      {daySchedule?.shift !== 'off' && (() => {
+                        const isCustom = daySchedule?.shift === 'custom';
+                        return (
+                          <>
+                            <input
+                              type="time"
+                              value={daySchedule?.startTime || ''}
+                              onChange={isCustom ? (e) => handleDayChange(day, 'startTime', e.target.value) : undefined}
+                              readOnly={!isCustom}
+                              className={`form-control time-input ${isCustom ? '' : 'time-input-locked'}`}
+                            />
+                            <span className="time-separator">to</span>
+                            <input
+                              type="time"
+                              value={daySchedule?.endTime || ''}
+                              onChange={isCustom ? (e) => handleDayChange(day, 'endTime', e.target.value) : undefined}
+                              readOnly={!isCustom}
+                              className={`form-control time-input ${isCustom ? '' : 'time-input-locked'}`}
+                            />
+                          </>
+                        );
+                      })()}
                     </div>
                   );
                 })}

@@ -298,20 +298,28 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
     showToast('Service history exported successfully!', 'success');
   };
 
+  // Voided transactions stay visible in the list (with the VOIDED badge and
+  // strikethrough) so cashiers can audit them, but they must NOT contribute
+  // to revenue / transaction count / average / unique customer count or to
+  // employee performance — otherwise voiding the receipt has no financial
+  // effect on the dashboard, defeating the purpose of voiding it.
+  const billable = filteredTransactions.filter((t) => t.status !== 'voided');
+
   // Calculate summary
   const summary = {
-    revenue: filteredTransactions.reduce((sum, t) => sum + t.total, 0),
-    transactions: filteredTransactions.length,
-    average: filteredTransactions.length > 0 ?
-      filteredTransactions.reduce((sum, t) => sum + t.total, 0) / filteredTransactions.length : 0,
-    customers: new Set(filteredTransactions.map(t => t.customer.name)).size
+    revenue: billable.reduce((sum, t) => sum + t.total, 0),
+    transactions: billable.length,
+    average: billable.length > 0
+      ? billable.reduce((sum, t) => sum + t.total, 0) / billable.length
+      : 0,
+    customers: new Set(billable.map(t => t.customer.name)).size
   };
 
   // Calculate employee performance
   const calculateEmployeePerformance = () => {
     const employeeStats = {};
 
-    filteredTransactions.forEach(t => {
+    billable.forEach(t => {
       (t.items || []).forEach(item => {
         if (!employeeStats[item.employeeName]) {
           employeeStats[item.employeeName] = {

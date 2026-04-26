@@ -114,14 +114,36 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
   // Get unique departments
   const departments = [...new Set(employees.map(e => e.department).filter(Boolean))];
 
-  // Filter schedules
+  // Filter schedules.
+  //
+  // Anchor visibility to the branch-filtered `employees` list rather than
+  // trusting `schedule.branchId` alone. A schedule's branch tag can drift
+  // out of sync with where its employee actually works — e.g. the schedule
+  // was created while the viewer was in branch A so it inherited
+  // branchId=A, but the employee's home branch was B; or the employee was
+  // moved to another branch / deleted while their old schedule lingered.
+  // Without the employee-anchor, those orphan schedules slip past the
+  // branch filter at load time, inflate the stat cards (`Employees`,
+  // `Day Shifts`, etc. all read off filteredSchedules), and render ghost
+  // rows that don't correspond to any staff member in this branch — which
+  // is exactly the "4 employees pero 22 day shifts" symptom.
+  //
+  // Also dedups by employeeId so a stray duplicate active record (cloud
+  // sync race vs concurrent local create) doesn't double-count one person.
+  const seenEmployeeIds = new Set();
   const filteredSchedules = schedules.filter(schedule => {
-    if (!schedule.weeklySchedule) return false; // Skip invalid schedules
-    const matchesSearch = (schedule.employeeName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (schedule.employeePosition || '').toLowerCase().includes(searchTerm.toLowerCase());
+    if (!schedule.weeklySchedule) return false;
 
     const employee = employees.find(e => e._id === schedule.employeeId);
-    const matchesDept = filterDepartment === 'all' || employee?.department === filterDepartment;
+    if (!employee) return false;
+
+    if (seenEmployeeIds.has(schedule.employeeId)) return false;
+    seenEmployeeIds.add(schedule.employeeId);
+
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = (schedule.employeeName || '').toLowerCase().includes(term) ||
+                         (schedule.employeePosition || '').toLowerCase().includes(term);
+    const matchesDept = filterDepartment === 'all' || employee.department === filterDepartment;
 
     return matchesSearch && matchesDept;
   });

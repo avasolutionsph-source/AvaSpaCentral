@@ -372,6 +372,9 @@
 @media (max-width: 768px) {
   .appointments-page {
     padding: var(--spacing-md);
+    /* Belt-and-braces against children that try to overflow horizontally
+       (e.g. wide tab rows) and squeeze the calendar grid. */
+    overflow-x: hidden;
   }
 
   .appointments-page .calendar-grid {
@@ -379,12 +382,22 @@
   }
 
   .appointments-page .calendar-day {
-    min-height: 60px;
-    padding: 4px;
+    /* Bigger tap target — Apple/MD guidelines want ~44px and the old 60px
+       still felt cramped because the number was top-left while the entire
+       cell shrank against the appointments dots. Hold a comfortable height
+       so the last row (26-30) doesn't get squeezed when the bottom-nav
+       eats screen space. */
+    min-height: 56px;
+    padding: 6px 4px;
+    display: flex;
+    flex-direction: column;
   }
 
   .appointments-page .calendar-day-number {
-    font-size: 0.75rem;
+    font-size: 0.85rem;
+    /* Centered makes touch easier and visually balances the cell. */
+    text-align: center;
+    margin-bottom: 2px;
   }
 
   .calendar-appointment-dot {

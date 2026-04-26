@@ -707,6 +707,10 @@
 @media (max-width: 768px) {
   .reports-page {
     padding: var(--spacing-md);
+    /* Hard-cap any descendant table/grid so content can't push the page wider
+       than the viewport — the symptom on phones was a horizontal scrollbar
+       that hid Print / Export PDF off-screen. */
+    overflow-x: hidden;
   }
 
   .report-categories {
@@ -725,15 +729,24 @@
 
   .report-actions {
     width: 100%;
-    flex-direction: column;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
   }
 
   .report-actions .btn {
-    width: 100%;
+    flex: 1 1 calc(50% - var(--spacing-sm));
+    min-width: 0;
   }
 
   .report-filters {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Filter pill rows scroll horizontally instead of bleeding off-screen.
+     Keeps Save Report / Print buttons visible on the same screen. */
+  .report-filters > * {
+    width: 100%;
   }
 
   .filter-group {

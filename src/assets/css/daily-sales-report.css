@@ -298,6 +298,40 @@
   .dsr-grid-3 {
     grid-template-columns: 1fr;
   }
+
+  /* Toolbar: period chips on one row (horizontal scroll if needed) and the
+     action buttons (Save Report / Print) on a separate row below. Without
+     this they share a row that's wider than the viewport, hiding Print. */
+  .dsr-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .dsr-period-group {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+
+  .dsr-period-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .dsr-meta {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .dsr-meta .btn {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+
+  .dsr-sheet {
+    padding: 16px;
+  }
 }
 
 .dsr-field {

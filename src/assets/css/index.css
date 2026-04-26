@@ -1537,6 +1537,9 @@ select {
   top: calc(100% + 8px);
   right: 0;
   width: 380px;
+  /* Cap to viewport so the panel never bleeds off the right edge on phones.
+     16px breathing room on each side keeps it from kissing the screen. */
+  max-width: calc(100vw - 32px);
   max-height: 480px;
   background: white;
   border-radius: 12px;
@@ -1544,6 +1547,17 @@ select {
   z-index: var(--z-dropdown);
   overflow: hidden;
   animation: dropdownFadeIn 0.2s ease;
+}
+
+@media (max-width: 480px) {
+  .notification-dropdown {
+    /* Anchor with explicit left/right so even a wide bell trigger doesn't
+       push the panel past the screen edge. */
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
 }
 
 @keyframes dropdownFadeIn {

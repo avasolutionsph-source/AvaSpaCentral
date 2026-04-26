@@ -34,6 +34,14 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embedded, defaultInnerTab]);
 
+  // Expose openCreateModal to the parent hub so the embedded view can be
+  // triggered from the hub's "+ New Appointment" button. Must live above any
+  // early return — moving it below `if (loading)` triggered React #310.
+  useEffect(() => {
+    if (onCreateRef) onCreateRef.current = () => openCreateModal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCreateRef]);
+
   // Keep the URL in sync when the inner tab changes — only on the standalone
   // route, never when embedded (parent owns the URL).
   const switchTab = (tab) => {
@@ -597,13 +605,6 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
   if (loading) {
     return <div className="page-loading"><div className="spinner"></div><p>Loading appointments...</p></div>;
   }
-
-  // Expose openCreateModal to the parent hub so the embedded view can be
-  // triggered from the hub's "+ New Appointment" button.
-  useEffect(() => {
-    if (onCreateRef) onCreateRef.current = () => openCreateModal();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onCreateRef]);
 
   return (
     <div className={`appointments-page ${embedded ? 'embedded' : ''}`}>

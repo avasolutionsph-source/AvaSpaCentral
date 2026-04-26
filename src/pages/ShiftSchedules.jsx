@@ -388,35 +388,20 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
   const pendingRequests = timeOffRequests.filter(r => r.status === 'pending').length;
 
   // TEMP DIAGNOSTIC — remove once the "22 day shifts for 4 employees" report
-  // is resolved. Lets the user (and us) see exactly which schedules are
-  // feeding the stat cards, why the count is what it is, and whether any
-  // schedule has an unexpected weeklySchedule shape (extra day keys, mixed
-  // shift values, etc.).
+  // is resolved. Each schedule's per-day breakdown is logged inline (one
+  // line per employee) so it's readable in the console without expanding
+  // group trees, which sometimes don't render the inner contents in
+  // production bundles.
   if (typeof window !== 'undefined') {
     /* eslint-disable no-console */
-    console.groupCollapsed(
+    console.log(
       `[ShiftSchedules debug] schedules=${schedules.length} filtered=${filteredSchedules.length} ` +
       `dayShifts=${stats.dayShifts} night=${stats.nightShifts} off=${stats.daysOff}`
     );
-    console.log('employees in branch (visible to filter):', employees.map(e => ({
-      _id: e._id, name: `${e.firstName} ${e.lastName}`, branchId: e.branchId, dept: e.department
-    })));
-    console.log('schedules in state (post-load filter, isActive only):', schedules.map(s => ({
-      _id: s._id, employeeId: s.employeeId, name: s.employeeName, branchId: s.branchId,
-      dayKeys: Object.keys(s.weeklySchedule || {}),
-    })));
-    console.log('filteredSchedules (what stats iterate over):', filteredSchedules.map(s => {
-      const counts = { day: 0, night: 0, off: 0, other: 0 };
-      DAYS.forEach(d => {
-        const sh = s.weeklySchedule?.[d]?.shift;
-        if (sh === 'day' || sh === 'wholeDay') counts.day++;
-        else if (sh === 'night') counts.night++;
-        else if (sh === 'off') counts.off++;
-        else counts.other++;
-      });
-      return { name: s.employeeName, employeeId: s.employeeId, ...counts };
-    }));
-    console.groupEnd();
+    filteredSchedules.forEach(s => {
+      const perDay = DAYS.map(d => `${d.slice(0, 3)}=${s.weeklySchedule?.[d]?.shift ?? 'NONE'}`).join(' ');
+      console.log(`[ShiftSchedules debug] ${s.employeeName || s.employeeId}: ${perDay}`);
+    });
     /* eslint-enable no-console */
   }
 

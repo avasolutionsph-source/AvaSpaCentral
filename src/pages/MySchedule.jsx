@@ -477,89 +477,110 @@ const MySchedule = ({ embedded = false, onDataChange }) => {
         </div>
       </div>
 
-      {/* No Schedule Warning */}
-      {!mySchedule && (
-        <div className="alert alert-info" style={{ marginBottom: '16px', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
-          {(() => {
-            const d = scheduleDiagnostic;
-            if (!d) {
-              return (
-                <span>
-                  <span style={{ marginRight: '6px' }}>ℹ️</span>
-                  No shift schedule has been assigned to you yet. Contact your manager to set up your schedule.
-                </span>
-              );
+      {/* No Schedule Warning — clean card layout: icon + headline + (optional) explainer + (optional) action. */}
+      {!mySchedule && (() => {
+        const d = scheduleDiagnostic;
+        // Build a single, structured message: { tone, icon, title, detail?, action? }
+        let view;
+        if (!d) {
+          view = {
+            tone: 'info',
+            icon: 'ℹ️',
+            title: 'No shift schedule has been assigned to you yet.',
+            action: 'Contact your manager to set up your schedule.',
+          };
+        } else if (!d.employeeId) {
+          view = {
+            tone: 'warning',
+            icon: '⚠️',
+            title: 'Your account is not linked to an employee record.',
+            detail: 'Until your account is linked to an employee, your schedule, attendance and clock-in cannot work.',
+            action: 'Ask your manager to open Employees → Accounts, edit your account, and assign your employee.',
+          };
+        } else if (!d.employeeName) {
+          view = {
+            tone: 'warning',
+            icon: '⚠️',
+            title: 'Your account links to an employee record that no longer exists.',
+            detail: `Linked id: …${String(d.employeeId).slice(-8)}. Total schedules on this device: ${d.totalSchedules}.`,
+            action: 'Ask your manager to re-assign you in Employees → Accounts.',
+          };
+        } else {
+          const branchMismatch = d.userBranchId && d.employeeBranchId && d.userBranchId !== d.employeeBranchId;
+          const brokenSchedules = (d.matchingDetail || []).length > 0;
+          const inactiveOnly = brokenSchedules && d.matchingDetail.every((m) => !m.isActive);
+          const emptyWeekly = brokenSchedules && d.matchingDetail.every((m) => !m.hasWeekly);
+
+          let detail = null;
+          let action = 'Ask your manager to create a schedule for you in the Shift Schedules page.';
+
+          if (brokenSchedules) {
+            if (inactiveOnly) {
+              detail = `${d.schedulesForMe} schedule(s) exist for your employee but all are marked inactive.`;
+              action = 'Ask your manager to re-activate your schedule.';
+            } else if (emptyWeekly) {
+              detail = `${d.schedulesForMe} schedule(s) exist for your employee but the weekly data is empty.`;
+              action = 'Ask your manager to fill in the days in the Shift Schedules page.';
+            } else {
+              detail = `${d.schedulesForMe} schedule record(s) exist for your employee but were rejected. Open the browser console for the full dump.`;
             }
-            // No employeeId on the user record — account isn't linked at all.
-            if (!d.employeeId) {
-              return (
-                <>
-                  <strong>⚠️ Your account is not linked to an employee record.</strong>
-                  <span>
-                    Ask your manager to open <em>Employees → Accounts</em>, edit your account, and assign it to your employee record. Until then, your schedule, attendance and clock-in won't work.
-                  </span>
-                </>
-              );
-            }
-            // employeeId set, but no employee record matches — broken link.
-            if (!d.employeeName) {
-              return (
-                <>
-                  <strong>⚠️ Your account links to an employee record that no longer exists.</strong>
-                  <span style={{ fontSize: '0.85rem', color: '#666' }}>
-                    Linked id: …{String(d.employeeId).slice(-8)}. Total schedules on this device: {d.totalSchedules}.
-                  </span>
-                  <span>Ask your manager to re-assign you in <em>Employees → Accounts</em>.</span>
-                </>
-              );
-            }
-            // employeeId valid, but no schedule for it — the linked employee
-            // simply doesn't have a schedule. Show who DOES so the manager
-            // can spot mis-assignment immediately.
-            const branchMismatch =
-              d.userBranchId && d.employeeBranchId && d.userBranchId !== d.employeeBranchId;
-            // If schedules DO exist for this employeeId but the resolver
-            // rejected them, name the rejection reason.
-            const brokenSchedules = (d.matchingDetail || []).length > 0;
-            const inactiveOnly = brokenSchedules && d.matchingDetail.every((m) => !m.isActive);
-            const emptyWeekly = brokenSchedules && d.matchingDetail.every((m) => !m.hasWeekly);
-            return (
-              <>
-                <strong>ℹ️ No shift schedule has been assigned to {d.employeeName}.</strong>
-                {brokenSchedules && (
-                  <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 500 }}>
-                    ⚠️ {d.schedulesForMe} schedule record(s) DO exist for your employee, but they were rejected:
-                    {inactiveOnly && ' all are marked inactive — manager needs to re-activate.'}
-                    {emptyWeekly && ' the weekly schedule data is empty — manager needs to fill in the days.'}
-                    {!inactiveOnly && !emptyWeekly && ' some other data issue — open the browser console for the full dump.'}
-                  </span>
-                )}
-                {!brokenSchedules && d.employeeStatus && d.employeeStatus !== 'active' && (
-                  <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 500 }}>
-                    ⚠️ Your employee record is marked <strong>{d.employeeStatus}</strong>. Managers won't see it in their employees list until it's set back to active.
-                  </span>
-                )}
-                {!brokenSchedules && branchMismatch && (
-                  <span style={{ fontSize: '0.85rem', color: '#b45309', fontWeight: 500 }}>
-                    ⚠️ Branch mismatch: your employee record sits in branch …{String(d.employeeBranchId).slice(-6)},
-                    but your user account is locked to branch …{String(d.userBranchId).slice(-6)}.
-                    A Branch-Owner manager in the employee's branch — or an Owner-role user — must create the schedule.
-                  </span>
-                )}
-                {d.employeesWithSchedules.length > 0 && (
-                  <span style={{ fontSize: '0.85rem', color: '#666' }}>
-                    {d.totalSchedules} schedule(s) exist on this device, for: {d.employeesWithSchedules.join(', ')}.
-                    {' '}If your account should be linked to one of those employees, ask your manager to fix the link in <em>Employees → Accounts</em>.
-                  </span>
-                )}
-                {!d.employeesWithSchedules.length && (
-                  <span>Ask your manager to create a schedule for you in the Shift Schedules page.</span>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      )}
+          } else if (d.employeeStatus && d.employeeStatus !== 'active') {
+            detail = `Your employee record is marked "${d.employeeStatus}".`;
+            action = 'Ask your manager to set your employee status back to active.';
+          } else if (branchMismatch) {
+            detail = `Your employee record is in branch …${String(d.employeeBranchId).slice(-6)}, but your user account is locked to branch …${String(d.userBranchId).slice(-6)}.`;
+            action = 'A manager in the employee\'s branch — or an Owner-role user — must create the schedule.';
+          } else if (d.employeesWithSchedules.length > 0) {
+            detail = `${d.totalSchedules} schedule(s) exist on this device, but none are for your employee.`;
+            action = 'If your account should be linked to a different employee, ask your manager to fix the link in Employees → Accounts.';
+          }
+
+          view = {
+            tone: brokenSchedules || branchMismatch || (d.employeeStatus && d.employeeStatus !== 'active') ? 'warning' : 'info',
+            icon: brokenSchedules || branchMismatch || (d.employeeStatus && d.employeeStatus !== 'active') ? '⚠️' : 'ℹ️',
+            title: `No shift schedule has been assigned to ${d.employeeName}.`,
+            detail,
+            action,
+          };
+        }
+
+        const palette = view.tone === 'warning'
+          ? { bg: '#fffbeb', border: '#fde68a', titleColor: '#92400e', textColor: '#78350f' }
+          : { bg: '#eff6ff', border: '#bfdbfe', titleColor: '#1e3a8a', textColor: '#1e40af' };
+
+        return (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '14px',
+              padding: '16px 18px',
+              marginBottom: '16px',
+              background: palette.bg,
+              border: `1px solid ${palette.border}`,
+              borderRadius: '10px',
+            }}
+          >
+            <div style={{ fontSize: '22px', lineHeight: 1, flexShrink: 0 }}>{view.icon}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: palette.titleColor, lineHeight: 1.4 }}>
+                {view.title}
+              </div>
+              {view.detail && (
+                <div style={{ fontSize: '0.85rem', color: palette.textColor, lineHeight: 1.5 }}>
+                  {view.detail}
+                </div>
+              )}
+              {view.action && (
+                <div style={{ fontSize: '0.85rem', color: palette.textColor, lineHeight: 1.5 }}>
+                  <strong style={{ color: palette.titleColor }}>What to do: </strong>
+                  {view.action}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* View Toggle */}
       <div className="schedule-list">

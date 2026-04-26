@@ -221,6 +221,9 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       hireDate: data.hireDate,
       gender: data.gender || null,
       skills: data.skills,
+      // Default new employees to active so downstream views (Shift Schedules,
+      // Attendance) that strict-filter on status === 'active' actually see them.
+      status: data.status || 'active',
       ...(branchId && { branchId }),
       ...(data.photoUrl && { photoUrl: data.photoUrl })
     };

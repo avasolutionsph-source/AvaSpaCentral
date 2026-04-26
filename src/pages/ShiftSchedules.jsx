@@ -82,7 +82,11 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
       }
 
       setSchedules(schedulesData.filter(s => s.isActive));
-      setEmployees(employeesData.filter(e => e.status === 'active'));
+      // Treat anything not explicitly marked 'inactive' as active. Employees
+      // created via the Employees form land with `status: undefined` because
+      // transformForSubmit doesn't stamp it, and `=== 'active'` would
+      // silently exclude them from this view AND from the Add Employee modal.
+      setEmployees(employeesData.filter(e => e.status !== 'inactive'));
       setTemplates(templatesData);
       setShiftConfig(configData);
       setTimeOffRequests(timeOffData);

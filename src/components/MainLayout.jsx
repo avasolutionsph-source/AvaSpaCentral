@@ -7,7 +7,7 @@ import { useSyncStatus } from '../hooks';
 import { formatTime12Hour } from '../utils/dateUtils';
 
 const MainLayout = () => {
-  const { user, logout, hasPermission, selectedBranch, selectBranch, canSeeAllBranches, getEffectiveBranchId } = useApp();
+  const { user, logout, hasPermission, hasManagementAccess, selectedBranch, selectBranch, canSeeAllBranches, getEffectiveBranchId } = useApp();
   // Branch Owner and Manager are locked to a single branch — they shouldn't
   // see a switch affordance that would clear their branch and send them to
   // the picker.
@@ -136,6 +136,14 @@ const MainLayout = () => {
 
   useEffect(() => {
     const checkSetup = async () => {
+      // Setup banner is only actionable from Settings, which only Owner /
+      // Manager / Branch Owner can open. Skip the check entirely for
+      // therapists/receptionists/riders/utility — surfacing a "Go to Settings"
+      // button they can't actually use is noise, not signal.
+      if (!hasManagementAccess()) {
+        setSetupIssues([]);
+        return;
+      }
       const issues = [];
       try {
         // Check shift config
@@ -199,6 +207,15 @@ const MainLayout = () => {
   useEffect(() => {
     const checkNotifications = async () => {
       try {
+        // The bell aggregates branch-level operational alerts (inventory low,
+        // pending POs, late arrivals, payroll requests, etc). All of those
+        // are actioned from pages that only Owner / Manager / Branch Owner
+        // can open, so non-management roles get nothing useful from them —
+        // skip the whole loop and let MyPortal own a therapist's own alerts.
+        if (!hasManagementAccess()) {
+          setNotifications([]);
+          return;
+        }
         const newNotifications = [];
         const today = new Date();
         const todayStr = today.toDateString();

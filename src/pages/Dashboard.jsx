@@ -44,6 +44,31 @@ const Dashboard = () => {
     };
   }, []);
 
+  // Auto-request fullscreen when the user physically rotates the device to
+  // landscape. Browsers gate fullscreen on a user gesture, so this only
+  // works AFTER the user has tapped the Landscape button at least once in
+  // this session — Chrome/Edge then treat the rotation itself as a
+  // continuation. iOS Safari ignores it entirely (no Fullscreen API),
+  // which is fine; the rotate-the-device gesture still works there.
+  useEffect(() => {
+    const tryAutoFullscreen = async () => {
+      const goingLandscape = window.innerWidth > window.innerHeight;
+      if (!goingLandscape) return;
+      if (document.fullscreenElement) return;
+      try {
+        await document.documentElement.requestFullscreen?.();
+        if (window.screen?.orientation?.lock) {
+          try { await window.screen.orientation.lock('landscape'); } catch {}
+        }
+      } catch {
+        // Browser blocked us (no prior gesture). User can still tap the
+        // Landscape button to opt in explicitly.
+      }
+    };
+    window.addEventListener('orientationchange', tryAutoFullscreen);
+    return () => window.removeEventListener('orientationchange', tryAutoFullscreen);
+  }, []);
+
   // Force fullscreen + landscape orientation. screen.orientation.lock is
   // only allowed while the document is in fullscreen on most browsers, so
   // we request fullscreen first. If the second call throws (desktop, or a
@@ -900,6 +925,12 @@ const Dashboard = () => {
             className="btn btn-secondary"
             onClick={toggleLandscape}
             title="Force fullscreen landscape mode"
+            style={{
+              border: '2px solid #f97316',
+              color: '#f97316',
+              background: 'transparent',
+              fontWeight: 600,
+            }}
           >
             {isLandscape ? '⤢ Exit Landscape' : '⤢ Landscape'}
           </button>

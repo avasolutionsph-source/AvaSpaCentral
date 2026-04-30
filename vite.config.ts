@@ -16,7 +16,8 @@ export default defineConfig(({ mode }) => ({
         description: 'Daet Massage & Spa - Business Management System',
         theme_color: '#1B5E37',
         background_color: '#ffffff',
-        display: 'standalone',
+        display: 'fullscreen',
+        display_override: ['fullscreen', 'standalone'],
         orientation: 'any',
         scope: '/',
         // Installed PWA is the employee app — open it straight at /login so

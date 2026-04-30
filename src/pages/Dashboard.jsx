@@ -27,9 +27,45 @@ const Dashboard = () => {
   const [chartData, setChartData] = useState(null);
   const [bookingSlug, setBookingSlug] = useState(null);
   const [branches, setBranches] = useState([]);
+  const [isLandscape, setIsLandscape] = useState(false);
 
   // Use global branch from AppContext
   const selectedBranchId = selectedBranch?.id || null;
+
+  // Track landscape state so the toolbar button can flip its label.
+  useEffect(() => {
+    const update = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+
+  // Force fullscreen + landscape orientation. screen.orientation.lock is
+  // only allowed while the document is in fullscreen on most browsers, so
+  // we request fullscreen first. If the second call throws (desktop, or a
+  // browser that doesn't expose the API), we silently swallow it — the
+  // user still gets fullscreen which is the bigger win.
+  const toggleLandscape = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen?.();
+        if (window.screen?.orientation?.lock) {
+          try { await window.screen.orientation.lock('landscape'); } catch {}
+        }
+      } else {
+        if (window.screen?.orientation?.unlock) {
+          try { window.screen.orientation.unlock(); } catch {}
+        }
+        await document.exitFullscreen?.();
+      }
+    } catch (err) {
+      showToast?.('Landscape mode is not supported on this device', 'warning');
+    }
+  };
 
   // Fetch branches for the dropdown
   useEffect(() => {
@@ -860,6 +896,13 @@ const Dashboard = () => {
               ))}
             </select>
           )}
+          <button
+            className="btn btn-secondary"
+            onClick={toggleLandscape}
+            title="Force fullscreen landscape mode"
+          >
+            {isLandscape ? '⤢ Exit Landscape' : '⤢ Landscape'}
+          </button>
           <button
             className="btn btn-secondary"
             onClick={refreshDashboard}

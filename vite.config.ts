@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => ({
         theme_color: '#1B5E37',
         background_color: '#ffffff',
         display: 'standalone',
-        orientation: 'portrait',
+        orientation: 'any',
         scope: '/',
         // Installed PWA is the employee app — open it straight at /login so
         // logout (which navigates to /login) and cold launches share the

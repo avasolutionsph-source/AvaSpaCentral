@@ -557,13 +557,27 @@ export const AppProvider = ({ children }) => {
     setAnalyticsBranchFilter(getEffectiveBranchId());
   }, [user?.role, user?.branchId, selectedBranch?.id, selectedBranch?._allBranches]);
 
-  // Select a branch (called from BranchSelect page)
+  // Select a branch (called from BranchSelect page or the inline switcher)
   const selectBranch = (branch) => {
+    // Detect a real switch — i.e. user already had a branch and is moving to
+    // a different one. Initial selection (null → branch) goes through the
+    // BranchSelect flow and must not reload, so it can navigate normally.
+    const prevId = selectedBranch?._allBranches ? '__all__' : selectedBranch?.id || null;
+    const nextId = branch?._allBranches ? '__all__' : branch?.id || null;
+    const isRealSwitch = prevId && nextId && prevId !== nextId;
+
     setSelectedBranch(branch);
     if (branch) {
       localStorage.setItem('selectedBranch', JSON.stringify(branch));
     } else {
       localStorage.removeItem('selectedBranch');
+    }
+
+    // Hard reload so every page re-fetches against the new branch scope.
+    // Cheaper and more reliable than threading branch deps into every
+    // useEffect across ~20 feature pages. Branch switches are infrequent.
+    if (isRealSwitch && typeof window !== 'undefined') {
+      window.location.reload();
     }
   };
 

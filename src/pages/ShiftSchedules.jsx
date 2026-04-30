@@ -499,12 +499,6 @@ const ShiftSchedules = ({ embedded = false, onDataChange }) => {
       {!embedded ? (
         <div className="page-header">
           <div>
-            <button
-              className="btn btn-secondary btn-sm back-to-calendar"
-              onClick={() => navigate('/calendar')}
-            >
-              ← Back to Calendar
-            </button>
             <h1>Shift Schedules</h1>
             <p>Manage employee work schedules and shifts</p>
           </div>

@@ -19,7 +19,7 @@ import { supplierValidation, validateWithToast } from '../validation/schemas';
 
 const Suppliers = ({ embedded = false }) => {
   const navigate = useNavigate();
-  const { showToast } = useApp();
+  const { showToast, getEffectiveBranchId } = useApp();
 
   // Additional state for categories and filters
   const [categories, setCategories] = useState([]);
@@ -79,9 +79,14 @@ const Suppliers = ({ embedded = false }) => {
       phone: supplier.phone,
       address: supplier.address,
       category: supplier.category,
-      paymentTerms: supplier.paymentTerms
+      paymentTerms: supplier.paymentTerms,
+      branchId: supplier.branchId || ''
     }),
-    transformForSubmit: (data) => data,
+    transformForSubmit: (data) => {
+      // Branch-scope new suppliers; preserve existing branchId on edit.
+      const branchId = data.branchId || getEffectiveBranchId();
+      return branchId ? { ...data, branchId } : data;
+    },
     validateForm: (data) => validateWithToast(supplierValidation, data, showToast)
   });
 
@@ -98,14 +103,14 @@ const Suppliers = ({ embedded = false }) => {
     loadCategories();
   }, []);
 
-  // Filter suppliers
+  // Filter suppliers — now branch-scoped (suppliers table has branch_id).
+  // Legacy suppliers without a branchId are hidden once a specific branch is
+  // active, mirroring the behaviour of every other branch-scoped feature.
   const filteredSuppliers = useMemo(() => {
-    // Suppliers are business-scoped — the Supabase suppliers table has no
-    // branch_id column and the sync layer strips any locally-set branchId on
-    // push. Trying to narrow by branch here only created a stats↔list mismatch
-    // (and made newly-created suppliers vanish after the first sync round-trip
-    // overwrote their local branchId).
-    let filtered = [...suppliers];
+    const effectiveBranchId = getEffectiveBranchId();
+    let filtered = effectiveBranchId
+      ? suppliers.filter(s => s.branchId === effectiveBranchId)
+      : [...suppliers];
 
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
@@ -125,7 +130,7 @@ const Suppliers = ({ embedded = false }) => {
     }
 
     return filtered;
-  }, [suppliers, searchTerm, filterCategory, filterStatus]);
+  }, [suppliers, searchTerm, filterCategory, filterStatus, getEffectiveBranchId]);
 
   // Open details modal
   const openDetailsModal = async (supplier) => {

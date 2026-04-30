@@ -520,12 +520,6 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       {!embedded && (
         <div className="page-header">
           <div>
-            <button
-              className="btn btn-secondary btn-sm back-to-calendar"
-              onClick={() => navigate('/calendar')}
-            >
-              ← Back to Calendar
-            </button>
             <h1>{!hasManagementAccess() ? 'My Attendance' : 'Attendance'}</h1>
             <p>{!hasManagementAccess() ? 'Track your clock in/out and work hours' : 'Track employee clock in/out and work hours'}</p>
           </div>

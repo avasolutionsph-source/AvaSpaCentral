@@ -142,9 +142,9 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       showToast('Phone is required', 'error');
       return false;
     }
-    const phoneRegex = /^[\d\s+\-()]{7,15}$/;
-    if (!phoneRegex.test(data.phone.trim())) {
-      showToast('Please enter a valid phone number', 'error');
+    // PH mobile format: exactly 11 digits, numbers only
+    if (!/^\d{11}$/.test(data.phone.trim())) {
+      showToast('Phone must be exactly 11 digits', 'error');
       return false;
     }
     if (!data.position) {
@@ -336,6 +336,10 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
       }));
     } else if (name === 'rateType') {
       setFormData(prev => ({ ...prev, rateType: value }));
+    } else if (name === 'phone') {
+      // Phone must be digits only, max 11 characters (PH mobile format)
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 11);
+      setFormData(prev => ({ ...prev, phone: digitsOnly }));
     } else {
       handleInputChange(e);
     }
@@ -710,8 +714,11 @@ const Employees = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
               name="phone"
               value={formData.phone}
               onChange={handleFieldChange}
-              placeholder="+63 912 345 6789"
+              placeholder="09XXXXXXXXX"
               className="form-control"
+              inputMode="numeric"
+              pattern="\d{11}"
+              maxLength={11}
               required
             />
           </div>

@@ -887,3 +887,104 @@
     margin-top: 2px;
   }
 }
+
+/* ==========================================================================
+   COMPACT CALENDAR NAV BUTTONS (chevron-style, used on Bookings calendar)
+   ========================================================================== */
+.calendar-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--gray-700);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.calendar-nav-btn:hover {
+  background: var(--gray-100);
+  color: var(--primary);
+}
+
+.calendar-nav-btn:active {
+  background: var(--gray-200);
+}
+
+/* Mobile: match image 2 — keep title centered between two compact arrows
+   instead of stacking the header vertically. Today is a red ring on the
+   day number, not a filled cell. */
+@media (max-width: 1024px) {
+  .appointments-page .calendar-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .appointments-page .calendar-title {
+    flex: 1;
+    text-align: center;
+    font-size: 1.0625rem;
+    min-width: 0;
+  }
+
+  /* Single compact filter row matching image 2:
+     [Calendar] [List]   [Status: All ▾]   then the result text on its own line. */
+  .appointments-page .filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .appointments-page .view-mode-toggle {
+    display: inline-flex;
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .appointments-page .view-mode-toggle .btn {
+    flex: 0 0 auto;
+  }
+
+  .appointments-page .filter-select {
+    flex: 0 1 auto;
+    min-width: 130px;
+    max-width: 170px;
+  }
+
+  .appointments-page .results-count {
+    flex: 0 0 100%;
+    margin-left: 0;
+    font-size: 0.8125rem;
+    color: var(--gray-700);
+    text-align: left;
+  }
+
+  /* Today indicator: red ring around the day number (matches image 2),
+     no filled background or border on the cell itself. */
+  .appointments-page .calendar-day.today {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+  }
+
+  .appointments-page .calendar-day.today .calendar-day-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    margin-bottom: 0;
+  }
+}

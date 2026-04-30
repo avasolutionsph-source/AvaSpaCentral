@@ -18,7 +18,7 @@ const fmtDate = (value, pattern, fallback = '—') => {
 };
 
 const PayrollRequests = ({ embedded = false, onDataChange, onOpenSubmitRef }) => {
-  const { showToast, user } = useApp();
+  const { showToast, user, getEffectiveBranchId } = useApp();
   const [payrollHistory, setPayrollHistory] = useState([]);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [showPayslipModal, setShowPayslipModal] = useState(false);
@@ -53,7 +53,13 @@ const PayrollRequests = ({ embedded = false, onDataChange, onOpenSubmitRef }) =>
   const fetchPayrollRequests = async () => {
     try {
       const requests = await mockApi.payrollRequests.getRequests(user?._id);
-      setPayrollRequests(requests);
+      // Branch scope: only show requests submitted from the active branch.
+      // Legacy requests with no branchId are hidden once a branch is active.
+      const effectiveBranchId = getEffectiveBranchId();
+      const scoped = effectiveBranchId
+        ? requests.filter(r => r.branchId === effectiveBranchId)
+        : requests;
+      setPayrollRequests(scoped);
     } catch (error) {
       showToast('Failed to load payroll requests', 'error');
     }
@@ -162,13 +168,19 @@ Generated: ${format(new Date(), 'yyyy-MM-dd h:mm:ss a')}
     }
 
     try {
+      const branchId = getEffectiveBranchId();
+      if (!branchId) {
+        showToast('Please select a specific branch before submitting a payroll request', 'error');
+        return;
+      }
       const result = await mockApi.payrollRequests.createRequest({
         employeeId: user?._id,
         employeeName: `${user?.firstName} ${user?.lastName}`,
         type: requestForm.type,
         subject: requestForm.subject,
         description: requestForm.description,
-        amount: requestForm.amount ? parseFloat(requestForm.amount) : null
+        amount: requestForm.amount ? parseFloat(requestForm.amount) : null,
+        branchId
       });
 
       showToast('Request submitted successfully! Your manager will review it shortly.', 'success');

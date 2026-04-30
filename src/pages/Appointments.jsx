@@ -472,12 +472,20 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
     return (
       <div className="calendar-view">
         <div className="calendar-header">
-          <button className="btn btn-sm btn-secondary" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-            ← Previous
+          <button
+            className="calendar-nav-btn"
+            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            aria-label="Previous month"
+          >
+            ‹
           </button>
           <h2 className="calendar-title">{format(currentMonth, 'MMMM yyyy')}</h2>
-          <button className="btn btn-sm btn-secondary" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-            Next →
+          <button
+            className="calendar-nav-btn"
+            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            aria-label="Next month"
+          >
+            ›
           </button>
         </div>
         <div className="calendar-grid">
@@ -611,12 +619,6 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
       {!embedded && (
         <div className="page-header">
           <div>
-            <button
-              className="btn btn-secondary btn-sm back-to-calendar"
-              onClick={() => navigate('/calendar')}
-            >
-              ← Back to Calendar
-            </button>
             <h1>Appointments</h1>
             <p>{isTherapist() ? 'View your appointments' : 'Manage bookings and schedules'}</p>
           </div>
@@ -664,14 +666,16 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                 </button>
               </div>
               <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="no-show">No-Show</option>
+                <option value="all">Status: All</option>
+                <option value="pending">Status: Pending</option>
+                <option value="confirmed">Status: Confirmed</option>
+                <option value="completed">Status: Completed</option>
+                <option value="cancelled">Status: Cancelled</option>
+                <option value="no-show">Status: No-Show</option>
               </select>
-              <div className="results-count">{getFilteredAppointments().length} appointments</div>
+              <div className="results-count">
+                Found {getFilteredAppointments().length} appointment{getFilteredAppointments().length === 1 ? '' : 's'} for {format(currentMonth, 'MMMM')}
+              </div>
             </div>
           </div>
 

@@ -90,7 +90,12 @@ const MyPortal = () => {
         mockApi.appointments.getAppointments()
       ]);
 
-      const pendingRequests = payrollRequests.filter(r => r.status === 'pending').length;
+      // Branch-scope: a request belongs to the branch it was submitted from.
+      const effectiveBranchId = getEffectiveBranchId?.();
+      const scopedPayrollRequests = effectiveBranchId
+        ? payrollRequests.filter(r => r.branchId === effectiveBranchId)
+        : payrollRequests;
+      const pendingRequests = scopedPayrollRequests.filter(r => r.status === 'pending').length;
 
       // Count upcoming appointments for this employee
       const today = new Date();
@@ -432,44 +437,6 @@ const MyPortal = () => {
             )}
           </div>
         </div>
-
-        {/* Clock In/Out Section */}
-        {!hasManagementAccess() && user?.employeeId && (
-          <div className="my-portal-clock-section">
-            <div className="my-portal-clock-info">
-              <div className="my-portal-clock-time">
-                {format(currentTime, 'hh:mm:ss a')}
-              </div>
-              <div className="my-portal-clock-date">
-                {format(currentTime, 'EEEE, MMMM dd, yyyy')}
-              </div>
-              <div className="my-portal-clock-status" style={{ color: todayStatus.color }}>
-                {todayStatus.label}
-                {todayRecord?.clockIn && (
-                  <span style={{ color: '#666', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
-                    (In: {formatTime12Hour(todayRecord.clockIn)}{todayRecord.clockOut ? ` - Out: ${formatTime12Hour(todayRecord.clockOut)}` : ''})
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="my-portal-clock-buttons">
-              <button
-                className="btn btn-success"
-                onClick={() => handleClockAction('in')}
-                disabled={clockLoading || (todayRecord?.clockIn && !todayRecord?.clockOut)}
-              >
-                Clock In
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => handleClockAction('out')}
-                disabled={clockLoading || !todayRecord?.clockIn || !!todayRecord?.clockOut}
-              >
-                Clock Out
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Tab Navigation */}
         <div className="sales-tabs">

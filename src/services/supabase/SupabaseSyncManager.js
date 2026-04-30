@@ -139,7 +139,7 @@ const SUPABASE_TABLE_COLUMNS = {
   ],
   suppliers: [
     'id', 'business_id', 'name', 'contact_person', 'email', 'phone',
-    'address', 'payment_terms', 'notes', 'status',
+    'address', 'payment_terms', 'notes', 'status', 'branch_id',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
 

@@ -6,6 +6,42 @@
    ============================================================================ */
 
 /* ============================================================================
+   PORTRAIT-ONLY LOCK FOR MOBILE / TABLET
+   Shows a rotate-device overlay when the user holds a phone or tablet in
+   landscape orientation. The app is designed for portrait-first mobile use.
+   ============================================================================ */
+@media screen and (max-width: 1024px) and (orientation: landscape) {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    background: #1a1a1a;
+  }
+  body::after {
+    content: "Please rotate your device to portrait mode \A to use this app.";
+    white-space: pre-wrap;
+    text-align: center;
+    position: fixed;
+    inset: 0;
+    z-index: 100001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 1.125rem;
+    font-weight: 600;
+    padding: 2rem;
+    line-height: 1.6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .main-layout,
+  .auth-page {
+    visibility: hidden;
+  }
+}
+
+/* ============================================================================
    CSS VARIABLES & THEME
    Strict color palette - minimal, professional
    ============================================================================ */
@@ -3958,9 +3994,9 @@ select {
     grid-template-columns: 1fr;
   }
 
-  /* Add bottom padding for bottom nav */
+  /* Add bottom padding for bottom nav (60px nav + safe-area + breathing room) */
   .page-content {
-    padding-bottom: calc(var(--spacing-md) + 64px);
+    padding-bottom: calc(var(--spacing-md) + 88px + env(safe-area-inset-bottom, 0px));
   }
 }
 

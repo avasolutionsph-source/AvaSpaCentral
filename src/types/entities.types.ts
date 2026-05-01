@@ -128,7 +128,7 @@ export interface Transaction extends BaseEntity {
   tax?: number;
   serviceCharge?: number;
   totalAmount: number;
-  paymentMethod: 'Cash' | 'Card' | 'GCash' | string;
+  paymentMethod: 'Cash' | 'Card' | 'GCash' | 'QRPh' | string;
   amountReceived?: number;
   change?: number;
   giftCertificateCode?: string;
@@ -136,6 +136,27 @@ export interface Transaction extends BaseEntity {
   bookingSource?: 'Walk-in' | 'Phone' | 'Facebook' | 'Instagram' | string;
   notes?: string;
   branchId?: string;
+  paymentIntentId?: string;
+}
+
+// Payment intent (NextPay QRPh / bank transfer)
+export interface PaymentIntent extends BaseEntity {
+  businessId: string;
+  branchId: string;
+  sourceType: 'pos_transaction' | 'advance_booking';
+  sourceId: string;
+  amount: number;
+  currency: 'PHP';
+  paymentMethod: 'qrph' | 'bank_transfer';
+  nextpayIntentId?: string;
+  nextpayQrString?: string;
+  nextpayQrImageUrl?: string;
+  status: 'pending' | 'awaiting_payment' | 'succeeded' | 'failed' | 'expired' | 'cancelled';
+  referenceCode: string;
+  nextpayPayload?: Record<string, unknown>;
+  createdBy?: string;
+  expiresAt: string;
+  paidAt?: string;
 }
 
 // Appointment entity

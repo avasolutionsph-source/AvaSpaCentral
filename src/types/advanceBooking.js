@@ -6,7 +6,8 @@
  */
 
 /**
- * @typedef {'paid' | 'pending'} PaymentStatus
+ * @typedef {'paid' | 'pending' | 'unpaid' | 'deposit_paid' | 'fully_paid'} PaymentStatus
+ * Note: QRPh full-prepay flow uses 'fully_paid' on webhook success.
  */
 
 /**
@@ -33,6 +34,7 @@
  * @property {PaymentTiming} paymentTiming - When payment is collected
  * @property {PaymentStatus} paymentStatus - Payment status
  * @property {string} transactionId - Related transaction ID
+ * @property {string} [paymentIntentId] - Linked NextPay payment intent ID (QRPh prepay)
  * @property {BookingStatus} status - Current booking status
  * @property {string|null} [specialRequests] - Special requests or notes
  * @property {string|null} [actualStartTime] - ISO datetime when service actually started

@@ -36,18 +36,20 @@ CREATE INDEX idx_payment_intents_branch_created ON payment_intents(branch_id, cr
 -- RLS: read scoped to user's branch; writes only via service role (Edge Functions)
 ALTER TABLE payment_intents ENABLE ROW LEVEL SECURITY;
 
--- TODO(RLS): This policy uses (true) as a temporary placeholder.
--- The original design assumed a `user_branches` join table
--- (SELECT branch_id FROM user_branches WHERE user_id = auth.uid()),
--- but this codebase stores a single branch_id directly on the `users` table
--- (SELECT branch_id FROM users WHERE id = auth.uid() AND auth_id = auth.uid()).
--- Before going to production, replace (true) with a proper USING clause that
--- joins the users table, e.g.:
---   USING (branch_id = (SELECT branch_id FROM users WHERE auth_id = auth.uid()))
--- or introduce a user_branches join table if multi-branch access per user is needed.
+-- Read scope: user can read intents for their branch, OR all branches in their
+-- business if their role is Owner. Writes are service-role only (Edge Functions).
+-- The codebase stores a single branch_id directly on the `users` table and links
+-- to Supabase Auth via the auth_id column (see authService.ts:_loadUserProfile).
 CREATE POLICY "read own branch intents" ON payment_intents
   FOR SELECT TO authenticated
-  USING (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.auth_id = auth.uid()
+        AND u.business_id = payment_intents.business_id
+        AND (u.role = 'Owner' OR u.branch_id = payment_intents.branch_id)
+    )
+  );
 
 -- Realtime publication
 ALTER PUBLICATION supabase_realtime ADD TABLE payment_intents;

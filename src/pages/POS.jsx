@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import AdvanceBookingCheckout from '../components/AdvanceBookingCheckout';
+import QRPaymentModal from '../components/QRPaymentModal';
+import { createPaymentIntent } from '../services/payments';
 import { ConfirmDialog, ManageOrder, EmptyState } from '../components/shared';
 import { getTherapists } from '../utils/employeeFilters';
 import { formatTimeRange, formatTime12Hour } from '../utils/dateUtils';
@@ -96,6 +98,11 @@ const POS = () => {
 
   // Scheduled employees for advance booking (based on selected date)
   const [scheduledEmployees, setScheduledEmployees] = useState([]);
+
+  // QRPh (NextPay) checkout state
+  const [activeIntentId, setActiveIntentId] = useState(null);
+  const [qrPaymentError, setQrPaymentError] = useState(null);
+  const pendingQrphRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -839,7 +846,8 @@ const POS = () => {
                 }
               : { name: 'Walk-in' },
           bookingSource: bookingSource,
-          status: 'completed',
+          // QRPh sales sit at 'pending' until the NextPay webhook flips them.
+          status: paymentMethod === 'QRPh' ? 'pending' : 'completed',
           roomId: selectedRoom || null,
           roomName: selectedRoom ? rooms.find(r => r._id === selectedRoom)?.name : null,
           isHomeService: isHomeService,
@@ -848,6 +856,52 @@ const POS = () => {
           cashier: user?.name || 'Staff',
           cashierId: user?._id || null
         };
+
+        // QRPh: save as pending, mint intent, hand off to QRPaymentModal.
+        // Post-checkout side-effects (rotation queue, room status, GC redeem,
+        // receipt) are deferred to onSuccess via pendingQrphRef.
+        if (paymentMethod === 'QRPh') {
+          setQrPaymentError(null);
+          let savedTxn;
+          try {
+            savedTxn = await mockApi.transactions.createTransaction(transaction);
+          } catch (err) {
+            showToast('Failed to save transaction: ' + (err?.message || err), 'error');
+            setCheckoutLoading(false);
+            return;
+          }
+          try {
+            const intent = await createPaymentIntent({
+              amount: getTotal(),
+              sourceType: 'pos_transaction',
+              sourceId: savedTxn._id,
+              branchId: checkoutBranchId,
+              businessId: user?.businessId,
+              referenceCode: `TXN-${(savedTxn._id || receiptNumber).slice(0, 8)}`,
+              description: `Spa POS sale ${receiptNumber}`,
+            });
+            pendingQrphRef.current = {
+              transaction: savedTxn,
+              receiptNumber,
+              cartSnapshot: cart,
+              employee,
+              commissionAmount,
+              selectedRoomId: selectedRoom,
+              isHomeService,
+              homeServiceAddress,
+              appliedGC,
+              discountType,
+            };
+            setActiveIntentId(intent.id);
+          } catch (err) {
+            // Roll back: void the pending transaction so it doesn't linger.
+            try { await mockApi.transactions.voidTransaction?.(savedTxn._id); } catch {}
+            setQrPaymentError(err?.message || 'Could not start QRPh payment');
+          } finally {
+            setCheckoutLoading(false);
+          }
+          return;
+        }
 
         // Save transaction
         await mockApi.transactions.createTransaction(transaction);
@@ -1049,6 +1103,132 @@ const POS = () => {
     setBookingSource('Walk-in');
     setCustomerSearch('');
     setShowCustomerSuggestions(false);
+  };
+
+  // Run all the side-effects that the regular-checkout branch does after
+  // mockApi.transactions.createTransaction. For QRPh we defer them until
+  // the webhook has confirmed payment (via QRPaymentModal.onSuccess).
+  const finalizeQrphCheckout = async () => {
+    const ctx = pendingQrphRef.current;
+    if (!ctx) return;
+    const {
+      transaction,
+      receiptNumber,
+      cartSnapshot,
+      employee,
+      selectedRoomId,
+      isHomeService: wasHomeService,
+      homeServiceAddress: wasHomeServiceAddress,
+      appliedGC: wasAppliedGC,
+      discountType: wasDiscountType,
+    } = ctx;
+
+    try {
+      await mockApi.transactions.updateTransaction(transaction._id, {
+        status: 'completed',
+        paymentMethod: 'QRPh',
+      });
+    } catch (err) {
+      console.warn('[POS] failed to mark QRPh transaction completed locally:', err);
+    }
+
+    // Gift certificate redemption (mirrors regular branch)
+    if (wasDiscountType === 'gc' && wasAppliedGC) {
+      try {
+        const gcDiscount = (transaction.discount ?? 0);
+        await mockApi.giftCertificates.redeemGiftCertificate(wasAppliedGC.code, gcDiscount);
+      } catch (error) {
+        console.error('Gift certificate redemption failed:', error);
+        showToast('Payment received but gift certificate redemption failed. Please redeem manually.', 'warning');
+      }
+    }
+
+    // Receipt
+    setReceiptData({
+      receiptNumber,
+      date: new Date(),
+      items: cartSnapshot.map(item => ({ name: item.name, quantity: item.quantity, price: item.price, subtotal: item.subtotal })),
+      subtotal: transaction.subtotal,
+      discount: transaction.discount,
+      discountType: transaction.discountType,
+      tax: transaction.tax,
+      total: transaction.totalAmount,
+      paymentMethod: 'QRPh',
+      amountReceived: transaction.totalAmount,
+      changeAmount: 0,
+      employee: employee ? `${employee.firstName} ${employee.lastName}` : 'Staff',
+      cashier: user?.name || 'Staff',
+      customer: transaction.customer?.name || 'Walk-in',
+    });
+
+    // Rotation queue
+    if (employee?._id) {
+      try {
+        await mockApi.serviceRotation.recordService(employee._id);
+      } catch (error) {
+        console.error('Failed to record service rotation:', error);
+      }
+    }
+
+    // Room or home service status
+    if (selectedRoomId) {
+      try {
+        const totalDuration = cartSnapshot.reduce((total, item) => {
+          return total + ((item.type === 'service' && item.duration) ? item.duration * item.quantity : 0);
+        }, 0) || 60;
+        const serviceNames = cartSnapshot
+          .filter(item => item.type === 'service')
+          .map(item => item.name);
+        await mockApi.rooms.updateRoomStatus(selectedRoomId, 'pending', {
+          serviceDuration: totalDuration,
+          transactionId: receiptNumber,
+          employeeId: employee?._id,
+          employeeName: employee ? `${employee.firstName} ${employee.lastName}` : null,
+          serviceNames,
+          customerName: transaction.customer?.name || null,
+          customerPhone: transaction.customer?.phone || null,
+          customerEmail: transaction.customer?.email || null,
+        });
+      } catch (error) {
+        console.error('Failed to update room status:', error);
+        showToast('Room status could not be updated', 'warning');
+      }
+    } else if (wasHomeService && wasHomeServiceAddress) {
+      try {
+        const totalDuration = cartSnapshot.reduce((total, item) => {
+          return total + ((item.type === 'service' && item.duration) ? item.duration * item.quantity : 0);
+        }, 0) || 60;
+        const serviceNames = cartSnapshot
+          .filter(item => item.type === 'service')
+          .map(item => item.name);
+        await mockApi.homeServices.createHomeService({
+          employeeId: employee?._id,
+          employeeName: employee ? `${employee.firstName} ${employee.lastName}` : null,
+          customerName: transaction.customer?.name || null,
+          customerPhone: transaction.customer?.phone || null,
+          customerEmail: transaction.customer?.email || null,
+          address: wasHomeServiceAddress,
+          serviceNames,
+          serviceDuration: totalDuration,
+          transactionId: receiptNumber,
+        });
+      } catch (error) {
+        console.error('Failed to create home service:', error);
+      }
+    }
+
+    // Reset like the regular branch
+    setCart([]);
+    setShowCheckout(false);
+    resetCheckoutForm();
+    if (receiptEnabled) setShowReceipt(true);
+    showToast('QRPh payment received', 'success');
+
+    pendingQrphRef.current = null;
+    setActiveIntentId(null);
+
+    loadPOSData();
+    loadRotationQueue();
   };
 
   if (loading) {
@@ -1814,7 +1994,25 @@ const POS = () => {
                       >
                         GCash
                       </button>
+                      <button
+                        className={`payment-btn ${paymentMethod === 'QRPh' ? 'active' : ''}`}
+                        onClick={() => setPaymentMethod('QRPh')}
+                        disabled={!navigator.onLine}
+                        title={!navigator.onLine ? 'QRPh requires internet' : undefined}
+                      >
+                        QRPh
+                      </button>
                     </div>
+                  )}
+                  {paymentMethod === 'QRPh' && (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 'var(--spacing-sm)' }}>
+                      Customer will scan a QR code to pay via any QRPh-enabled bank or e-wallet.
+                    </p>
+                  )}
+                  {qrPaymentError && (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--danger)', marginTop: 'var(--spacing-sm)' }}>
+                      {qrPaymentError}
+                    </p>
                   )}
 
                   {paymentMethod === 'Cash' && (
@@ -2211,6 +2409,20 @@ const POS = () => {
         renderSubLabel={(product) => `${product.category} - ₱${product.price}`}
         saving={savingOrder}
       />
+
+      {/* QRPh payment modal (NextPay) */}
+      {activeIntentId && (
+        <QRPaymentModal
+          intentId={activeIntentId}
+          onSuccess={finalizeQrphCheckout}
+          onClose={() => {
+            // User dismissed before paying. The pending transaction stays
+            // in the DB (status='pending'); the cashier can retry.
+            pendingQrphRef.current = null;
+            setActiveIntentId(null);
+          }}
+        />
+      )}
     </div>
   );
 };

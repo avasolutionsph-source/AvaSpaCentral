@@ -48,3 +48,6 @@ export { default as HomeServiceRepository } from './HomeServiceRepository';
 export { default as LoyaltyHistoryRepository } from './LoyaltyHistoryRepository';
 export { default as StockHistoryRepository } from './StockHistoryRepository';
 export { default as ProductConsumptionRepository } from './ProductConsumptionRepository';
+
+// Payments
+export { default as PaymentIntentRepository } from './PaymentIntentRepository';

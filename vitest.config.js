@@ -7,7 +7,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],
-    include: ['src/**/*.{test,spec}.{js,jsx}'],
+    include: [
+      'src/**/*.{test,spec}.{js,jsx,ts,tsx}',
+      'supabase/functions/**/*.{test,spec}.{js,ts}'
+    ],
     coverage: {
       reporter: ['text', 'json', 'html'],
       exclude: [

@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 
 import { getCustomerSession, logoutCustomer } from '../services/customerAuthService';
 import { applyColorTheme } from '../services/brandingService';
+import QRPaymentModal from '../components/QRPaymentModal';
+import { createPaymentIntent } from '../services/payments';
 import '../assets/css/booking.css';
 
 // Available hero fonts for booking page
@@ -198,6 +200,13 @@ const BookingPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingReference, setBookingReference] = useState('');
+
+  // QRPh full-prepay state. When the customer chooses to pay now, we mint a
+  // payment_intent after the booking row is created and show the QR modal
+  // full-screen. The webhook flips the booking to confirmed/fully_paid.
+  const [prepayEnabled, setPrepayEnabled] = useState(false);
+  const [activeIntentId, setActiveIntentId] = useState(null);
+  const [prepayError, setPrepayError] = useState(null);
 
   // When the success state is shown, anchor browser back to the booking
   // home. Without this, if the user earlier bounced through /login or
@@ -889,8 +898,34 @@ const BookingPage = () => {
 
       if (!rpcResponse.ok) {
         throw new Error(rpcResult?.message || rpcResult?.error || `Server error (${rpcResponse.status})`);
+      }
+
+      setBookingReference(reference);
+
+      // PostgREST `Prefer: return=representation` returns either an array or
+      // an object depending on the function definition. Accept both shapes.
+      const inserted = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+      const newBookingId = inserted?.id || inserted?.booking_id;
+
+      if (prepayEnabled && newBookingId) {
+        try {
+          const intent = await createPaymentIntent({
+            amount: cartTotal,
+            sourceType: 'advance_booking',
+            sourceId: newBookingId,
+            branchId: selectedBranch?.id || (business?.id || businessIdOrSlug),
+            businessId: business?.id || businessIdOrSlug,
+            referenceCode: `BKG-${reference}`,
+            description: `Booking prepay ${reference}`,
+          });
+          setActiveIntentId(intent.id);
+        } catch (err) {
+          console.error('[BookingPage] prepay intent failed:', err);
+          setPrepayError(err?.message || 'Could not start QRPh payment');
+          // Still show the booking-success page; staff can collect later.
+          setBookingSuccess(true);
+        }
       } else {
-        setBookingReference(reference);
         setBookingSuccess(true);
       }
     } catch (err) {
@@ -2333,16 +2368,51 @@ const BookingPage = () => {
                     </div>
                   </div>
 
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.5rem',
+                      margin: '0.75rem 0',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={prepayEnabled}
+                      onChange={(e) => setPrepayEnabled(e.target.checked)}
+                      disabled={submitting || !navigator.onLine}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                    <span>
+                      Pay full amount now via <strong>QRPh</strong> to instantly
+                      confirm this booking.
+                    </span>
+                  </label>
+
                   <button
                     className="submit-booking-btn"
                     onClick={handleSubmitBooking}
                     disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
                   >
-                    {submitting ? 'Submitting...' : 'Confirm Booking'}
+                    {submitting
+                      ? 'Submitting...'
+                      : prepayEnabled
+                        ? `Pay ₱${cartTotal.toLocaleString()} to Confirm`
+                        : 'Confirm Booking'}
                   </button>
 
+                  {prepayError && (
+                    <p className="booking-note" style={{ color: 'var(--danger, #c00)' }}>
+                      {prepayError}
+                    </p>
+                  )}
+
                   <p className="booking-note">
-                    We'll contact you to confirm your booking and arrange payment.
+                    {prepayEnabled
+                      ? 'You will be shown a QR code to scan with your bank or e-wallet.'
+                      : "We'll contact you to confirm your booking and arrange payment."}
                   </p>
                 </div>
               )}
@@ -2403,6 +2473,26 @@ const BookingPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Full-screen QRPh prepay modal */}
+      {activeIntentId && (
+        <QRPaymentModal
+          intentId={activeIntentId}
+          fullScreen
+          onSuccess={() => {
+            setActiveIntentId(null);
+            setBookingSuccess(true);
+          }}
+          onClose={() => {
+            // User dismissed without paying. The booking row exists at
+            // status='pending' / payment_status='unpaid' and pg_cron will
+            // eventually expire the intent. Show the regular success page
+            // so the customer at least has the reference.
+            setActiveIntentId(null);
+            setBookingSuccess(true);
+          }}
+        />
+      )}
     </div>
   );
 };

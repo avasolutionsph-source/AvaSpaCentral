@@ -105,6 +105,18 @@ const Settings = () => {
   // POS Settings
   const [showReceiptAfterCheckout, setShowReceiptAfterCheckout] = useState(false);
 
+  // Payment Gateway (NextPay). API credentials live in Supabase Edge Function
+  // secrets; only operational toggles and display copy live here.
+  const [nextpaySettings, setNextpaySettings] = useState({
+    environment: 'sandbox',
+    merchantDisplayName: '',
+    qrExpiryMinutes: 15,
+    bookingExpiryMinutes: 30,
+    enablePosQrph: false,
+    enableBookingDeposits: false,
+  });
+  const [nextpaySaving, setNextpaySaving] = useState(false);
+
   // Tax Settings
   const [taxSettings, setTaxSettings] = useState([
     { id: 'vat', name: 'VAT', description: 'Value Added Tax', rate: 12, enabled: true },
@@ -1467,6 +1479,11 @@ const Settings = () => {
         const savedReceiptSetting = await SettingsRepository.get('showReceiptAfterCheckout');
         if (savedReceiptSetting !== undefined) setShowReceiptAfterCheckout(savedReceiptSetting);
 
+        const savedNextpay = await SettingsRepository.get('nextpaySettings');
+        if (savedNextpay && typeof savedNextpay === 'object') {
+          setNextpaySettings((prev) => ({ ...prev, ...savedNextpay }));
+        }
+
         const savedBookingCapacity = await SettingsRepository.get('bookingCapacity');
         const savedBookingWindow = await SettingsRepository.get('bookingWindowMinutes');
         if (savedBookingCapacity) setBookingCapacity(parseInt(savedBookingCapacity));
@@ -2304,6 +2321,14 @@ const Settings = () => {
             GPS
           </button>
         )}
+        {isOwnerOrManager() && (
+          <button
+            className={`settings-tab ${activeTab === 'payments' ? 'active' : ''}`}
+            onClick={() => setActiveTab('payments')}
+          >
+            Payments
+          </button>
+        )}
       </div>
 
       {activeTab === 'gps' ? (
@@ -2396,6 +2421,117 @@ const Settings = () => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'payments' ? (
+        <div className="settings-content">
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-icon">💳</div>
+              <div className="settings-section-title">
+                <h2>Payment Gateway (NextPay)</h2>
+                <p>QRPh acceptance for POS sales and online booking deposits.</p>
+              </div>
+            </div>
+            <div className="settings-section-body">
+              <p className="muted" style={{ marginBottom: '1rem', fontSize: '0.85rem', color: '#666' }}>
+                API credentials are stored as Supabase Edge Function secrets,
+                not here. Contact your developer to rotate keys or switch
+                between sandbox and production.
+              </p>
+
+              <div style={{ display: 'grid', gap: '1rem', maxWidth: '480px' }}>
+                <label>
+                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Environment</div>
+                  <select
+                    value={nextpaySettings.environment}
+                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, environment: e.target.value })}
+                    className="form-input"
+                    style={{ width: '100%' }}
+                  >
+                    <option value="sandbox">Sandbox (test)</option>
+                    <option value="production">Production (live money)</option>
+                  </select>
+                </label>
+
+                <label>
+                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Merchant display name</div>
+                  <input
+                    type="text"
+                    value={nextpaySettings.merchantDisplayName}
+                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, merchantDisplayName: e.target.value })}
+                    placeholder="Daet Massage & Spa"
+                    className="form-input"
+                    style={{ width: '100%' }}
+                  />
+                </label>
+
+                <label>
+                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>POS QR expiry (minutes)</div>
+                  <input
+                    type="number"
+                    min={5}
+                    max={60}
+                    value={nextpaySettings.qrExpiryMinutes}
+                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, qrExpiryMinutes: Number(e.target.value) || 15 })}
+                    className="form-input"
+                    style={{ width: '100%' }}
+                  />
+                </label>
+
+                <label>
+                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Booking QR expiry (minutes)</div>
+                  <input
+                    type="number"
+                    min={10}
+                    max={120}
+                    value={nextpaySettings.bookingExpiryMinutes}
+                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, bookingExpiryMinutes: Number(e.target.value) || 30 })}
+                    className="form-input"
+                    style={{ width: '100%' }}
+                  />
+                </label>
+
+                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={nextpaySettings.enablePosQrph}
+                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, enablePosQrph: e.target.checked })}
+                  />
+                  <span>Enable QRPh in POS checkout</span>
+                </label>
+
+                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={nextpaySettings.enableBookingDeposits}
+                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, enableBookingDeposits: e.target.checked })}
+                  />
+                  <span>Enable QRPh prepay on Online Booking</span>
+                </label>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={nextpaySaving}
+                    onClick={async () => {
+                      setNextpaySaving(true);
+                      try {
+                        await SettingsRepository.set('nextpaySettings', nextpaySettings);
+                        showToast('Payment gateway settings saved.', 'success');
+                      } catch (err) {
+                        showToast('Failed to save: ' + (err?.message || err), 'error');
+                      } finally {
+                        setNextpaySaving(false);
+                      }
+                    }}
+                  >
+                    {nextpaySaving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

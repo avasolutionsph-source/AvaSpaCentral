@@ -103,6 +103,7 @@ const POS = () => {
   const [activeIntentId, setActiveIntentId] = useState(null);
   const [qrPaymentError, setQrPaymentError] = useState(null);
   const pendingQrphRef = useRef(null);
+  const [enablePosQrph, setEnablePosQrph] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -189,9 +190,19 @@ const POS = () => {
       } catch {}
     };
 
+    const loadNextpaySetting = async () => {
+      try {
+        const saved = await SettingsRepository.get('nextpaySettings');
+        if (isMounted && saved && typeof saved === 'object') {
+          setEnablePosQrph(Boolean(saved.enablePosQrph));
+        }
+      } catch {}
+    };
+
     loadData();
     loadTaxSettings();
     loadReceiptSetting();
+    loadNextpaySetting();
     // Load queue after a short delay to ensure attendance data is synced
     loadQueue();
     // Retry queue load after sync has time to complete
@@ -1994,14 +2005,16 @@ const POS = () => {
                       >
                         GCash
                       </button>
-                      <button
-                        className={`payment-btn ${paymentMethod === 'QRPh' ? 'active' : ''}`}
-                        onClick={() => setPaymentMethod('QRPh')}
-                        disabled={!navigator.onLine}
-                        title={!navigator.onLine ? 'QRPh requires internet' : undefined}
-                      >
-                        QRPh
-                      </button>
+                      {enablePosQrph && (
+                        <button
+                          className={`payment-btn ${paymentMethod === 'QRPh' ? 'active' : ''}`}
+                          onClick={() => setPaymentMethod('QRPh')}
+                          disabled={!navigator.onLine}
+                          title={!navigator.onLine ? 'QRPh requires internet' : undefined}
+                        >
+                          QRPh
+                        </button>
+                      )}
                     </div>
                   )}
                   {paymentMethod === 'QRPh' && (

@@ -114,6 +114,10 @@ const Settings = () => {
     bookingExpiryMinutes: 30,
     enablePosQrph: false,
     enableBookingDeposits: false,
+    // Phase 2 — outbound disbursements
+    enableDisbursementsPayroll: false,
+    enableDisbursementsSupplierAp: false,
+    enableDisbursementsExpense: false,
   });
   const [nextpaySaving, setNextpaySaving] = useState(false);
 
@@ -2495,37 +2499,57 @@ const Settings = () => {
             </div>
           </div>
 
-          {/* Disbursements (Phase 2) — placeholder until wired */}
+          {/* Disbursements (Phase 2) — live toggles */}
           <div className="settings-section">
             <div className="settings-section-header">
               <div className="settings-section-icon">💸</div>
               <div className="settings-section-title">
-                <h2>Disbursements (NextPay) — Coming in Phase 2</h2>
+                <h2>Disbursements (NextPay)</h2>
                 <p>Outbound payouts: payroll, supplier AP, expense reimbursements.</p>
               </div>
             </div>
             <div className="settings-section-body">
-              <p style={{ marginBottom: '0.75rem' }}>
-                Phase 2 will wire NextPay's <code>POST /v2/disbursements</code>{' '}
-                endpoint into the existing Payroll, Supplier AP, and Expense
-                workflows. The flow is the inverse of the inbound design we
-                shelved:
+              <p style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#666' }}>
+                Each toggle independently surfaces a "Pay via NextPay" button
+                on its respective workflow. Edge Functions and DB schema are
+                already deployed; recipients need bank info on file before
+                the button works.
               </p>
-              <ol style={{ marginLeft: '1.25rem', marginBottom: '0.75rem' }}>
-                <li>Operator approves a payroll batch / supplier invoice / expense reimbursement.</li>
-                <li>App calls a new Edge Function <code>create-disbursement</code> per recipient.</li>
-                <li>NextPay sends the funds to the recipient's bank or e-wallet (BPI, BDO, GCash, Maya, etc.).</li>
-                <li>NextPay calls our webhook with the disbursement status.</li>
-                <li>Webhook updates the payroll/AP/expense row to <code>paid</code> and stamps the disbursement reference.</li>
-              </ol>
-              <p style={{ marginBottom: '0.75rem' }}>
-                Source-of-truth design doc:{' '}
-                <code>docs/superpowers/specs/2026-05-02-nextpay-disbursements-design.md</code>{' '}
-                (committed alongside this notice).
-              </p>
-              <p style={{ fontSize: '0.85rem', color: '#666' }}>
-                Status: design only. No code yet. Operator action items will
-                appear here once the spec is approved and Phase 2 starts.
+
+              <div style={{ display: 'grid', gap: '0.75rem', maxWidth: 560 }}>
+                <DisbursementToggleRow
+                  label="Payroll payouts"
+                  description="At cycle approval, send each employee's net pay to their registered bank/e-wallet."
+                  checked={nextpaySettings.enableDisbursementsPayroll}
+                  onChange={(v) => setNextpaySettings({ ...nextpaySettings, enableDisbursementsPayroll: v })}
+                  envIsProduction={nextpaySettings.environment === 'production'}
+                  workflowName="payroll"
+                />
+
+                <DisbursementToggleRow
+                  label="Supplier AP payments"
+                  description="When a Purchase Order is marked ready to pay, send the supplier their amount."
+                  checked={nextpaySettings.enableDisbursementsSupplierAp}
+                  onChange={(v) => setNextpaySettings({ ...nextpaySettings, enableDisbursementsSupplierAp: v })}
+                  envIsProduction={nextpaySettings.environment === 'production'}
+                  workflowName="supplier AP"
+                />
+
+                <DisbursementToggleRow
+                  label="Expense reimbursements"
+                  description="When an Expense is approved for reimbursement, send to the requester's bank/e-wallet."
+                  checked={nextpaySettings.enableDisbursementsExpense}
+                  onChange={(v) => setNextpaySettings({ ...nextpaySettings, enableDisbursementsExpense: v })}
+                  envIsProduction={nextpaySettings.environment === 'production'}
+                  workflowName="expense reimbursement"
+                />
+              </div>
+
+              <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#666' }}>
+                Status discovery uses polling every 1 minute via the
+                <code> poll-disbursements </code> Edge Function (NextPay's
+                webhook events for disbursements are still in private beta
+                and not available to this account).
               </p>
             </div>
           </div>
@@ -4957,5 +4981,50 @@ const Settings = () => {
     </div>
   );
 };
+
+/**
+ * Single row in the Disbursements toggle list. Pops a confirm dialog on
+ * the first flip-on in production so the operator doesn't accidentally
+ * arm a workflow that moves real money.
+ */
+function DisbursementToggleRow({ label, description, checked, onChange, envIsProduction, workflowName }) {
+  const handleToggle = (e) => {
+    const next = e.target.checked;
+    if (next && envIsProduction) {
+      const ok = window.confirm(
+        `Enable automated ${workflowName} disbursements in PRODUCTION?\n\n` +
+        `From now on, when an operator approves a ${workflowName} item, NextPay will move REAL money to the recipient's bank or e-wallet.\n\n` +
+        `Click OK to enable, or Cancel to keep manual.`,
+      );
+      if (!ok) return;
+    }
+    onChange(next);
+  };
+  return (
+    <label
+      style={{
+        display: 'flex',
+        gap: '0.6rem',
+        alignItems: 'flex-start',
+        padding: '0.6rem 0.75rem',
+        borderRadius: 8,
+        background: checked ? '#f0fdf4' : '#fff',
+        border: checked ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+        cursor: 'pointer',
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={!!checked}
+        onChange={handleToggle}
+        style={{ marginTop: '0.25rem' }}
+      />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 500, color: checked ? '#166534' : 'inherit' }}>{label}</div>
+        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>{description}</div>
+      </div>
+    </label>
+  );
+}
 
 export default Settings;

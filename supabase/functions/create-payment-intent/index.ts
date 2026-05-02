@@ -88,9 +88,13 @@ serve(async (req) => {
       throw new Error(`db insert failed: ${insertErr?.message}`);
     }
 
-    // 2. Call NextPay
+    // 2. Call NextPay. Auth uses two keys per
+    // https://nextpayph.stoplight.io/docs/nextpay-api-v2/ — client_key in the
+    // 'client-id' header on every request, and a per-request HMAC-SHA256
+    // signature of the JSON body keyed with client_secret.
     const nextpay = new NextPayClient(
-      Deno.env.get('NEXTPAY_API_KEY')!,
+      Deno.env.get('NEXTPAY_CLIENT_KEY')!,
+      Deno.env.get('NEXTPAY_CLIENT_SECRET') ?? Deno.env.get('NEXTPAY_API_KEY')!,
       (Deno.env.get('NEXTPAY_ENV') as NextPayEnvironment) ?? 'sandbox',
     );
 

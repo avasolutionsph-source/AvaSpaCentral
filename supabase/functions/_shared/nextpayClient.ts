@@ -1,12 +1,17 @@
 /**
  * Thin Deno-side wrapper around the NextPay v2 collections API.
- * The Edge Function holds the API key; the browser never sees it.
  *
- * Field-name adapter: NextPay's API uses snake_case (callback_url, expires_at,
- * qr_string). This client accepts a clean camelCase shape and translates both
- * directions, so callers don't depend on the upstream wire format.
+ * Auth scheme (per https://nextpayph.stoplight.io/docs/nextpay-api-v2/):
+ *   - All requests:  header "client-id: <client_key>"
+ *   - Mutating req:  header "signature: <hex(HMAC-SHA256(body, client_secret))>"
  *
- * Reference: https://nextpayph.stoplight.io/docs/nextpay-api-v2/
+ * The signature is computed over the EXACT JSON string sent as the body, so
+ * we stringify once and reuse — never re-stringify or NextPay will reject it.
+ *
+ * NOTE on the URL: the docs published the test-mode dashboard at
+ * https://app-sandbox.nextpay.world but we have not yet seen the actual API
+ * host in writing. The constants below are the best guess. If a request
+ * returns 4xx with no NextPay JSON error envelope, suspect the host first.
  */
 
 const SANDBOX_BASE = 'https://api-sandbox.nextpay.world';
@@ -40,11 +45,12 @@ export class NextPayError extends Error {
 
 export class NextPayClient {
   constructor(
-    private readonly apiKey: string,
+    private readonly clientKey: string,
+    private readonly clientSecret: string,
     private readonly environment: NextPayEnvironment = 'sandbox',
   ) {
-    if (!apiKey) {
-      throw new Error('NextPayClient: apiKey is required');
+    if (!clientKey || !clientSecret) {
+      throw new Error('NextPayClient: clientKey and clientSecret are required');
     }
   }
 
@@ -53,20 +59,25 @@ export class NextPayClient {
   }
 
   async createQrphIntent(req: CreateQrphRequest): Promise<CreateQrphResponse> {
+    const bodyStr = JSON.stringify({
+      amount: req.amount,
+      currency: req.currency,
+      reference: req.reference,
+      description: req.description,
+      callback_url: req.callbackUrl,
+      expires_at: req.expiresAt,
+    });
+
+    const signature = await hmacSha256Hex(bodyStr, this.clientSecret);
+
     const res = await fetch(`${this.baseUrl}/v2/collections/qrph`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        'client-id': this.clientKey,
+        'signature': signature,
       },
-      body: JSON.stringify({
-        amount: req.amount,
-        currency: req.currency,
-        reference: req.reference,
-        description: req.description,
-        callback_url: req.callbackUrl,
-        expires_at: req.expiresAt,
-      }),
+      body: bodyStr,
     });
 
     if (!res.ok) {
@@ -86,4 +97,23 @@ export class NextPayClient {
       expiresAt: data.expires_at ?? data.expiresAt,
     };
   }
+}
+
+/**
+ * HMAC-SHA256 of `body` keyed with `secret`, hex-lowercase encoded.
+ * Matches NodeJS `crypto-js.HmacSHA256(body, secret)` + Hex.stringify(...).
+ */
+async function hmacSha256Hex(body: string, secret: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(body));
+  return Array.from(new Uint8Array(sigBuf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }

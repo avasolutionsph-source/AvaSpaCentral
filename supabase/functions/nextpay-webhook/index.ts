@@ -4,9 +4,11 @@
  * Receives status callbacks from NextPay and flips payment_intents +
  * cascades to transactions / advance_bookings on success.
  *
- * Security: HMAC-SHA256 signature in X-Nextpay-Signature header, verified
- * against NEXTPAY_WEBHOOK_SECRET. Deployed with --no-verify-jwt because
- * NextPay does not have a Supabase token.
+ * Security: HMAC-SHA256 signature in the `signature` header (lowercase, per
+ * NextPay docs), verified against NEXTPAY_WEBHOOK_SECRET (which equals the
+ * client_secret since NextPay uses the same key for both API auth and
+ * webhook signing). Deployed with --no-verify-jwt because NextPay does not
+ * have a Supabase token.
  *
  * Idempotency: terminal-state intents are not re-updated. The cascade UPDATE
  * uses .neq('status', 'succeeded') so a duplicate webhook never double-writes
@@ -45,7 +47,11 @@ serve(async (req) => {
   }
 
   const rawBody = await req.text();
-  const sig = req.headers.get('X-Nextpay-Signature') ?? '';
+  // NextPay sends a lowercase `signature` header. Fall back to the older
+  // X-Nextpay-Signature so a future header rename does not silently break us.
+  const sig = req.headers.get('signature')
+    ?? req.headers.get('X-Nextpay-Signature')
+    ?? '';
   const secret = Deno.env.get('NEXTPAY_WEBHOOK_SECRET');
   if (!secret) {
     console.error('[nextpay-webhook] NEXTPAY_WEBHOOK_SECRET not set');

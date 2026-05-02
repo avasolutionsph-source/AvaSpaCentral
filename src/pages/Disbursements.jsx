@@ -249,6 +249,7 @@ function NewDisbursementModal({
 
     const amount = Number(form.amount);
     if (!amount || amount <= 0) { setError('Amount must be > 0'); return; }
+    if (amount < 50) { setError('NextPay minimum disbursement is ₱50'); return; }
     if (!form.sourceId.trim()) { setError('Source ID is required'); return; }
     if (!form.referenceCode.trim()) { setError('Reference code is required'); return; }
     if (!form.recipientName.trim()) { setError('Recipient name is required'); return; }
@@ -339,10 +340,12 @@ function NewDisbursementModal({
 
           <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
             <label>
-              <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.2rem' }}>Amount (PHP)</div>
+              <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.2rem' }}>
+                Amount (PHP) <span style={{ color: '#666', fontWeight: 400 }}>· min ₱50</span>
+              </div>
               <input
                 type="number"
-                min={1}
+                min={50}
                 step="0.01"
                 value={form.amount}
                 onChange={(e) => setField('amount', e.target.value)}

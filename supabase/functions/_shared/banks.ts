@@ -1,38 +1,38 @@
 /**
- * NextPay bank-code enum.
+ * NextPay bank types — the actual list is fetched live from NextPay's
+ * GET /v2/banks endpoint (proxied through the list-banks Edge Function),
+ * not hardcoded here. NextPay maintains the canonical list and includes
+ * per-bank validation rules + supported methods.
  *
- * NextPay's POST /v2/disbursements expects `destination.bank` as a NUMBER
- * (e.g. `bank: 6`), not a string. The full mapping lives on the docs sidebar
- * page "List of Supported Banks". This file is the operator-supplied
- * mapping — until the docs page is pasted, the array is empty and the
- * recipient bank dropdown will show no options.
- *
- * To fill: open https://nextpayph.stoplight.io/docs/nextpay-api-v2/ and copy
- * the bank table from the "List of Supported Banks" page into the
- * NEXTPAY_BANKS array below. Each entry needs at minimum a numeric `code`,
- * a human `name`, and the methods that bank supports (instapay, pesonet,
- * gcash, maya, etc.).
+ * This file holds only the type definitions shared between the
+ * list-banks Edge Function and any TypeScript code that consumes its
+ * response.
  */
 
-export type DisbursementMethod = 'instapay' | 'pesonet' | 'gcash' | 'maya';
+export type DisbursementMethod = 'instapay' | 'pesonet' | 'gcash' | 'maya' | string;
 
-export interface BankOption {
-  code: number;
-  name: string;
-  shortName: string;
-  supportedMethods: DisbursementMethod[];
+export type BankStatus = 'enabled' | 'disabled' | 'inactive';
+
+export interface BankAccountNumberValidation {
+  // NextPay's docs hint at a regex/length rule per bank. Shape is loosely
+  // typed because the docs only show "object" — real shape lands when we
+  // probe the live endpoint.
+  [key: string]: unknown;
 }
 
-export const NEXTPAY_BANKS: BankOption[] = [
-  // Examples (commented out — real values come from NextPay docs):
-  // { code: 1, name: 'Bank of the Philippine Islands', shortName: 'BPI', supportedMethods: ['instapay', 'pesonet'] },
-  // { code: 6, name: 'BDO Unibank',                    shortName: 'BDO', supportedMethods: ['instapay', 'pesonet'] },
-];
-
-export function bankByCode(code: number): BankOption | undefined {
-  return NEXTPAY_BANKS.find((b) => b.code === code);
+export interface NextPayBank {
+  id: number;                                       // the integer used as `bank: N` in disbursement requests
+  object: 'bank';
+  name: string;                                     // machine name, e.g. 'bank_of_the_philippine_islands'
+  label: string;                                    // display name, e.g. 'Bank Of The Philippine Islands'
+  label_short: string;                              // short, e.g. 'BPI'
+  country: string;                                  // ISO 2-letter, e.g. 'PH'
+  status: BankStatus;
+  account_number_validation: BankAccountNumberValidation | null;
+  methods: DisbursementMethod[];
 }
 
-export function bankNameForCode(code: number): string {
-  return bankByCode(code)?.name ?? `Bank #${code}`;
+export interface ListBanksResponse {
+  total_count: number;
+  data: NextPayBank[];
 }

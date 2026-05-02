@@ -252,6 +252,10 @@ function NewDisbursementModal({
     if (!form.sourceId.trim()) { setError('Source ID is required'); return; }
     if (!form.referenceCode.trim()) { setError('Reference code is required'); return; }
     if (!form.recipientName.trim()) { setError('Recipient name is required'); return; }
+    if (!form.recipientEmail.trim()) {
+      setError('Recipient email is required (NextPay sandbox enforces it even though the docs say optional)');
+      return;
+    }
     if (!form.payout.bankCode) { setError('Pick a bank'); return; }
     if (!form.payout.accountNumber.trim()) { setError('Account number is required'); return; }
     if (!form.payout.accountName.trim()) { setError('Account name is required'); return; }
@@ -404,14 +408,21 @@ function NewDisbursementModal({
 
           <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
             <label>
-              <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.2rem' }}>Email (optional)</div>
+              <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.2rem' }}>
+                Email *
+              </div>
               <input
                 type="email"
                 value={form.recipientEmail}
                 onChange={(e) => setField('recipientEmail', e.target.value)}
+                placeholder="recipient@example.com"
+                required
                 className="form-input"
                 style={{ width: '100%' }}
               />
+              <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '0.15rem' }}>
+                NextPay requires this — recipient gets a notification.
+              </div>
             </label>
             <label>
               <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.2rem' }}>Phone (optional)</div>

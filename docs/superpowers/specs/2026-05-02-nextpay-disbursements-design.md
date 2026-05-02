@@ -1,9 +1,20 @@
 # NextPay Outbound Disbursements — Design Spec
 
 **Date:** 2026-05-02
-**Status:** Draft, awaiting user approval
+**Status:** Approved, in-flight (operator chose A on 2026-05-02)
 **Scope:** Phase 2 of payment-gateway integration. Outbound only — sending money OUT to employees (payroll), suppliers (AP), and reimbursees (expenses).
 **Replaces:** Phase 1 (`docs/superpowers/specs/2026-05-01-nextpay-inbound-payments-design.md`) which is shelved because NextPay v2 has no inbound API.
+
+> **Webhook gap (2026-05-02):** NextPay's Webhooks (Private Beta) currently
+> only ships the `paymentlink.paid` event — there are no `disbursement.*`
+> events. The dashboard explicitly says the feature is "still under
+> development is available to only select users for now." So Phase 2 cannot
+> rely on a push from NextPay to learn that a disbursement settled. We use
+> **polling** instead: a `poll-disbursements` Edge Function scheduled by
+> pg_cron walks every `submitted` row and calls `GET /v2/disbursements/{id}`
+> until the row reaches a terminal status. When NextPay later ships the
+> events (and our merchant gets access), we'll wire the webhook handler as
+> a fast-path on top of polling — same cascade code, no behaviour change.
 
 ---
 

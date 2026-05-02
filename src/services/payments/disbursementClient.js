@@ -71,29 +71,54 @@ export async function createDisbursement({
   return data;
 }
 
-/**
- * Fetch the live NextPay bank catalog (cached for the session via the
- * caller — useNextpayBanks hook caches in component state).
- */
-export async function listNextpayBanks({ limit = 100 } = {}) {
-  if (!supabase) throw new Error('Supabase is not configured');
-  // Use direct fetch instead of supabase.functions.invoke so we can pass
-  // query params (invoke only supports POST + body).
-  const url = new URL(`${supabase.supabaseUrl}/functions/v1/list-banks`);
-  url.searchParams.set('_limit', String(limit));
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token ?? supabase.supabaseKey;
+// NextPay caps _limit at 100. We paginate transparently so callers always
+// get the full catalog regardless of how many banks NextPay adds later.
+const NEXTPAY_PAGE_LIMIT = 100;
 
-  const res = await fetch(url.toString(), {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'apikey': supabase.supabaseKey,
-    },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`list-banks failed: ${res.status} ${text}`);
+/**
+ * Fetch the live NextPay bank catalog. Pages internally to work around
+ * NextPay's 100-per-call cap; returns the merged { total_count, data }
+ * envelope.
+ */
+export async function listNextpayBanks() {
+  if (!supabase) throw new Error('Supabase is not configured');
+
+  const fetchOnePage = async (start) => {
+    const url = new URL(`${supabase.supabaseUrl}/functions/v1/list-banks`);
+    url.searchParams.set('_limit', String(NEXTPAY_PAGE_LIMIT));
+    if (start > 0) url.searchParams.set('_start', String(start));
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token ?? supabase.supabaseKey;
+
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabase.supabaseKey,
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`list-banks failed: ${res.status} ${text}`);
+    }
+    return res.json();
+  };
+
+  const first = await fetchOnePage(0);
+  const totalCount = first.total_count ?? first.data?.length ?? 0;
+  const merged = [...(first.data ?? [])];
+
+  // Walk subsequent pages until we have everything. Cap at 10 pages so a
+  // pathological NextPay response can never spin forever.
+  let start = NEXTPAY_PAGE_LIMIT;
+  let pages = 1;
+  while (merged.length < totalCount && pages < 10) {
+    const next = await fetchOnePage(start);
+    if (!next?.data?.length) break;
+    merged.push(...next.data);
+    start += next.data.length;
+    pages += 1;
   }
-  return res.json();
+
+  return { total_count: totalCount, data: merged };
 }

@@ -13,7 +13,7 @@ let cachedPromise = null;
 
 function loadBanksOnce() {
   if (!cachedPromise) {
-    cachedPromise = listNextpayBanks({ limit: 200 }).catch((e) => {
+    cachedPromise = listNextpayBanks().catch((e) => {
       // Reset the cache on failure so the next caller can retry.
       cachedPromise = null;
       throw e;

@@ -76,17 +76,30 @@ describe('listNextpayBanks', () => {
     global.fetch = vi.fn();
   });
 
-  it('returns banks list on 200', async () => {
+  it('returns banks list on 200 (single page)', async () => {
     global.fetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ total_count: 102, data: [{ id: 9, label: 'BPI' }] }),
+      json: async () => ({ total_count: 1, data: [{ id: 9, label: 'BPI' }] }),
     });
     const result = await listNextpayBanks();
-    expect(result.total_count).toBe(102);
+    expect(result.total_count).toBe(1);
     expect(result.data[0].label).toBe('BPI');
     const calledUrl = global.fetch.mock.calls[0][0];
     expect(calledUrl).toContain('/functions/v1/list-banks');
     expect(calledUrl).toContain('_limit=100');
+  });
+
+  it('paginates to fetch banks beyond a single 100-row page', async () => {
+    const page1 = { total_count: 102, data: new Array(100).fill(null).map((_, i) => ({ id: i, label: `Bank ${i}` })) };
+    const page2 = { total_count: 102, data: [{ id: 100, label: 'Bank 100' }, { id: 101, label: 'Bank 101' }] };
+    global.fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => page1 })
+      .mockResolvedValueOnce({ ok: true, json: async () => page2 });
+    const result = await listNextpayBanks();
+    expect(result.total_count).toBe(102);
+    expect(result.data).toHaveLength(102);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch.mock.calls[1][0]).toContain('_start=100');
   });
 
   it('throws on non-200', async () => {

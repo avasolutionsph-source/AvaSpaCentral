@@ -256,6 +256,10 @@ function NewDisbursementModal({
       setError('Recipient email is required (NextPay sandbox enforces it even though the docs say optional)');
       return;
     }
+    if (!form.recipientPhone.trim()) {
+      setError('Recipient phone is required (NextPay sandbox enforces it even though the docs say optional)');
+      return;
+    }
     if (!form.payout.bankCode) { setError('Pick a bank'); return; }
     if (!form.payout.accountNumber.trim()) { setError('Account number is required'); return; }
     if (!form.payout.accountName.trim()) { setError('Account name is required'); return; }
@@ -425,15 +429,21 @@ function NewDisbursementModal({
               </div>
             </label>
             <label>
-              <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.2rem' }}>Phone (optional)</div>
+              <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.2rem' }}>
+                Phone *
+              </div>
               <input
                 type="tel"
                 value={form.recipientPhone}
                 onChange={(e) => setField('recipientPhone', e.target.value)}
-                placeholder="+639..."
+                placeholder="+639171234567"
+                required
                 className="form-input"
                 style={{ width: '100%' }}
               />
+              <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '0.15rem' }}>
+                NextPay requires this — recipient gets an SMS notification.
+              </div>
             </label>
           </div>
 

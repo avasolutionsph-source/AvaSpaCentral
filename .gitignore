@@ -33,6 +33,10 @@ dist-ssr
 .env.production
 .env.staging
 
+# Operator-only credential / notes files - NEVER commit these
+*.local.md
+NEXTPAY-CREDENTIALS.*
+
 # Build outputs
 build
 .cache

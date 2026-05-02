@@ -2450,409 +2450,86 @@ const Settings = () => {
           </div>
         </div>
       ) : activeTab === 'payments' ? (
-        (() => {
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-          const projectRef = (() => {
-            try {
-              const u = new URL(supabaseUrl);
-              return u.hostname.split('.')[0];
-            } catch {
-              return '';
-            }
-          })();
-          const webhookUrl = supabaseUrl
-            ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/nextpay-webhook`
-            : '';
-          const dashboardSecretsUrl = projectRef
-            ? `https://supabase.com/dashboard/project/${projectRef}/functions/secrets`
-            : 'https://supabase.com/dashboard';
-          const dashboardFunctionsUrl = projectRef
-            ? `https://supabase.com/dashboard/project/${projectRef}/functions`
-            : 'https://supabase.com/dashboard';
-          const dashboardDbUrl = projectRef
-            ? `https://supabase.com/dashboard/project/${projectRef}/database/extensions`
-            : 'https://supabase.com/dashboard';
-          const nextpayDashUrl = nextpaySettings.environment === 'production'
-            ? 'https://platform.nextpay.world'
-            : 'https://sandbox.nextpay.world';
-          const cliCommand = `npx supabase secrets set \\
-  NEXTPAY_API_KEY="${pendingApiKey || '<paste-api-key>'}" \\
-  NEXTPAY_WEBHOOK_SECRET="${pendingWebhookSecret || '<paste-webhook-secret>'}" \\
-  NEXTPAY_ENV=${nextpaySettings.environment}`;
-
-          const copyToClipboard = async (text, label) => {
-            try {
-              await navigator.clipboard.writeText(text);
-              showToast(`${label} copied to clipboard`, 'success');
-            } catch {
-              showToast('Could not copy. Select the text and copy manually.', 'warning');
-            }
-          };
-
-          const setupSteps = [
-            { key: 'migrationsApplied', label: 'Apply 3 SQL migrations', help: 'Run them in Supabase Studio → SQL editor (top to bottom).' },
-            { key: 'pgCronEnabled', label: 'Enable pg_cron extension', help: 'Database → Extensions → search "pg_cron" → enable.' },
-            { key: 'functionsDeployed', label: 'Deploy both Edge Functions', help: 'create-payment-intent and nextpay-webhook (with --no-verify-jwt).' },
-            { key: 'secretsSet', label: 'Set Edge Function secrets', help: 'NEXTPAY_API_KEY, NEXTPAY_WEBHOOK_SECRET, NEXTPAY_ENV.' },
-            { key: 'webhookConfigured', label: 'Configure webhook URL in NextPay dashboard', help: 'Paste the webhook URL above into NextPay → Webhooks.' },
-            { key: 'sandboxQaPassed', label: 'Run sandbox QA end-to-end', help: 'Walk the docs/nextpay-qa-and-cutover.md checklist.' },
-            { key: 'productionCutover', label: 'Production cutover', help: 'Only after sandbox QA passes for at least one full day.' },
-          ];
-
-          const completedSteps = setupSteps.filter(s => nextpaySetupProgress[s.key]).length;
-
-          return (
         <div className="settings-content">
-          {/* SECTION 1: Connection Setup */}
+          {/* Pivot notice — read NEXTPAY-PIVOT.md / NEXT-STEPS.md for context */}
           <div className="settings-section">
             <div className="settings-section-header">
-              <div className="settings-section-icon">🔌</div>
+              <div className="settings-section-icon">⚠️</div>
               <div className="settings-section-title">
-                <h2>Connection Setup</h2>
-                <p>Wire NextPay to this Supabase project. Step-by-step.</p>
+                <h2>Payment Gateway — Direction Changed</h2>
+                <p>Phase 1 (POS QRPh + Online Booking prepay) is shelved. NextPay v2 only supports outbound disbursements.</p>
               </div>
             </div>
             <div className="settings-section-body">
-              <div style={{ display: 'grid', gap: '1.5rem' }}>
-
-                {/* Step 1: Webhook URL to paste in NextPay */}
-                <div>
-                  <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
-                    Step 1 — Webhook URL (paste this in NextPay dashboard)
-                  </div>
-                  <p style={{ fontSize: '0.85rem', color: '#666', margin: '0 0 0.5rem' }}>
-                    Open NextPay → Webhooks and set the callback URL to:
-                  </p>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <input
-                      type="text"
-                      value={webhookUrl || '(VITE_SUPABASE_URL not configured)'}
-                      readOnly
-                      onFocus={(e) => e.target.select()}
-                      className="form-input"
-                      style={{ flex: '1', minWidth: '300px', fontFamily: 'monospace', fontSize: '0.85rem', background: '#f8f8f8' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => copyToClipboard(webhookUrl, 'Webhook URL')}
-                      disabled={!webhookUrl}
-                    >
-                      Copy
-                    </button>
-                    <a
-                      className="btn btn-secondary"
-                      href={nextpayDashUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open NextPay ↗
-                    </a>
-                  </div>
-                </div>
-
-                {/* Step 2: Paste credentials */}
-                <div>
-                  <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
-                    Step 2 — Paste your NextPay credentials
-                  </div>
-                  <p style={{ fontSize: '0.85rem', color: '#666', margin: '0 0 0.5rem' }}>
-                    These are <strong>not</strong> saved in this app — they are only used to
-                    generate the CLI command below. Run that command in your terminal to
-                    store the secrets server-side (Supabase Edge Function secrets).
-                  </p>
-
-                  <label style={{ display: 'block', marginBottom: '0.75rem' }}>
-                    <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                      NextPay API Key (sandbox or production)
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        value={pendingApiKey}
-                        onChange={(e) => setPendingApiKey(e.target.value)}
-                        placeholder="sk_test_... or sk_live_..."
-                        className="form-input"
-                        style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem' }}
-                        autoComplete="off"
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => setShowApiKey(s => !s)}
-                      >
-                        {showApiKey ? 'Hide' : 'Show'}
-                      </button>
-                    </div>
-                  </label>
-
-                  <label style={{ display: 'block', marginBottom: '0.75rem' }}>
-                    <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                      NextPay Webhook Signing Secret
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input
-                        type={showWebhookSecret ? 'text' : 'password'}
-                        value={pendingWebhookSecret}
-                        onChange={(e) => setPendingWebhookSecret(e.target.value)}
-                        placeholder="whsec_..."
-                        className="form-input"
-                        style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem' }}
-                        autoComplete="off"
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => setShowWebhookSecret(s => !s)}
-                      >
-                        {showWebhookSecret ? 'Hide' : 'Show'}
-                      </button>
-                    </div>
-                  </label>
-                </div>
-
-                {/* Step 3: CLI command */}
-                <div>
-                  <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
-                    Step 3 — Run this command in your terminal
-                  </div>
-                  <p style={{ fontSize: '0.85rem', color: '#666', margin: '0 0 0.5rem' }}>
-                    From the <code>AVADAETSPA</code> directory. Or paste the values manually
-                    via the dashboard link below if you don't have the Supabase CLI.
-                  </p>
-                  <pre style={{
-                    background: '#1e293b',
-                    color: '#e2e8f0',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    overflowX: 'auto',
-                    margin: '0 0 0.5rem',
-                  }}>
-{cliCommand}
-                  </pre>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => copyToClipboard(cliCommand, 'CLI command')}
-                      disabled={!pendingApiKey || !pendingWebhookSecret}
-                      title={!pendingApiKey || !pendingWebhookSecret ? 'Fill in both fields above first' : undefined}
-                    >
-                      Copy command
-                    </button>
-                    <a
-                      className="btn btn-secondary"
-                      href={dashboardSecretsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open Supabase Secrets ↗
-                    </a>
-                    <a
-                      className="btn btn-secondary"
-                      href={dashboardFunctionsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open Edge Functions ↗
-                    </a>
-                    <a
-                      className="btn btn-secondary"
-                      href={dashboardDbUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open Extensions ↗
-                    </a>
-                  </div>
-                </div>
-
-              </div>
+              <p style={{ marginBottom: '0.75rem' }}>
+                We started by wiring NextPay for inbound QRPh (customers paying us
+                at POS or via the booking page). After integrating against the
+                NextPay v2 API, we found that the public API exposes only{' '}
+                <strong>outbound disbursements</strong> (sending money out — payroll,
+                supplier AP, refunds). There is no documented endpoint to mint a
+                QRPh QR code for an incoming payment.
+              </p>
+              <p style={{ marginBottom: '0.75rem' }}>
+                <strong>What this means right now:</strong>
+              </p>
+              <ul style={{ marginLeft: '1.25rem', marginBottom: '0.75rem' }}>
+                <li>The POS "QRPh" payment-method button is hidden.</li>
+                <li>The "Pay full amount now via QRPh" checkbox on the public booking page is hidden.</li>
+                <li>The Edge Functions (<code>create-payment-intent</code>, <code>nextpay-webhook</code>) are deployed but unused — safe to leave in place.</li>
+                <li>The <code>payment_intents</code> table is empty and will stay that way.</li>
+              </ul>
+              <p style={{ marginBottom: '0.75rem' }}>
+                <strong>Next direction (Phase 2):</strong> use NextPay for{' '}
+                <strong>outbound</strong> only — automated payroll payouts,
+                supplier AP disbursements, expense reimbursements. The same
+                <code>NEXTPAY_CLIENT_KEY</code> /{' '}
+                <code>NEXTPAY_CLIENT_SECRET</code> /{' '}
+                <code>NEXTPAY_ENV</code> secrets you already set in Supabase
+                will be reused.
+              </p>
+              <p style={{ fontSize: '0.85rem', color: '#666' }}>
+                Inbound payment alternatives (PayMongo, Xendit, Maya) are out of
+                scope for now. Bring them up if you want a separate inbound
+                gateway later.
+              </p>
             </div>
           </div>
 
-          {/* SECTION 2: Existing config */}
+          {/* Disbursements (Phase 2) — placeholder until wired */}
           <div className="settings-section">
             <div className="settings-section-header">
-              <div className="settings-section-icon">💳</div>
+              <div className="settings-section-icon">💸</div>
               <div className="settings-section-title">
-                <h2>Payment Gateway (NextPay)</h2>
-                <p>Operational toggles. Take effect on next page load.</p>
+                <h2>Disbursements (NextPay) — Coming in Phase 2</h2>
+                <p>Outbound payouts: payroll, supplier AP, expense reimbursements.</p>
               </div>
             </div>
             <div className="settings-section-body">
-              <div style={{ display: 'grid', gap: '1rem', maxWidth: '480px' }}>
-                <label>
-                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Environment</div>
-                  <select
-                    value={nextpaySettings.environment}
-                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, environment: e.target.value })}
-                    className="form-input"
-                    style={{ width: '100%' }}
-                  >
-                    <option value="sandbox">Sandbox (test)</option>
-                    <option value="production">Production (live money)</option>
-                  </select>
-                </label>
-
-                <label>
-                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Merchant display name</div>
-                  <input
-                    type="text"
-                    value={nextpaySettings.merchantDisplayName}
-                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, merchantDisplayName: e.target.value })}
-                    placeholder="Daet Massage & Spa"
-                    className="form-input"
-                    style={{ width: '100%' }}
-                  />
-                </label>
-
-                <label>
-                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>POS QR expiry (minutes)</div>
-                  <input
-                    type="number"
-                    min={5}
-                    max={60}
-                    value={nextpaySettings.qrExpiryMinutes}
-                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, qrExpiryMinutes: Number(e.target.value) || 15 })}
-                    className="form-input"
-                    style={{ width: '100%' }}
-                  />
-                </label>
-
-                <label>
-                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Booking QR expiry (minutes)</div>
-                  <input
-                    type="number"
-                    min={10}
-                    max={120}
-                    value={nextpaySettings.bookingExpiryMinutes}
-                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, bookingExpiryMinutes: Number(e.target.value) || 30 })}
-                    className="form-input"
-                    style={{ width: '100%' }}
-                  />
-                </label>
-
-                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={nextpaySettings.enablePosQrph}
-                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, enablePosQrph: e.target.checked })}
-                  />
-                  <span>Enable QRPh in POS checkout</span>
-                </label>
-
-                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={nextpaySettings.enableBookingDeposits}
-                    onChange={(e) => setNextpaySettings({ ...nextpaySettings, enableBookingDeposits: e.target.checked })}
-                  />
-                  <span>Enable QRPh prepay on Online Booking</span>
-                </label>
-
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={nextpaySaving}
-                    onClick={async () => {
-                      setNextpaySaving(true);
-                      try {
-                        await SettingsRepository.set('nextpaySettings', nextpaySettings);
-                        showToast('Payment gateway settings saved.', 'success');
-                      } catch (err) {
-                        showToast('Failed to save: ' + (err?.message || err), 'error');
-                      } finally {
-                        setNextpaySaving(false);
-                      }
-                    }}
-                  >
-                    {nextpaySaving ? 'Saving...' : 'Save'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 3: Setup Checklist */}
-          <div className="settings-section">
-            <div className="settings-section-header">
-              <div className="settings-section-icon">✅</div>
-              <div className="settings-section-title">
-                <h2>Setup Checklist</h2>
-                <p>{completedSteps} of {setupSteps.length} steps complete.</p>
-              </div>
-            </div>
-            <div className="settings-section-body">
-              <div style={{
-                background: '#f1f5f9',
-                height: '8px',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                marginBottom: '1.25rem',
-              }}>
-                <div style={{
-                  background: completedSteps === setupSteps.length ? '#16a34a' : '#3b82f6',
-                  height: '100%',
-                  width: `${(completedSteps / setupSteps.length) * 100}%`,
-                  transition: 'width 0.3s ease',
-                }} />
-              </div>
-
-              <ol style={{ display: 'grid', gap: '0.6rem', listStyle: 'none', padding: 0, margin: 0 }}>
-                {setupSteps.map((step, idx) => {
-                  const done = nextpaySetupProgress[step.key];
-                  return (
-                    <li key={step.key} style={{
-                      display: 'flex',
-                      gap: '0.65rem',
-                      alignItems: 'flex-start',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '8px',
-                      background: done ? '#f0fdf4' : '#fff',
-                      border: done ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={done}
-                        onChange={async (e) => {
-                          const next = { ...nextpaySetupProgress, [step.key]: e.target.checked };
-                          setNextpaySetupProgress(next);
-                          try {
-                            await SettingsRepository.set('nextpaySetupProgress', next);
-                          } catch (err) {
-                            console.warn('Failed to persist setup progress:', err);
-                          }
-                        }}
-                        style={{ marginTop: '0.2rem' }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          fontWeight: 500,
-                          textDecoration: done ? 'line-through' : 'none',
-                          color: done ? '#166534' : 'inherit',
-                        }}>
-                          {idx + 1}. {step.label}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
-                          {step.help}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
+              <p style={{ marginBottom: '0.75rem' }}>
+                Phase 2 will wire NextPay's <code>POST /v2/disbursements</code>{' '}
+                endpoint into the existing Payroll, Supplier AP, and Expense
+                workflows. The flow is the inverse of the inbound design we
+                shelved:
+              </p>
+              <ol style={{ marginLeft: '1.25rem', marginBottom: '0.75rem' }}>
+                <li>Operator approves a payroll batch / supplier invoice / expense reimbursement.</li>
+                <li>App calls a new Edge Function <code>create-disbursement</code> per recipient.</li>
+                <li>NextPay sends the funds to the recipient's bank or e-wallet (BPI, BDO, GCash, Maya, etc.).</li>
+                <li>NextPay calls our webhook with the disbursement status.</li>
+                <li>Webhook updates the payroll/AP/expense row to <code>paid</code> and stamps the disbursement reference.</li>
               </ol>
-
-              <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '1rem' }}>
-                Detailed runbook: <code>docs/nextpay-qa-and-cutover.md</code> in the repo.
+              <p style={{ marginBottom: '0.75rem' }}>
+                Source-of-truth design doc:{' '}
+                <code>docs/superpowers/specs/2026-05-02-nextpay-disbursements-design.md</code>{' '}
+                (committed alongside this notice).
+              </p>
+              <p style={{ fontSize: '0.85rem', color: '#666' }}>
+                Status: design only. No code yet. Operator action items will
+                appear here once the spec is approved and Phase 2 starts.
               </p>
             </div>
           </div>
         </div>
-          );
-        })()
       ) : activeTab === 'branches' ? (
         <BranchesTab />
       ) : activeTab === 'branding' ? (

@@ -191,12 +191,12 @@ const POS = () => {
     };
 
     const loadNextpaySetting = async () => {
-      try {
-        const saved = await SettingsRepository.get('nextpaySettings');
-        if (isMounted && saved && typeof saved === 'object') {
-          setEnablePosQrph(Boolean(saved.enablePosQrph));
-        }
-      } catch {}
+      // NextPay v2 API does not currently support inbound QRPh collections
+      // (only outbound disbursements). The POS QRPh button is force-disabled
+      // until a working inbound gateway is wired (PayMongo / Xendit / Maya)
+      // or NextPay ships an inbound API. The setting toggle is ignored.
+      setEnablePosQrph(false);
+      void SettingsRepository; // keep import live for future re-enable
     };
 
     loadData();

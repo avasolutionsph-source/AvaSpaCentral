@@ -1,136 +1,147 @@
-# NextPay Phase 1 — Next Steps
+# NextPay Integration — Next Steps
 
-All 15 plan tasks are code-committed on `main`. The remaining work is
-**operator-driven** (touching live infra), not code.
-
-For the full QA + cutover runbook, see [docs/nextpay-qa-and-cutover.md](docs/nextpay-qa-and-cutover.md).
-For the design spec, see [docs/superpowers/specs/2026-05-01-nextpay-inbound-payments-design.md](docs/superpowers/specs/2026-05-01-nextpay-inbound-payments-design.md).
-For the original plan, see [docs/superpowers/plans/2026-05-01-nextpay-inbound-payments.md](docs/superpowers/plans/2026-05-01-nextpay-inbound-payments.md).
-
----
-
-## 1. Apply the 3 migrations
-
-Order matters — run them top to bottom in Supabase Studio → SQL editor.
-
-- [ ] [supabase/migrations/20260501120000_create_payment_intents.sql](supabase/migrations/20260501120000_create_payment_intents.sql)
-- [ ] [supabase/migrations/20260501120100_extend_transactions_bookings.sql](supabase/migrations/20260501120100_extend_transactions_bookings.sql)
-- [ ] [supabase/migrations/20260501120200_payment_intents_cleanup.sql](supabase/migrations/20260501120200_payment_intents_cleanup.sql)
-
-Verify after each:
-```sql
--- Migration 1
-SELECT count(*) FROM information_schema.columns WHERE table_name='payment_intents';
--- Expect: 17
-
--- Migration 2
-SELECT column_name FROM information_schema.columns
-WHERE table_name IN ('transactions','advance_bookings')
-  AND column_name='payment_intent_id';
--- Expect: 2 rows
-
--- Migration 3 (needs pg_cron extension enabled first)
-SELECT jobname, schedule FROM cron.job WHERE jobname='expire-payment-intents';
--- Expect: 1 row, schedule '*/5 * * * *'
-```
-
-If `pg_cron` isn't enabled: Supabase Dashboard → Database → Extensions → search
-`pg_cron` → enable, then re-run migration 3.
+> **Direction changed 2026-05-02.** Phase 1 (POS QRPh + Online Booking prepay,
+> *inbound*) is shelved because the NextPay v2 API does not support
+> programmatic creation of inbound QRPh collections — only outbound
+> disbursements. This file now describes the new direction (Phase 2:
+> outbound disbursements). Phase 1 history is at the bottom.
 
 ---
 
-## 2. Set Edge Function secrets
+## Current state of the deployment
 
-Sandbox first. Use the NextPay sandbox API key from 1Password.
+What's still live in your Supabase project (`thyexktqknzqnjlnzdmv`):
 
-```bash
-cd AVADAETSPA
-npx supabase secrets set \
-  NEXTPAY_API_KEY=<sandbox_key_from_1password> \
-  NEXTPAY_WEBHOOK_SECRET=<sandbox_webhook_secret_from_nextpay_dashboard> \
-  NEXTPAY_ENV=sandbox
-```
+| Resource | State | Used by Phase 2? |
+|----------|-------|------------------|
+| `payment_intents` table | empty, RLS on, Realtime on | ❌ no — was inbound |
+| `transactions.payment_intent_id`, `advance_bookings.payment_intent_id` columns | added | ❌ no |
+| `pg_cron` job `expire-payment-intents` | scheduled every 5 min | ❌ no — but harmless (no rows to expire) |
+| Edge Function `create-payment-intent` | deployed, ACTIVE, version 5 | ❌ no |
+| Edge Function `nextpay-webhook` | deployed, ACTIVE, version 5 | ⚠️ partial — webhook handler will be reused for disbursement events |
+| Secrets `NEXTPAY_CLIENT_KEY`, `NEXTPAY_CLIENT_SECRET` (alias `NEXTPAY_API_KEY`), `NEXTPAY_WEBHOOK_SECRET`, `NEXTPAY_ENV` | set | ✅ yes — same auth scheme |
 
-`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-injected — don't set them.
+**Nothing needs to be torn down** to start Phase 2. The unused inbound code is
+small enough to leave in place; if NextPay ever adds an inbound API, we can
+revive it.
 
----
-
-## 3. Deploy both Edge Functions
-
-```bash
-cd AVADAETSPA
-npx supabase functions deploy create-payment-intent
-npx supabase functions deploy nextpay-webhook --no-verify-jwt
-```
-
-The `--no-verify-jwt` flag is **required** for the webhook because NextPay
-doesn't have a Supabase JWT — security is via HMAC signature.
+The two surfaced UI affordances (POS "QRPh" payment-method button, public
+booking page "Pay full amount now via QRPh" checkbox) are now **hidden** in
+the codebase regardless of the Settings toggle.
 
 ---
 
-## 4. Configure webhook URL in NextPay dashboard
+## Phase 2 — Outbound Disbursements
 
-In the NextPay sandbox dashboard, set the callback URL to:
+**Goal:** automate three existing manual cash-out flows by pushing money
+through NextPay's `POST /v2/disbursements` endpoint:
 
-```
-https://<your-project-ref>.supabase.co/functions/v1/nextpay-webhook
-```
+1. **Payroll payouts** — at the end of a payroll cycle, dispatch each
+   employee's net pay to their bank/e-wallet automatically instead of writing
+   cheques or transferring manually.
+2. **Supplier AP payments** — when a Purchase Order is marked paid, send the
+   supplier their amount automatically.
+3. **Expense reimbursements** — when an Expense is approved for reimbursement,
+   send the amount to the requester's bank/e-wallet.
+
+**Source-of-truth design doc:**
+[`docs/superpowers/specs/2026-05-02-nextpay-disbursements-design.md`](docs/superpowers/specs/2026-05-02-nextpay-disbursements-design.md)
+
+### Operator action items (in order)
+
+#### 1. Approve the Phase 2 design
+
+Open the design doc above. Confirm:
+
+- Three workflows in scope (or trim — e.g. start with just payroll)
+- Recipient bank-account capture flow (where employees / suppliers register
+  their bank and account number)
+- Approval / two-person rule for live disbursements (reason: same key can move
+  real money on production)
+
+Once approved, code generation starts.
+
+#### 2. Capture recipient bank info
+
+Each employee, supplier, and reimbursement-eligible user needs a destination
+bank account on file. Phase 2 will add:
+
+- A "Bank account" panel in **Employees → edit**
+- A "Payment details" panel in **Suppliers → edit**
+- (Optional) A "Bank for reimbursements" field on user profile
+
+The actual recipient validation happens at NextPay's side; we just store the
+bank code + account number locally so the operator doesn't re-enter it each
+payout.
+
+#### 3. Sandbox dry-run
+
+Before any live disbursement, run the sandbox QA (will be added to
+[`docs/nextpay-qa-and-cutover.md`](docs/nextpay-qa-and-cutover.md)):
+
+- Mint one ₱1 disbursement to a test recipient
+- Verify the webhook flips the source row to `paid`
+- Verify duplicate webhooks are idempotent
+- Verify a failed disbursement (insufficient balance, wrong account) does
+  *not* mark the source row paid
+
+#### 4. Production cutover
+
+Same shape as Phase 1's cutover — swap secrets to `pk_live_…` /
+`sk_live_…`, set `NEXTPAY_ENV=production`, redeploy, and turn on a
+**single-recipient ₱1** test before enabling batch payouts.
 
 ---
 
-## 5. Enable in Settings
+## Rollback plan for Phase 2
 
-In the running app, sign in as Owner/Manager:
+If something goes wrong in production:
 
-- [ ] Settings → **Payments** → set Environment to **Sandbox**
-- [ ] Tick **Enable QRPh in POS checkout**
-- [ ] Tick **Enable QRPh prepay on Online Booking**
-- [ ] Save
-
----
-
-## 6. Run sandbox QA
-
-Walk the full checklist in [docs/nextpay-qa-and-cutover.md](docs/nextpay-qa-and-cutover.md):
-- POS happy path
-- Booking happy path
-- Failure paths (expiry × 2, tampered webhook, duplicate webhook, offline)
-- Reconciliation query
-
-**Do not proceed to production cutover** until every section in that doc passes
-and reconciliation matches NextPay's daily report for at least one full day.
+1. **Settings → Payments → Disbursements** → uncheck the "Enable" toggles for
+   payroll / AP / expense (each workflow gates independently). Cashier /
+   accountant flow falls back to manual.
+2. NextPay disbursements that already cleared cannot be reversed via API —
+   refund/reversal is manual through NextPay's dashboard.
+3. The "pending disbursement" rows in our DB stay at `pending` until either
+   the webhook fires or the operator cancels them manually.
 
 ---
 
-## 7. Production cutover (only after QA passes)
+## Phase 1 history (shelved)
 
-See section 5 of [docs/nextpay-qa-and-cutover.md](docs/nextpay-qa-and-cutover.md).
-TL;DR:
-1. Get production credentials from NextPay (post-KYC)
-2. `supabase secrets set` with the production values + `NEXTPAY_ENV=production`
-3. Re-deploy both functions
-4. Configure the production webhook URL in NextPay's production dashboard
-5. Run **one** ₱1 live transaction, refund it manually
-6. Settings → Payments → switch to Production, save, and enable both toggles
-7. Brief cashiers
+The implementation that was committed for Phase 1 (Tasks 1–15 of the original
+plan) is still in the repo and on the `main` branch:
+
+- Migrations: `20260501120000` (payment_intents), `20260501120100`
+  (FK columns), `20260501120200` (pg_cron expiry)
+- Edge Functions: `create-payment-intent`, `nextpay-webhook`
+- Browser: `services/payments/`, `hooks/usePaymentIntent.js`,
+  `components/QRPaymentModal.jsx`, `repositories/PaymentIntentRepository.js`
+- UI hooks: POS QRPh button (now hidden), Booking prepay checkbox (now hidden),
+  Settings → Payments tab (replaced with pivot notice)
+
+Why we shelved it: NextPay v2 API exposes only outbound endpoints. The whole
+inbound flow assumed an endpoint like `POST /v2/collections/qrph` that does
+not exist in NextPay's published v2 API.
+
+If NextPay ever publishes an inbound API, reviving Phase 1 is mostly:
+
+1. Fix the URL + endpoint path in `supabase/functions/_shared/nextpayClient.ts`
+2. Re-deploy `create-payment-intent`
+3. Set `nextpaySettings.enablePosQrph` and `nextpaySettings.enableBookingDeposits`
+   in Settings, AND undo the force-disable in `POS.jsx` and `BookingPage.jsx`
+
+The original Phase 1 plan + spec are preserved at:
+- [`docs/superpowers/plans/2026-05-01-nextpay-inbound-payments.md`](docs/superpowers/plans/2026-05-01-nextpay-inbound-payments.md)
+- [`docs/superpowers/specs/2026-05-01-nextpay-inbound-payments-design.md`](docs/superpowers/specs/2026-05-01-nextpay-inbound-payments-design.md)
+- [`docs/nextpay-qa-and-cutover.md`](docs/nextpay-qa-and-cutover.md)
 
 ---
 
-## Rollback
+## What's still NOT in scope (future phases)
 
-If anything goes wrong in production:
-1. Settings → Payments → uncheck both enable toggles, save. The QRPh button
-   disappears immediately on next page load.
-2. Live `awaiting_payment` intents will expire on their own via `pg_cron`.
-3. If the webhook is misbehaving, set `NEXTPAY_ENV=sandbox` and redeploy. Live
-   charges will fail fast at the create-intent step rather than polluting the DB.
-
----
-
-## What's NOT in Phase 1 (deferred)
-
-- Outbound payouts (payroll, supplier AP, expense recurring) — separate plan
-- SaaS subscription billing — blocked on NextPay recurring API
-- POS card-payment gateway — blocked on NextPay card support
-- Refunds via API — manual through NextPay dashboard for now
-- SMS/email confirmation on success — fast follow
+- Inbound QRPh / GCash / cards (would need a separate gateway —
+  PayMongo, Xendit, or Maya — when prioritised)
+- SaaS subscription billing
+- Refunds via API (manual through gateway dashboard for now)
+- SMS/email confirmation on disbursement success — fast follow once Phase 2 ships

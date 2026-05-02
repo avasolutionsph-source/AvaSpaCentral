@@ -2368,51 +2368,22 @@ const BookingPage = () => {
                     </div>
                   </div>
 
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '0.5rem',
-                      margin: '0.75rem 0',
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={prepayEnabled}
-                      onChange={(e) => setPrepayEnabled(e.target.checked)}
-                      disabled={submitting || !navigator.onLine}
-                      style={{ marginTop: '0.2rem' }}
-                    />
-                    <span>
-                      Pay full amount now via <strong>QRPh</strong> to instantly
-                      confirm this booking.
-                    </span>
-                  </label>
+                  {/*
+                   * QRPh prepay checkbox is hidden — NextPay v2 API does not
+                   * currently support inbound QRPh collections. The state is
+                   * preserved in case we wire an alternate gateway later.
+                   */}
 
                   <button
                     className="submit-booking-btn"
                     onClick={handleSubmitBooking}
                     disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
                   >
-                    {submitting
-                      ? 'Submitting...'
-                      : prepayEnabled
-                        ? `Pay ₱${cartTotal.toLocaleString()} to Confirm`
-                        : 'Confirm Booking'}
+                    {submitting ? 'Submitting...' : 'Confirm Booking'}
                   </button>
 
-                  {prepayError && (
-                    <p className="booking-note" style={{ color: 'var(--danger, #c00)' }}>
-                      {prepayError}
-                    </p>
-                  )}
-
                   <p className="booking-note">
-                    {prepayEnabled
-                      ? 'You will be shown a QR code to scan with your bank or e-wallet.'
-                      : "We'll contact you to confirm your booking and arrange payment."}
+                    We'll contact you to confirm your booking and arrange payment.
                   </p>
                 </div>
               )}

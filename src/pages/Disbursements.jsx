@@ -20,6 +20,7 @@ import { DisbursementRepository, SettingsRepository } from '../services/storage/
 import { createDisbursement } from '../services/payments';
 import PayoutBankPanel, { EMPTY_PAYOUT_VALUE } from '../components/PayoutBankPanel';
 import DisbursementStatusBadge from '../components/DisbursementStatusBadge';
+import { useDisbursementRecipients } from '../hooks/useDisbursementRecipients';
 import { supabase } from '../services/supabase/supabaseClient';
 
 const SOURCE_TYPE_LABELS = {
@@ -232,6 +233,12 @@ function NewDisbursementModal({
     payout: { ...EMPTY_PAYOUT_VALUE },
   });
   const [error, setError] = useState(null);
+  const [pickerId, setPickerId] = useState('');  // selected recipient row id
+
+  const { recipients, loading: recipientsLoading } = useDisbursementRecipients(
+    form.sourceType,
+    { branchId },
+  );
 
   const allowedSourceTypes = useMemo(() => {
     const out = [];
@@ -241,7 +248,42 @@ function NewDisbursementModal({
     return out;
   }, [enabledWorkflows]);
 
+  const pickerLabel = form.sourceType === 'payroll_request'
+    ? 'Pick employee'
+    : form.sourceType === 'purchase_order'
+      ? 'Pick supplier'
+      : null;  // expense reimbursement has no entity table — manual entry only
+
   const setField = (field, val) => setForm((f) => ({ ...f, [field]: val }));
+
+  const applyRecipient = (id) => {
+    setPickerId(id);
+    if (!id) return;
+    const r = recipients.find((x) => String(x.id) === String(id));
+    if (!r) return;
+    setForm((f) => ({
+      ...f,
+      // For payroll/AP, use the recipient row's UUID as the source_id —
+      // operator can override after.
+      sourceId: f.sourceId || String(r.id),
+      recipientName: r.name,
+      recipientFirstName: r.firstName ?? '',
+      recipientLastName: r.lastName ?? '',
+      recipientEmail: r.email,
+      recipientPhone: r.phone,
+      payout: {
+        bankCode: r.bankCode ?? f.payout.bankCode,
+        accountNumber: r.accountNumber || f.payout.accountNumber,
+        accountName: r.accountName || r.name || f.payout.accountName,
+        method: r.method || f.payout.method,
+      },
+    }));
+  };
+
+  // Reset picker when source type changes (different table = different ids)
+  useEffect(() => {
+    setPickerId('');
+  }, [form.sourceType]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -337,6 +379,35 @@ function NewDisbursementModal({
               />
             </label>
           </div>
+
+          {pickerLabel && (
+            <label>
+              <div style={{ fontWeight: 500, fontSize: '0.85rem', marginBottom: '0.2rem' }}>
+                {pickerLabel} <span style={{ color: '#666', fontWeight: 400 }}>· auto-fills the rest</span>
+              </div>
+              <select
+                value={pickerId}
+                onChange={(e) => applyRecipient(e.target.value)}
+                disabled={recipientsLoading}
+                className="form-input"
+                style={{ width: '100%' }}
+              >
+                <option value="">
+                  {recipientsLoading ? 'Loading…' : `— pick from list (${recipients.length}) —`}
+                </option>
+                {recipients.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                    {r.bankCode != null ? ' · 🏦 has bank' : ' · ⚠ no bank on file'}
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '0.15rem' }}>
+                Picking auto-fills name, email, phone, and bank info (if on file).
+                You can still edit any field below.
+              </div>
+            </label>
+          )}
 
           <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
             <label>

@@ -51,3 +51,4 @@ export { default as ProductConsumptionRepository } from './ProductConsumptionRep
 
 // Payments
 export { default as PaymentIntentRepository } from './PaymentIntentRepository';
+export { default as DisbursementRepository } from './DisbursementRepository';

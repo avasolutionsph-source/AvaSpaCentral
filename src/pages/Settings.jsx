@@ -2521,7 +2521,16 @@ const Settings = () => {
                   label="Payroll payouts"
                   description="At cycle approval, send each employee's net pay to their registered bank/e-wallet."
                   checked={nextpaySettings.enableDisbursementsPayroll}
-                  onChange={(v) => setNextpaySettings({ ...nextpaySettings, enableDisbursementsPayroll: v })}
+                  onChange={async (v) => {
+                    const next = { ...nextpaySettings, enableDisbursementsPayroll: v };
+                    setNextpaySettings(next);
+                    try {
+                      await SettingsRepository.set('nextpaySettings', next);
+                      showToast(v ? 'Payroll disbursements enabled' : 'Payroll disbursements disabled', 'success');
+                    } catch (err) {
+                      showToast('Save failed: ' + (err?.message || err), 'error');
+                    }
+                  }}
                   envIsProduction={nextpaySettings.environment === 'production'}
                   workflowName="payroll"
                 />
@@ -2530,7 +2539,16 @@ const Settings = () => {
                   label="Supplier AP payments"
                   description="When a Purchase Order is marked ready to pay, send the supplier their amount."
                   checked={nextpaySettings.enableDisbursementsSupplierAp}
-                  onChange={(v) => setNextpaySettings({ ...nextpaySettings, enableDisbursementsSupplierAp: v })}
+                  onChange={async (v) => {
+                    const next = { ...nextpaySettings, enableDisbursementsSupplierAp: v };
+                    setNextpaySettings(next);
+                    try {
+                      await SettingsRepository.set('nextpaySettings', next);
+                      showToast(v ? 'Supplier AP disbursements enabled' : 'Supplier AP disbursements disabled', 'success');
+                    } catch (err) {
+                      showToast('Save failed: ' + (err?.message || err), 'error');
+                    }
+                  }}
                   envIsProduction={nextpaySettings.environment === 'production'}
                   workflowName="supplier AP"
                 />
@@ -2539,17 +2557,26 @@ const Settings = () => {
                   label="Expense reimbursements"
                   description="When an Expense is approved for reimbursement, send to the requester's bank/e-wallet."
                   checked={nextpaySettings.enableDisbursementsExpense}
-                  onChange={(v) => setNextpaySettings({ ...nextpaySettings, enableDisbursementsExpense: v })}
+                  onChange={async (v) => {
+                    const next = { ...nextpaySettings, enableDisbursementsExpense: v };
+                    setNextpaySettings(next);
+                    try {
+                      await SettingsRepository.set('nextpaySettings', next);
+                      showToast(v ? 'Expense reimbursements enabled' : 'Expense reimbursements disabled', 'success');
+                    } catch (err) {
+                      showToast('Save failed: ' + (err?.message || err), 'error');
+                    }
+                  }}
                   envIsProduction={nextpaySettings.environment === 'production'}
                   workflowName="expense reimbursement"
                 />
               </div>
 
               <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#666' }}>
-                Status discovery uses polling every 1 minute via the
-                <code> poll-disbursements </code> Edge Function (NextPay's
-                webhook events for disbursements are still in private beta
-                and not available to this account).
+                Toggles auto-save. Status discovery uses polling every 1 minute
+                via the <code>poll-disbursements</code> Edge Function (NextPay's
+                webhook events for disbursements are still in private beta and
+                not available to this account).
               </p>
             </div>
           </div>

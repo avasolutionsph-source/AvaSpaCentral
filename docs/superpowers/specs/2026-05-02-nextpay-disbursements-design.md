@@ -176,26 +176,94 @@ time (no permanent storage on the user record — keeps user table light).
 
 ---
 
-## API surface (NextPay v2)
+## API surface (NextPay v2 — CONFIRMED 2026-05-02)
 
-Per the docs sidebar:
+Production base URL: `https://api.nextpay.world` (sandbox URL TBD; either
+`api-sandbox.nextpay.world` like our Phase 1 guess, or the same prod URL
+with sandbox key prefix doing the routing — needs one operator probe).
 
 ```
 GET  /v2/disbursements                — list
-POST /v2/disbursements                — create  (the one we use)
+POST /v2/disbursements                — create  ← the only one we use
 GET  /v2/disbursements/{id}           — retrieve
 GET  /v2/disbursement-recipients      — list known recipients
 ```
 
-Auth headers (same as Phase 1 client we already wrote):
+### Auth headers
 
 - `client-id: <NEXTPAY_CLIENT_KEY>`
-- `signature: <hex(HMAC-SHA256(body, NEXTPAY_CLIENT_SECRET))>` for POST
+- `signature: <hex(HMAC-SHA256(body, NEXTPAY_CLIENT_SECRET))>`
+- `idempotency-key: <random-uuid>`  (NextPay-side dedupe — separate from our
+  source-row dedupe; combine both for defence in depth)
 
-The exact request/response field names for `POST /v2/disbursements` need to
-be copied from the docs page before code is written. **Operator: please paste
-the docs page for "Create a disbursement" before Phase 2 implementation
-starts.**
+### Request body
+
+```jsonc
+{
+  "name": "Payday — Apr 30, 2026",            // required, human label
+  "private_notes": "monthly payroll",          // optional, internal
+  "require_authorization": false,              // EXPERIMENTAL — see below
+  "recipients": [                              // 1..100 items
+    {
+      "amount": 25000,                         // PHP, NUMBER (int or float)
+      "currency": "PHP",
+      "first_name": "Jack",
+      "last_name": "Black",
+      "name": "Jack Black",                    // optional override
+      "email": "jack@black.com",               // optional, recipient gets email
+      "phone_number": "+639171234567",         // optional, recipient gets SMS
+      "private_notes": "April salary",         // internal
+      "recipient_notes": "Payment for SY26",   // shown to recipient
+      "destination": {                          // REQUIRED
+        "bank": 6,                             // bank-code ENUM (number, not string)
+        "account_name": "Jack Black",
+        "account_number": "1234567890",
+        "method": "instapay"                   // method ENUM — instapay | pesonet | …
+      }
+    }
+  ],
+  "nonce": 1746198000123                       // required, current epoch ms
+}
+```
+
+### Response (200)
+
+```jsonc
+{
+  "id": "4dff4e26-24f4-4eb7-bf18-f5161fc480ea",   // UUID — store as nextpay_disbursement_id
+  "object": "disbursement",
+  "name": "Payday — Apr 30, 2026",
+  "status": "pending",                              // pending | complete | partial_complete | failed | scheduled | awaiting_authorization
+  "reference_id": "DISB-3909-3937-36824",          // human-readable, show on UI
+  "private_notes": "monthly payroll",
+  "recipients_count": 2,
+  "created_at": "2026-04-30T12:34:56.000Z"
+}
+```
+
+### Status mapping (NextPay → our `disbursements.status`)
+
+| NextPay | Ours | Source-row update |
+|---------|------|-------------------|
+| `pending` | `submitted` | (none — wait for webhook) |
+| `scheduled` | `submitted` | (none) |
+| `awaiting_authorization` | `submitted` | (none — depends on the require_authorization flow) |
+| `complete` | `succeeded` | mark source row paid |
+| `partial_complete` | `succeeded` (per-recipient detail) | mark source row paid + flag for accountant review |
+| `failed` | `failed` | leave source row at pending |
+
+### Two key gotchas
+
+1. **`bank` is a NUMBER, not a string code.** NextPay maintains an enum
+   (e.g. `1=BPI, 6=BDO, …`). The full mapping lives on the docs sidebar
+   under "List of Supported Banks". Operator must paste that page so we can
+   build a constant + a dropdown for the recipient bank-info forms.
+
+2. **`require_authorization: true`** is an EXPERIMENTAL NextPay feature
+   that adds a built-in two-person approval step on NextPay's side. We will
+   default to `false` for v1 and add a Settings toggle to opt in once
+   NextPay graduates the feature out of experimental. (This means we don't
+   have to build our own approver UI — yet.)
 
 ---
 

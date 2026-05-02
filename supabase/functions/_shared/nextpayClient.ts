@@ -97,6 +97,122 @@ export class NextPayClient {
       expiresAt: data.expires_at ?? data.expiresAt,
     };
   }
+
+  /**
+   * POST /v2/disbursements — outbound payout to one or more recipients.
+   * Same auth scheme as createQrphIntent, plus the optional idempotency-key
+   * header so retries don't double-debit on our side.
+   */
+  async createDisbursement(req: CreateDisbursementRequest): Promise<CreateDisbursementResponse> {
+    const bodyObj = {
+      name: req.name,
+      private_notes: req.privateNotes,
+      require_authorization: req.requireAuthorization ?? false,
+      recipients: req.recipients.map((r) => ({
+        amount: r.amount,
+        currency: r.currency,
+        first_name: r.firstName,
+        last_name: r.lastName,
+        name: r.name,
+        email: r.email,
+        phone_number: r.phoneNumber,
+        private_notes: r.privateNotes,
+        recipient_notes: r.recipientNotes,
+        destination: {
+          bank: r.destination.bank,
+          account_name: r.destination.accountName,
+          account_number: r.destination.accountNumber,
+          method: r.destination.method,
+        },
+      })),
+      nonce: Date.now(),
+    };
+    const bodyStr = JSON.stringify(bodyObj);
+    const signature = await hmacSha256Hex(bodyStr, this.clientSecret);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'client-id': this.clientKey,
+      'signature': signature,
+    };
+    if (req.idempotencyKey) headers['idempotency-key'] = req.idempotencyKey;
+
+    const res = await fetch(`${this.baseUrl}/v2/disbursements`, {
+      method: 'POST',
+      headers,
+      body: bodyStr,
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new NextPayError(`NextPay API ${res.status}: ${text}`, res.status);
+    }
+
+    const data = await res.json();
+    return {
+      id: data.id,
+      object: data.object,
+      name: data.name,
+      status: data.status,
+      referenceId: data.reference_id,
+      privateNotes: data.private_notes,
+      recipientsCount: data.recipients_count,
+      createdAt: data.created_at,
+    };
+  }
+}
+
+// ===========================================================================
+// Disbursements — request / response types (POST /v2/disbursements)
+// ===========================================================================
+
+export type DisbursementMethod = 'instapay' | 'pesonet' | 'gcash' | 'maya' | string;
+
+export type DisbursementStatus =
+  | 'pending'
+  | 'complete'
+  | 'partial_complete'
+  | 'failed'
+  | 'scheduled'
+  | 'awaiting_authorization';
+
+export interface DisbursementDestination {
+  bank: number;             // NextPay bank-code enum (see _shared/banks.ts)
+  accountName: string;
+  accountNumber: string;
+  method: DisbursementMethod;
+}
+
+export interface DisbursementRecipient {
+  amount: number;
+  currency: 'PHP';
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  email?: string;
+  phoneNumber?: string;
+  privateNotes?: string;
+  recipientNotes?: string;
+  destination: DisbursementDestination;
+}
+
+export interface CreateDisbursementRequest {
+  name: string;                         // human label, e.g. "Payday — Apr 30, 2026"
+  privateNotes?: string;
+  requireAuthorization?: boolean;       // EXPERIMENTAL — defaults to false
+  recipients: DisbursementRecipient[];  // 1..100 items
+  idempotencyKey?: string;              // optional, NextPay-side dedupe
+}
+
+export interface CreateDisbursementResponse {
+  id: string;
+  object: string;
+  name: string;
+  status: DisbursementStatus;
+  referenceId: string;        // human-readable, DISB-XXXX-XXXX-XXXXX
+  privateNotes?: string;
+  recipientsCount: number;
+  createdAt: string;
 }
 
 /**

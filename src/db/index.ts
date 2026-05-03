@@ -171,8 +171,11 @@ interface CashAdvanceRequest extends BaseEntity {
   employeeId: string;
   amount: number;
   reason?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'paid';
   createdAt: string;
+  paidAt?: string;
+  paidBy?: string;
+  disbursementId?: string;
 }
 
 interface IncidentReport extends BaseEntity {
@@ -348,6 +351,18 @@ class SpaDatabase extends Dexie {
         version: 11,
         timestamp: new Date().toISOString(),
         description: 'Indexed branchId on customers and giftCertificates',
+      });
+    });
+
+    // Version 12: Add paymentStatus index to purchaseOrders for disbursement queries.
+    this.version(12).stores({
+      purchaseOrders: '_id, supplierId, orderDate, status, paymentStatus, businessId',
+    }).upgrade(async (tx) => {
+      console.log('[Dexie] Upgrading to version 12: adding paymentStatus index to purchaseOrders');
+      await tx.table('migrationLog').add({
+        version: 12,
+        timestamp: new Date().toISOString(),
+        description: 'Added paymentStatus index to purchaseOrders for disbursement integration',
       });
     });
   }

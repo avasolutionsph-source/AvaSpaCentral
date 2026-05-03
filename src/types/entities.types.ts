@@ -245,7 +245,11 @@ export interface PurchaseOrder extends BaseEntity {
   }>;
   totalAmount: number;
   deliveryDate?: string;
-  status: 'pending' | 'received' | 'cancelled';
+  status: 'pending' | 'approved' | 'received' | 'cancelled';
+  paymentStatus?: 'unpaid' | 'paid';
+  paidAt?: string;
+  paidBy?: string;
+  disbursementId?: string;
 }
 
 // Activity Log entity

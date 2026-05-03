@@ -158,41 +158,47 @@ if (existing) {
 
 Also confirm the existing per-workflow toggle gate covers `cash_advance` → gates on `nextpaySettings.enableDisbursementsPayroll` (cash advance reuses payroll's toggle since both are employee-targeted; no 5th toggle in Settings).
 
-### `nextpay-webhook` — extend cascade switch
+### `poll-disbursements` — extend cascade + fix existing PO cascade
+
+The existing `nextpay-webhook` Edge Function handles only Phase 1 inbound `payment_intents` and does NOT cascade disbursements at all. Disbursement cascade lives entirely in `poll-disbursements/index.ts` (lines 156-178). Two changes there:
 
 ```ts
-case 'cash_advance':
-  await supabase.from('cash_advance_requests')
+// CHANGE 1: PO cascade was writing status='paid' (semantically wrong — would
+// collide with the new payment_status column). Switch to payment_status only,
+// leave order status alone.
+} else if (row.source_type === 'purchase_order') {
+  await supabase
+    .from('purchase_orders')
+    .update({
+      payment_status: 'paid',         // was: status: 'paid'
+      paid_at: now,
+      paid_by: row.approved_by,        // NEW — see SELECT change below
+      disbursement_id: row.id,
+    })
+    .eq('id', row.source_id);
+}
+
+// CHANGE 2: add cash_advance branch
+} else if (row.source_type === 'cash_advance') {
+  await supabase
+    .from('cash_advance_requests')
     .update({
       status: 'paid',
       paid_at: now,
-      paid_by: disbursement.approved_by,  // copied from disbursement row
-      disbursement_id: disbursement.id,
+      paid_by: row.approved_by,
+      disbursement_id: row.id,
     })
-    .eq('id', disbursement.source_id);
-  break;
-
-case 'purchase_order':
-  // CHANGED — was likely status='paid'; now writes payment_status only,
-  // independent of order status (don't touch status)
-  await supabase.from('purchase_orders')
-    .update({
-      payment_status: 'paid',
-      paid_at: now,
-      paid_by: disbursement.approved_by,
-      disbursement_id: disbursement.id,
-    })
-    .eq('id', disbursement.source_id);
-  break;
+    .eq('id', row.source_id);
+}
 ```
 
-`paid_by` is sourced from `disbursements.approved_by` (which is set browser-side at creation time = who clicked Pay). No extra round-trip needed.
+Also update the `DisbursementRow` interface (line 40) and the SELECT at line 74 to include `approved_by` so it can be propagated to source rows.
 
-**Refactor opportunity (in-scope):** if `nextpay-webhook` and `poll-disbursements` duplicate the cascade switch, factor it into a shared helper at `supabase/functions/_shared/cascadeOnSuccess.ts`. Verify during implementation; small refactor if needed.
+`paid_by` is sourced from `disbursements.approved_by` (set browser-side at creation time = who clicked Pay).
 
-### `poll-disbursements` — no changes
+### `nextpay-webhook` — no changes
 
-Polling discovers new statuses regardless of source type and uses the same cascade path.
+Currently handles only `payment_intents` cascade. NextPay's `disbursement.*` webhook events are still in private beta. When they graduate, a future change will add a disbursement-handler branch here that calls into the same cascade logic — at that point we extract a `_shared/disbursementCascade.ts` helper. Premature extraction now would be YAGNI (one caller).
 
 ---
 
@@ -341,7 +347,7 @@ User-confirmed: source row never reflects payment failure. Source state = govern
 
 ## Open items (resolve during implementation)
 
-- [ ] Verify whether `nextpay-webhook` and `poll-disbursements` already share a cascade helper or duplicate the switch — if duplicated, extract to `_shared/cascadeOnSuccess.ts`
+- [x] ~~Verify cascade helper sharing~~ — resolved during planning: webhook doesn't handle disbursements at all (only payment_intents). Cascade is single-call-site in `poll-disbursements`. No extraction needed.
 - [ ] Confirm exact column names on `employees` and `suppliers` for payout info (assumed: `payout_bank_code`, `payout_account_number`, `payout_account_name`, `payout_method` — already used by `useDisbursementRecipients`)
-- [ ] Confirm `cash_advance_requests` table actually exists in Supabase with `business_id` + RLS (Dexie has it; verify the cloud mirror migration)
+- [x] ~~Confirm `cash_advance_requests` cloud table exists~~ — verify in Task 0 of plan (precondition check)
 - [ ] Verify `CA-` ref-code prefix is unused elsewhere; if collision, switch to `CADV-`

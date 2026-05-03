@@ -432,3 +432,106 @@ export async function deletePayrollConfigKey(businessId, key) {
     throw new Error(`Failed to delete payroll_config (${res.status}): ${body}`);
   }
 }
+
+/**
+ * Generic raw-REST helpers used by SupabaseSyncManager to push pending
+ * syncQueue items without going through supabase-js, which has a known
+ * write-hang in this codebase. Each helper has a hard 12s timeout.
+ *
+ * Errors mimic the supabase-js error shape (`code`, `status`) so existing
+ * conflict-handling logic (e.g. duplicate-key fallback to UPDATE) keeps
+ * working unchanged.
+ */
+function makeRestError(action, table, status, body) {
+  const err = new Error(`Failed to ${action} ${table} (${status}): ${body || ''}`);
+  err.status = status;
+  // PostgREST returns the original Postgres error code (e.g. '23505') in
+  // the body as JSON when available. Try to surface it.
+  if (body) {
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed === 'object' && parsed.code) {
+        err.code = parsed.code;
+        if (parsed.message) err.message = parsed.message;
+        if (parsed.details) err.details = parsed.details;
+        if (parsed.hint) err.hint = parsed.hint;
+      }
+    } catch {
+      // body wasn't JSON — ignore
+    }
+  }
+  // Fallback: 409 from PostgREST without a parsable code = unique violation
+  if (!err.code && status === 409) err.code = '23505';
+  return err;
+}
+
+export async function restInsert(tableName, record) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+  const accessToken = getAccessTokenSync();
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/rest/v1/${tableName}`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify([record]),
+    },
+    12000,
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw makeRestError('insert into', tableName, res.status, body);
+  }
+}
+
+export async function restUpdateById(tableName, id, record) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+  if (!id) throw new Error(`restUpdateById ${tableName}: missing id`);
+  const accessToken = getAccessTokenSync();
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/rest/v1/${tableName}?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(record),
+    },
+    12000,
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw makeRestError('update', tableName, res.status, body);
+  }
+}
+
+export async function restSoftDeleteById(tableName, id) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase not configured');
+  if (!id) throw new Error(`restSoftDeleteById ${tableName}: missing id`);
+  const accessToken = getAccessTokenSync();
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/rest/v1/${tableName}?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ deleted: true, updated_at: new Date().toISOString() }),
+    },
+    12000,
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw makeRestError('soft-delete', tableName, res.status, body);
+  }
+}

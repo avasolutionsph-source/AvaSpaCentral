@@ -15,6 +15,9 @@ import {
   deletePayrollConfigKey,
   upsertServiceRotation,
   deleteServiceRotation,
+  restInsert,
+  restUpdateById,
+  restSoftDeleteById,
 } from '../brandingService';
 
 /**
@@ -1463,21 +1466,24 @@ class SupabaseSyncManager {
             await upsertServiceRotation(bizId, date, supabaseRecord.rotation_data);
           }
         } else {
+          // All other tables go through the raw-REST helpers in brandingService
+          // instead of supabase-js, which has a known write-hang where the
+          // promise never resolves and the entire sync loop stalls. The REST
+          // helpers have a hard 12s timeout so a stuck call surfaces as a
+          // retryable error instead of freezing every other queued change.
           switch (item.operation) {
             case 'create':
               console.log(`[SupabaseSyncManager] INSERT into ${tableName}:`, supabaseRecord);
-              const { error: createError } = await supabase
-                .from(tableName)
-                .insert(supabaseRecord);
-              if (createError) {
-                // If duplicate key conflict (409), retry as update instead of failing
+              try {
+                await restInsert(tableName, supabaseRecord);
+              } catch (createError) {
+                // 23505 = unique violation. The row already exists in Supabase
+                // (often from a previous push that succeeded server-side but
+                // failed to clear locally). Retry as an UPDATE so the latest
+                // local data wins.
                 if (createError.code === '23505') {
                   console.log(`[SupabaseSyncManager] Duplicate detected for ${tableName}, retrying as UPDATE`);
-                  const { error: fallbackError } = await supabase
-                    .from(tableName)
-                    .update(supabaseRecord)
-                    .eq('id', supabaseRecord.id);
-                  if (fallbackError) throw fallbackError;
+                  await restUpdateById(tableName, supabaseRecord.id, supabaseRecord);
                 } else {
                   throw createError;
                 }
@@ -1486,20 +1492,11 @@ class SupabaseSyncManager {
               break;
 
             case 'update':
-              const { error: updateError } = await supabase
-                .from(tableName)
-                .update(supabaseRecord)
-                .eq('id', supabaseRecord.id);
-              if (updateError) throw updateError;
+              await restUpdateById(tableName, supabaseRecord.id, supabaseRecord);
               break;
 
             case 'delete':
-              // Soft delete
-              const { error: deleteError } = await supabase
-                .from(tableName)
-                .update({ deleted: true, updated_at: new Date().toISOString() })
-                .eq('id', item.entityId);
-              if (deleteError) throw deleteError;
+              await restSoftDeleteById(tableName, item.entityId);
               break;
           }
         }

@@ -13,6 +13,8 @@
 import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import PayDisbursementModal from './PayDisbursementModal';
+import PayrollBreakdownPopover from './PayrollBreakdownPopover';
+import PayslipModal from './PayslipModal';
 import { SettingsRepository } from '../services/storage/repositories';
 import { useApp } from '../context/AppContext';
 
@@ -113,9 +115,14 @@ export default function SavedPayrollsList({ items, currentUser, onDelete }) {
 
 function SavedPayrollReadOnlyView({ item, currentUser, onBack }) {
   const s = item.summary ?? {};
-  const rows = Array.isArray(item.rows) ? item.rows : [];
+  // Local working copy of rows so Approve toggles a row's status visually
+  // without mutating the saved snapshot. Refreshing the page or navigating
+  // back resets — the saved row in DB remains as it was when saved.
+  const [rows, setRows] = useState(() => Array.isArray(item.rows) ? [...item.rows] : []);
   const { showToast } = useApp();
   const [payModalRow, setPayModalRow] = useState(null);
+  const [breakdownOpen, setBreakdownOpen] = useState(null);  // { rowIndex, type }
+  const [payslipRow, setPayslipRow] = useState(null);
   const [payrollDisbursementsEnabled, setPayrollDisbursementsEnabled] = useState(false);
 
   useEffect(() => {
@@ -125,6 +132,21 @@ function SavedPayrollReadOnlyView({ item, currentUser, onBack }) {
     }).catch(() => { /* default false */ });
     return () => { mounted = false; };
   }, []);
+
+  const handleApproveRow = (rowIndex) => {
+    setRows((prev) => {
+      const next = [...prev];
+      if (next[rowIndex]) next[rowIndex] = { ...next[rowIndex], status: 'approved' };
+      return next;
+    });
+    showToast?.('Row approved (snapshot unchanged)', 'success');
+  };
+
+  const togglePayCellBreakdown = (rowIndex, type) => {
+    setBreakdownOpen((prev) => (
+      prev?.rowIndex === rowIndex && prev?.type === type ? null : { rowIndex, type }
+    ));
+  };
 
   return (
     <div className="saved-payroll-readonly" style={{ padding: '1rem' }}>
@@ -171,7 +193,7 @@ function SavedPayrollReadOnlyView({ item, currentUser, onBack }) {
             <th style={{ padding: '0.5rem', textAlign: 'right' }}>Deductions</th>
             <th style={{ padding: '0.5rem', textAlign: 'right' }}>Net</th>
             <th style={{ padding: '0.5rem' }}>Status</th>
-            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Pay</th>
+            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -182,36 +204,88 @@ function SavedPayrollReadOnlyView({ item, currentUser, onBack }) {
               && r.status !== 'paid'
               && Number(r.netPay ?? 0) >= 50
               && emp._id;
+            const breakdownCell = (type, displayValue) => (
+              <td style={{ padding: '0.5rem', textAlign: 'right', position: 'relative' }}>
+                <span
+                  onClick={() => togglePayCellBreakdown(i, type)}
+                  style={{ cursor: 'pointer', borderBottom: '1px dashed #cbd5e1' }}
+                  title="Click for breakdown"
+                >
+                  {displayValue}
+                </span>
+                {breakdownOpen?.rowIndex === i && breakdownOpen?.type === type && (
+                  <PayrollBreakdownPopover
+                    type={type}
+                    payroll={r}
+                    onClose={() => setBreakdownOpen(null)}
+                  />
+                )}
+              </td>
+            );
             return (
               <tr key={emp._id || i} style={{ borderTop: '1px solid #e2e8f0' }}>
                 <td style={{ padding: '0.5rem' }}>{name}{emp.position ? <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}> · {emp.position}</span> : null}</td>
                 <td style={{ padding: '0.5rem', textAlign: 'right' }}>{num(r.daysWorked)}</td>
                 <td style={{ padding: '0.5rem', textAlign: 'right' }}>{num(r.regularHours)}</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{peso(r.regularPay)}</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{peso(r.overtimePay)}</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{peso(r.commissions)}</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{peso(r.grossPay)}</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{peso(r.deductions?.total ?? r.deductions)}</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 500 }}>{peso(r.netPay)}</td>
+                {breakdownCell('regularPay', peso(r.regularPay))}
+                {breakdownCell('overtimePay', peso(r.overtimePay))}
+                {breakdownCell('commissions', peso(r.commissions))}
+                {breakdownCell('grossPay', peso(r.grossPay))}
+                {breakdownCell('deductions', peso(r.deductions?.total ?? r.deductions))}
+                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 500, position: 'relative' }}>
+                  <span
+                    onClick={() => togglePayCellBreakdown(i, 'netPay')}
+                    style={{ cursor: 'pointer', borderBottom: '1px dashed #cbd5e1' }}
+                    title="Click for breakdown"
+                  >
+                    {peso(r.netPay)}
+                  </span>
+                  {breakdownOpen?.rowIndex === i && breakdownOpen?.type === 'netPay' && (
+                    <PayrollBreakdownPopover
+                      type="netPay"
+                      payroll={r}
+                      onClose={() => setBreakdownOpen(null)}
+                    />
+                  )}
+                </td>
                 <td style={{ padding: '0.5rem' }}>
                   <span className={`status-badge ${r.status}`} style={{ textTransform: 'uppercase', fontSize: '0.7rem' }}>
                     {r.status || 'pending'}
                   </span>
                 </td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>
-                  {canPay ? (
+                <td style={{ padding: '0.5rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-secondary"
+                    onClick={() => setPayslipRow(r)}
+                    title="View payslip"
+                  >
+                    Payslip
+                  </button>
+                  {r.status === 'pending' && (
                     <button
                       type="button"
-                      className="btn btn-sm btn-primary"
+                      className="btn btn-xs btn-success"
+                      style={{ marginLeft: 4 }}
+                      onClick={() => handleApproveRow(i)}
+                      title="Approve this row (visual only — saved snapshot unchanged)"
+                    >
+                      Approve
+                    </button>
+                  )}
+                  {canPay && (
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-primary"
+                      style={{ marginLeft: 4 }}
                       onClick={() => setPayModalRow({ row: r, emp })}
                       title="Pay employee via NextPay"
                     >
                       💸 Pay
                     </button>
-                  ) : (
-                    r.status === 'paid'
-                      ? <span style={{ color: '#10b981', fontSize: '0.75rem' }}>✓</span>
-                      : <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>—</span>
+                  )}
+                  {r.status === 'paid' && (
+                    <span style={{ marginLeft: 4, color: '#10b981', fontSize: '0.75rem' }}>✓ paid</span>
                   )}
                 </td>
               </tr>
@@ -219,6 +293,14 @@ function SavedPayrollReadOnlyView({ item, currentUser, onBack }) {
           })}
         </tbody>
       </table>
+
+      {payslipRow && (
+        <PayslipModal
+          payslip={payslipRow}
+          businessName={item.branch_name ? `Saved Payroll — ${item.branch_name}` : 'Saved Payroll'}
+          onClose={() => setPayslipRow(null)}
+        />
+      )}
 
       {payModalRow && (() => {
         const { row, emp } = payModalRow;

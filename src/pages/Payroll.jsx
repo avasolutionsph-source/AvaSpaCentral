@@ -3,123 +3,16 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, subDays, subMonths, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import PayDisbursementModal from '../components/PayDisbursementModal';
+import PayrollBreakdownPopover from '../components/PayrollBreakdownPopover';
+import PayslipModal from '../components/PayslipModal';
 import { SettingsRepository } from '../services/storage/repositories';
 import { SavedPayrollRepository } from '../services/storage/repositories';
 
 const formatPeso = (value) => `₱${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const BreakdownPopover = ({ type, payroll, onClose }) => {
-  const popoverRef = React.useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
-  const renderContent = () => {
-    const hr = payroll._hourlyRate ?? 0;
-
-    switch (type) {
-      case 'regularPay':
-        return (
-          <>
-            <div className="breakdown-title">Regular Pay Breakdown</div>
-            <div className="breakdown-row"><span>Hourly Rate</span><span>{formatPeso(hr)}</span></div>
-            <div className="breakdown-row"><span>Regular Hours</span><span>{payroll.regularHours}h</span></div>
-            <div className="breakdown-formula">{formatPeso(hr)} × {payroll.regularHours}h</div>
-            <div className="breakdown-total"><span>Total</span><span>{formatPeso(payroll.regularPay)}</span></div>
-          </>
-        );
-      case 'overtimePay':
-        return (
-          <>
-            <div className="breakdown-title">Overtime Pay Breakdown</div>
-            <div className="breakdown-row"><span>Hourly Rate</span><span>{formatPeso(hr)}</span></div>
-            <div className="breakdown-row"><span>OT Hours</span><span>{payroll.overtimeHours}h</span></div>
-            <div className="breakdown-row"><span>OT Multiplier</span><span>×{payroll.appliedRates?.overtime ?? 1.25}</span></div>
-            <div className="breakdown-formula">{formatPeso(hr)} × {payroll.overtimeHours}h × {payroll.appliedRates?.overtime ?? 1.25}</div>
-            <div className="breakdown-total"><span>Total</span><span>{formatPeso(payroll.overtimePay)}</span></div>
-          </>
-        );
-      case 'commissions': {
-        const details = payroll._commissionDetails || [];
-        return (
-          <>
-            <div className="breakdown-title">Commission Breakdown</div>
-            {payroll.employee?.commission?.type === 'percentage' && (
-              <div className="breakdown-row"><span>Commission Rate</span><span>{payroll.employee.commission.value}%</span></div>
-            )}
-            {details.length > 0 ? (
-              <>
-                <div className="breakdown-subtitle">{details.length} service(s) this period</div>
-                <div className="breakdown-list">
-                  {details.map((d, i) => (
-                    <div key={i} className="breakdown-row">
-                      <span className="breakdown-receipt">#{d.receipt}</span>
-                      <span>{formatPeso(d.serviceTotal)} → {formatPeso(d.commission)}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="breakdown-empty">No services found this period</div>
-            )}
-            <div className="breakdown-total"><span>Total</span><span>{formatPeso(payroll.commissions)}</span></div>
-          </>
-        );
-      }
-      case 'grossPay':
-        return (
-          <>
-            <div className="breakdown-title">Gross Pay Breakdown</div>
-            <div className="breakdown-row"><span>Regular Pay</span><span>{formatPeso(payroll.regularPay)}</span></div>
-            <div className="breakdown-row"><span>Overtime Pay</span><span>{formatPeso(payroll.overtimePay)}</span></div>
-            {payroll.nightDiffPay > 0 && (
-              <div className="breakdown-row"><span>Night Differential</span><span>{formatPeso(payroll.nightDiffPay)}</span></div>
-            )}
-            <div className="breakdown-row"><span>Commissions</span><span>{formatPeso(payroll.commissions)}</span></div>
-            <div className="breakdown-total"><span>Gross Pay</span><span>{formatPeso(payroll.grossPay)}</span></div>
-          </>
-        );
-      case 'deductions': {
-        const d = payroll.deductions;
-        return (
-          <>
-            <div className="breakdown-title">Deductions Breakdown</div>
-            <div className="breakdown-subtitle">Semi-monthly (monthly ÷ 2)</div>
-            <div className="breakdown-row"><span>SSS</span><span>{formatPeso(d.sss)}</span></div>
-            <div className="breakdown-row"><span>PhilHealth</span><span>{formatPeso(d.philHealth)}</span></div>
-            <div className="breakdown-row"><span>Pag-IBIG</span><span>{formatPeso(d.pagibig)}</span></div>
-            <div className="breakdown-row"><span>Withholding Tax</span><span>{formatPeso(d.withholdingTax)}</span></div>
-            <div className="breakdown-total"><span>Total Deductions</span><span>{formatPeso(d.total)}</span></div>
-          </>
-        );
-      }
-      case 'netPay':
-        return (
-          <>
-            <div className="breakdown-title">Net Pay Breakdown</div>
-            <div className="breakdown-row"><span>Gross Pay</span><span>{formatPeso(payroll.grossPay)}</span></div>
-            <div className="breakdown-row subtract"><span>- Deductions</span><span>{formatPeso(payroll.deductions.total)}</span></div>
-            <div className="breakdown-total"><span>Net Pay</span><span>{formatPeso(payroll.netPay)}</span></div>
-          </>
-        );
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div className="breakdown-popover" ref={popoverRef}>
-      {renderContent()}
-    </div>
-  );
-};
+// BreakdownPopover extracted to src/components/PayrollBreakdownPopover.jsx
+// (also reused by the Saved Payrolls read-only viewer).
+const BreakdownPopover = PayrollBreakdownPopover;
 
 const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef, onSaveRef }) => {
   const { showToast, getEffectiveBranchId, user, selectedBranch } = useApp();
@@ -1054,114 +947,13 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
         );
       })()}
 
-      {/* Payslip Modal */}
+      {/* Payslip Modal — extracted to shared component for reuse in Saved Payrolls viewer */}
       {showPayslipModal && selectedPayslip && (
-        <div className="modal-overlay" onClick={() => setShowPayslipModal(false)}>
-          <div className="modal payslip-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Payslip</h2>
-              <button className="modal-close" onClick={() => setShowPayslipModal(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="payslip-content">
-                <div className="payslip-header">
-                  <h1>DAET MASSAGE & SPA</h1>
-                  <h2>PAY SLIP</h2>
-                </div>
-
-                <div className="payslip-employee-info">
-                  <div><strong>Employee:</strong> {selectedPayslip.employee.firstName} {selectedPayslip.employee.lastName}</div>
-                  <div><strong>ID:</strong> {selectedPayslip.employee._id.slice(-6).toUpperCase()}</div>
-                  <div><strong>Position:</strong> {selectedPayslip.employee.position}</div>
-                  <div><strong>Pay Period:</strong> {format(parseISO(selectedPayslip.period.start), 'MMM dd')} - {format(parseISO(selectedPayslip.period.end), 'MMM dd, yyyy')}</div>
-                </div>
-
-                <div className="payslip-section">
-                  <div className="payslip-section-title">EARNINGS</div>
-                  <div className="payslip-line">
-                    <span>Regular Pay ({selectedPayslip.regularHours}h @ ₱{((selectedPayslip.employee?.dailyRate ?? 0) / 8).toFixed(2)}/hr)</span>
-                    <span>₱{(selectedPayslip.regularPay ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="payslip-line">
-                    <span>Overtime Pay ({selectedPayslip.overtimeHours}h @ {((selectedPayslip.appliedRates?.overtime || 1.25) * 100).toFixed(0)}%)</span>
-                    <span>₱{(selectedPayslip.overtimePay ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  {selectedPayslip.nightDiffPay > 0 && (
-                    <div className="payslip-line">
-                      <span>Night Differential ({selectedPayslip.nightDiffHours}h @ +{((selectedPayslip.appliedRates?.nightDiff || 0.10) * 100).toFixed(0)}%)</span>
-                      <span>₱{(selectedPayslip.nightDiffPay ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                  )}
-                  <div className="payslip-line">
-                    <span>Commissions</span>
-                    <span>₱{(selectedPayslip.commissions ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="payslip-line total">
-                    <span>GROSS PAY</span>
-                    <span>₱{(selectedPayslip.grossPay ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
-
-                <div className="payslip-section">
-                  <div className="payslip-section-title">DEDUCTIONS</div>
-                  <div className="payslip-line">
-                    <span>SSS Contribution</span>
-                    <span>₱{selectedPayslip.deductions.sss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="payslip-line">
-                    <span>PhilHealth Contribution</span>
-                    <span>₱{selectedPayslip.deductions.philHealth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="payslip-line">
-                    <span>Pag-IBIG Contribution</span>
-                    <span>₱{selectedPayslip.deductions.pagibig.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="payslip-line">
-                    <span>Withholding Tax</span>
-                    <span>₱{selectedPayslip.deductions.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="payslip-line total">
-                    <span>TOTAL DEDUCTIONS</span>
-                    <span>₱{selectedPayslip.deductions.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
-
-                <div className="payslip-line total" style={{ fontSize: '1.25rem', marginTop: 'var(--spacing-lg)' }}>
-                  <span>NET PAY</span>
-                  <span>₱{selectedPayslip.netPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-
-                <div className="payslip-footer">
-                  <div style={{ marginBottom: 'var(--spacing-md)', fontSize: '0.875rem' }}>
-                    <div>Days Worked: {selectedPayslip.daysWorked} days</div>
-                    <div>Total Hours: {selectedPayslip.regularHours + selectedPayslip.overtimeHours} hours</div>
-                    {selectedPayslip.lateMinutes > 0 && (
-                      <div>Late Minutes: {selectedPayslip.lateMinutes} minutes</div>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: '0.875rem', marginBottom: 'var(--spacing-md)' }}>
-                    <div>Generated: {format(new Date(), 'MMMM dd, yyyy')}</div>
-                    <div>Status: {selectedPayslip.status.toUpperCase()}</div>
-                  </div>
-
-                  <div className="payslip-signatures">
-                    <div className="payslip-signature-line">
-                      Employee Signature
-                    </div>
-                    <div className="payslip-signature-line">
-                      Manager Signature
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowPayslipModal(false)}>Close</button>
-              <button className="btn btn-primary" onClick={() => showToast('Payslip would be printed', 'info')}>Print Payslip</button>
-            </div>
-          </div>
-        </div>
+        <PayslipModal
+          payslip={selectedPayslip}
+          businessName="DAET MASSAGE & SPA"
+          onClose={() => setShowPayslipModal(false)}
+        />
       )}
     </div>
   );

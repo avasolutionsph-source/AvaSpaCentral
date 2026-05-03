@@ -14,6 +14,7 @@ const CameraCapture = ({ onCapture, onCancel, isOpen }) => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [facingMode, setFacingMode] = useState('user'); // 'user' for front camera (selfie)
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [cameraError, setCameraError] = useState(null);
 
   // Update time every second
   useEffect(() => {
@@ -120,8 +121,24 @@ const CameraCapture = ({ onCapture, onCancel, isOpen }) => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play();
-          setIsCameraReady(true);
+          // iOS Safari (and Safari standalone PWA mode) will reject .play()
+          // if it isn't tied to a user gesture. The modal is opened from a
+          // tap so this usually succeeds, but not always — catch the
+          // rejection so the UI doesn't get stuck on "Starting camera…".
+          const playPromise = videoRef.current.play();
+          if (playPromise && typeof playPromise.then === 'function') {
+            playPromise
+              .then(() => setIsCameraReady(true))
+              .catch((err) => {
+                console.warn('Video play() rejected:', err);
+                // Mark ready anyway so capture still works (the stream is
+                // attached and the canvas can read frames); on iOS the
+                // user can tap the video to start playback if needed.
+                setIsCameraReady(true);
+              });
+          } else {
+            setIsCameraReady(true);
+          }
         };
       }
 
@@ -130,13 +147,19 @@ const CameraCapture = ({ onCapture, onCancel, isOpen }) => {
       console.error('Camera error:', error);
       setHasPermission(false);
 
+      // Surface camera errors via a dedicated state so they don't shadow
+      // unrelated location errors on the same overlay.
+      let msg;
       if (error.name === 'NotAllowedError') {
-        setLocationError('Camera permission denied. Please enable camera access.');
+        msg = 'Camera permission denied. Please enable camera access in Settings → Safari → Camera (iOS) or your browser permissions.';
       } else if (error.name === 'NotFoundError') {
-        setLocationError('No camera found on this device.');
+        msg = 'No camera found on this device.';
+      } else if (error.name === 'NotReadableError') {
+        msg = 'Camera is in use by another app. Close other apps using the camera and try again.';
       } else {
-        setLocationError('Unable to access camera: ' + error.message);
+        msg = 'Unable to access camera: ' + (error.message || error.name || 'unknown error');
       }
+      setCameraError(msg);
     }
   }, [facingMode]);
 
@@ -144,6 +167,8 @@ const CameraCapture = ({ onCapture, onCancel, isOpen }) => {
   useEffect(() => {
     if (isOpen) {
       setCapturedImage(null);
+      setCameraError(null);
+      setHasPermission(null);
       startCamera();
     }
 
@@ -288,7 +313,19 @@ const CameraCapture = ({ onCapture, onCancel, isOpen }) => {
                 <div className="camera-error">
                   <span className="camera-error-icon">📷</span>
                   <p>Camera access required</p>
-                  <small>Please allow camera access in your browser settings</small>
+                  <small>{cameraError || 'Please allow camera access in your browser settings'}</small>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ marginTop: 12 }}
+                    onClick={() => {
+                      setHasPermission(null);
+                      setCameraError(null);
+                      startCamera();
+                    }}
+                  >
+                    Try again
+                  </button>
                 </div>
               )}
               {/* Selfie frame guide */}

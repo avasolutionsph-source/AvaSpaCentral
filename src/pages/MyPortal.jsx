@@ -512,14 +512,16 @@ const MyPortal = () => {
         {activeTab === 'payroll' && <PayrollRequests embedded onDataChange={loadStats} onOpenSubmitRef={payrollSubmitRef} />}
       </div>
 
-      {/* Camera Capture Modal */}
-      {showCamera && (
-        <CameraCapture
-          onCapture={handleCameraCapture}
-          onClose={() => { setShowCamera(false); setPendingClockAction(null); }}
-          title={`Clock ${pendingClockAction?.type === 'in' ? 'In' : 'Out'} - Photo Capture`}
-        />
-      )}
+      {/* Camera Capture Modal — note: CameraCapture uses `isOpen` to decide
+          whether to render and `onCancel` for the dismiss callback. The
+          previous wiring (onClose, missing isOpen) silently rendered
+          nothing, which is why therapists/riders couldn't clock in from
+          their own portal even though clicking the button "did something". */}
+      <CameraCapture
+        isOpen={showCamera}
+        onCapture={handleCameraCapture}
+        onCancel={() => { setShowCamera(false); setPendingClockAction(null); }}
+      />
     </div>
   );
 };

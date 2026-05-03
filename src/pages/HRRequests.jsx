@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { format, parseISO } from 'date-fns';
 import OTRequestRepository from '../services/storage/repositories/OTRequestRepository';
 import LeaveRequestRepository from '../services/storage/repositories/LeaveRequestRepository';
 import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
 import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
+import PayDisbursementModal from '../components/PayDisbursementModal';
+import { SettingsRepository, EmployeeRepository } from '../services/storage/repositories';
+import { supabase } from '../services/supabase/supabaseClient';
 
 const HRRequests = ({ embedded = false, onDataChange }) => {
   const { showToast, user, isOwner, isManager, getEffectiveBranchId, selectedBranch } = useApp();
@@ -16,10 +19,52 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState(null); // 'approve', 'reject', 'acknowledge', 'resolve', 'close'
   const [actionNotes, setActionNotes] = useState('');
+  const [payModalRequest, setPayModalRequest] = useState(null);
+  const [payrollDisbursementsEnabled, setPayrollDisbursementsEnabled] = useState(false);
+  const [employees, setEmployees] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    SettingsRepository.get('nextpaySettings').then((s) => {
+      if (mounted && s) setPayrollDisbursementsEnabled(Boolean(s.enableDisbursementsPayroll));
+    }).catch(() => { /* default false */ });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    EmployeeRepository.getAll().then((emps) => {
+      if (mounted && emps) setEmployees(emps);
+    }).catch(() => { /* default empty */ });
+    return () => { mounted = false; };
+  }, []);
+
+  const employeesById = useMemo(() => {
+    const map = new Map();
+    for (const e of employees) map.set(e._id, e);
+    return map;
+  }, [employees]);
 
   useEffect(() => {
     loadRequests();
   }, [activeRequestType, activeStatus, selectedBranch?.id, selectedBranch?._allBranches]);
+
+  useEffect(() => {
+    if (!supabase) return undefined;
+    const channel = supabase
+      .channel('cash-advance-requests-status')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'cash_advance_requests' },
+        () => {
+          loadRequests();
+        },
+      )
+      .subscribe();
+    return () => {
+      try { channel.unsubscribe(); } catch { /* best effort */ }
+    };
+  }, []);
 
   // Strict branch scoping: legacy NULL-branchId requests were backfilled to
   // Naga, so any request without branchId after that is treated as out of
@@ -109,6 +154,7 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
     switch (status) {
       case 'pending': return 'warning';
       case 'approved': return 'success';
+      case 'paid': return 'success';
       case 'rejected': return 'danger';
       case 'acknowledged': return 'info';
       case 'resolved': return 'success';
@@ -208,6 +254,7 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
   const statusFilters = [
     { id: 'pending', label: 'Pending' },
     { id: 'approved', label: 'Approved' },
+    { id: 'paid', label: 'Paid' },
     { id: 'rejected', label: 'Rejected' },
     { id: 'all', label: 'All' }
   ];
@@ -338,6 +385,23 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
               Reject
             </button>
           </>
+        );
+      }
+
+      // Approved cash advance — show "Pay via NextPay" if payroll-disbursements enabled
+      if (
+        request.requestType === 'cashAdvance'
+        && request.status === 'approved'
+        && payrollDisbursementsEnabled
+      ) {
+        return (
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={() => setPayModalRequest(request)}
+            title="Pay employee via NextPay"
+          >
+            💸 Pay via NextPay
+          </button>
         );
       }
     }
@@ -882,6 +946,39 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
           }
         }
       `}</style>
+
+      {payModalRequest && (() => {
+        const employee = employeesById.get(payModalRequest.employeeId);
+        return (
+          <PayDisbursementModal
+            sourceType="cash_advance"
+            sourceId={payModalRequest._id}
+            businessId={user?.businessId}
+            branchId={getEffectiveBranchId?.()}
+            amount={payModalRequest.amount}
+            recipient={{
+              name: payModalRequest.employeeName || `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim() || 'Employee',
+              firstName: employee?.firstName,
+              lastName: employee?.lastName,
+              email: employee?.email,
+              phone: employee?.phone,
+              payout: {
+                bankCode: employee?.payoutBankCode ?? null,
+                accountNumber: employee?.payoutAccountNumber || '',
+                accountName: employee?.payoutAccountName || `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim() || payModalRequest.employeeName || '',
+                method: employee?.payoutMethod || 'instapay',
+              },
+            }}
+            recipientEntity={{ table: 'employees', id: payModalRequest.employeeId }}
+            referenceCode={`CA-${payModalRequest._id.slice(-8)}`}
+            onClose={() => setPayModalRequest(null)}
+            onSubmitted={() => {
+              setPayModalRequest(null);
+              showToast?.('Disbursement submitted to NextPay', 'success');
+            }}
+          />
+        );
+      })()}
     </div>
   );
 };

@@ -299,7 +299,12 @@ const useCrudOperations = ({
         showToast(`${entityLabel} deleted`, 'success');
         setDeleteConfirm({ isOpen: false, item: null });
         setIsDeleting(false);
-        loadData();
+        // Optimistic local removal instead of a full loadData() refetch.
+        // loadData() flips `loading` to true, which makes pages render
+        // their full-page loader and lose the user's scroll position
+        // (that's the "scroll jumps to top after delete" complaint).
+        // The server-side delete already succeeded; mirror it locally.
+        setItems((prev) => prev.filter((i) => i._id !== item._id));
         onSuccess?.();
       }
       return true;

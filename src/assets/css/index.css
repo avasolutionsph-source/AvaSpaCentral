@@ -3897,6 +3897,26 @@ select {
 
   .gc-grid-enhanced {
     grid-template-columns: 1fr;
+    /* Reserve room below the last gift-cert card so its action footer
+       (Redeem / Delete) doesn't sit underneath the fixed mobile bottom
+       nav. Without this, mobile users couldn't reach the Delete button
+       on the last visible card. */
+    padding-bottom: calc(var(--spacing-xl) + 96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .gift-certificates-page {
+    padding-bottom: calc(var(--spacing-md) + 96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .gc-card-actions-enhanced {
+    /* Stack actions vertically on phones so each button (Redeem / Delete)
+       is full-width and easy to tap, and the Delete button never gets
+       pushed off-screen by a long Redeem label. */
+    flex-direction: column;
+  }
+
+  .gc-action-btn {
+    width: 100%;
   }
 
   .gc-code-input-group {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { sanitizePhoneInput, phoneInputProps } from '../utils/phoneInput';
 
 const AdvanceBookingCheckout = ({
   enabled,
@@ -347,11 +348,11 @@ const AdvanceBookingCheckout = ({
                 <div className="form-group">
                   <label>Phone Number *</label>
                   <input
-                    type="tel"
+                    {...phoneInputProps}
                     value={walkInCustomerData.phone}
-                    onChange={(e) => onWalkInDataChange && onWalkInDataChange({ ...walkInCustomerData, phone: e.target.value })}
+                    onChange={(e) => onWalkInDataChange && onWalkInDataChange({ ...walkInCustomerData, phone: sanitizePhoneInput(e.target.value) })}
                     className={errors.clientPhone ? 'error' : ''}
-                    placeholder="+63 XXX XXX XXXX"
+                    placeholder="09XXXXXXXXX"
                   />
                   {errors.clientPhone && (
                     <span className="error-message">{errors.clientPhone}</span>

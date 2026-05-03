@@ -13,6 +13,7 @@ import CustomersTab from './Customers';
 import CashDrawerHistoryTab from './CashDrawerHistory';
 import DailySalesReport from './DailySalesReport';
 import { SettingsRepository } from '../services/storage/repositories';
+import { sanitizePhoneInput, phoneInputProps } from '../utils/phoneInput';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import storageService from '../services/storage';
@@ -1861,10 +1862,10 @@ const POS = () => {
                       <div className="form-group">
                         <label>Phone Number</label>
                         <input
-                          type="tel"
+                          {...phoneInputProps}
                           value={walkInCustomerData.phone}
-                          onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, phone: e.target.value })}
-                          placeholder="Enter phone number"
+                          onChange={(e) => setWalkInCustomerData({ ...walkInCustomerData, phone: sanitizePhoneInput(e.target.value) })}
+                          placeholder="09XXXXXXXXX"
                           className="form-control"
                         />
                       </div>

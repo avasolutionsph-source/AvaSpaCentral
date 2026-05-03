@@ -82,10 +82,23 @@ const Dashboard = () => {
           try { await window.screen.orientation.lock('landscape'); } catch {}
         }
       } else {
-        if (window.screen?.orientation?.unlock) {
-          try { window.screen.orientation.unlock(); } catch {}
+        // Exiting landscape: actively snap back to portrait instead of
+        // just calling unlock(). Plain unlock() on Android Chrome leaves
+        // the device sitting in landscape because the OS only flips
+        // orientation when it detects a physical rotation — users
+        // expect the screen to follow the button. Lock to portrait,
+        // exit fullscreen, then unlock so future rotations work freely.
+        if (window.screen?.orientation?.lock) {
+          try { await window.screen.orientation.lock('portrait'); } catch {}
         }
         await document.exitFullscreen?.();
+        if (window.screen?.orientation?.unlock) {
+          // Defer the unlock so the portrait lock actually applies first
+          // (lock+immediate-unlock is a no-op on some browsers).
+          setTimeout(() => {
+            try { window.screen.orientation.unlock(); } catch {}
+          }, 400);
+        }
       }
     } catch (err) {
       showToast?.('Landscape mode is not supported on this device', 'warning');

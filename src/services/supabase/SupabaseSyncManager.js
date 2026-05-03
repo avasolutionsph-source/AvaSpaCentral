@@ -32,6 +32,27 @@ function debounce(fn, ms) {
 }
 
 /**
+ * Race a promise against a hard timeout. Resolves with the original
+ * promise's result, or rejects with a timeout error after `ms`. Used to
+ * cap supabase-js calls (especially reads) so a stuck call can't freeze
+ * the entire sync loop indefinitely.
+ */
+function withTimeout(promise, ms, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+// Auto-revive cooldown: a queue item parked as `failed` becomes eligible
+// for a fresh retry after this many minutes. Lets devices self-heal once
+// the underlying issue (e.g. expired token, transient outage) is gone.
+const FAILED_REVIVE_COOLDOWN_MS = 5 * 60 * 1000;
+
+/**
  * Validate if a string is a valid UUID
  */
 function isValidUUID(str) {
@@ -939,6 +960,22 @@ class SupabaseSyncManager {
       });
     }
 
+    // Visibility-based safety net: realtime subscriptions can silently
+    // drop (e.g. tab suspended, websocket killed by aggressive battery
+    // savers, network switch). When the app regains focus, force a sync
+    // so any data that the realtime channel missed gets reconciled.
+    if (!this._visibilityHandler) {
+      this._visibilityHandler = () => {
+        if (document.visibilityState === 'visible' && navigator.onLine) {
+          console.log('[SupabaseSyncManager] App regained focus - triggering sync to catch missed realtime updates');
+          this.sync().catch((err) =>
+            console.warn('[SupabaseSyncManager] Visibility-triggered sync failed:', err)
+          );
+        }
+      };
+      document.addEventListener('visibilitychange', this._visibilityHandler);
+    }
+
     // Setup real-time subscriptions if authenticated
     if (authService.currentUser) {
       // Clear old subscriptions first
@@ -1400,6 +1437,14 @@ class SupabaseSyncManager {
    * Push local changes to Supabase
    */
   async _pushChanges() {
+    // Self-heal: revive items that previously hit max-retries and got parked
+    // as `failed`, but only after the cool-down. Without this, a transient
+    // outage (network, expired token, supabase-js hang) can permanently
+    // strand local writes — and the user has no way to recover them short
+    // of a manual force-repush. With this, a device that comes back online
+    // a few minutes later picks up its own backlog automatically.
+    await this._reviveFailedQueueItems();
+
     const pendingItems = await db.syncQueue.where('status').equals('pending').toArray();
     let pushed = 0;
     let failed = 0;
@@ -1538,6 +1583,9 @@ class SupabaseSyncManager {
           error: error.message,
           retryCount: newRetryCount,
           nextRetryAt: isParked ? null : nextRetryAt,
+          // Track when this item last had an attempt so the auto-revive
+          // path can check whether the cool-down has elapsed.
+          updatedAt: new Date().toISOString(),
         });
 
         if (isParked) {
@@ -1562,6 +1610,39 @@ class SupabaseSyncManager {
   _shouldSkipDueToBackoff(item) {
     if (!item.nextRetryAt) return false;
     return new Date(item.nextRetryAt) > new Date();
+  }
+
+  /**
+   * Move queue items from `failed` back to `pending` once enough time has
+   * passed since their last attempt. Resets the retry counter so the
+   * exponential-backoff schedule starts fresh — important because
+   * `failed` items are otherwise dead weight that will never sync until
+   * a manual force-repush.
+   */
+  async _reviveFailedQueueItems() {
+    const failedItems = await db.syncQueue.where('status').equals('failed').toArray();
+    if (failedItems.length === 0) return 0;
+
+    const cutoff = Date.now() - FAILED_REVIVE_COOLDOWN_MS;
+    let revived = 0;
+    for (const item of failedItems) {
+      const lastTry = item.updatedAt ? new Date(item.updatedAt).getTime()
+        : item.createdAt ? new Date(item.createdAt).getTime()
+        : 0;
+      if (lastTry && lastTry > cutoff) continue; // still in cooldown
+
+      await db.syncQueue.update(item.id, {
+        status: 'pending',
+        retryCount: 0,
+        nextRetryAt: null,
+        error: null,
+      });
+      revived++;
+    }
+    if (revived > 0) {
+      console.log(`[SupabaseSyncManager] Revived ${revived} parked sync items for retry`);
+    }
+    return revived;
   }
 
   /**
@@ -1706,7 +1787,10 @@ class SupabaseSyncManager {
           query = query.gt('updated_at', since);
         }
 
-        let { data, error } = await query;
+        // Cap the read at 15s. If supabase-js stalls on the auth-refresh
+        // queue (same hang that affects writes), the timeout lets us move
+        // on to the next entity instead of stalling the whole pull cycle.
+        let { data, error } = await withTimeout(query, 15000, `PULL ${tableName}`);
 
         if (error) {
           // Table might not exist yet, skip silently
@@ -1723,7 +1807,7 @@ class SupabaseSyncManager {
             } else {
               retryQuery = retryQuery.eq('business_id', businessId);
             }
-            const retryResult = await retryQuery;
+            const retryResult = await withTimeout(retryQuery, 15000, `PULL ${tableName} (retry)`);
             if (retryResult.error) {
               throw retryResult.error;
             }

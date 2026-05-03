@@ -84,7 +84,7 @@ export default function PayoutBankPanel({
           className="form-input"
           style={{ width: '100%' }}
         >
-          <option value="">{loading ? 'Loading banks…' : '— select bank —'}</option>
+          <option value="">{loading ? 'Loading…' : '— select —'}</option>
           {banks?.filter((b) => b.status === 'enabled').map((b) => (
             <option key={b.id} value={b.id}>
               {b.label_short || b.label}

@@ -152,7 +152,7 @@ export default function PayDisbursementModal({
             </>
           ) : (
             <div style={{ fontSize: '0.85rem', color: '#475569' }}>
-              Bank: <code>#{payout.bankCode}</code> · Acct <code>{payout.accountNumber}</code>
+              🏦 Bank: <code>#{payout.bankCode}</code> · Acct <code>{payout.accountNumber}</code> · {payout.accountName}
             </div>
           )}
 

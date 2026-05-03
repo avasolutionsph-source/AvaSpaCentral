@@ -45,7 +45,7 @@ describe('PayDisbursementModal', () => {
 
   it('renders with pre-filled recipient info shown read-only', () => {
     render(<PayDisbursementModal {...baseProps} />);
-    expect(screen.getByText(/Juan Dela Cruz/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Juan Dela Cruz/).length).toBeGreaterThan(0);
     expect(screen.getByText(/₱5,000/)).toBeInTheDocument();
     expect(screen.getByText(/CA-12345678/)).toBeInTheDocument();
   });
@@ -59,8 +59,8 @@ describe('PayDisbursementModal', () => {
       },
     };
     render(<PayDisbursementModal {...noBankProps} />);
-    // PayoutBankPanel renders a "Bank" select label
-    expect(screen.getByText(/Bank/i)).toBeInTheDocument();
+    // PayoutBankPanel renders bank + method <select> elements (combobox role)
+    expect(screen.getAllByRole('combobox').length).toBeGreaterThan(0);
   });
 
   it('disables submit while in-flight', async () => {

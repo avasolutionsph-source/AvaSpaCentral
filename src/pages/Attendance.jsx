@@ -532,21 +532,96 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     return <div className="page-loading"><div className="spinner"></div><p>Loading attendance...</p></div>;
   }
 
+  // Resolve the current employee's own state for the dashboard cards
+  // (therapist / non-manager view only).
+  const myTodayRecord = !hasManagementAccess() && user?.employeeId
+    ? todayAttendance.find(
+        (a) =>
+          (a.employee && String(a.employee._id) === String(user.employeeId)) ||
+          String(a.employeeId) === String(user.employeeId),
+      )
+    : null;
+
+  const myStatusLabel = (() => {
+    if (!myTodayRecord || !myTodayRecord.clockIn) return 'Off-Duty';
+    if (myTodayRecord.clockIn && !myTodayRecord.clockOut) {
+      return `On Duty — clocked in at ${formatTime12Hour(myTodayRecord.clockIn)}`;
+    }
+    return `Completed (${formatTime12Hour(myTodayRecord.clockIn)} – ${formatTime12Hour(myTodayRecord.clockOut)})`;
+  })();
+
+  const myShiftDisplay = (() => {
+    const shift = user?.employeeId ? getEmployeeShift(user.employeeId) : null;
+    if (!shift) return 'No schedule';
+    if (shift.label === 'Off') return 'Off today';
+    if (shift.startTime && shift.endTime) {
+      return formatTimeRange(shift.startTime, shift.endTime);
+    }
+    return 'Not set';
+  })();
+
   return (
     <div className={`attendance-page ${embedded ? 'embedded' : ''}`}>
-      {!embedded && (
+      {!embedded && hasManagementAccess() && (
         <div className="page-header">
           <div>
-            <h1>{!hasManagementAccess() ? 'My Attendance' : 'Attendance'}</h1>
-            <p>{!hasManagementAccess() ? 'Track your clock in/out and work hours' : 'Track employee clock in/out and work hours'}</p>
+            <h1>Attendance</h1>
+            <p>Track employee clock in/out and work hours</p>
           </div>
-          {hasManagementAccess() && (
-            <div className="flex gap-sm">
-              <button className="btn btn-secondary" onClick={() => openClockModal('in')}>⏱ Clock In</button>
-              <button className="btn btn-primary" onClick={() => openClockModal('out')}>⏱ Clock Out</button>
-            </div>
-          )}
+          <div className="flex gap-sm">
+            <button className="btn btn-secondary" onClick={() => openClockModal('in')}>⏱ Clock In</button>
+            <button className="btn btn-primary" onClick={() => openClockModal('out')}>⏱ Clock Out</button>
+          </div>
         </div>
+      )}
+
+      {/* Therapist (employee) Attendance Dashboard — two-card layout:
+          left card has the big Clock-In/Clock-Out actions and current
+          duty status, right card shows live time + scheduled shift. */}
+      {!embedded && !hasManagementAccess() && (
+        <>
+          <h1 className="attendance-dashboard-title">Attendance Dashboard</h1>
+          <div className="attendance-dashboard-grid">
+            <div className="attendance-dashboard-card">
+              <h3 className="attendance-dashboard-card-title">Clocking Status</h3>
+              <div className="attendance-dashboard-clock-buttons">
+                <button
+                  type="button"
+                  className="attendance-dashboard-btn clock-in"
+                  onClick={() => handleQuickClock('in')}
+                  disabled={!isViewingToday}
+                >
+                  Clock-In
+                </button>
+                <button
+                  type="button"
+                  className="attendance-dashboard-btn clock-out"
+                  onClick={() => handleQuickClock('out')}
+                  disabled={!isViewingToday}
+                >
+                  Clock-Out
+                </button>
+              </div>
+              <div className="attendance-dashboard-status">
+                Status: <span className="attendance-dashboard-status-value">{myStatusLabel}</span>
+              </div>
+            </div>
+            <div className="attendance-dashboard-card">
+              <h3 className="attendance-dashboard-card-title">Current Time</h3>
+              <div className="attendance-dashboard-time-block">
+                <div className="attendance-dashboard-date">
+                  {format(currentTime, 'EEEE, MMMM dd, yyyy')}
+                </div>
+                <div className="attendance-dashboard-time">
+                  {format(currentTime, 'h:mm a')}
+                </div>
+                <div className="attendance-dashboard-shift">
+                  Scheduled Shift: {myShiftDisplay}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Stats Cards - Only for Owner/Manager */}
@@ -597,34 +672,12 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         </div>
       )}
 
-      {/* Quick Clock In/Out - only show when viewing today */}
-      {isViewingToday && <div className="quick-clock-section">
-        <h3 className="mb-md text-base">
-          {!hasManagementAccess() ? 'My Attendance' : 'Quick Clock In/Out'}
-        </h3>
-        {!hasManagementAccess() ? (
-          // Simplified UI for therapists - no dropdown
-          <div className="quick-clock-form">
-            <div className="flex-1 flex items-center gap-sm">
-              <span className="text-base font-medium">
-                {user?.name || 'My Attendance'}
-              </span>
-            </div>
-            <button
-              className="btn btn-success"
-              onClick={() => handleQuickClock('in')}
-            >
-              Clock In
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => handleQuickClock('out')}
-            >
-              Clock Out
-            </button>
-          </div>
-        ) : (
-          // Full UI for Owner/Manager with dropdown
+      {/* Quick Clock In/Out — manager-only quick-pick form. Therapists
+          use the new Attendance Dashboard cards above instead, so we
+          skip rendering this for them entirely. */}
+      {isViewingToday && hasManagementAccess() && (
+        <div className="quick-clock-section">
+          <h3 className="mb-md text-base">Quick Clock In/Out</h3>
           <div className="quick-clock-form">
             <div className="form-group">
               <label>Select Employee</label>
@@ -634,7 +687,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                 className="form-control"
               >
                 <option value="">Choose employee...</option>
-                {employees.map(emp => (
+                {employees.map((emp) => (
                   <option key={emp._id} value={emp._id}>
                     {emp.firstName} {emp.lastName} - {emp.position}
                   </option>
@@ -656,14 +709,16 @@ const Attendance = ({ embedded = false, onDataChange }) => {
               Clock Out
             </button>
           </div>
-        )}
-      </div>}
+        </div>
+      )}
 
       {/* Attendance Table */}
       <div className="attendance-table-section">
         <div className="flex items-center justify-between mb-lg" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
           <h3 className="text-lg" style={{ margin: 0 }}>
-            {!hasManagementAccess() ? 'My Attendance' : 'Attendance'} - {format(parseISO(selectedDate), 'EEEE, MMMM dd, yyyy')}
+            {!hasManagementAccess()
+              ? `${isViewingToday ? "Today's Logs" : 'Logs'}: ${format(parseISO(selectedDate), 'MMMM dd, yyyy')}`
+              : `Attendance - ${format(parseISO(selectedDate), 'EEEE, MMMM dd, yyyy')}`}
           </h3>
           <div className="flex items-center gap-sm">
             <button

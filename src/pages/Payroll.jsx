@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
-import { format, parseISO, startOfMonth, endOfMonth, subDays, isWithinInterval } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, subDays, subMonths, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import PayDisbursementModal from '../components/PayDisbursementModal';
 import { SettingsRepository } from '../services/storage/repositories';
 import { SavedPayrollRepository } from '../services/storage/repositories';
@@ -209,49 +209,61 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
     }
   };
 
+  // Compute date range for a named preset.
+  const computePresetRange = (presetId) => {
+    const today = new Date();
+    switch (presetId) {
+      case 'current':  // Current semi-monthly (1-15 or 16-end)
+        return today.getDate() <= 15
+          ? { start: new Date(today.getFullYear(), today.getMonth(), 1), end: new Date(today.getFullYear(), today.getMonth(), 15) }
+          : { start: new Date(today.getFullYear(), today.getMonth(), 16), end: endOfMonth(today) };
+      case 'last': {  // Previous semi-monthly
+        if (today.getDate() <= 15) {
+          const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          return { start: new Date(prev.getFullYear(), prev.getMonth(), 16), end: endOfMonth(prev) };
+        }
+        return { start: new Date(today.getFullYear(), today.getMonth(), 1), end: new Date(today.getFullYear(), today.getMonth(), 15) };
+      }
+      case 'thisWeek':
+        return { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) };
+      case 'thisMonth':
+        return { start: startOfMonth(today), end: endOfMonth(today) };
+      case 'lastMonth': {
+        const prev = subMonths(today, 1);
+        return { start: startOfMonth(prev), end: endOfMonth(prev) };
+      }
+      default:
+        return { start: startOfMonth(today), end: endOfMonth(today) };
+    }
+  };
+
+  // Auto-fill the date inputs on first mount so the user always sees a valid range.
+  useEffect(() => {
+    if (customStartDate || customEndDate) return;
+    const { start, end } = computePresetRange('current');
+    setCustomStartDate(format(start, 'yyyy-MM-dd'));
+    setCustomEndDate(format(end, 'yyyy-MM-dd'));
+    setPeriod('current');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Apply a preset by populating the date inputs (still editable after).
+  const applyPreset = (presetId) => {
+    const { start, end } = computePresetRange(presetId);
+    setCustomStartDate(format(start, 'yyyy-MM-dd'));
+    setCustomEndDate(format(end, 'yyyy-MM-dd'));
+    setPeriod(presetId);
+  };
+
+  // Read the date range straight from the date inputs (single source of truth).
+  // Falls back to current semi-monthly if either input is empty.
   const getPeriodDates = () => {
     const today = new Date();
-    let startDate, endDate;
-
-    switch (period) {
-      case 'current':
-        // Current semi-monthly (1-15 or 16-end)
-        if (today.getDate() <= 15) {
-          startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-          endDate = new Date(today.getFullYear(), today.getMonth(), 15);
-        } else {
-          startDate = new Date(today.getFullYear(), today.getMonth(), 16);
-          endDate = endOfMonth(today);
-        }
-        break;
-      case 'last':
-        // Previous semi-monthly
-        if (today.getDate() <= 15) {
-          const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-          startDate = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 16);
-          endDate = endOfMonth(prevMonth);
-        } else {
-          startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-          endDate = new Date(today.getFullYear(), today.getMonth(), 15);
-        }
-        break;
-      case 'monthly':
-        startDate = startOfMonth(today);
-        endDate = endOfMonth(today);
-        break;
-      case 'custom':
-        if (!customStartDate || !customEndDate) {
-          showToast('Custom date range is empty — defaulting to full month', 'warning');
-        }
-        startDate = customStartDate ? parseISO(customStartDate) : startOfMonth(today);
-        endDate = customEndDate ? parseISO(customEndDate) : endOfMonth(today);
-        break;
-      default:
-        startDate = startOfMonth(today);
-        endDate = endOfMonth(today);
+    if (!customStartDate || !customEndDate) {
+      const { start, end } = computePresetRange('current');
+      return { startDate: start, endDate: end };
     }
-
-    return { startDate, endDate };
+    return { startDate: parseISO(customStartDate), endDate: parseISO(customEndDate) };
   };
 
   // Philippine Labor Law Calculations
@@ -694,52 +706,65 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       )}
 
 
-      {/* Period Selector */}
+      {/* Period Selector — preset buttons populate the date inputs; inputs always editable */}
       <div className="period-selector-section">
         <label>Pay Period:</label>
         <div className="period-buttons">
           <button
+            type="button"
             className={`period-btn ${period === 'current' ? 'active' : ''}`}
-            onClick={() => setPeriod('current')}
+            onClick={() => applyPreset('current')}
+            title="Semi-monthly (1-15 or 16-end of current month)"
           >
             Current Period
           </button>
           <button
+            type="button"
             className={`period-btn ${period === 'last' ? 'active' : ''}`}
-            onClick={() => setPeriod('last')}
+            onClick={() => applyPreset('last')}
+            title="Previous semi-monthly cycle"
           >
             Last Period
           </button>
           <button
-            className={`period-btn ${period === 'monthly' ? 'active' : ''}`}
-            onClick={() => setPeriod('monthly')}
+            type="button"
+            className={`period-btn ${period === 'thisWeek' ? 'active' : ''}`}
+            onClick={() => applyPreset('thisWeek')}
           >
-            Monthly
+            This Week
           </button>
           <button
-            className={`period-btn ${period === 'custom' ? 'active' : ''}`}
-            onClick={() => setPeriod('custom')}
+            type="button"
+            className={`period-btn ${period === 'thisMonth' ? 'active' : ''}`}
+            onClick={() => applyPreset('thisMonth')}
           >
-            Custom Range
+            This Month
+          </button>
+          <button
+            type="button"
+            className={`period-btn ${period === 'lastMonth' ? 'active' : ''}`}
+            onClick={() => applyPreset('lastMonth')}
+          >
+            Last Month
           </button>
         </div>
-        {period === 'custom' && (
-          <div className="custom-date-range">
-            <input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              placeholder="Start Date"
-            />
-            <span>to</span>
-            <input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              placeholder="End Date"
-            />
-          </div>
-        )}
+        <div className="custom-date-range" style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.85rem', color: '#475569' }}>From</span>
+          <input
+            type="date"
+            value={customStartDate}
+            onChange={(e) => { setCustomStartDate(e.target.value); setPeriod('custom'); }}
+          />
+          <span style={{ fontSize: '0.85rem', color: '#475569' }}>to</span>
+          <input
+            type="date"
+            value={customEndDate}
+            onChange={(e) => { setCustomEndDate(e.target.value); setPeriod('custom'); }}
+          />
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+            (presets pre-fill these; you can still edit)
+          </span>
+        </div>
         {payrollData.length > 0 && payrollData[0].period && (
           <div className="payroll-period-banner" style={{
             marginTop: '0.75rem',

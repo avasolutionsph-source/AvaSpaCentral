@@ -132,6 +132,7 @@ const SUPABASE_TABLE_COLUMNS = {
     'department', 'position', 'status', 'hire_date', 'hourly_rate', 'daily_rate',
     'commission_rate', 'commission', 'monthly_rate', 'photo_url', 'address',
     'emergency_contact', 'skills', 'metadata', 'notes', 'gender', 'branch_id',
+    'payout_bank_code', 'payout_account_number', 'payout_account_name', 'payout_method',
     'sync_status', 'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   users: [
@@ -164,6 +165,7 @@ const SUPABASE_TABLE_COLUMNS = {
   suppliers: [
     'id', 'business_id', 'name', 'contact_person', 'email', 'phone',
     'address', 'payment_terms', 'notes', 'status', 'branch_id',
+    'payout_bank_code', 'payout_account_number', 'payout_account_name', 'payout_method',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
 
@@ -509,6 +511,11 @@ const FIELD_NAME_MAP = {
   isOutOfRange: 'is_out_of_range',
   clockIn: 'clock_in',
   clockOut: 'clock_out',
+  // Payout fields
+  payoutBankCode: 'payout_bank_code',
+  payoutAccountNumber: 'payout_account_number',
+  payoutAccountName: 'payout_account_name',
+  payoutMethod: 'payout_method',
   // Misc
   syncStatus: 'sync_status',
 };

@@ -33,10 +33,12 @@ import { initSentry } from './utils/sentry'
 initSentry()
 
 // Re-apply the user's saved screen-orientation preference (auto / landscape /
-// portrait) on every launch. Lock attempts only succeed inside the installed
-// PWA's fullscreen window; in a regular browser tab they'll reject silently.
+// portrait) on every launch. We deliberately skip the fullscreen request here
+// (no user gesture available at launch, and surprising fullscreen on cold
+// open is bad UX). The lock() call will succeed inside an already-fullscreen
+// PWA window; otherwise it fails silently and the UI falls back to Auto.
 import { applyOrientationPreference } from './utils/orientation'
-applyOrientationPreference().catch(() => { /* non-fatal */ })
+applyOrientationPreference(null, { enterFullscreen: false }).catch(() => { /* non-fatal */ })
 
 // Initialize offline-first storage
 import InitializationService from './services/InitializationService'

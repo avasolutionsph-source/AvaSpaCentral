@@ -1,5 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+
+// Mock useApp + SettingsRepository so the read-only view (which now wires Pay
+// buttons via PayDisbursementModal) doesn't crash during these display-only
+// tests. Stubs declared BEFORE the component import via vi.mock hoisting.
+vi.mock('../context/AppContext', () => ({
+  useApp: () => ({ showToast: vi.fn() }),
+}));
+vi.mock('../services/storage/repositories', () => ({
+  SettingsRepository: { get: vi.fn().mockResolvedValue(null) },
+}));
+vi.mock('./PayDisbursementModal', () => ({
+  default: () => null,
+}));
+
 import SavedPayrollsList from './SavedPayrollsList';
 
 const sampleItem = {

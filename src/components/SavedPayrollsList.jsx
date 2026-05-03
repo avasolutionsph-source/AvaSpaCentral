@@ -10,8 +10,11 @@
  *   - currentUser: { id, role } — used to gate Delete button
  *   - onDelete?: (id) => void — called when Delete button clicked
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
+import PayDisbursementModal from './PayDisbursementModal';
+import { SettingsRepository } from '../services/storage/repositories';
+import { useApp } from '../context/AppContext';
 
 const peso = (n) => `₱${Number(n ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const num = (n) => Number(n ?? 0).toLocaleString('en-PH');
@@ -29,6 +32,7 @@ export default function SavedPayrollsList({ items, currentUser, onDelete }) {
     return (
       <SavedPayrollReadOnlyView
         item={viewingItem}
+        currentUser={currentUser}
         onBack={() => setViewingItem(null)}
       />
     );
@@ -107,9 +111,20 @@ export default function SavedPayrollsList({ items, currentUser, onDelete }) {
   );
 }
 
-function SavedPayrollReadOnlyView({ item, onBack }) {
+function SavedPayrollReadOnlyView({ item, currentUser, onBack }) {
   const s = item.summary ?? {};
   const rows = Array.isArray(item.rows) ? item.rows : [];
+  const { showToast } = useApp();
+  const [payModalRow, setPayModalRow] = useState(null);
+  const [payrollDisbursementsEnabled, setPayrollDisbursementsEnabled] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    SettingsRepository.get('nextpaySettings').then((set) => {
+      if (mounted && set) setPayrollDisbursementsEnabled(Boolean(set.enableDisbursementsPayroll));
+    }).catch(() => { /* default false */ });
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="saved-payroll-readonly" style={{ padding: '1rem' }}>
@@ -156,12 +171,17 @@ function SavedPayrollReadOnlyView({ item, onBack }) {
             <th style={{ padding: '0.5rem', textAlign: 'right' }}>Deductions</th>
             <th style={{ padding: '0.5rem', textAlign: 'right' }}>Net</th>
             <th style={{ padding: '0.5rem' }}>Status</th>
+            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Pay</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r, i) => {
             const emp = r.employee || {};
             const name = `${emp.firstName ?? emp.first_name ?? ''} ${emp.lastName ?? emp.last_name ?? ''}`.trim() || '—';
+            const canPay = payrollDisbursementsEnabled
+              && r.status !== 'paid'
+              && Number(r.netPay ?? 0) >= 50
+              && emp._id;
             return (
               <tr key={emp._id || i} style={{ borderTop: '1px solid #e2e8f0' }}>
                 <td style={{ padding: '0.5rem' }}>{name}{emp.position ? <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}> · {emp.position}</span> : null}</td>
@@ -178,11 +198,61 @@ function SavedPayrollReadOnlyView({ item, onBack }) {
                     {r.status || 'pending'}
                   </span>
                 </td>
+                <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                  {canPay ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => setPayModalRow({ row: r, emp })}
+                      title="Pay employee via NextPay"
+                    >
+                      💸 Pay
+                    </button>
+                  ) : (
+                    r.status === 'paid'
+                      ? <span style={{ color: '#10b981', fontSize: '0.75rem' }}>✓</span>
+                      : <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>—</span>
+                  )}
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      {payModalRow && (() => {
+        const { row, emp } = payModalRow;
+        return (
+          <PayDisbursementModal
+            sourceType="payroll_request"
+            sourceId={`payroll-snap-${item.id}-${emp._id}`}
+            businessId={currentUser?.businessId}
+            branchId={item.branch_id || null}
+            amount={row.netPay}
+            recipient={{
+              name: `${emp.firstName ?? emp.first_name ?? ''} ${emp.lastName ?? emp.last_name ?? ''}`.trim() || 'Employee',
+              firstName: emp.firstName ?? emp.first_name,
+              lastName: emp.lastName ?? emp.last_name,
+              email: emp.email,
+              phone: emp.phone,
+              payout: {
+                bankCode: emp.payoutBankCode ?? emp.payout_bank_code ?? null,
+                accountNumber: emp.payoutAccountNumber || emp.payout_account_number || '',
+                accountName: emp.payoutAccountName || emp.payout_account_name
+                  || `${emp.firstName ?? emp.first_name ?? ''} ${emp.lastName ?? emp.last_name ?? ''}`.trim() || '',
+                method: emp.payoutMethod || emp.payout_method || 'instapay',
+              },
+            }}
+            recipientEntity={{ table: 'employees', id: emp._id }}
+            referenceCode={`PAY-${String(emp._id).slice(-4)}-SNAP-${String(item.id).slice(-4)}`}
+            onClose={() => setPayModalRow(null)}
+            onSubmitted={() => {
+              setPayModalRow(null);
+              showToast?.('Disbursement submitted to NextPay', 'success');
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -947,10 +947,10 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
               email: supplier?.email,
               phone: supplier?.phone,
               payout: {
-                bankCode: supplier?.payout_bank_code ?? null,
-                accountNumber: supplier?.payout_account_number || '',
-                accountName: supplier?.payout_account_name || supplier?.name || payModalOrder.supplierName || '',
-                method: supplier?.payout_method || 'instapay',
+                bankCode: supplier?.payoutBankCode ?? supplier?.payout_bank_code ?? null,
+                accountNumber: supplier?.payoutAccountNumber || supplier?.payout_account_number || '',
+                accountName: supplier?.payoutAccountName || supplier?.payout_account_name || supplier?.name || payModalOrder.supplierName || '',
+                method: supplier?.payoutMethod || supplier?.payout_method || 'instapay',
               },
             }}
             recipientEntity={{ table: 'suppliers', id: payModalOrder.supplierId }}

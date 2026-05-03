@@ -4,7 +4,7 @@
  * Walks every `disbursements` row currently in 'submitted' state and asks
  * NextPay for the latest status via GET /v2/disbursements/{id}, then
  * cascades the result to the source row (payroll_request /
- * purchase_order / expense).
+ * purchase_order / expense / cash_advance).
  *
  * Why polling: NextPay's Webhooks (Private Beta) do not yet ship
  * `disbursement.*` events as of 2026-05-02 — only `paymentlink.paid`. Once
@@ -163,15 +163,18 @@ async function cascadeToSource(
   const paidBy = row.approved_by ?? null;
 
   if (row.source_type === 'payroll_request') {
-    await supabase
+    const { error: cascadeErr } = await supabase
       .from('payroll_requests')
       .update({ status: 'paid', paid_at: now, paid_by: paidBy, disbursement_id: row.id })
       .eq('id', row.source_id);
+    if (cascadeErr) {
+      console.error(`[poll-disbursements] cascade ${row.source_type} ${row.source_id} failed: ${cascadeErr.message}`);
+    }
   } else if (row.source_type === 'purchase_order') {
     // payment_status is independent of order status — do NOT touch status.
     // (Was previously writing status='paid', which collided with the new
     // payment_status column added in 20260503*_extend_disbursements_*.sql.)
-    await supabase
+    const { error: cascadeErr } = await supabase
       .from('purchase_orders')
       .update({
         payment_status: 'paid',
@@ -180,13 +183,22 @@ async function cascadeToSource(
         disbursement_id: row.id,
       })
       .eq('id', row.source_id);
+    if (cascadeErr) {
+      console.error(`[poll-disbursements] cascade ${row.source_type} ${row.source_id} failed: ${cascadeErr.message}`);
+    }
   } else if (row.source_type === 'expense') {
-    await supabase
+    // expenses table has no paid_by column (intentional omission in Task 1
+    // migration — expense reimbursements are operationally tracked via
+    // disbursement_id rather than a denormalized actor field).
+    const { error: cascadeErr } = await supabase
       .from('expenses')
       .update({ status: 'reimbursed', reimbursed_at: now, disbursement_id: row.id })
       .eq('id', row.source_id);
+    if (cascadeErr) {
+      console.error(`[poll-disbursements] cascade ${row.source_type} ${row.source_id} failed: ${cascadeErr.message}`);
+    }
   } else if (row.source_type === 'cash_advance') {
-    await supabase
+    const { error: cascadeErr } = await supabase
       .from('cash_advance_requests')
       .update({
         status: 'paid',
@@ -195,6 +207,9 @@ async function cascadeToSource(
         disbursement_id: row.id,
       })
       .eq('id', row.source_id);
+    if (cascadeErr) {
+      console.error(`[poll-disbursements] cascade ${row.source_type} ${row.source_id} failed: ${cascadeErr.message}`);
+    }
   }
 }
 

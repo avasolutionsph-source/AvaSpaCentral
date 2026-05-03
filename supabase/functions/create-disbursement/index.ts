@@ -74,7 +74,7 @@ serve(async (req) => {
     // Idempotency guard: if a disbursement for this (source_type, source_id,
     // reference_code) already exists in a non-terminal-failure state, refuse.
     // This makes double-clicks / network retries safe.
-    const { data: existing } = await supabase
+    const { data: existing, error: guardErr } = await supabase
       .from('disbursements')
       .select('id, status')
       .eq('reference_code', body.referenceCode)
@@ -82,6 +82,7 @@ serve(async (req) => {
       .eq('source_id', body.sourceId)
       .in('status', ['pending', 'submitted', 'succeeded'])
       .maybeSingle();
+    if (guardErr) throw new Error(`idempotency check failed: ${guardErr.message}`);
 
     if (existing) {
       return jsonResponse(
@@ -220,6 +221,10 @@ serve(async (req) => {
 function validate(body: CreateDisbursementBody): void {
   if (!body.sourceType || !body.sourceId) {
     throw new Error('sourceType and sourceId required');
+  }
+  const ALLOWED_SOURCE_TYPES = ['payroll_request', 'purchase_order', 'expense', 'cash_advance'] as const;
+  if (!ALLOWED_SOURCE_TYPES.includes(body.sourceType as typeof ALLOWED_SOURCE_TYPES[number])) {
+    throw new Error(`sourceType must be one of: ${ALLOWED_SOURCE_TYPES.join(', ')}`);
   }
   if (!body.businessId) {
     throw new Error('businessId required');

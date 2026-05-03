@@ -39,11 +39,12 @@ const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 
 interface DisbursementRow {
   id: string;
-  source_type: 'payroll_request' | 'purchase_order' | 'expense';
+  source_type: 'payroll_request' | 'purchase_order' | 'expense' | 'cash_advance';
   source_id: string;
   nextpay_disbursement_id: string | null;
   status: string;
   recipient_account_number: string;
+  approved_by: string | null;
 }
 
 serve(async (req) => {
@@ -71,7 +72,7 @@ serve(async (req) => {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600_000).toISOString();
   const { data: rows, error: fetchErr } = await supabase
     .from('disbursements')
-    .select('id, source_type, source_id, nextpay_disbursement_id, status, recipient_account_number')
+    .select('id, source_type, source_id, nextpay_disbursement_id, status, recipient_account_number, approved_by')
     .eq('status', 'submitted')
     .gte('submitted_at', sevenDaysAgo)
     .not('nextpay_disbursement_id', 'is', null)
@@ -159,20 +160,40 @@ async function cascadeToSource(
   row: DisbursementRow,
 ): Promise<void> {
   const now = new Date().toISOString();
+  const paidBy = row.approved_by ?? null;
+
   if (row.source_type === 'payroll_request') {
     await supabase
       .from('payroll_requests')
-      .update({ status: 'paid', paid_at: now, disbursement_id: row.id })
+      .update({ status: 'paid', paid_at: now, paid_by: paidBy, disbursement_id: row.id })
       .eq('id', row.source_id);
   } else if (row.source_type === 'purchase_order') {
+    // payment_status is independent of order status — do NOT touch status.
+    // (Was previously writing status='paid', which collided with the new
+    // payment_status column added in 20260503*_extend_disbursements_*.sql.)
     await supabase
       .from('purchase_orders')
-      .update({ status: 'paid', paid_at: now, disbursement_id: row.id })
+      .update({
+        payment_status: 'paid',
+        paid_at: now,
+        paid_by: paidBy,
+        disbursement_id: row.id,
+      })
       .eq('id', row.source_id);
   } else if (row.source_type === 'expense') {
     await supabase
       .from('expenses')
       .update({ status: 'reimbursed', reimbursed_at: now, disbursement_id: row.id })
+      .eq('id', row.source_id);
+  } else if (row.source_type === 'cash_advance') {
+    await supabase
+      .from('cash_advance_requests')
+      .update({
+        status: 'paid',
+        paid_at: now,
+        paid_by: paidBy,
+        disbursement_id: row.id,
+      })
       .eq('id', row.source_id);
   }
 }

@@ -665,41 +665,39 @@ const Attendance = ({ embedded = false, onDataChange }) => {
           <h3 className="text-lg" style={{ margin: 0 }}>
             {!hasManagementAccess() ? 'My Attendance' : 'Attendance'} - {format(parseISO(selectedDate), 'EEEE, MMMM dd, yyyy')}
           </h3>
-          {hasManagementAccess() && (
-            <div className="flex items-center gap-sm">
+          <div className="flex items-center gap-sm">
+            <button
+              className="btn btn-sm"
+              onClick={() => setSelectedDate(format(subDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
+              title="Previous day"
+            >
+              &larr;
+            </button>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              max={format(new Date(), 'yyyy-MM-dd')}
+              className="form-control"
+              style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.875rem' }}
+            />
+            <button
+              className="btn btn-sm"
+              onClick={() => setSelectedDate(format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
+              disabled={selectedDate >= format(new Date(), 'yyyy-MM-dd')}
+              title="Next day"
+            >
+              &rarr;
+            </button>
+            {!isViewingToday && (
               <button
-                className="btn btn-sm"
-                onClick={() => setSelectedDate(format(subDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
-                title="Previous day"
+                className="btn btn-sm btn-primary"
+                onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
               >
-                &larr;
+                Today
               </button>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                max={format(new Date(), 'yyyy-MM-dd')}
-                className="form-control"
-                style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.875rem' }}
-              />
-              <button
-                className="btn btn-sm"
-                onClick={() => setSelectedDate(format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
-                disabled={selectedDate >= format(new Date(), 'yyyy-MM-dd')}
-                title="Next day"
-              >
-                &rarr;
-              </button>
-              {!isViewingToday && (
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
-                >
-                  Today
-                </button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <table className="attendance-table">
           <thead>

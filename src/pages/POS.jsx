@@ -362,6 +362,27 @@ const POS = () => {
     showToast('Employee selected from rotation queue', 'info');
   }, [showToast]);
 
+  // Auto-pick the next-in-rotation therapist, optionally filtered by gender ('male' | 'female')
+  const pickAutoTherapist = useCallback((gender = null) => {
+    if (availableRotationQueue.length === 0) {
+      showToast('No clocked-in therapist available in rotation', 'error');
+      return;
+    }
+    const empById = new Map(employees.map(e => [String(e._id), e]));
+    const match = availableRotationQueue.find(q => {
+      if (!gender) return true;
+      const emp = empById.get(String(q.employeeId));
+      return emp && (emp.gender || '').toLowerCase() === gender;
+    });
+    if (!match) {
+      showToast(`No available ${gender} therapist in rotation`, 'error');
+      return;
+    }
+    setSelectedEmployee(match.employeeId);
+    const suffix = gender ? ` (${gender})` : '';
+    showToast(`Auto-selected${suffix}: ${match.employeeName}`, 'success');
+  }, [availableRotationQueue, employees, showToast]);
+
   // Skip current employee in rotation
   const skipInRotation = useCallback(async (employeeId) => {
     try {
@@ -1595,6 +1616,35 @@ const POS = () => {
                     <div className="rotation-queue-header">
                       <span className="rotation-queue-title">🔄 Service Rotation Queue</span>
                       <span className="rotation-queue-count">{availableRotationQueue.length} available</span>
+                    </div>
+                    <div className="rotation-auto-select">
+                      <button
+                        type="button"
+                        className="rotation-auto-btn"
+                        onClick={() => pickAutoTherapist()}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next therapist in rotation"
+                      >
+                        Auto Select
+                      </button>
+                      <button
+                        type="button"
+                        className="rotation-auto-btn male"
+                        onClick={() => pickAutoTherapist('male')}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next male therapist in rotation"
+                      >
+                        Auto Select (Male)
+                      </button>
+                      <button
+                        type="button"
+                        className="rotation-auto-btn female"
+                        onClick={() => pickAutoTherapist('female')}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next female therapist in rotation"
+                      >
+                        Auto Select (Female)
+                      </button>
                     </div>
                     <div className="rotation-service-filter">
                       {[

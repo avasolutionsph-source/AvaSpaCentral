@@ -972,6 +972,54 @@
   font-weight: 500;
 }
 
+.rotation-auto-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.rotation-auto-btn {
+  flex: 1 1 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  background: white;
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rotation-auto-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: white;
+}
+
+.rotation-auto-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rotation-auto-btn.male {
+  border-color: #2563EB;
+  color: #2563EB;
+}
+.rotation-auto-btn.male:hover:not(:disabled) {
+  background: #2563EB;
+  color: white;
+}
+
+.rotation-auto-btn.female {
+  border-color: #DB2777;
+  color: #DB2777;
+}
+.rotation-auto-btn.female:hover:not(:disabled) {
+  background: #DB2777;
+  color: white;
+}
+
 .rotation-service-filter {
   display: flex;
   gap: 4px;

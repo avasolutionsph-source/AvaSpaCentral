@@ -103,14 +103,19 @@ const Suppliers = ({ embedded = false }) => {
     loadCategories();
   }, []);
 
-  // Filter suppliers — now branch-scoped (suppliers table has branch_id).
+  // Suppliers visible in the active branch (no search/category/status filters).
   // Legacy suppliers without a branchId are hidden once a specific branch is
   // active, mirroring the behaviour of every other branch-scoped feature.
-  const filteredSuppliers = useMemo(() => {
+  const branchScopedSuppliers = useMemo(() => {
     const effectiveBranchId = getEffectiveBranchId();
-    let filtered = effectiveBranchId
+    return effectiveBranchId
       ? suppliers.filter(s => s.branchId === effectiveBranchId)
       : [...suppliers];
+  }, [suppliers, getEffectiveBranchId]);
+
+  // Filter suppliers — branch-scoped first, then search/category/status.
+  const filteredSuppliers = useMemo(() => {
+    let filtered = [...branchScopedSuppliers];
 
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
@@ -130,7 +135,7 @@ const Suppliers = ({ embedded = false }) => {
     }
 
     return filtered;
-  }, [suppliers, searchTerm, filterCategory, filterStatus, getEffectiveBranchId]);
+  }, [branchScopedSuppliers, searchTerm, filterCategory, filterStatus]);
 
   // Open details modal
   const openDetailsModal = async (supplier) => {
@@ -222,17 +227,18 @@ const Suppliers = ({ embedded = false }) => {
         </div>
       )}
 
-      {/* Summary Cards */}
+      {/* Summary Cards — scoped to the active branch so suppliers from
+          other branches don't leak into the totals. */}
       <div className="suppliers-summary">
         <div className="summary-card">
           <div className="summary-content">
-            <span className="summary-value">{suppliers.length}</span>
+            <span className="summary-value">{branchScopedSuppliers.length}</span>
             <span className="summary-label">Total Suppliers</span>
           </div>
         </div>
         <div className="summary-card">
           <div className="summary-content">
-            <span className="summary-value">{suppliers.filter(s => s.status === 'active').length}</span>
+            <span className="summary-value">{branchScopedSuppliers.filter(s => s.status === 'active').length}</span>
             <span className="summary-label">Active</span>
           </div>
         </div>
@@ -245,7 +251,9 @@ const Suppliers = ({ embedded = false }) => {
         <div className="summary-card">
           <div className="summary-content">
             <span className="summary-value">
-              {suppliers.length > 0 ? (suppliers.reduce((sum, s) => sum + (s.rating || 0), 0) / suppliers.length).toFixed(1) : '0'}
+              {branchScopedSuppliers.length > 0
+                ? (branchScopedSuppliers.reduce((sum, s) => sum + (s.rating || 0), 0) / branchScopedSuppliers.length).toFixed(1)
+                : '0'}
             </span>
             <span className="summary-label">Avg Rating</span>
           </div>

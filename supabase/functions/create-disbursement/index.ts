@@ -37,7 +37,7 @@ interface RecipientPayload {
 }
 
 interface CreateDisbursementBody {
-  sourceType: 'payroll_request' | 'purchase_order' | 'expense';
+  sourceType: 'payroll_request' | 'purchase_order' | 'expense' | 'cash_advance';
   sourceId: string;
   branchId?: string | null;
   businessId: string;
@@ -69,6 +69,29 @@ serve(async (req) => {
     const userId = await resolveUserId(supabase, req.headers.get('Authorization'));
     if (!userId) {
       return jsonResponse({ error: 'auth required' }, 401);
+    }
+
+    // Idempotency guard: if a disbursement for this (source_type, source_id,
+    // reference_code) already exists in a non-terminal-failure state, refuse.
+    // This makes double-clicks / network retries safe.
+    const { data: existing } = await supabase
+      .from('disbursements')
+      .select('id, status')
+      .eq('reference_code', body.referenceCode)
+      .eq('source_type', body.sourceType)
+      .eq('source_id', body.sourceId)
+      .in('status', ['pending', 'submitted', 'succeeded'])
+      .maybeSingle();
+
+    if (existing) {
+      return jsonResponse(
+        {
+          error: `Disbursement already exists for ${body.sourceType} ${body.sourceId} (status: ${existing.status})`,
+          existing_id: existing.id,
+          existing_status: existing.status,
+        },
+        409,
+      );
     }
 
     // 1. Insert one disbursements row per recipient. Doing one row per

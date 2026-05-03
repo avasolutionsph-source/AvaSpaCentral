@@ -28,6 +28,7 @@ import { supabase } from '../services/supabase/supabaseClient';
 const TABLE_BY_SOURCE = {
   payroll_request: 'employees',
   purchase_order: 'suppliers',
+  cash_advance: 'employees',
 };
 
 const COLUMNS = `
@@ -46,8 +47,9 @@ const COLUMNS = `
 function normalizeRow(row, sourceType) {
   const first = row.first_name ?? '';
   const last = row.last_name ?? '';
+  const isEmployee = sourceType === 'payroll_request' || sourceType === 'cash_advance';
   const name = row.name
-    ?? (sourceType === 'payroll_request'
+    ?? (isEmployee
       ? `${first} ${last}`.trim()
       : '');
   return {
@@ -81,7 +83,8 @@ export function useDisbursementRecipients(sourceType, { branchId } = {}) {
     let mounted = true;
     setLoading(true);
 
-    const cols = sourceType === 'payroll_request'
+    const isEmployeeSource = sourceType === 'payroll_request' || sourceType === 'cash_advance';
+    const cols = isEmployeeSource
       // employees: no `name` column, build from first+last
       ? `id, first_name, last_name, email, phone, payout_bank_code, payout_account_number, payout_account_name, payout_method, branch_id, status`
       // suppliers: have `name`
@@ -91,10 +94,10 @@ export function useDisbursementRecipients(sourceType, { branchId } = {}) {
       .from(table)
       .select(cols)
       .eq('status', 'active')
-      .order(sourceType === 'payroll_request' ? 'first_name' : 'name', { ascending: true })
+      .order(isEmployeeSource ? 'first_name' : 'name', { ascending: true })
       .limit(500);
 
-    if (branchId && sourceType === 'payroll_request') {
+    if (branchId && isEmployeeSource) {
       // Branch filter for employees only — suppliers are usually business-wide
       query = query.eq('branch_id', branchId);
     }

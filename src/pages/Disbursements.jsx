@@ -27,6 +27,7 @@ const SOURCE_TYPE_LABELS = {
   payroll_request: 'Payroll request',
   purchase_order: 'Purchase order',
   expense: 'Expense reimbursement',
+  cash_advance: 'Cash advance',
 };
 
 function formatPHP(amount) {

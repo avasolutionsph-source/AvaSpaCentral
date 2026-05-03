@@ -286,6 +286,15 @@ const SUPABASE_TABLE_COLUMNS = {
     'sync_status', 'created_at', 'updated_at'
   ],
 
+  // === Reports (cloud-only; sync bypassed but kept here for forward-compat) ===
+  saved_reports: [
+    'id', 'business_id', 'branch_id', 'branch_name',
+    'period', 'period_label', 'period_key',
+    'saved_by_user_id', 'saved_by_name',
+    'data', 'manual',
+    'created_at'
+  ],
+
   // === Services & Bookings ===
   advance_bookings: [
     'id', 'business_id', 'customer_id', 'customer_name', 'employee_id',

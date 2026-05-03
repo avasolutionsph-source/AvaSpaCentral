@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, isValid } from 'date-fns';
 import '../assets/css/purchase-orders.css';
 import { ConfirmDialog } from '../components/shared';
+import PayDisbursementModal from '../components/PayDisbursementModal';
+import { SettingsRepository } from '../services/storage/repositories';
 
 // Guard against records that lost a required date (e.g. legacy rows missing
 // orderDate) — date-fns format() throws RangeError on Invalid Date and that
@@ -18,7 +20,7 @@ const safeFormat = (value, pattern, fallback = '—') => {
 const PurchaseOrders = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { showToast, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId, user } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -47,6 +49,24 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
   const [approveConfirm, setApproveConfirm] = useState({ isOpen: false, order: null });
   const [cancelConfirm, setCancelConfirm] = useState({ isOpen: false, order: null });
 
+  // Pay via NextPay
+  const [payModalOrder, setPayModalOrder] = useState(null);
+  const [supplierAPEnabled, setSupplierAPEnabled] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    SettingsRepository.get('nextpaySettings').then((s) => {
+      if (mounted && s) setSupplierAPEnabled(Boolean(s.enableDisbursementsSupplierAp));
+    }).catch(() => { /* default false */ });
+    return () => { mounted = false; };
+  }, []);
+
+  const suppliersById = useMemo(() => {
+    const map = new Map();
+    for (const s of suppliers) map.set(s._id, s);
+    return map;
+  }, [suppliers]);
+
   // Form Data
   const [formData, setFormData] = useState({
     supplierId: '',
@@ -55,7 +75,7 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
     items: []
   });
 
-  const statusOptions = ['pending', 'approved', 'received', 'cancelled'];
+  const statusOptions = ['pending', 'approved', 'received', 'cancelled', 'unpaid_approved'];
 
   useEffect(() => {
     loadData();
@@ -111,7 +131,11 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
     }
 
     if (filterStatus) {
-      filtered = filtered.filter(o => o.status === filterStatus);
+      if (filterStatus === 'unpaid_approved') {
+        filtered = filtered.filter(o => o.status === 'approved' && (o.paymentStatus ?? 'unpaid') === 'unpaid');
+      } else {
+        filtered = filtered.filter(o => o.status === filterStatus);
+      }
     }
 
     if (filterSupplier) {
@@ -437,7 +461,9 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
           >
             <option value="">All Status</option>
             {statusOptions.map(status => (
-              <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+              <option key={status} value={status}>
+                {status === 'unpaid_approved' ? 'Unpaid (approved)' : status.charAt(0).toUpperCase() + status.slice(1)}
+              </option>
             ))}
           </select>
           <select
@@ -494,6 +520,7 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
                 <th>Items</th>
                 <th>Total</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -518,6 +545,15 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
                     <span className={`status-badge ${getStatusColor(order.status)}`}>
                       {order.status}
                     </span>
+                  </td>
+                  <td>
+                    {order.paymentStatus === 'paid' ? (
+                      <span className="status-badge approved" title={order.paidAt ? `Paid ${new Date(order.paidAt).toLocaleDateString()}` : 'Paid'}>
+                        ✓ paid
+                      </span>
+                    ) : (
+                      <span className="status-badge" style={{ background: '#fef3c7', color: '#92400e' }}>unpaid</span>
+                    )}
                   </td>
                   <td>
                     <div className="actions-cell">
@@ -560,6 +596,17 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
                           title="Mark as Received"
                         >
                           Receive
+                        </button>
+                      )}
+                      {supplierAPEnabled
+                        && order.status === 'approved'
+                        && (order.paymentStatus ?? 'unpaid') === 'unpaid' && (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => setPayModalOrder(order)}
+                          title="Pay supplier via NextPay"
+                        >
+                          💸 Pay
                         </button>
                       )}
                     </div>
@@ -885,6 +932,37 @@ const PurchaseOrders = ({ embedded = false, onDataChange }) => {
         confirmText="Cancel Order"
         confirmVariant="danger"
       />
+
+      {payModalOrder && (() => {
+        const supplier = suppliersById.get(payModalOrder.supplierId);
+        return (
+          <PayDisbursementModal
+            sourceType="purchase_order"
+            sourceId={payModalOrder._id}
+            businessId={user?.businessId}
+            branchId={getEffectiveBranchId?.()}
+            amount={payModalOrder.totalAmount}
+            recipient={{
+              name: payModalOrder.supplierName || supplier?.name || 'Supplier',
+              email: supplier?.email,
+              phone: supplier?.phone,
+              payout: {
+                bankCode: supplier?.payout_bank_code ?? null,
+                accountNumber: supplier?.payout_account_number || '',
+                accountName: supplier?.payout_account_name || supplier?.name || payModalOrder.supplierName || '',
+                method: supplier?.payout_method || 'instapay',
+              },
+            }}
+            recipientEntity={{ table: 'suppliers', id: payModalOrder.supplierId }}
+            referenceCode={`PO-${payModalOrder._id.slice(-8)}`}
+            onClose={() => setPayModalOrder(null)}
+            onSubmitted={() => {
+              setPayModalOrder(null);
+              showToast?.('Disbursement submitted to NextPay', 'success');
+            }}
+          />
+        );
+      })()}
     </div>
   );
 };

@@ -676,6 +676,18 @@ export const transactionsAdapter = {
     return clone(transaction);
   },
 
+  // Rooms/home services store the receiptNumber (a human-readable string
+  // like "RCP-20260503-...") in their transactionId field, not the
+  // Dexie primary key. This helper resolves a receiptNumber back to the
+  // underlying transaction so callers (e.g. service upgrade) can update it.
+  async getTransactionByReceiptNumber(receiptNumber) {
+    if (!receiptNumber) return null;
+    await delay();
+    const all = await storageService.transactions.getAll();
+    const match = all.find(t => t.receiptNumber === receiptNumber);
+    return match ? clone(match) : null;
+  },
+
   async createTransaction(data) {
     await delay();
 

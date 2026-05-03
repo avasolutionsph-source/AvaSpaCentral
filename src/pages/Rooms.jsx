@@ -451,25 +451,49 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         servicePrice: newPrice
       });
 
-      // Update the linked transaction if exists
+      // Update the linked transaction so Service History and Sales
+      // reflect the upgraded service. room.transactionId stores the
+      // human-readable receiptNumber (e.g. "RCP-…"), not the Dexie
+      // primary key — getTransaction(id) would throw "not found" here,
+      // which is the regression that silently dropped upgrades from
+      // sales totals.
       if (room.transactionId) {
         try {
-          const txn = await mockApi.transactions.getTransaction(room.transactionId);
+          const txn = await mockApi.transactions.getTransactionByReceiptNumber(room.transactionId);
           if (txn) {
-            const updatedItems = selectedUpgradeServices.map(s => ({
+            // Preserve any non-service items (e.g. add-on products) that
+            // were on the original receipt; only swap out the services.
+            const nonServiceItems = (txn.items || []).filter((it) => it.type !== 'service');
+            const upgradedServiceItems = selectedUpgradeServices.map((s) => ({
               id: s._id || s.id,
               name: s.name,
               type: 'service',
               price: s.price || 0,
               quantity: 1,
               subtotal: s.price || 0,
-              itemsUsed: []
+              itemsUsed: [],
             }));
-            await mockApi.transactions.updateTransaction(room.transactionId, {
+            const updatedItems = [...nonServiceItems, ...upgradedServiceItems];
+            const nonServiceSubtotal = nonServiceItems.reduce(
+              (sum, it) => sum + (Number(it.subtotal) || 0),
+              0,
+            );
+            const newSubtotal = nonServiceSubtotal + newPrice;
+            // Re-apply any prior discount/tax shape verbatim — we don't
+            // try to recompute them here since the service upgrade shouldn't
+            // silently change tax/discount math without the cashier's say-so.
+            const updatedTotal = newSubtotal - (Number(txn.discount) || 0) + (Number(txn.tax) || 0);
+
+            await mockApi.transactions.updateTransaction(txn._id, {
               items: updatedItems,
-              total: newPrice,
-              subtotal: newPrice
+              subtotal: newSubtotal,
+              totalAmount: updatedTotal,
+              // Mirror the legacy `total` field too in case any downstream
+              // consumer reads from it instead of totalAmount.
+              total: updatedTotal,
             });
+          } else {
+            console.warn('[upgradeService] No transaction matched receipt', room.transactionId);
           }
         } catch (txErr) {
           console.warn('Could not update transaction:', txErr);

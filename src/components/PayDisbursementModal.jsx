@@ -55,8 +55,9 @@ export default function PayDisbursementModal({
       setError('Bank info is required');
       return;
     }
-    if (Number(amount) < 50) {
-      setError('NextPay minimum disbursement is ₱50');
+    const numericAmount = Number(amount);
+    if (!amount || isNaN(numericAmount) || numericAmount < 50) {
+      setError('Amount is required and must be at least ₱50');
       return;
     }
     if (!recipient?.email?.trim()) {
@@ -77,7 +78,7 @@ export default function PayDisbursementModal({
         branchId,
         referenceCode,
         recipients: [{
-          amount: Number(amount),
+          amount: numericAmount,
           name: recipient.name,
           firstName: recipient.firstName || undefined,
           lastName: recipient.lastName || undefined,
@@ -91,8 +92,11 @@ export default function PayDisbursementModal({
       });
 
       // Optional: write bank info back to source profile so next time it's pre-filled.
+      // We log save-back errors but DO NOT surface them as a modal error — the
+      // disbursement itself succeeded and onSubmitted should still fire. The
+      // operator will simply re-enter the bank info next time.
       if (saveBackToProfile && needsBankEntry && recipientEntity?.table && recipientEntity?.id && supabase) {
-        await supabase
+        const { error: saveErr } = await supabase
           .from(recipientEntity.table)
           .update({
             payout_bank_code: payout.bankCode,
@@ -101,6 +105,9 @@ export default function PayDisbursementModal({
             payout_method: payout.method || 'instapay',
           })
           .eq('id', recipientEntity.id);
+        if (saveErr) {
+          console.warn('[PayDisbursementModal] save bank info to profile failed:', saveErr.message);
+        }
       }
 
       onSubmitted?.(result?.disbursements?.[0]);
@@ -157,7 +164,7 @@ export default function PayDisbursementModal({
           )}
 
           {error && (
-            <div style={{ padding: '0.5rem 0.75rem', background: '#fee2e2', color: '#991b1b', borderRadius: 6, fontSize: '0.85rem' }}>
+            <div role="alert" style={{ padding: '0.5rem 0.75rem', background: '#fee2e2', color: '#991b1b', borderRadius: 6, fontSize: '0.85rem' }}>
               {error}
             </div>
           )}

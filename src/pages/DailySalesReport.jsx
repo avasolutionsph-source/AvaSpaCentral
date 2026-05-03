@@ -499,7 +499,11 @@ const DailySalesReport = () => {
             </div>
             <div className="dsr-meta">
               <span className="dsr-range">
-                Saved {format(new Date(viewingReport.saved_at || viewingReport.savedAt), 'PPpp')}
+                Saved {(() => {
+                  const t = viewingReport.created_at || viewingReport.saved_at || viewingReport.savedAt;
+                  const d = t ? new Date(t) : null;
+                  return d && !isNaN(d.getTime()) ? format(d, 'PPpp') : '—';
+                })()}
                 {(viewingReport.saved_by_name || viewingReport.savedBy) ? ` · ${viewingReport.saved_by_name || viewingReport.savedBy}` : ''}
               </span>
               <button
@@ -570,7 +574,11 @@ const SavedReportsList = ({ items, onView, onDelete, currentUser }) => {
               <td><span className="dsr-period-chip">{PERIODS.find(p => p.id === r.period)?.label || r.period}</span></td>
               <td>{r.period_label || r.periodLabel}</td>
               <td className="dsr-small">{r.branch_name || r.branchName || '—'}</td>
-              <td className="dsr-small">{format(new Date(r.saved_at || r.savedAt), 'MMM d, yyyy h:mm a')}</td>
+              <td className="dsr-small">{(() => {
+                const t = r.created_at || r.saved_at || r.savedAt;
+                const d = t ? new Date(t) : null;
+                return d && !isNaN(d.getTime()) ? format(d, 'MMM d, yyyy h:mm a') : '—';
+              })()}</td>
               <td className="dsr-small">{r.saved_by_name || r.savedBy || '—'}</td>
               <td className="right">{peso(r.data?.netSales)}</td>
               <td className="right">{num(r.data?.totalClients)}</td>

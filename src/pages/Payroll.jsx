@@ -691,6 +691,28 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
             />
           </div>
         )}
+        {payrollData.length > 0 && payrollData[0].period && (
+          <div className="payroll-period-banner" style={{
+            marginTop: '0.75rem',
+            padding: '0.5rem 0.85rem',
+            background: '#ecfdf5',
+            border: '1px solid #6ee7b7',
+            borderRadius: 6,
+            color: '#065f46',
+            fontSize: '0.9rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+          }}>
+            <span>📅</span>
+            <strong>Generated for:</strong>
+            <span>
+              {format(parseISO(payrollData[0].period.start), 'MMM d, yyyy')}
+              {' – '}
+              {format(parseISO(payrollData[0].period.end), 'MMM d, yyyy')}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}

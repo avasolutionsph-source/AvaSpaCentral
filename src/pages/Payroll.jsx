@@ -184,10 +184,6 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
     }
   }, [onPayslipsRef]);
 
-  useEffect(() => {
-    if (onSaveRef) onSaveRef.current = handleSavePayroll;
-  }, [onSaveRef, payrollData, user, selectedBranch, period, summary]);
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -664,6 +660,12 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       setSaving(false);
     }
   };
+
+  // Expose handleSavePayroll to HRHub via ref. Must come AFTER handleSavePayroll +
+  // summary are declared, otherwise the dep array hits a TDZ on first render.
+  useEffect(() => {
+    if (onSaveRef) onSaveRef.current = handleSavePayroll;
+  }, [onSaveRef, payrollData, user, selectedBranch, period, summary]);
 
   if (loading) {
     return <div className="page-loading"><div className="spinner"></div><p>Loading payroll data...</p></div>;

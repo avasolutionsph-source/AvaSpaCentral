@@ -48,12 +48,66 @@ InitializationService.initialize()
     // App will still render, but may have limited functionality
   });
 
-// Auto-reload when new version is deployed
-// This ensures users always get the latest CSS/JS without manual refresh
+// Auto-reload when new version is deployed.
+// Goal: every time an installed user opens the app, they get the newest build.
+// We proactively poke the service worker on cold launch, on focus regain (PWA
+// reopened from background), when the network comes back online, and every
+// 30 min while the app is open. When a refresh is needed mid-session we hold
+// off until the user is idle (60s no input) or backgrounds the app, so we
+// don't yank them out of an in-progress transaction.
+const APP_LAUNCH_AT = Date.now()
+let lastUserInteractionAt = 0
+;['click', 'keydown', 'input', 'touchstart', 'pointerdown'].forEach((ev) => {
+  document.addEventListener(ev, () => {
+    lastUserInteractionAt = Date.now()
+  }, { passive: true, capture: true })
+})
+
+const isSafeToReloadNow = () => {
+  if (document.visibilityState !== 'visible') return true
+  if (Date.now() - APP_LAUNCH_AT < 30_000 && lastUserInteractionAt === 0) return true
+  if (lastUserInteractionAt > 0 && Date.now() - lastUserInteractionAt > 60_000) return true
+  return false
+}
+
 const updateSW = registerSW({
+  immediate: true,
+  onRegisteredSW(_swUrl, registration) {
+    if (!registration) return
+
+    const checkForUpdate = () => {
+      if (!navigator.onLine) return
+      registration.update().catch((err) => {
+        console.warn('[SW] Update check failed', err)
+      })
+    }
+
+    checkForUpdate()
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkForUpdate()
+    })
+
+    window.addEventListener('online', checkForUpdate)
+
+    setInterval(checkForUpdate, 30 * 60 * 1000)
+  },
   onNeedRefresh() {
-    // New content available — reload immediately so users get the update
-    updateSW(true)
+    const reloadIfSafe = () => {
+      if (isSafeToReloadNow()) {
+        updateSW(true)
+      }
+    }
+
+    if (isSafeToReloadNow()) {
+      updateSW(true)
+      return
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reloadIfSafe()
+    })
+    setInterval(reloadIfSafe, 30_000)
   },
   onOfflineReady() {
     console.log('[SW] App ready for offline use')

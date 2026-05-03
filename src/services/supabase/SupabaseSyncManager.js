@@ -294,6 +294,13 @@ const SUPABASE_TABLE_COLUMNS = {
     'data', 'manual',
     'created_at'
   ],
+  saved_payrolls: [
+    'id', 'business_id', 'branch_id', 'branch_name',
+    'period_label', 'period_start', 'period_end', 'period_type',
+    'saved_by_user_id', 'saved_by_name',
+    'rows', 'summary',
+    'created_at'
+  ],
 
   // === Services & Bookings ===
   advance_bookings: [

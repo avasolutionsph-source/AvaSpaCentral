@@ -55,3 +55,6 @@ export { default as DisbursementRepository } from './DisbursementRepository';
 
 // Reports (cloud-only)
 export { default as SavedReportRepository } from './SavedReportRepository';
+
+// Payroll (cloud-only)
+export { default as SavedPayrollRepository } from './SavedPayrollRepository';

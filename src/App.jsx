@@ -25,6 +25,7 @@ const CustomerLogin = lazy(() => import('./pages/CustomerLogin'));
 const CustomerRegister = lazy(() => import('./pages/CustomerRegister'));
 const CustomerProfile = lazy(() => import('./pages/CustomerProfile'));
 const Install = lazy(() => import('./pages/Install'));
+const Update = lazy(() => import('./pages/Update'));
 
 // Lazy loaded pages (code splitting for better initial load)
 const Products = lazy(() => import('./pages/Products'));
@@ -316,6 +317,18 @@ function AppRoutes() {
           element={
             <Suspense fallback={<PageLoader />}>
               <Install />
+            </Suspense>
+          }
+        />
+
+        {/* PWA update self-service page — anyone can hit /update to pull
+            the latest build without reinstalling. Public on purpose so
+            users with a stale cached app can still reach it. */}
+        <Route
+          path="/update"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Update />
             </Suspense>
           }
         />

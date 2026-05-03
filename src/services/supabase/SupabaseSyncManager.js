@@ -202,6 +202,7 @@ const SUPABASE_TABLE_COLUMNS = {
   purchase_orders: [
     'id', 'business_id', 'supplier_id', 'supplier_name', 'order_date', 'expected_date',
     'status', 'items', 'total', 'notes', 'branch_id',
+    'payment_status', 'paid_at', 'paid_by', 'disbursement_id',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   inventory_movements: [
@@ -265,6 +266,7 @@ const SUPABASE_TABLE_COLUMNS = {
   cash_advance_requests: [
     'id', 'business_id', 'employee_id', 'employee_name', 'amount', 'reason',
     'status', 'approved_by', 'approved_at', 'rejection_reason', 'branch_id',
+    'paid_at', 'paid_by', 'disbursement_id',
     'created_at', 'updated_at'
   ],
   incident_reports: [
@@ -458,6 +460,9 @@ const FIELD_NAME_MAP = {
   clockInPhoto: 'clock_in_photo',
   clockOutPhoto: 'clock_out_photo',
   paymentStatus: 'payment_status',
+  paidAt: 'paid_at',
+  paidBy: 'paid_by',
+  disbursementId: 'disbursement_id',
   overtimeHours: 'overtime_hours',
   lateMinutes: 'late_minutes',
   clockInLocation: 'clock_in_location',

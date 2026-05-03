@@ -3,6 +3,7 @@
  * New Disbursement modal, scoped by source_type:
  *
  *   payroll_request → active employees
+ *   cash_advance    → active employees (same mapping as payroll_request)
  *   purchase_order  → active suppliers
  *   expense         → users (TBD; expense reimbursements pick the requester)
  *
@@ -47,9 +48,9 @@ const COLUMNS = `
 function normalizeRow(row, sourceType) {
   const first = row.first_name ?? '';
   const last = row.last_name ?? '';
-  const isEmployee = sourceType === 'payroll_request' || sourceType === 'cash_advance';
+  const isEmployeeSource = sourceType === 'payroll_request' || sourceType === 'cash_advance';
   const name = row.name
-    ?? (isEmployee
+    ?? (isEmployeeSource
       ? `${first} ${last}`.trim()
       : '');
   return {

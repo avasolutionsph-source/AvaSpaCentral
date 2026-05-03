@@ -32,6 +32,12 @@ import './utils/chartConfig'
 import { initSentry } from './utils/sentry'
 initSentry()
 
+// Re-apply the user's saved screen-orientation preference (auto / landscape /
+// portrait) on every launch. Lock attempts only succeed inside the installed
+// PWA's fullscreen window; in a regular browser tab they'll reject silently.
+import { applyOrientationPreference } from './utils/orientation'
+applyOrientationPreference().catch(() => { /* non-fatal */ })
+
 // Initialize offline-first storage
 import InitializationService from './services/InitializationService'
 

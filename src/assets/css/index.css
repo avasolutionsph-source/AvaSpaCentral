@@ -1490,7 +1490,8 @@ select {
   position: relative;
 }
 
-.notification-bell {
+.notification-bell,
+.orientation-toggle-btn {
   position: relative;
   display: flex;
   align-items: center;
@@ -1503,6 +1504,11 @@ select {
   cursor: pointer;
   transition: all 0.2s ease;
   color: var(--text-secondary);
+}
+
+.orientation-toggle-btn:hover {
+  background: var(--gray-200);
+  color: var(--primary);
 }
 
 .notification-bell:hover {

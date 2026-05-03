@@ -5,6 +5,10 @@ import mockApi from '../mockApi';
 import OfflineIndicator from './OfflineIndicator';
 import { useSyncStatus } from '../hooks';
 import { formatTime12Hour } from '../utils/dateUtils';
+import {
+  getPreferredOrientation,
+  setPreferredOrientation,
+} from '../utils/orientation';
 
 const MainLayout = () => {
   const { user, logout, hasPermission, hasManagementAccess, selectedBranch, selectBranch, canSeeAllBranches, getEffectiveBranchId } = useApp();
@@ -23,6 +27,40 @@ const MainLayout = () => {
   const [branchOptions, setBranchOptions] = useState([]);
   const [branchOptionsLoading, setBranchOptionsLoading] = useState(false);
   const branchMenuRef = React.useRef(null);
+
+  // Per-device screen orientation preference. Persisted in localStorage so
+  // therapists/riders/utility staff only need to set it once on their phone.
+  const [orientationPref, setOrientationPref] = useState(() => getPreferredOrientation());
+  const [orientationMenuOpen, setOrientationMenuOpen] = useState(false);
+  const orientationMenuRef = React.useRef(null);
+
+  useEffect(() => {
+    if (!orientationMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (orientationMenuRef.current && !orientationMenuRef.current.contains(e.target)) {
+        setOrientationMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [orientationMenuOpen]);
+
+  const handleOrientationChange = async (pref) => {
+    setOrientationMenuOpen(false);
+    setOrientationPref(pref);
+    const result = await setPreferredOrientation(pref);
+    // If the lock attempt failed (most often because we're in a browser tab
+    // rather than the installed PWA fullscreen window), reset to auto so the
+    // UI doesn't show a state we can't actually deliver.
+    if (!result.ok && pref !== 'auto') {
+      setOrientationPref('auto');
+      await setPreferredOrientation('auto');
+    }
+  };
 
   useEffect(() => {
     if (!branchMenuOpen || !canSwitchBranch || !user?.businessId) return;
@@ -975,6 +1013,76 @@ const MainLayout = () => {
             </button>
           </div>
           <div className="header-right">
+            {/* Screen orientation toggle — useful for installed PWA on
+                phones/tablets where the OS auto-rotate doesn't always kick
+                in. Reachable from every page so non-manager roles
+                (therapist, rider, utility) can toggle it too. */}
+            <div className="orientation-container" ref={orientationMenuRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="orientation-toggle-btn"
+                onClick={() => setOrientationMenuOpen((o) => !o)}
+                aria-haspopup="menu"
+                aria-expanded={orientationMenuOpen}
+                aria-label={`Screen orientation: ${orientationPref}`}
+                title={`Screen orientation: ${orientationPref}`}
+              >
+                {orientationPref === 'landscape' ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="6" width="20" height="12" rx="2" ry="2" />
+                    <line x1="6" y1="12" x2="6.01" y2="12" />
+                  </svg>
+                ) : orientationPref === 'portrait' ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="6" y="2" width="12" height="20" rx="2" ry="2" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                    <path d="M3 22v-6h6" />
+                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                  </svg>
+                )}
+              </button>
+              {orientationMenuOpen && (
+                <div
+                  role="menu"
+                  className="orientation-menu"
+                  style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 1100,
+                    background: 'var(--color-surface-elevated, #fff)',
+                    border: '1px solid var(--color-border, #e5e7eb)',
+                    borderRadius: '8px', minWidth: '180px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.12)', overflow: 'hidden',
+                  }}
+                >
+                  {[
+                    { value: 'auto', label: 'Auto (rotate freely)' },
+                    { value: 'landscape', label: 'Lock to landscape' },
+                    { value: 'portrait', label: 'Lock to portrait' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      role="menuitemradio"
+                      aria-checked={orientationPref === opt.value}
+                      onClick={() => handleOrientationChange(opt.value)}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '10px 14px', border: 'none', background: 'none',
+                        cursor: 'pointer', fontSize: '0.875rem',
+                        color: orientationPref === opt.value ? 'var(--color-primary, #6B1C23)' : 'inherit',
+                        fontWeight: orientationPref === opt.value ? 600 : 400,
+                      }}
+                    >
+                      {orientationPref === opt.value ? '✓ ' : '   '}{opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Notification Bell */}
             <div className="notification-container" ref={notificationRef}>
               <button

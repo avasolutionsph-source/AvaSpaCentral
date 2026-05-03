@@ -381,10 +381,35 @@
 @media (max-width: 768px) {
   .rooms-page {
     padding: var(--spacing-md);
+    /* Reserve space below the last room card so the Start Service /
+       Cancel buttons aren't clipped by the fixed bottom-nav (60px tall
+       plus the device's safe-area inset). The page-content parent
+       already adds bottom padding for the nav, but on shorter viewports
+       the room card's own action buttons can still hug the nav. */
+    padding-bottom: calc(var(--spacing-xl) + 96px + env(safe-area-inset-bottom, 0px));
   }
 
   .rooms-grid {
     grid-template-columns: 1fr;
+  }
+
+  .room-card {
+    /* Ensure card content can fully render and the action buttons
+       always have breathing room above the fixed bottom nav. */
+    padding-bottom: var(--spacing-md);
+  }
+
+  .service-action-buttons {
+    /* On mobile, stack the buttons so labels don't truncate and the
+       hit-targets stay easily tappable. */
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .service-action-buttons .start-service-btn,
+  .service-action-buttons .stop-service-btn {
+    width: 100%;
+    flex: none;
   }
 
   .room-actions {

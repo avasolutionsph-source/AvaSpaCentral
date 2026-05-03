@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, subDays, isWithinInterval } from 'date-fns';
+import PayDisbursementModal from '../components/PayDisbursementModal';
+import { SettingsRepository } from '../services/storage/repositories';
 
 const formatPeso = (value) => `₱${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -119,11 +121,21 @@ const BreakdownPopover = ({ type, payroll, onClose }) => {
 };
 
 const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef }) => {
-  const { showToast, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId, user } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [payrollData, setPayrollData] = useState([]);
+  const [payModalIndex, setPayModalIndex] = useState(null);
+  const [payrollDisbursementsEnabled, setPayrollDisbursementsEnabled] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    SettingsRepository.get('nextpaySettings').then((s) => {
+      if (mounted && s) setPayrollDisbursementsEnabled(Boolean(s.enableDisbursementsPayroll));
+    }).catch(() => { /* default false */ });
+    return () => { mounted = false; };
+  }, []);
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -594,6 +606,12 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
   };
 
   const handleMarkAsPaid = (index) => {
+    if (payrollDisbursementsEnabled) {
+      // Open NextPay disbursement modal — local 'paid' state is set in onSubmitted.
+      setPayModalIndex(index);
+      return;
+    }
+    // Fallback when payroll disbursements toggle is off: legacy badge-only behavior.
     const updated = [...payrollData];
     updated[index].status = 'paid';
     setPayrollData(updated);
@@ -897,6 +915,48 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
           </div>
         </div>
       )}
+
+      {/* Pay via NextPay modal — synthetic source_id since payroll rows aren't
+          persisted (Phase C deferred). Disbursement record created + audit log
+          shows it in /disbursements; local row badge flips to 'paid' optimistically. */}
+      {payModalIndex !== null && payrollData[payModalIndex] && (() => {
+        const row = payrollData[payModalIndex];
+        const emp = row.employee;
+        const periodKey = (row.period?.start || '').replace(/-/g, '');
+        return (
+          <PayDisbursementModal
+            sourceType="payroll_request"
+            sourceId={`payroll-${emp._id}-${row.period?.start || 'na'}`}
+            businessId={user?.businessId}
+            branchId={getEffectiveBranchId?.()}
+            amount={row.netPay}
+            recipient={{
+              name: `${emp.firstName ?? emp.first_name ?? ''} ${emp.lastName ?? emp.last_name ?? ''}`.trim() || 'Employee',
+              firstName: emp.firstName ?? emp.first_name,
+              lastName: emp.lastName ?? emp.last_name,
+              email: emp.email,
+              phone: emp.phone,
+              payout: {
+                bankCode: emp.payoutBankCode ?? emp.payout_bank_code ?? null,
+                accountNumber: emp.payoutAccountNumber || emp.payout_account_number || '',
+                accountName: emp.payoutAccountName || emp.payout_account_name
+                  || `${emp.firstName ?? emp.first_name ?? ''} ${emp.lastName ?? emp.last_name ?? ''}`.trim() || '',
+                method: emp.payoutMethod || emp.payout_method || 'instapay',
+              },
+            }}
+            recipientEntity={{ table: 'employees', id: emp._id }}
+            referenceCode={`PAY-${String(emp._id).slice(-4)}-${periodKey || 'na'}`}
+            onClose={() => setPayModalIndex(null)}
+            onSubmitted={() => {
+              const updated = [...payrollData];
+              updated[payModalIndex].status = 'paid';
+              setPayrollData(updated);
+              setPayModalIndex(null);
+              showToast('Disbursement submitted to NextPay', 'success');
+            }}
+          />
+        );
+      })()}
 
       {/* Payslip Modal */}
       {showPayslipModal && selectedPayslip && (

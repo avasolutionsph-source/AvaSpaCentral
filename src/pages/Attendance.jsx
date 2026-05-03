@@ -496,6 +496,23 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     return dayShift;
   };
 
+  // For today: returns true only if the employee has a scheduled shift today and it has already ended.
+  // Used so we don't prematurely mark someone ABSENT before their shift is over.
+  const hasShiftEndedToday = (employeeId) => {
+    const shift = getEmployeeShift(employeeId);
+    if (!shift || shift.label === 'Off') return false;
+    if (!shift.startTime || !shift.endTime) return false;
+    const [sh, sm] = shift.startTime.split(':').map(Number);
+    const [eh, em] = shift.endTime.split(':').map(Number);
+    const startMins = sh * 60 + sm;
+    let endMins = eh * 60 + em;
+    // Overnight shift: end time is on the next day
+    if (endMins <= startMins) endMins += 24 * 60;
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    return nowMins >= endMins;
+  };
+
   const openPhotoViewer = (record) => {
     setSelectedRecord(record);
     setShowPhotoModal(true);
@@ -707,7 +724,16 @@ const Attendance = ({ embedded = false, onDataChange }) => {
               return true;
             }).map(employee => {
               const record = getEmployeeRecord(employee._id);
-              const status = record ? getAttendanceStatus(record) : 'absent';
+              // Only show "absent" once the shift has ended (or for past dates).
+              // Before the shift ends today, leave the status blank so we don't pre-judge an employee.
+              let status;
+              if (record) {
+                status = getAttendanceStatus(record);
+              } else if (!isViewingToday) {
+                status = 'absent';
+              } else {
+                status = hasShiftEndedToday(employee._id) ? 'absent' : null;
+              }
               const overtime = record ? calculateOvertimeHours(record) : 0;
               const hoursWorked = (() => {
                 if (!record?.clockIn || !record?.clockOut) return 0;
@@ -739,11 +765,15 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                     })()}
                   </td>
                   <td>
-                    <span className={`status-badge ${status}`}>
-                      {status}
-                    </span>
+                    {status ? (
+                      <span className={`status-badge ${status}`}>
+                        {status}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-500">-</span>
+                    )}
                   </td>
-                  <td className={`time-cell ${status}`}>
+                  <td className={`time-cell ${status || ''}`}>
                     {record?.clockIn ? formatTime12Hour(record.clockIn) : '-'}
                   </td>
                   <td className="time-cell">

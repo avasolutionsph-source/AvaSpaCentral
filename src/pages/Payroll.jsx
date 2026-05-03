@@ -4,6 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO, startOfMonth, endOfMonth, subDays, isWithinInterval } from 'date-fns';
 import PayDisbursementModal from '../components/PayDisbursementModal';
 import { SettingsRepository } from '../services/storage/repositories';
+import { SavedPayrollRepository } from '../services/storage/repositories';
 
 const formatPeso = (value) => `₱${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -120,11 +121,12 @@ const BreakdownPopover = ({ type, payroll, onClose }) => {
   );
 };
 
-const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef }) => {
-  const { showToast, getEffectiveBranchId, user } = useApp();
+const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef, onSaveRef }) => {
+  const { showToast, getEffectiveBranchId, user, selectedBranch } = useApp();
 
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [payrollData, setPayrollData] = useState([]);
   const [payModalIndex, setPayModalIndex] = useState(null);
   const [payrollDisbursementsEnabled, setPayrollDisbursementsEnabled] = useState(false);
@@ -181,6 +183,10 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       onPayslipsRef.current = handleGeneratePayslips;
     }
   }, [onPayslipsRef]);
+
+  useEffect(() => {
+    if (onSaveRef) onSaveRef.current = handleSavePayroll;
+  }, [onSaveRef, payrollData, user, selectedBranch, period, summary]);
 
   const loadData = async () => {
     try {
@@ -616,6 +622,47 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
     updated[index].status = 'paid';
     setPayrollData(updated);
     showToast('Marked as paid', 'success');
+  };
+
+  const handleSavePayroll = async () => {
+    if (!user?.businessId) {
+      showToast('Cannot save: not logged in', 'error');
+      return;
+    }
+    if (payrollData.length === 0) {
+      showToast('Calculate payroll first', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const period0 = payrollData[0]?.period;
+      if (!period0?.start || !period0?.end) {
+        throw new Error('Period dates missing on payroll rows');
+      }
+      const branchId = getEffectiveBranchId();
+      const payload = {
+        business_id: user.businessId,
+        branch_id: branchId || null,
+        branch_name: selectedBranch?.name || user?.branchName || null,
+        period_label: `${format(parseISO(period0.start), 'MMM d, yyyy')} – ${format(parseISO(period0.end), 'MMM d, yyyy')}`,
+        period_start: period0.start,
+        period_end: period0.end,
+        period_type: period,
+        saved_by_user_id: user?.id || null,
+        saved_by_name: user
+          ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || user.email
+          : null,
+        rows: payrollData,
+        summary,
+      };
+      await SavedPayrollRepository.create(payload);
+      showToast('Payroll saved to cloud', 'success');
+    } catch (err) {
+      console.error('[Payroll] save failed:', err);
+      showToast('Failed to save payroll: ' + (err?.message || 'unknown error'), 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {

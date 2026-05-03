@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
@@ -13,6 +13,9 @@ import OTRequestRepository from '../services/storage/repositories/OTRequestRepos
 import LeaveRequestRepository from '../services/storage/repositories/LeaveRequestRepository';
 import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
 import IncidentReportRepository from '../services/storage/repositories/IncidentReportRepository';
+import SavedPayrollsList from '../components/SavedPayrollsList';
+import { SavedPayrollRepository } from '../services/storage/repositories';
+import { supabase } from '../services/supabase/supabaseClient';
 import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
@@ -28,6 +31,7 @@ const HRHub = () => {
   const payrollCalculateRef = useRef(null);
   const payrollRemittancesRef = useRef(null);
   const payrollPayslipsRef = useRef(null);
+  const payrollSaveRef = useRef(null);
 
   // Quick stats for badges
   const [stats, setStats] = useState({
@@ -135,6 +139,11 @@ const HRHub = () => {
       badge: stats.pendingRequests > 0 ? stats.pendingRequests : null,
       badgeType: 'warning'
     },
+    {
+      id: 'saved-payrolls',
+      label: 'Saved Payrolls',
+      badge: null
+    },
     // Only show Accounts tab to Owner and Branch Owner
     ...((isOwner() || isManager() || isBranchOwner()) ? [{
       id: 'accounts',
@@ -187,6 +196,13 @@ const HRHub = () => {
                 >
                   Calculate
                 </button>
+                <button
+                  className="btn btn-success"
+                  onClick={() => payrollSaveRef.current?.()}
+                  title="Save snapshot to cloud (visible across devices)"
+                >
+                  💾 Save Payroll
+                </button>
               </>
             )}
             {/* Accounts Tab Button */}
@@ -226,11 +242,77 @@ const HRHub = () => {
         {activeTab === 'attendance' && <Attendance embedded onDataChange={loadStats} />}
         {activeTab === 'shift-schedules' && <ShiftSchedules embedded onDataChange={loadStats} />}
         {activeTab === 'requests' && <HRRequests embedded onDataChange={loadStats} />}
-        {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} onCalculateRef={payrollCalculateRef} onRemittancesRef={payrollRemittancesRef} onPayslipsRef={payrollPayslipsRef} />}
+        {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} onCalculateRef={payrollCalculateRef} onRemittancesRef={payrollRemittancesRef} onPayslipsRef={payrollPayslipsRef} onSaveRef={payrollSaveRef} />}
+        {activeTab === 'saved-payrolls' && <SavedPayrollsTabContent />}
         {activeTab === 'accounts' && (isOwner() || isManager() || isBranchOwner()) && <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />}
       </div>
     </div>
   );
 };
+
+function SavedPayrollsTabContent() {
+  const { user, showToast } = useApp();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    if (!user?.businessId) return;
+    try {
+      const rows = await SavedPayrollRepository.list(user.businessId);
+      setItems(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      console.error('[HRHub] saved payrolls load failed', err);
+      showToast?.('Failed to load saved payrolls', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.businessId, showToast]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  // Realtime: refetch on any insert/delete in this business
+  useEffect(() => {
+    if (!supabase || !user?.businessId) return undefined;
+    const channel = supabase
+      .channel('saved-payrolls-list')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'saved_payrolls',
+          filter: `business_id=eq.${user.businessId}`,
+        },
+        () => refresh(),
+      )
+      .subscribe();
+    return () => { try { channel.unsubscribe(); } catch { /* best effort */ } };
+  }, [user?.businessId, refresh]);
+
+  const handleDelete = async (id) => {
+    try {
+      await SavedPayrollRepository.delete(id);
+      setItems((prev) => prev.filter((r) => r.id !== id));
+      showToast?.('Saved payroll deleted', 'success');
+    } catch (err) {
+      const msg = err?.message?.includes('403')
+        ? "You can't delete this payroll (creator or Owner only)"
+        : 'Failed to delete payroll';
+      showToast?.(msg, 'error');
+    }
+  };
+
+  if (loading) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}><div className="spinner" /></div>;
+  }
+
+  return (
+    <SavedPayrollsList
+      items={items}
+      currentUser={user}
+      onDelete={handleDelete}
+    />
+  );
+}
 
 export default HRHub;

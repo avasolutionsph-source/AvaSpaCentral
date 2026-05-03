@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
-import { SettingsRepository } from '../services/storage/repositories';
+import { SettingsRepository, SavedReportRepository } from '../services/storage/repositories';
 import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
+import { supabase } from '../services/supabase/supabaseClient';
 import {
   format,
   startOfDay, endOfDay,
@@ -139,13 +140,14 @@ const DailySalesReport = () => {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [txs, exps, emps, sessions, advances, saved] = await Promise.all([
+      const [txs, exps, emps, sessions, advances, , cloudSaved] = await Promise.all([
         mockApi.transactions.getTransactions(),
         mockApi.expenses.getExpenses(),
         mockApi.employees.getEmployees(),
         mockApi.cashDrawer.getSessions(),
         CashAdvanceRequestRepository.getAll(),
         SettingsRepository.get(SAVED_KEY),
+        SavedReportRepository.list(user?.businessId),
       ]);
       // Strict per-branch filter: when a branch is selected, only include rows
       // whose branchId matches exactly. Legacy unbranched rows stay hidden here
@@ -156,10 +158,7 @@ const DailySalesReport = () => {
       setEmployees(emps || []);
       setCashSessions((sessions || []).filter(branchFilter));
       setCashAdvances((advances || []).filter(branchFilter));
-      const branchSaved = Array.isArray(saved)
-        ? saved.filter(r => !branchId || r.branchId === branchId)
-        : [];
-      setSavedReports(branchSaved);
+      setSavedReports(Array.isArray(cloudSaved) ? cloudSaved : []);
     } catch {
       // Silent — each section renders zeros when data is missing
     } finally {
@@ -168,6 +167,71 @@ const DailySalesReport = () => {
   }, [branchId]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Realtime: refetch when any session in this business creates or deletes a report
+  useEffect(() => {
+    if (!supabase || !user?.businessId) return undefined;
+    const channel = supabase
+      .channel('saved-reports-list')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'saved_reports',
+          filter: `business_id=eq.${user.businessId}`,
+        },
+        () => {
+          SavedReportRepository.list(user.businessId)
+            .then((rows) => setSavedReports(Array.isArray(rows) ? rows : []))
+            .catch((err) => console.error('[DailySalesReport] realtime refetch failed', err));
+        },
+      )
+      .subscribe();
+    return () => {
+      try { channel.unsubscribe(); } catch { /* best effort */ }
+    };
+  }, [user?.businessId]);
+
+  // One-time migration: if there are local saved reports left over from the
+  // pre-cloud era, push them to Supabase then delete the local key.
+  // Best-effort — silent on failure (will retry on next mount).
+  useEffect(() => {
+    if (!user?.businessId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const local = await SettingsRepository.get(SAVED_KEY);
+        if (cancelled || !Array.isArray(local) || local.length === 0) return;
+
+        const mapped = local.map((r) => ({
+          business_id: user.businessId,
+          branch_id: r.branchId || null,
+          branch_name: r.branchName || null,
+          period: r.period,
+          period_label: r.periodLabel,
+          period_key: r.periodKey,
+          saved_by_user_id: user?.id || null,
+          saved_by_name: r.savedBy || null,
+          data: r.data,
+          manual: r.manual,
+        }));
+
+        const inserted = await SavedReportRepository.bulkCreate(mapped);
+        if (cancelled) return;
+        if (Array.isArray(inserted) && inserted.length === mapped.length) {
+          await SettingsRepository.delete(SAVED_KEY);
+          setSavedReports((prev) => [...inserted, ...prev]);
+          showToast?.(`Migrated ${inserted.length} local report(s) to cloud`, 'success');
+        } else {
+          console.warn('[DailySalesReport] partial migration; keeping local data');
+        }
+      } catch (e) {
+        console.error('[DailySalesReport] local→cloud migration failed', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.businessId]);
 
   // Load manual fields whenever the period key changes
   useEffect(() => {
@@ -320,47 +384,53 @@ const DailySalesReport = () => {
   const handlePrint = () => window.print();
 
   const handleSaveReport = async () => {
-    const snapshot = {
-      id: `report_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      savedAt: new Date().toISOString(),
+    if (!user?.businessId) {
+      showToast?.('Cannot save: not logged in', 'error');
+      return;
+    }
+    const payload = {
+      business_id: user.businessId,
+      branch_id: branchId || null,
+      branch_name: selectedBranch?.name || user?.branchName || null,
       period,
-      periodLabel,
-      periodKey,
-      branchId: branchId || null,
-      branchName: selectedBranch?.name || user?.branchName || null,
-      savedBy: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || user.email : null,
+      period_label: periodLabel,
+      period_key: periodKey,
+      saved_by_user_id: user?.id || null,
+      saved_by_name: user
+        ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || user.email
+        : null,
       data: liveData,
       manual,
     };
     try {
-      const existing = (await SettingsRepository.get(SAVED_KEY)) || [];
-      const next = [snapshot, ...(Array.isArray(existing) ? existing : [])];
-      await SettingsRepository.set(SAVED_KEY, next);
-      // Refresh local list (branch-filtered the same way as loadAll)
-      setSavedReports(prev => [snapshot, ...prev]);
+      const inserted = await SavedReportRepository.create(payload);
+      setSavedReports(prev => [inserted, ...prev]);
       showToast?.('Report saved', 'success');
     } catch (e) {
+      console.error('[DailySalesReport] handleSaveReport failed', e);
       showToast?.('Failed to save report', 'error');
     }
   };
 
   const handleDeleteReport = async (id) => {
     try {
-      const existing = (await SettingsRepository.get(SAVED_KEY)) || [];
-      const next = (Array.isArray(existing) ? existing : []).filter(r => r.id !== id);
-      await SettingsRepository.set(SAVED_KEY, next);
+      await SavedReportRepository.delete(id);
       setSavedReports(prev => prev.filter(r => r.id !== id));
       setConfirmDeleteId(null);
       if (viewingReport?.id === id) setViewingReport(null);
       showToast?.('Saved report deleted', 'success');
-    } catch {
-      showToast?.('Failed to delete report', 'error');
+    } catch (e) {
+      console.error('[DailySalesReport] handleDeleteReport failed', e);
+      const msg = e?.message?.includes('403')
+        ? "You can't delete this report (creator or Owner only)"
+        : 'Failed to delete report';
+      showToast?.(msg, 'error');
     }
   };
 
   // Decide what to render in the sheet area
   const sheetSnapshot = viewingReport
-    ? { data: viewingReport.data, manual: viewingReport.manual, periodLabel: viewingReport.periodLabel, readOnly: true }
+    ? { data: viewingReport.data, manual: viewingReport.manual, periodLabel: viewingReport.period_label || viewingReport.periodLabel, readOnly: true }
     : { data: liveData, manual, periodLabel, readOnly: false };
 
   return (
@@ -417,6 +487,7 @@ const DailySalesReport = () => {
           items={savedReports}
           onView={setViewingReport}
           onDelete={(id) => setConfirmDeleteId(id)}
+          currentUser={user}
         />
       )}
 
@@ -428,8 +499,8 @@ const DailySalesReport = () => {
             </div>
             <div className="dsr-meta">
               <span className="dsr-range">
-                Saved {format(new Date(viewingReport.savedAt), 'PPpp')}
-                {viewingReport.savedBy ? ` · ${viewingReport.savedBy}` : ''}
+                Saved {format(new Date(viewingReport.saved_at || viewingReport.savedAt), 'PPpp')}
+                {(viewingReport.saved_by_name || viewingReport.savedBy) ? ` · ${viewingReport.saved_by_name || viewingReport.savedBy}` : ''}
               </span>
               <button
                 className="btn btn-secondary"
@@ -443,7 +514,7 @@ const DailySalesReport = () => {
           </div>
           <ReportSheet
             {...sheetSnapshot}
-            branchName={viewingReport.branchName || '—'}
+            branchName={viewingReport.branch_name || viewingReport.branchName || '—'}
             showShift={viewingReport.period === 'today'}
           />
         </>
@@ -467,7 +538,7 @@ const DailySalesReport = () => {
 
 // --- Saved Reports List ---------------------------------------------------
 
-const SavedReportsList = ({ items, onView, onDelete }) => {
+const SavedReportsList = ({ items, onView, onDelete, currentUser }) => {
   if (!items.length) {
     return (
       <div className="dsr-empty-state">
@@ -485,6 +556,7 @@ const SavedReportsList = ({ items, onView, onDelete }) => {
           <tr>
             <th>Period</th>
             <th>Range</th>
+            <th>Branch</th>
             <th>Saved</th>
             <th>Saved By</th>
             <th className="right">Net Sales</th>
@@ -496,14 +568,17 @@ const SavedReportsList = ({ items, onView, onDelete }) => {
           {items.map(r => (
             <tr key={r.id}>
               <td><span className="dsr-period-chip">{PERIODS.find(p => p.id === r.period)?.label || r.period}</span></td>
-              <td>{r.periodLabel}</td>
-              <td className="dsr-small">{format(new Date(r.savedAt), 'MMM d, yyyy h:mm a')}</td>
-              <td className="dsr-small">{r.savedBy || '—'}</td>
+              <td>{r.period_label || r.periodLabel}</td>
+              <td className="dsr-small">{r.branch_name || r.branchName || '—'}</td>
+              <td className="dsr-small">{format(new Date(r.saved_at || r.savedAt), 'MMM d, yyyy h:mm a')}</td>
+              <td className="dsr-small">{r.saved_by_name || r.savedBy || '—'}</td>
               <td className="right">{peso(r.data?.netSales)}</td>
               <td className="right">{num(r.data?.totalClients)}</td>
               <td className="right">
                 <button className="dsr-link-btn" onClick={() => onView(r)}>View</button>
-                <button className="dsr-link-btn danger" onClick={() => onDelete(r.id)}>Delete</button>
+                {(r.saved_by_user_id === currentUser?.id || currentUser?.role === 'Owner') && (
+                  <button className="dsr-link-btn danger" onClick={() => onDelete(r.id)}>Delete</button>
+                )}
               </td>
             </tr>
           ))}

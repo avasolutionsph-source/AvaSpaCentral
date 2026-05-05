@@ -500,7 +500,11 @@ export async function restUpdateById(tableName, id, record) {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
+        // return=representation so we can detect 0-row PATCHes. With return=minimal,
+        // PostgREST returns 204 even when nothing matched the id filter, so the
+        // queue item is silently cleared and the next pull restores the server's
+        // pre-update value (the "service upgrade total doesn't update" symptom).
+        Prefer: 'return=representation',
       },
       body: JSON.stringify(record),
     },
@@ -509,6 +513,15 @@ export async function restUpdateById(tableName, id, record) {
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw makeRestError('update', tableName, res.status, body);
+  }
+  const rows = await res.json().catch(() => []);
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw makeRestError(
+      'update',
+      tableName,
+      404,
+      `No row matched id=${id} (RLS, missing row, or id mismatch). Local update will be retried.`,
+    );
   }
 }
 
@@ -524,7 +537,11 @@ export async function restSoftDeleteById(tableName, id) {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
+        // return=representation so we can detect 0-row PATCHes. With return=minimal,
+        // PostgREST happily returns 204 even when nothing matched the id filter,
+        // which silently completes the queue item and lets the next pull re-add
+        // the locally-deleted row (the "deleted expenses come back" bug).
+        Prefer: 'return=representation',
       },
       body: JSON.stringify({ deleted: true, updated_at: new Date().toISOString() }),
     },
@@ -533,5 +550,14 @@ export async function restSoftDeleteById(tableName, id) {
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw makeRestError('soft-delete', tableName, res.status, body);
+  }
+  const rows = await res.json().catch(() => []);
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw makeRestError(
+      'soft-delete',
+      tableName,
+      404,
+      `No row matched id=${id} (RLS, missing row, or id mismatch). Local delete will be retried.`,
+    );
   }
 }

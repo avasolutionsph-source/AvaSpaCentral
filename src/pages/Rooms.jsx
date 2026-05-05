@@ -457,7 +457,12 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       // primary key — getTransaction(id) would throw "not found" here,
       // which is the regression that silently dropped upgrades from
       // sales totals.
-      if (room.transactionId) {
+      let historyUpdateFailed = false;
+      let historyFailReason = null;
+      if (!room.transactionId) {
+        historyUpdateFailed = true;
+        historyFailReason = 'no receipt linked to room';
+      } else {
         try {
           const txn = await mockApi.transactions.getTransactionByReceiptNumber(room.transactionId);
           if (txn) {
@@ -494,14 +499,27 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             });
           } else {
             console.warn('[upgradeService] No transaction matched receipt', room.transactionId);
+            historyUpdateFailed = true;
+            historyFailReason = `receipt ${room.transactionId} not found`;
           }
         } catch (txErr) {
           console.warn('Could not update transaction:', txErr);
+          historyUpdateFailed = true;
+          historyFailReason = txErr?.message || 'update failed';
         }
       }
 
       setUpgradeModal({ isOpen: false, room: null });
-      showToast(`Service upgraded to: ${newServiceNames.join(', ')}`, 'success');
+      if (historyUpdateFailed) {
+        // Service-history sync didn't propagate. Tell the user explicitly so
+        // they don't think the new total reached reports/sales when it didn't.
+        showToast(
+          `Room upgraded, but service history not updated (${historyFailReason}).`,
+          'warning',
+        );
+      } else {
+        showToast(`Service upgraded to: ${newServiceNames.join(', ')}`, 'success');
+      }
       loadRooms();
     } catch (error) {
       showToast('Failed to upgrade service', 'error');

@@ -1630,24 +1630,15 @@ const Settings = () => {
       }
     };
 
-  // Data loaders. Re-runs when user.businessId becomes available — without
-  // this dep, the loaders would close over a null user (auth restores async)
-  // and silently skip the cloud seed, leaving the form on default values.
-  useEffect(() => {
-    loadSettings();
-    loadPayrollConfig();
-    loadSyncConfig();
-    loadParkedItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.businessId]);
-
   // Refs to the latest loader functions so the pull_complete handler (in the
   // mount-only useEffect below) always invokes the current closure rather
-  // than the stale one captured at mount when user was still null.
-  const loadSettingsRef = useRef(loadSettings);
-  const loadPayrollConfigRef = useRef(loadPayrollConfig);
+  // than the stale one captured at mount when user was still null. Both refs
+  // are initialised to null and re-assigned after their target functions
+  // have been declared (loadPayrollConfig is defined further down — reading
+  // it here directly would hit the temporal dead zone and crash the page).
+  const loadSettingsRef = useRef(null);
+  const loadPayrollConfigRef = useRef(null);
   loadSettingsRef.current = loadSettings;
-  loadPayrollConfigRef.current = loadPayrollConfig;
 
   // Detect any real user interaction with form controls. The ref gates the
   // post-pull auto-refresh below so live edits never get clobbered. We listen
@@ -1681,8 +1672,8 @@ const Settings = () => {
           // 30s have passed since mount, to avoid clobbering live edits.
           const sinceMount = Date.now() - mountedAtRef.current;
           if (status.type === 'pull_complete' && !userHasEditedRef.current && sinceMount < 30000) {
-            loadSettingsRef.current();
-            loadPayrollConfigRef.current();
+            loadSettingsRef.current?.();
+            loadPayrollConfigRef.current?.();
           }
         }, 1000);
       } else if (status.type === 'sync_error' || status.type === 'push_error' || status.type === 'pull_error') {
@@ -1809,6 +1800,22 @@ const Settings = () => {
       setPayrollConfigLoading(false);
     }
   };
+
+  // Now that loadPayrollConfig exists, point its ref at it. The effect
+  // below uses ref.current() so the latest closure is always used by the
+  // pull_complete handler that lives in the mount-only subscription effect.
+  loadPayrollConfigRef.current = loadPayrollConfig;
+
+  // Data loaders. Re-runs when user.businessId becomes available — without
+  // this dep, the loaders would close over a null user (auth restores async)
+  // and silently skip the cloud seed, leaving the form on default values.
+  useEffect(() => {
+    loadSettingsRef.current?.();
+    loadPayrollConfigRef.current?.();
+    loadSyncConfig();
+    loadParkedItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.businessId]);
 
   // Handle payroll rate toggle
   const handlePayrollRateToggle = (rateKey) => {
@@ -2449,8 +2456,27 @@ const Settings = () => {
                         </div>
 
                         {isConfigured && (
-                          <div style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#64748b' }}>
-                            <span>📍 {config.latitude.toFixed(6)}, {config.longitude.toFixed(6)}</span>
+                          <div style={{ marginBottom: '1rem' }}>
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${config.latitude},${config.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                fontSize: '0.9rem', color: '#1d4ed8', textDecoration: 'none',
+                                background: '#fff', border: '1px solid #cbd5e1',
+                                borderRadius: '6px', padding: '6px 10px', fontWeight: 500
+                              }}
+                              title="View this location on Google Maps"
+                            >
+                              📍 {config.latitude.toFixed(6)}, {config.longitude.toFixed(6)}
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>(View on map ↗)</span>
+                            </a>
+                            {config.radius ? (
+                              <span style={{ marginLeft: '8px', fontSize: '0.8rem', color: '#64748b' }}>
+                                Radius: {config.radius} m
+                              </span>
+                            ) : null}
                           </div>
                         )}
 

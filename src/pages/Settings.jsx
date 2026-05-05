@@ -68,6 +68,15 @@ const BRANCH_CONFIG_SECTIONS = [
 const Settings = () => {
   const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId, getEffectiveBranchId, selectedBranch } = useApp();
 
+  // Refs that gate auto-refresh of the form state when background sync
+  // completes. Without these, a user-edit-in-progress could be clobbered by
+  // the pull_complete handler.
+  //   - userHasEditedRef: flipped to true once any form input is touched
+  //   - mountedAtRef: when the page mounted, used to expire auto-refresh
+  //                   after 30s so we never refresh on stale long sessions
+  const userHasEditedRef = useRef(false);
+  const mountedAtRef = useRef(Date.now());
+
   // Tab state for switching between Settings and Activity Logs
   const [activeTab, setActiveTab] = useState('settings');
 
@@ -1469,9 +1478,11 @@ const Settings = () => {
     }));
   };
 
-  useEffect(() => {
-    // Load saved settings from Dexie
-    const loadSettings = async () => {
+  // Hoisted so we can re-run the cloud seed when user.businessId arrives
+  // asynchronously (after the page already mounted) and after a sync pull
+  // populates Dexie. Note: this never runs to write user data — it only
+  // mirrors saved cloud values into local Dexie + the form's React state.
+  const loadSettings = async () => {
       try {
         // Check for localStorage migration first
         const localStorageKeys = ['businessInfo', 'businessHours', 'taxSettings', 'theme', 'securitySettings', 'twoFactorEnabled'];
@@ -1619,18 +1630,40 @@ const Settings = () => {
       }
     };
 
+  // Data loaders. Re-runs when user.businessId becomes available — without
+  // this dep, the loaders would close over a null user (auth restores async)
+  // and silently skip the cloud seed, leaving the form on default values.
+  useEffect(() => {
     loadSettings();
-
-    // Load payroll configuration
     loadPayrollConfig();
-
-    // Load sync configuration
     loadSyncConfig();
-
-    // Load parked sync items
     loadParkedItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.businessId]);
 
-    // Subscribe to sync status changes (debounced to avoid re-renders while typing)
+  // Refs to the latest loader functions so the pull_complete handler (in the
+  // mount-only useEffect below) always invokes the current closure rather
+  // than the stale one captured at mount when user was still null.
+  const loadSettingsRef = useRef(loadSettings);
+  const loadPayrollConfigRef = useRef(loadPayrollConfig);
+  loadSettingsRef.current = loadSettings;
+  loadPayrollConfigRef.current = loadPayrollConfig;
+
+  // Detect any real user interaction with form controls. The ref gates the
+  // post-pull auto-refresh below so live edits never get clobbered. We listen
+  // at the document level so we don't have to wire each onChange individually.
+  useEffect(() => {
+    const handler = () => { userHasEditedRef.current = true; };
+    document.addEventListener('input', handler, true);
+    document.addEventListener('change', handler, true);
+    return () => {
+      document.removeEventListener('input', handler, true);
+      document.removeEventListener('change', handler, true);
+    };
+  }, []);
+
+  // Subscriptions only — set up once on mount, never re-run.
+  useEffect(() => {
     let syncDebounceTimer = null;
     const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
       if (status.type === 'sync_complete' || status.type === 'push_complete' || status.type === 'pull_complete') {
@@ -1639,6 +1672,18 @@ const Settings = () => {
           loadSyncStatus();
           loadParkedItems();
           setSyncOperation(null);
+
+          // After a sync pull completes, Dexie may have just received the
+          // freshly-pulled cloud values for keys that hadn't loaded yet
+          // (typical right after a cache-clear). Re-run the form loaders so
+          // the user sees their saved values instead of the defaults.
+          // Guard: skip if the user has already started editing OR more than
+          // 30s have passed since mount, to avoid clobbering live edits.
+          const sinceMount = Date.now() - mountedAtRef.current;
+          if (status.type === 'pull_complete' && !userHasEditedRef.current && sinceMount < 30000) {
+            loadSettingsRef.current();
+            loadPayrollConfigRef.current();
+          }
         }, 1000);
       } else if (status.type === 'sync_error' || status.type === 'push_error' || status.type === 'pull_error') {
         setSyncOperation(null);
@@ -1650,7 +1695,6 @@ const Settings = () => {
       }
     });
 
-    // Subscribe to network status changes (debounced)
     let networkDebounceTimer = null;
     const unsubscribeNetwork = NetworkDetector.subscribe((isOnline) => {
       clearTimeout(networkDebounceTimer);
@@ -1665,6 +1709,7 @@ const Settings = () => {
       clearTimeout(syncDebounceTimer);
       clearTimeout(networkDebounceTimer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-pull branch-scoped settings (contact, hours, tax, capacity, POS) whenever

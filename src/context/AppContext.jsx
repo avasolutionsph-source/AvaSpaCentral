@@ -85,7 +85,7 @@ const rolePermissions = {
             'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings'],
   'Manager': ['dashboard', 'pos', 'products', 'inventory', 'employees', 'customers', 'appointments', 'attendance',
               'payroll', 'rooms', 'service-history', 'gift-certificates', 'expenses', 'ai-chatbot', 'daet-insights', 'analytics', 'settings',
-              'my-schedule', 'shift-schedules', 'payroll-requests', 'calendar'],
+              'my-schedule', 'shift-schedules', 'payroll-requests', 'calendar', 'cash-drawer-history'],
   'Branch Owner': ['dashboard', 'pos', 'products', 'employees', 'customers', 'appointments', 'attendance', 'rooms',
                    'gift-certificates', 'expenses', 'payroll', 'my-schedule', 'shift-schedules', 'payroll-requests', 'cash-drawer-history',
                    'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings'],
@@ -94,6 +94,20 @@ const rolePermissions = {
   'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests'],
   'Rider': ['appointments', 'attendance', 'my-schedule', 'payroll-requests'],
   'Utility': ['attendance', 'my-schedule', 'payroll-requests']
+};
+
+// Action-level permissions (finer-grained than page access).
+// Use hasAction(key) in the UI to show/hide buttons. Repository methods can
+// double-check on the server side via activity logs.
+const actionPermissions = {
+  'drawer.open':              ['Owner', 'Branch Owner', 'Manager', 'Receptionist'],
+  'drawer.shift.start':       ['Owner', 'Branch Owner', 'Manager', 'Receptionist'],
+  'drawer.shift.end.own':     ['Owner', 'Branch Owner', 'Manager', 'Receptionist'],
+  'drawer.shift.end.any':     ['Owner', 'Branch Owner', 'Manager'],
+  'drawer.close':             ['Owner', 'Branch Owner', 'Manager', 'Receptionist'],
+  'drawer.variance.approve':  ['Owner', 'Branch Owner', 'Manager'],
+  'drawer.eod.signoff':       ['Owner', 'Branch Owner', 'Manager'],
+  'drawer.history.all':       ['Owner', 'Branch Owner', 'Manager'],
 };
 
 // First page redirect after login
@@ -457,6 +471,14 @@ export const AppProvider = ({ children }) => {
     return permissions.includes(page);
   };
 
+  // Check if user can perform a fine-grained action (see actionPermissions map).
+  const hasAction = (actionKey) => {
+    if (!user) return false;
+    const allowed = actionPermissions[actionKey];
+    if (!allowed) return false;
+    return allowed.includes(user.role);
+  };
+
   // Get allowed pages for current user
   const getAllowedPages = () => {
     if (!user) return [];
@@ -617,6 +639,7 @@ export const AppProvider = ({ children }) => {
     login,
     logout,
     hasPermission,
+    hasAction,
     getAllowedPages,
     getFirstPage,
     isOwner,

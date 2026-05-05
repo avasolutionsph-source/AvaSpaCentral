@@ -23,6 +23,7 @@ export { default as AttendanceRepository } from './AttendanceRepository';
 export { default as ActivityLogRepository } from './ActivityLogRepository';
 export { default as PayrollRequestRepository } from './PayrollRequestRepository';
 export { default as CashDrawerRepository } from './CashDrawerRepository';
+export { default as CashDrawerShiftRepository } from './CashDrawerShiftRepository';
 export { default as ShiftScheduleRepository } from './ShiftScheduleRepository';
 export { default as TimeOffRequestRepository } from './TimeOffRequestRepository';
 

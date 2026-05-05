@@ -21,6 +21,7 @@ import AttendanceRepository from './repositories/AttendanceRepository';
 import ActivityLogRepository from './repositories/ActivityLogRepository';
 import PayrollRequestRepository from './repositories/PayrollRequestRepository';
 import CashDrawerRepository from './repositories/CashDrawerRepository';
+import CashDrawerShiftRepository from './repositories/CashDrawerShiftRepository';
 import ShiftScheduleRepository from './repositories/ShiftScheduleRepository';
 import SettingsRepository from './repositories/SettingsRepository';
 import BusinessConfigRepository from './repositories/BusinessConfigRepository';
@@ -46,6 +47,7 @@ class StorageService {
     this.activityLogs = ActivityLogRepository;
     this.payrollRequests = PayrollRequestRepository;
     this.cashDrawerSessions = CashDrawerRepository;
+    this.cashDrawerShifts = CashDrawerShiftRepository;
     this.shiftSchedules = ShiftScheduleRepository;
     this.settings = SettingsRepository;
     this.businessConfig = BusinessConfigRepository;
@@ -205,6 +207,7 @@ export {
   ActivityLogRepository,
   PayrollRequestRepository,
   CashDrawerRepository,
+  CashDrawerShiftRepository,
   ShiftScheduleRepository,
   SettingsRepository,
   BusinessConfigRepository,

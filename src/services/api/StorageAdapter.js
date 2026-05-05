@@ -1588,6 +1588,51 @@ export const cashDrawerAdapter = {
     return clone(await storageService.cashDrawerSessions.getSessions(filters));
   },
 
+  // ===== New (preferred) drawer-day API =====
+
+  async openDrawer(input) {
+    await delay();
+    const result = await storageService.cashDrawerSessions.openDrawer(input);
+    return clone(result);
+  },
+
+  async closeDrawer(sessionId, input) {
+    await delay();
+    const session = await storageService.cashDrawerSessions.closeDrawer(sessionId, input);
+    return clone(session);
+  },
+
+  async getOpenDrawerForBranch(branchId) {
+    await delay();
+    const session = await storageService.cashDrawerSessions.getOpenDrawerForBranch(branchId);
+    return session ? clone(session) : null;
+  },
+
+  async startShift(input) {
+    await delay();
+    const shift = await storageService.cashDrawerShifts.startShift(input);
+    return clone(shift);
+  },
+
+  async endShift(shiftId, input) {
+    await delay();
+    const shift = await storageService.cashDrawerShifts.endShift(shiftId, input);
+    return clone(shift);
+  },
+
+  async getShiftsBySession(sessionId) {
+    await delay();
+    return clone(await storageService.cashDrawerShifts.getBySession(sessionId));
+  },
+
+  async getActiveShift(sessionId) {
+    await delay();
+    const shift = await storageService.cashDrawerShifts.getActiveBySession(sessionId);
+    return shift ? clone(shift) : null;
+  },
+
+  // ===== Legacy API (kept for back-compat; delegates to new methods) =====
+
   async createSession(data) {
     await delay();
     const session = await storageService.cashDrawerSessions.createSession(data);
@@ -1617,17 +1662,25 @@ export const cashDrawerAdapter = {
     return clone(await storageService.cashDrawerSessions.getByDate(dateString));
   },
 
+  /**
+   * Branch-scoped lookup of the active drawer for the current user's session.
+   * Falls back to legacy per-user open session if no branchId or branch lookup
+   * returns nothing — keeps existing notification banner working.
+   */
   async getCurrentDrawer() {
     await delay();
-    // Get the current user from localStorage
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
+    if (!user) return null;
 
-    if (!user) {
-      return null;
+    const branchStr = localStorage.getItem('selectedBranch');
+    const branch = branchStr ? JSON.parse(branchStr) : null;
+    const branchId = branch?.id || user.branchId || null;
+
+    if (branchId) {
+      const session = await storageService.cashDrawerSessions.getOpenDrawerForBranch(branchId);
+      if (session) return clone(session);
     }
-
-    // Get open session for current user
     const session = await storageService.cashDrawerSessions.getOpenSession(user._id);
     return session ? clone(session) : null;
   }

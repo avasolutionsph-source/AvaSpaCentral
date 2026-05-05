@@ -88,7 +88,7 @@ const SYNCABLE_ENTITIES = [
   // HR Requests
   'otRequests', 'leaveRequests', 'cashAdvanceRequests', 'incidentReports',
   // Financial
-  'cashDrawerSessions',
+  'cashDrawerSessions', 'cashDrawerShifts',
   // Settings & Config (no 'settings' — handled directly via businesses table)
   'businessConfig', 'serviceRotation',
   // Services & Bookings
@@ -108,6 +108,7 @@ const TABLE_NAME_MAP = {
   stockHistory: 'stock_history',
   productConsumption: 'product_consumption',
   cashDrawerSessions: 'cash_drawer_sessions',
+  cashDrawerShifts: 'cash_drawer_shifts',
   payrollConfig: 'payroll_config',
   payrollConfigLogs: 'payroll_config_logs',
   businessConfig: 'business_config',
@@ -179,6 +180,7 @@ const SUPABASE_TABLE_COLUMNS = {
     'card_transaction_id', 'gcash_reference', 'booking_source',
     'room_id', 'room_name', 'is_home_service', 'home_service_address',
     'employee', 'customer', 'upgrade_history',
+    'cashier_id', 'cashier_name', 'shift_id', 'drawer_session_id',
     'branch_id', 'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   appointments: [
@@ -280,9 +282,20 @@ const SUPABASE_TABLE_COLUMNS = {
 
   // === Financial ===
   cash_drawer_sessions: [
-    'id', 'business_id', 'user_id', 'open_time', 'close_time',
-    'opening_balance', 'closing_balance', 'expected_balance', 'difference',
+    'id', 'business_id', 'user_id', 'user_name', 'user_role',
+    'opened_by', 'opened_by_name', 'closed_by', 'closed_by_name',
+    'open_date', 'open_time', 'close_time',
+    'opening_balance', 'opening_float', 'closing_balance',
+    'expected_balance', 'expected_cash', 'actual_cash',
+    'difference', 'variance',
     'status', 'transactions', 'notes', 'branch_id',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+  cash_drawer_shifts: [
+    'id', 'business_id', 'session_id', 'branch_id',
+    'user_id', 'user_name', 'user_role',
+    'start_time', 'end_time', 'start_count', 'end_count',
+    'cash_sales', 'variance', 'status', 'notes',
     'sync_status', 'created_at', 'updated_at'
   ],
 
@@ -362,9 +375,25 @@ const FIELD_NAME_MAP = {
   expectedDate: 'expected_date',
   openTime: 'open_time',
   closeTime: 'close_time',
+  openDate: 'open_date',
   openingBalance: 'opening_balance',
+  openingFloat: 'opening_float',
   closingBalance: 'closing_balance',
   expectedBalance: 'expected_balance',
+  expectedCash: 'expected_cash',
+  actualCash: 'actual_cash',
+  openedBy: 'opened_by',
+  openedByName: 'opened_by_name',
+  closedBy: 'closed_by',
+  closedByName: 'closed_by_name',
+  cashierId: 'cashier_id',
+  cashierName: 'cashier_name',
+  shiftId: 'shift_id',
+  drawerSessionId: 'drawer_session_id',
+  sessionId: 'session_id',
+  startCount: 'start_count',
+  endCount: 'end_count',
+  cashSales: 'cash_sales',
   recipientName: 'recipient_name',
   recipientEmail: 'recipient_email',
   purchaserName: 'purchaser_name',

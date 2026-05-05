@@ -186,6 +186,22 @@ interface IncidentReport extends BaseEntity {
   createdAt: string;
 }
 
+interface CashDrawerShift extends BaseEntity {
+  sessionId: string;
+  branchId?: string;
+  userId: string;
+  userName?: string;
+  userRole?: string;
+  startTime: string;
+  endTime?: string;
+  startCount: number;
+  endCount?: number;
+  cashSales?: number;
+  variance?: number;
+  status: 'active' | 'ended';
+  notes?: string;
+}
+
 // Database class with typed tables
 class SpaDatabase extends Dexie {
   // Core business
@@ -214,6 +230,7 @@ class SpaDatabase extends Dexie {
   // Financial
   expenses!: Table<Expense, string>;
   cashDrawerSessions!: Table<CashDrawerSession, string>;
+  cashDrawerShifts!: Table<CashDrawerShift, string>;
   giftCertificates!: Table<GiftCertificate, string>;
 
   // HR
@@ -377,6 +394,24 @@ class SpaDatabase extends Dexie {
         description: 'Fixed userId index typo (oduserId -> userId) on cashDrawerSessions',
       });
     });
+
+    // Version 14: Multi-cashier drawer model.
+    // - Drawer is now keyed by branch (one open drawer per branch per business day).
+    // - Add cashDrawerShifts table for per-cashier shifts within a drawer day.
+    // - Index branchId + openDate on sessions for cross-device branch-scoped lookups.
+    // - Index cashierId + shiftId on transactions so reports can break down by who rang it up.
+    this.version(14).stores({
+      cashDrawerSessions: '_id, userId, status, openTime, businessId, branchId, openDate',
+      cashDrawerShifts: '_id, sessionId, userId, status, startTime, businessId, branchId',
+      transactions: '_id, date, status, employeeId, customerId, businessId, cashierId, shiftId',
+    }).upgrade(async (tx) => {
+      console.log('[Dexie] Upgrading to version 14: branch-scoped drawer + per-cashier shifts');
+      await tx.table('migrationLog').add({
+        version: 14,
+        timestamp: new Date().toISOString(),
+        description: 'Added cashDrawerShifts table; indexed branchId/openDate on cashDrawerSessions; indexed cashierId/shiftId on transactions',
+      });
+    });
   }
 }
 
@@ -412,6 +447,7 @@ export const {
   stockHistory,
   expenses,
   cashDrawerSessions,
+  cashDrawerShifts,
   giftCertificates,
   attendance,
   shiftSchedules,

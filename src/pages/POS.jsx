@@ -154,20 +154,26 @@ const POS = () => {
 
         if (!isMounted) return;
 
-        // Filter by branch if needed
         const effectiveBranchId = getEffectiveBranchId();
         let queue = result.queue || [];
+
+        // Therapists-only — never include receptionists / utility / other staff
+        // who happen to have clocked in.
+        const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
+        const therapistIds = new Set(getTherapists(allEmployees).map(e => String(e._id || e.id)));
+        queue = queue.filter(q => therapistIds.has(String(q.employeeId)));
+
         if (effectiveBranchId) {
-          // Get employee branch mapping
-          const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
-          const branchEmpIds = new Set(allEmployees.filter(e => e.branchId === effectiveBranchId).map(e => String(e._id || e.id)));
-          queue = queue.filter(q => branchEmpIds.has(q.employeeId));
-          // Re-number queue positions
-          queue.forEach((q, i) => { q.queuePosition = i + 1; });
+          const branchEmpIds = new Set(
+            allEmployees.filter(e => e.branchId === effectiveBranchId).map(e => String(e._id || e.id))
+          );
+          queue = queue.filter(q => branchEmpIds.has(String(q.employeeId)));
         }
 
+        queue.forEach((q, i) => { q.queuePosition = i + 1; q.isNext = i === 0; });
+
         setRotationQueue(queue);
-        setNextEmployee(result.nextEmployee || queue[0] || null);
+        setNextEmployee(queue[0] || null);
       } catch (error) {
         console.error('[POS] Failed to load rotation queue:', error);
       }
@@ -271,18 +277,28 @@ const POS = () => {
     try {
       const result = await mockApi.serviceRotation.getRotationQueue();
 
-      // Filter by branch if needed
       const effectiveBranchId = getEffectiveBranchId();
       let queue = result.queue || [];
+
+      // Filter to therapists only — receptionists / utility / other clocked-in
+      // staff should never appear in the service rotation queue. Also apply
+      // the branch scope. Single employees fetch covers both filters.
+      const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
+      const therapistIds = new Set(getTherapists(allEmployees).map(e => String(e._id || e.id)));
+      queue = queue.filter(q => therapistIds.has(String(q.employeeId)));
+
       if (effectiveBranchId) {
-        const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
-        const branchEmpIds = new Set(allEmployees.filter(e => e.branchId === effectiveBranchId).map(e => String(e._id || e.id)));
-        queue = queue.filter(q => branchEmpIds.has(q.employeeId));
-        queue.forEach((q, i) => { q.queuePosition = i + 1; });
+        const branchEmpIds = new Set(
+          allEmployees.filter(e => e.branchId === effectiveBranchId).map(e => String(e._id || e.id))
+        );
+        queue = queue.filter(q => branchEmpIds.has(String(q.employeeId)));
       }
 
+      // Re-number positions after filtering so #1, #2, #3 stay sequential.
+      queue.forEach((q, i) => { q.queuePosition = i + 1; q.isNext = i === 0; });
+
       setRotationQueue(queue);
-      setNextEmployee(result.nextEmployee || queue[0] || null);
+      setNextEmployee(queue[0] || null);
 
       if (!selectedEmployee && queue[0]) {
         setSelectedEmployee(queue[0].employeeId);

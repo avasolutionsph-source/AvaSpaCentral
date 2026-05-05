@@ -326,14 +326,42 @@ const Settings = () => {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsSaving, setGpsSaving] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(null); // branchId being located
+  // True once the user changes any GPS field after the last load. Prevents
+  // a tab-switch reload from overwriting unsaved edits with cloud state.
+  const gpsDirtyRef = useRef(false);
 
   const loadGpsConfig = async () => {
     setGpsLoading(true);
     try {
-      // Load GPS config from SettingsRepository
+      // 1) Local Dexie first — instant, offline-ready, last-known-good.
       const saved = await SettingsRepository.get('gpsConfig');
       if (saved) {
         setGpsConfig(saved);
+      }
+
+      // 2) Cloud is source of truth for cross-device. Pull the businessId-wide
+      // gpsConfig row from the settings table and merge it on top of local.
+      // Skip the override when the user has unsaved edits so we don't wipe
+      // their work just because they tab-switched.
+      if (user?.businessId && !gpsDirtyRef.current) {
+        try {
+          const cloud = await getSettingsByKeys(user.businessId, ['gpsConfig']);
+          if (cloud?.gpsConfig) {
+            // Merge per-branch — cloud values are authoritative for branches
+            // present there, and any local-only branches (e.g. branch added
+            // on this device but not yet synced) survive.
+            const localBranches = saved?.branches || {};
+            const cloudBranches = cloud.gpsConfig.branches || {};
+            const merged = {
+              ...cloud.gpsConfig,
+              branches: { ...localBranches, ...cloudBranches },
+            };
+            setGpsConfig(merged);
+            await SettingsRepository.set('gpsConfig', merged);
+          }
+        } catch (cloudErr) {
+          console.warn('[Settings] GPS cloud load failed:', cloudErr?.message);
+        }
       }
 
       // Load branches from Supabase
@@ -401,6 +429,7 @@ const Settings = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
+        gpsDirtyRef.current = true;
         setGpsConfig(prev => ({
           ...prev,
           branches: {
@@ -414,7 +443,7 @@ const Settings = () => {
             }
           }
         }));
-        showToast(`Location set for ${branchName}: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, 'success');
+        showToast(`Location set for ${branchName}: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}. Click Save to sync.`, 'success');
         setGettingLocation(null);
       },
       (error) => {
@@ -432,6 +461,7 @@ const Settings = () => {
 
   const handleRadiusChange = (branchId, radius) => {
     const clampedRadius = Math.min(1000, Math.max(50, radius));
+    gpsDirtyRef.current = true;
     setGpsConfig(prev => ({
       ...prev,
       branches: {
@@ -456,8 +486,49 @@ const Settings = () => {
     }
     setGpsSaving(true);
     try {
-      await SettingsRepository.set('gpsConfig', gpsConfig);
-      showToast('GPS settings saved successfully!', 'success');
+      // Merge with the current cloud blob before writing so a Branch Owner
+      // editing only their own branch can't accidentally clobber other
+      // branches' GPS data they may not have in their visible list. Cloud
+      // is the union of everyone's saved values.
+      let payload = gpsConfig;
+      if (user?.businessId) {
+        try {
+          const cloud = await getSettingsByKeys(user.businessId, ['gpsConfig']);
+          const cloudBranches = cloud?.gpsConfig?.branches || {};
+          payload = {
+            ...gpsConfig,
+            branches: { ...cloudBranches, ...(gpsConfig.branches || {}) },
+          };
+        } catch {
+          // If the merge-fetch fails, fall through and upsert what we have.
+          // Worst case: user has to re-save on the device that owns the lost row.
+        }
+      }
+
+      // Local Dexie save (instant, offline-ready)
+      await SettingsRepository.set('gpsConfig', payload);
+      setGpsConfig(payload);
+
+      // Cross-device: push to Supabase settings table via raw REST upsert.
+      // upsertSettings hits supabase.rest directly to avoid the supabase-js
+      // write-hang. business-wide row (branchId omitted).
+      let cloudOk = false;
+      if (user?.businessId) {
+        try {
+          await upsertSettings(user.businessId, { gpsConfig: payload });
+          cloudOk = true;
+        } catch (cloudErr) {
+          console.warn('[Settings] GPS cloud sync failed:', cloudErr?.message);
+        }
+      }
+
+      gpsDirtyRef.current = false;
+      showToast(
+        cloudOk
+          ? 'GPS settings saved and synced across devices!'
+          : 'GPS settings saved locally — cloud sync failed, will retry next time you save.',
+        cloudOk ? 'success' : 'warning'
+      );
     } catch (err) {
       console.error('Failed to save GPS config:', err);
       showToast('Failed to save GPS settings. Please try again.', 'error');

@@ -27,6 +27,11 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   // Date selection for viewing attendance
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const isViewingToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
+  // Yesterday's date string. Used to allow late clock-out for overnight
+  // shifts that started yesterday — the underlying API already accepts
+  // "today or yesterday's open record", we just need the UI to expose it.
+  const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+  const isViewingYesterday = selectedDate === yesterdayStr;
 
   // Quick clock form
   const [quickEmployeeId, setQuickEmployeeId] = useState('');
@@ -597,7 +602,10 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                   type="button"
                   className="attendance-dashboard-btn clock-out"
                   onClick={() => handleQuickClock('out')}
-                  disabled={!isViewingToday}
+                  // Allow clock-out from today OR yesterday so an overnight
+                  // shift (e.g. 8 PM–4 AM) can still close from yesterday's
+                  // view. The API closes whichever date has the open record.
+                  disabled={!isViewingToday && !isViewingYesterday}
                 >
                   Clock-Out
                 </button>
@@ -858,9 +866,11 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                   </td>
                   {hasManagementAccess() && (
                     <td>
-                      {!isViewingToday ? (
-                        <span className="text-sm text-gray-500">-</span>
-                      ) : !record?.clockIn ? (
+                      {/* Clock In is only allowed for today. Clock Out is
+                          allowed for today AND yesterday (so overnight
+                          shifts that span past midnight can still close
+                          properly). Older dates remain read-only. */}
+                      {isViewingToday && !record?.clockIn ? (
                         <button
                           className="btn btn-xs btn-success"
                           onClick={() => handleQuickClock('in')}
@@ -868,16 +878,19 @@ const Attendance = ({ embedded = false, onDataChange }) => {
                         >
                           Clock In
                         </button>
-                      ) : !record?.clockOut ? (
+                      ) : (isViewingToday || isViewingYesterday) && record?.clockIn && !record?.clockOut ? (
                         <button
                           className="btn btn-xs btn-primary"
                           onClick={() => handleQuickClock('out')}
                           onMouseDown={() => setQuickEmployeeId(employee._id)}
+                          title={isViewingYesterday ? 'Late clock-out for yesterday\'s shift' : 'Clock out'}
                         >
-                          Clock Out
+                          {isViewingYesterday ? 'Clock Out (late)' : 'Clock Out'}
                         </button>
-                      ) : (
+                      ) : record?.clockIn && record?.clockOut ? (
                         <span className="text-sm text-gray-500">Complete</span>
+                      ) : (
+                        <span className="text-sm text-gray-500">-</span>
                       )}
                     </td>
                   )}

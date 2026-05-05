@@ -829,6 +829,20 @@ const POS = () => {
           return sum + commission;
         }, 0);
 
+        // Resolve active drawer + shift for this branch so the transaction is
+        // tagged with who rang it up. Branch-scoped lookup (not per-user) so
+        // any device at the same branch sees the same drawer/shift.
+        let drawerSession = null;
+        let drawerShift = null;
+        try {
+          drawerSession = await mockApi.cashDrawer.getOpenDrawerForBranch(checkoutBranchId);
+          if (drawerSession) {
+            drawerShift = await mockApi.cashDrawer.getActiveShift(drawerSession._id);
+          }
+        } catch (err) {
+          console.warn('[POS] could not resolve active drawer/shift:', err);
+        }
+
         // Build transaction
         const transaction = {
           businessId: user?.businessId,
@@ -887,7 +901,10 @@ const POS = () => {
           homeServiceAddress: isHomeService ? homeServiceAddress : null,
           homeServiceFee: isHomeService ? (parseFloat(homeServiceFee) || 0) : 0,
           cashier: user?.name || 'Staff',
-          cashierId: user?._id || null
+          cashierId: user?._id || null,
+          cashierName: user?.name || null,
+          shiftId: drawerShift?._id || null,
+          drawerSessionId: drawerSession?._id || null
         };
 
         // QRPh: save as pending, mint intent, hand off to QRPaymentModal.
@@ -939,18 +956,20 @@ const POS = () => {
         // Save transaction
         await mockApi.transactions.createTransaction(transaction);
 
-        // Add to open cash drawer if payment is cash
-        if (transaction.paymentMethod === 'Cash') {
+        // Add to open cash drawer if payment is cash. Drawer is branch-scoped:
+        // any cashier at the same branch logs to the same drawer day, tagged
+        // with the active shift for per-cashier reporting.
+        if (transaction.paymentMethod === 'Cash' && drawerSession) {
           try {
-            const openSession = await mockApi.cashDrawer.getOpenSession(user._id);
-            if (openSession) {
-              await mockApi.cashDrawer.addTransaction(openSession._id, {
-                type: 'Sale',
-                amount: transaction.totalAmount,
-                method: 'Cash',
-                description: transaction.receiptNumber
-              });
-            }
+            await mockApi.cashDrawer.addTransaction(drawerSession._id, {
+              type: 'Sale',
+              amount: transaction.totalAmount,
+              method: 'Cash',
+              description: transaction.receiptNumber,
+              cashierId: user?._id || null,
+              cashierName: user?.name || null,
+              shiftId: drawerShift?._id || null
+            });
           } catch (err) {
             console.warn('Cash drawer transaction logging failed:', err);
           }

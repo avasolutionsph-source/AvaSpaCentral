@@ -423,8 +423,8 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       const products = await mockApi.products.getProducts();
       // Scope to the room's own branch — multi-branch tenants have the same
       // service name (e.g. "Signature Massage") seeded in every branch as
-      // separate product rows, so a name-only preselect would match all of
-      // them and end up duplicating the service in the upgraded list.
+      // separate product rows, so a name-only match would otherwise hit all
+      // of them at once.
       const services = products.filter(
         (p) =>
           p.type === 'service' &&
@@ -432,21 +432,14 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
           (!room.branchId || !p.branchId || p.branchId === room.branchId),
       );
       setAvailableServices(services);
-      // Pre-select current services. Match each name to AT MOST ONE service
-      // to keep the selection list aligned with the actual count of services
-      // running in this room.
-      const currentNames = room.serviceNames || [];
-      const preSelected = [];
-      const seen = new Set();
-      for (const name of currentNames) {
-        if (seen.has(name)) continue;
-        const match = services.find((s) => s.name === name);
-        if (match) {
-          preSelected.push(match);
-          seen.add(name);
-        }
-      }
-      setSelectedUpgradeServices(preSelected);
+      // Start with NO services pre-selected. "Upgrade" replaces the receipt's
+      // services with whatever the user picks here — pre-selecting the
+      // existing one and then ticking another caused the price to be added on
+      // top instead of swapped (199 → 350 ended up at 549 because Signature
+      // Massage stayed selected). The current services are still shown above
+      // the picker as context so the user knows what's running before they
+      // confirm.
+      setSelectedUpgradeServices([]);
       setUpgradeDuration(room.serviceDuration || 60);
       setUpgradeModal({ isOpen: true, room });
     } catch (error) {
@@ -1377,8 +1370,25 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             </div>
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               <p style={{ marginBottom: '12px', color: '#666', fontSize: '0.9rem' }}>
-                Select the new service(s). The timer will keep running.
+                Pick the new service(s) — they will replace what's running. The timer keeps going.
               </p>
+
+              {(upgradeModal.room?.serviceNames || []).length > 0 && (
+                <div
+                  style={{
+                    marginBottom: '12px',
+                    padding: '8px 12px',
+                    background: '#fef3c7',
+                    border: '1px solid #fcd34d',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    color: '#78350f',
+                  }}
+                >
+                  <strong>Currently:</strong>{' '}
+                  {(upgradeModal.room.serviceNames || []).join(', ')}
+                </div>
+              )}
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>Select Services</label>

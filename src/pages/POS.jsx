@@ -1563,18 +1563,63 @@ const POS = () => {
                   <option value="">Select room or location...</option>
                   <option value="home">Home Service</option>
                   {rooms
-                    .filter(room => room.status === 'available')
-                    .map(room => (
-                      <option key={room._id} value={room._id}>
-                        {room.name} - {room.type}
-                      </option>
-                    ))}
+                    .slice()
+                    .sort((a, b) => {
+                      // Available first, then in-use, then maintenance — keeps the
+                      // "free right now" rooms at the top of the list while still
+                      // letting the cashier pick a busy room (e.g. queueing the
+                      // next customer) without having to leave the POS flow.
+                      const order = { available: 0, pending: 1, occupied: 2, maintenance: 3 };
+                      return (order[a.status] ?? 9) - (order[b.status] ?? 9);
+                    })
+                    .map(room => {
+                      const inUse = room.status === 'occupied' || room.status === 'pending';
+                      const maint = room.status === 'maintenance';
+                      const label =
+                        room.status === 'occupied'
+                          ? ' (in use)'
+                          : room.status === 'pending'
+                            ? ' (waiting to start)'
+                            : maint
+                              ? ' (maintenance)'
+                              : '';
+                      return (
+                        <option
+                          key={room._id}
+                          value={room._id}
+                          style={{
+                            backgroundColor: inUse ? '#fef3c7' : maint ? '#e5e7eb' : undefined,
+                            color: inUse ? '#92400e' : maint ? '#6b7280' : undefined,
+                          }}
+                        >
+                          {room.name} - {room.type}{label}
+                        </option>
+                      );
+                    })}
                 </select>
-                {selectedRoom && !isHomeService && (
-                  <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--gray-600)' }}>
-                    📍 {rooms.find(r => r._id === selectedRoom)?.name}
-                  </p>
-                )}
+                {selectedRoom && !isHomeService && (() => {
+                  const r = rooms.find(rm => rm._id === selectedRoom);
+                  if (!r) return null;
+                  const inUse = r.status === 'occupied' || r.status === 'pending';
+                  const maint = r.status === 'maintenance';
+                  return (
+                    <>
+                      <p style={{ marginTop: 'var(--spacing-sm)', fontSize: '0.85rem', color: 'var(--gray-600)' }}>
+                        📍 {r.name}
+                      </p>
+                      {inUse && (
+                        <p style={{ marginTop: '4px', fontSize: '0.8rem', color: '#92400e', background: '#fef3c7', padding: '6px 10px', borderRadius: '6px' }}>
+                          ⚠️ This room is currently {r.status === 'occupied' ? `in use${r.assignedEmployeeName ? ` by ${r.assignedEmployeeName}` : ''}` : 'pending start'}. Proceeding will replace its current booking — make sure the existing service is finished or stopped first.
+                        </p>
+                      )}
+                      {maint && (
+                        <p style={{ marginTop: '4px', fontSize: '0.8rem', color: '#374151', background: '#e5e7eb', padding: '6px 10px', borderRadius: '6px' }}>
+                          🛠 This room is under maintenance.
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
                 {isHomeService && (
                   <>
                     <div className="form-group" style={{ marginTop: 'var(--spacing-md)' }}>

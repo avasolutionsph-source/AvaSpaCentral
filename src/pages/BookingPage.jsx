@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
 import { getCustomerSession, logoutCustomer } from '../services/customerAuthService';
-import { applyColorTheme } from '../services/brandingService';
+import { applyColorTheme, getSettingsByKeys } from '../services/brandingService';
 import QRPaymentModal from '../components/QRPaymentModal';
 import { createPaymentIntent } from '../services/payments';
+import { geocodeAddress, haversineKm, transportFeeForDistance } from '../utils/geocoding';
 import '../assets/css/booking.css';
 
 // Available hero fonts for booking page
@@ -157,6 +158,14 @@ const BookingPage = () => {
   const [serviceCity, setServiceCity] = useState('');
   const [serviceLandmark, setServiceLandmark] = useState('');
   const [serviceInstructions, setServiceInstructions] = useState('');
+
+  // Distance-based transport fee (home/hotel service).
+  // gpsConfig.branches[branchId] holds the spa's lat/lng. We geocode the
+  // client's typed address, compute km via haversine, then map km to a tier.
+  const [branchGpsConfig, setBranchGpsConfig] = useState(null);
+  const [distanceKm, setDistanceKm] = useState(null);
+  const [distanceLoading, setDistanceLoading] = useState(false);
+  const [distanceError, setDistanceError] = useState(null);
 
   // Services & therapists from Supabase (allX = unfiltered, X = branch-filtered)
   const [allServices, setAllServices] = useState([]);
@@ -724,17 +733,103 @@ const BookingPage = () => {
     return filtered;
   }, [services, selectedCategory, searchTerm, sortBy]);
 
-  // Calculate transport fee based on service location
+  // Pull the branch GPS config (saved per-branch lat/lng + radius from
+  // Settings → GPS) so we can compute distance-based transport fees.
+  // Cross-device source of truth is Supabase; this just reads the same
+  // settings row that the GPS settings page upserts to.
+  useEffect(() => {
+    let cancelled = false;
+    const businessId = (selectedBranch && (selectedBranch.business_id || selectedBranch.businessId))
+      || business?.id
+      || null;
+    if (!businessId) {
+      setBranchGpsConfig(null);
+      return () => { cancelled = true; };
+    }
+    (async () => {
+      try {
+        const cloud = await getSettingsByKeys(businessId, ['gpsConfig']);
+        if (!cancelled) setBranchGpsConfig(cloud?.gpsConfig || null);
+      } catch {
+        if (!cancelled) setBranchGpsConfig(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedBranch?.id, business?.id]);
+
+  // Resolve the spa branch's saved coordinates. Returns null when GPS isn't
+  // configured for this branch — the fee falls back to the branch's static
+  // home/hotel fee in that case.
+  const branchPin = useMemo(() => {
+    if (!branchGpsConfig?.branches || !selectedBranch?.id) return null;
+    const cfg = branchGpsConfig.branches[selectedBranch.id];
+    if (!cfg || !Number.isFinite(cfg.latitude) || !Number.isFinite(cfg.longitude)) return null;
+    return { lat: cfg.latitude, lng: cfg.longitude };
+  }, [branchGpsConfig, selectedBranch?.id]);
+
+  // Geocode the client's address (debounced) and compute km from the spa.
+  // Only fires for home_service / hotel_service. Skips when the spa has no
+  // GPS pin or the address is too short to be meaningful.
+  useEffect(() => {
+    if (serviceLocation !== 'home_service' && serviceLocation !== 'hotel_service') {
+      setDistanceKm(null);
+      setDistanceError(null);
+      return;
+    }
+    if (!branchPin) {
+      setDistanceKm(null);
+      setDistanceError(null);
+      return;
+    }
+    const fullAddress = serviceLocation === 'home_service'
+      ? [serviceAddress, serviceCity].filter(Boolean).join(', ')
+      : [serviceAddress, serviceCity].filter(Boolean).join(' ');
+    if (!fullAddress || fullAddress.trim().length < 6) {
+      setDistanceKm(null);
+      setDistanceError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setDistanceLoading(true);
+    setDistanceError(null);
+    // Debounce 1.2s so we don't hit Nominatim on every keystroke
+    const handle = setTimeout(async () => {
+      const point = await geocodeAddress(fullAddress);
+      if (cancelled) return;
+      setDistanceLoading(false);
+      if (!point) {
+        setDistanceKm(null);
+        setDistanceError("Couldn't find that address on the map. We'll use the base fee — please double-check.");
+        return;
+      }
+      const km = haversineKm(branchPin.lat, branchPin.lng, point.lat, point.lng);
+      setDistanceKm(km);
+    }, 1200);
+
+    return () => { cancelled = true; clearTimeout(handle); };
+  }, [serviceLocation, serviceAddress, serviceCity, branchPin]);
+
+  // Distance-tier fee. Falls back to the branch's static fee when we don't
+  // have a distance (no GPS pin, no address typed yet, geocode failed).
+  const distanceFee = useMemo(() => {
+    if (!Number.isFinite(distanceKm)) return null;
+    return transportFeeForDistance(distanceKm);
+  }, [distanceKm]);
+
+  // Calculate transport fee based on service location.
+  // Preference order:
+  //   1) distance-based tier (when we have a working geocode + branch pin)
+  //   2) branch's static home_service_fee / hotel_service_fee
+  //   3) zero (in-store)
   const transportFee = useMemo(() => {
     if (!selectedBranch) return 0;
-    if (serviceLocation === 'home_service') {
-      return selectedBranch.home_service_fee || 0;
-    }
-    if (serviceLocation === 'hotel_service') {
-      return selectedBranch.hotel_service_fee || 0;
-    }
+    if (serviceLocation !== 'home_service' && serviceLocation !== 'hotel_service') return 0;
+    if (distanceFee && distanceFee.withinRange) return distanceFee.fee;
+    if (serviceLocation === 'home_service') return selectedBranch.home_service_fee || 0;
+    if (serviceLocation === 'hotel_service') return selectedBranch.hotel_service_fee || 0;
     return 0;
-  }, [selectedBranch, serviceLocation]);
+  }, [selectedBranch, serviceLocation, distanceFee]);
 
   // Calculate totals
   const servicesTotal = useMemo(() => {
@@ -819,6 +914,17 @@ const BookingPage = () => {
         alert('Please enter the room number.');
         return;
       }
+    }
+
+    // Block bookings outside the 9 km service area when distance was
+    // successfully computed. If we couldn't geocode (distanceFee is null
+    // and there's a non-fatal distanceError), fall through and let the
+    // branch handle it manually — better than blocking valid bookings on
+    // a flaky geocoder.
+    if ((serviceLocation === 'home_service' || serviceLocation === 'hotel_service')
+        && distanceFee && !distanceFee.withinRange) {
+      alert('Sorry, that address is outside our 9 km service area. Please pick Spa Service or contact the branch.');
+      return;
     }
 
     // Re-check capacity before submitting
@@ -2105,6 +2211,39 @@ const BookingPage = () => {
                     onChange={(e) => setServiceCity(e.target.value)}
                   />
                 </div>
+                {/* Distance + tier feedback. Only shown when we have a branch
+                    pin AND the user typed something resolvable. */}
+                {branchPin && (
+                  <div style={{
+                    marginTop: '0.25rem', marginBottom: '0.75rem',
+                    padding: '10px 12px', borderRadius: '8px',
+                    background: distanceFee && !distanceFee.withinRange ? '#fef2f2'
+                              : distanceFee ? '#f0fdf4'
+                              : '#f8fafc',
+                    border: '1px solid ' + (distanceFee && !distanceFee.withinRange ? '#fecaca'
+                              : distanceFee ? '#bbf7d0'
+                              : '#e2e8f0'),
+                    fontSize: '0.85rem'
+                  }}>
+                    {distanceLoading && <span style={{ color: '#64748b' }}>📍 Computing distance from spa…</span>}
+                    {!distanceLoading && distanceError && (
+                      <span style={{ color: '#92400e' }}>⚠ {distanceError}</span>
+                    )}
+                    {!distanceLoading && distanceFee && distanceFee.withinRange && (
+                      <span style={{ color: '#166534' }}>
+                        📍 {distanceKm.toFixed(1)} km from spa · Tier {distanceFee.tier} ·
+                        {' '}
+                        <strong>Transport fee ₱{distanceFee.fee.toLocaleString()}</strong>
+                      </span>
+                    )}
+                    {!distanceLoading && distanceFee && !distanceFee.withinRange && (
+                      <span style={{ color: '#991b1b' }}>
+                        🚫 {distanceKm.toFixed(1)} km away — outside our 9 km service area.
+                        Please pick Spa Service or contact the branch.
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Landmark <span className="optional">(Optional)</span></label>
                   <input
@@ -2147,6 +2286,37 @@ const BookingPage = () => {
                     required
                   />
                 </div>
+                {/* Distance + tier feedback for hotel addresses. */}
+                {branchPin && (
+                  <div style={{
+                    marginTop: '0.25rem', marginBottom: '0.75rem',
+                    padding: '10px 12px', borderRadius: '8px',
+                    background: distanceFee && !distanceFee.withinRange ? '#fef2f2'
+                              : distanceFee ? '#f0fdf4'
+                              : '#f8fafc',
+                    border: '1px solid ' + (distanceFee && !distanceFee.withinRange ? '#fecaca'
+                              : distanceFee ? '#bbf7d0'
+                              : '#e2e8f0'),
+                    fontSize: '0.85rem'
+                  }}>
+                    {distanceLoading && <span style={{ color: '#64748b' }}>📍 Computing distance from spa…</span>}
+                    {!distanceLoading && distanceError && (
+                      <span style={{ color: '#92400e' }}>⚠ {distanceError}</span>
+                    )}
+                    {!distanceLoading && distanceFee && distanceFee.withinRange && (
+                      <span style={{ color: '#166534' }}>
+                        📍 {distanceKm.toFixed(1)} km from spa · Tier {distanceFee.tier} ·
+                        {' '}
+                        <strong>Transport fee ₱{distanceFee.fee.toLocaleString()}</strong>
+                      </span>
+                    )}
+                    {!distanceLoading && distanceFee && !distanceFee.withinRange && (
+                      <span style={{ color: '#991b1b' }}>
+                        🚫 {distanceKm.toFixed(1)} km away — outside our 9 km service area.
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="form-group">
                   <label>Special Instructions <span className="optional">(Optional)</span></label>
                   <textarea
@@ -2354,7 +2524,14 @@ const BookingPage = () => {
                     </div>
                     {transportFee > 0 && (
                       <div className="luxe-total-row">
-                        <span>{serviceLocation === 'home_service' ? 'Home Service Fee' : 'Hotel Service Fee'}</span>
+                        <span>
+                          {serviceLocation === 'home_service' ? 'Home Service Fee' : 'Hotel Service Fee'}
+                          {distanceFee?.withinRange && Number.isFinite(distanceKm) && (
+                            <span style={{ marginLeft: '6px', fontSize: '0.78rem', color: '#64748b' }}>
+                              ({distanceKm.toFixed(1)} km · {distanceFee.tier})
+                            </span>
+                          )}
+                        </span>
                         <span>₱{transportFee.toLocaleString()}</span>
                       </div>
                     )}

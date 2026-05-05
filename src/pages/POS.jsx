@@ -45,6 +45,11 @@ const POS = () => {
   const [customers, setCustomers] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  // True when the cashier picked the therapist from the "Requested Therapist"
+  // dropdown (i.e. client asked for them by name). When true, completing the
+  // service does NOT advance the rotation queue — the requested therapist
+  // keeps their position in line.
+  const [isRequestedTherapist, setIsRequestedTherapist] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerType, setCustomerType] = useState('walk-in'); // walk-in, existing, new
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -373,9 +378,10 @@ const POS = () => {
     return rotationQueue.filter(emp => !busyEmployeeIds.includes(String(emp.employeeId)));
   }, [rotationQueue, busyEmployeeIds]);
 
-  // Select employee from rotation queue
+  // Select employee from rotation queue (counts as a normal rotation pick)
   const selectFromRotation = useCallback((employeeId) => {
     setSelectedEmployee(employeeId);
+    setIsRequestedTherapist(false);
     showToast('Employee selected from rotation queue', 'info');
   }, [showToast]);
 
@@ -396,6 +402,7 @@ const POS = () => {
       return;
     }
     setSelectedEmployee(match.employeeId);
+    setIsRequestedTherapist(false);
     const suffix = gender ? ` (${gender})` : '';
     showToast(`Auto-selected${suffix}: ${match.employeeName}`, 'success');
   }, [availableRotationQueue, employees, showToast]);
@@ -959,6 +966,7 @@ const POS = () => {
               discountType,
               drawerSessionId: drawerSession?._id || null,
               drawerShiftId: drawerShift?._id || null,
+              isRequestedTherapist,
             };
             setActiveIntentId(intent.id);
           } catch (err) {
@@ -1026,8 +1034,10 @@ const POS = () => {
           customer: customerType === 'walk-in' ? (walkInCustomerData.name || 'Walk-in') : (selectedCustomer?.name || 'Walk-in')
         });
 
-        // Record service in rotation queue
-        if (selectedEmployee) {
+        // Record service in rotation queue — but only when the therapist was
+        // picked via auto-rotation. Manually-requested therapists keep their
+        // place in the queue so they're not penalised for being asked for.
+        if (selectedEmployee && !isRequestedTherapist) {
           try {
             await mockApi.serviceRotation.recordService(selectedEmployee);
           } catch (error) {
@@ -1155,6 +1165,7 @@ const POS = () => {
 
   const resetCheckoutForm = () => {
     setSelectedEmployee(null);
+    setIsRequestedTherapist(false);
     setSelectedCustomer(null);
     setSelectedRoom(null);
     setIsHomeService(false);
@@ -1252,8 +1263,9 @@ const POS = () => {
       customer: transaction.customer?.name || 'Walk-in',
     });
 
-    // Rotation queue
-    if (employee?._id) {
+    // Rotation queue — skip when the client requested this therapist by name,
+    // mirroring the regular checkout path.
+    if (employee?._id && !ctx.isRequestedTherapist) {
       try {
         await mockApi.serviceRotation.recordService(employee._id);
       } catch (error) {
@@ -1835,14 +1847,26 @@ const POS = () => {
                   </div>
                 )}
 
-                {/* Standard Employee Dropdown - Therapists Only */}
+                {/* Requested Therapist dropdown — for clients who asked for
+                    a specific therapist by name. Picking from here will NOT
+                    advance the rotation queue. */}
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#6b7280', marginTop: '8px', marginBottom: '4px', letterSpacing: '0.4px' }}>
+                  REQUESTED THERAPIST <span style={{ fontWeight: 400, fontStyle: 'italic', textTransform: 'none', letterSpacing: 0 }}>— if the client asked for a specific therapist</span>
+                </label>
                 <select
                   value={selectedEmployee || ''}
-                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedEmployee(id);
+                    // If the user picked a real therapist from this dropdown,
+                    // mark it as a manual request so rotation isn't bumped.
+                    // Clearing the dropdown reverts to non-request state.
+                    setIsRequestedTherapist(!!id);
+                  }}
                   className="form-control"
                   required
                 >
-                  <option value="">Select therapist...</option>
+                  <option value="">Select requested therapist...</option>
                   {getTherapists(employees).map(emp => {
                     // For advance booking: check if therapist is scheduled for the selected date/time
                     if (isAdvanceBooking) {
@@ -1896,6 +1920,15 @@ const POS = () => {
                     );
                   })}
                 </select>
+                {selectedEmployee && isRequestedTherapist && (
+                  <div style={{
+                    marginTop: '6px', padding: '6px 10px', borderRadius: '6px',
+                    background: '#fef3c7', color: '#92400e', fontSize: '12px',
+                    fontWeight: 600, display: 'inline-block'
+                  }}>
+                    🙋 Requested by client — rotation queue won't advance
+                  </div>
+                )}
                 {selectedEmployee && (
                   <p className="employee-commission">
                     Commission: {employees.find(e => e._id === selectedEmployee)?.commission.value}

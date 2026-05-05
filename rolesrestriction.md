@@ -52,7 +52,7 @@ Configure system settings
 View all financial data
 Access all reports
 Manager
-Pages Visible (18 total):
+Pages Visible (19 total):
 ✅ Dashboard
 ✅ POS
 ✅ Services (Products)
@@ -68,12 +68,12 @@ Pages Visible (18 total):
 ✅ Service History
 ✅ Gift Certificates
 ✅ Expenses
+✅ Cash Drawer History (added — needed for cashier handover oversight)
 ✅ AI Assistant (Chatbot)
 ✅ Settings
 ✅ Payroll Requests (Can view/approve for branch)
 Pages Hidden:
 ❌ Calendar View (Owner only)
-❌ Cash Drawer History
 Permissions:
 Read-only access to most data
 Can view all business reports
@@ -82,6 +82,7 @@ Can view payroll requests from branch employees
 Can approve payroll requests (with branch owner's userId context)
 Can manage shift schedules
 Can view all attendance records
+Can Open / Close cash drawer, Start / End any shift, approve variance > ₱50
 Cannot modify business settings
 Cannot delete employees
 Cannot modify financial data
@@ -105,11 +106,15 @@ Pages Hidden:
 ❌ Shift Schedule
 ❌ Calendar View
 ❌ Gift Certificates
-❌ Cash Drawer History
+❌ Cash Drawer History (standalone page — but the embedded Cash Drawer tab inside POS is accessible)
 ❌ AI Assistant
 ❌ Settings
 Permissions:
 Can process transactions (POS access)
+Can Open Drawer for her branch at start of day
+Can Start / End her own shift, including handover to incoming cashier
+Can Close Drawer (end-of-day) — variance > ₱50 escalates to a manager for sign-off
+Cannot End someone else's shift (manager/owner only)
 Can create/manage appointments
 Can view/add customers
 Can clock in/out (own attendance)
@@ -275,10 +280,11 @@ All Therapists: ❌ No access
 Approval Threshold:
 Expenses over ₱10,000 require owner approval
 Expenses under ₱10,000 auto-approved
-Cash Drawer History
-Owner: View all cash drawer shifts, reconciliation
-Manager: ❌ No access
-All Employees: ❌ No access
+Cash Drawer History (drawer is keyed by branch, multiple cashier shifts per drawer day)
+Owner / Branch Owner: View all branches' drawer history; Open / Close, Start / End any shift, approve variance > ₱50
+Manager: View this branch's drawer history; same operations as Owner within their branch
+Receptionist: Open Drawer (start of day), Start / End own shift, Close Drawer (EOD); variance > ₱50 escalates to manager
+All Therapists / Other Staff: ❌ No access
 AI Assistant (Chatbot)
 Owner: Full access
 Manager: Full access

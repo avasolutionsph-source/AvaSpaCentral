@@ -78,17 +78,19 @@ Tax calculations (VAT, Senior/PWD discount)
 Receipt printing
 Transaction history
 Void/Refund transactions
-Cash drawer management (open/close shift)
+Cash drawer management — Open Drawer (start of day), Start/End Shift (per cashier), Close Drawer (end of day)
 Actions:
 ✅ Process transactions
 ✅ Apply discounts
 ✅ Void transactions
 ✅ Issue refunds
-✅ Open/close cash drawer
+✅ Open / Close drawer
+✅ Start / End any cashier's shift
+✅ Approve cash variance > ₱50
 ✅ View all employee sales
 ✅ Generate reports
 👔 Manager
-Same as Owner - Full POS access
+Same as Owner — Full POS access; can also Open / Close drawer, Start / End any shift, and approve variance > ₱50
 👩‍💼 Receptionist
 What They See:
 Same POS Interface as Owner/Manager
@@ -96,14 +98,17 @@ Can process all transaction types
 Can select any employee for commission tracking
 Can apply discounts (within approval limits)
 Cannot void transactions (owner approval required)
-Cannot close cash drawer (manager/owner only)
+Can Open Drawer at start of day, Start / End her own shift, and Close Drawer at end of day. Variance > ₱50 escalates to a manager for sign-off.
 Actions:
 ✅ Process sales
 ✅ Select employee
 ✅ Apply discounts (up to 20%)
+✅ Open Drawer / Close Drawer (EOD)
+✅ Start / End own shift
+❌ End another cashier's shift (manager/owner only)
 ❌ Void transactions (requires approval)
 ❌ Modify prices
-❌ Access cash drawer reports
+❌ View cross-branch cash drawer history
 ❌ All Therapists & Other Staff
 No access to POS
 Cannot process transactions
@@ -1112,9 +1117,10 @@ Request Status:
 ❌ All Therapists & Other Staff
 No access to expense management
 16. CASH DRAWER HISTORY
-👑 Owner Only
+👑 Owner / Branch Owner / Manager
 What They See:
 Cash Drawer History Dashboard
+(Note: Drawer is keyed by branch, not by user. One open drawer per branch per business day; multiple cashier shifts within it.)
 Total shifts this month
 Total cash collected
 Total card payments
@@ -1159,9 +1165,10 @@ Actual cash counted breakdown
 Variance explanation
 Manager notes
 Discrepancy resolution
+👩‍💼 Receptionist
+Sees only: today's drawer for her own branch + her own shift history (via the embedded Cash Drawer tab in POS). Can Open / Start / End / Close drawer for her own branch.
 ❌ All Other Roles
-No access to cash drawer history
-Only owner can view financial reconciliation data
+No access to cash drawer history. Variance > ₱50 always requires a manager/owner sign-off regardless of who closed the drawer.
 17. AI ASSISTANT (CHATBOT)
 👑 Owner
 What They See:

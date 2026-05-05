@@ -326,10 +326,14 @@ const initPayrollConfig = async () => {
     return config;
   }
 
-  // Initialize with defaults using repository
-  for (const [key, value] of Object.entries(defaultPayrollConfig)) {
-    await PayrollConfigRepository.set(key, value);
-  }
+  // Dexie is empty — return defaults in-memory ONLY. Do not persist or queue
+  // sync ops here: that path used to fire on every fresh device / account
+  // switch / browser-data-clear, which queued 7 upserts that landed on
+  // Supabase before the initial pull populated payroll_config locally. Since
+  // upsertPayrollConfig merges by (business_id, key), it overwrote the
+  // owner's saved rates back to defaults across all devices. Persistence
+  // happens lazily — when the owner clicks "Save Payroll Settings",
+  // updatePayrollConfig writes the chosen values via the repository.
   return defaultPayrollConfig;
 };
 

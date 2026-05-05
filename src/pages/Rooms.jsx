@@ -421,11 +421,31 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   const openUpgradeModal = async (room) => {
     try {
       const products = await mockApi.products.getProducts();
-      const services = products.filter(p => p.type === 'service' && p.active !== false);
+      // Scope to the room's own branch — multi-branch tenants have the same
+      // service name (e.g. "Signature Massage") seeded in every branch as
+      // separate product rows, so a name-only preselect would match all of
+      // them and end up duplicating the service in the upgraded list.
+      const services = products.filter(
+        (p) =>
+          p.type === 'service' &&
+          p.active !== false &&
+          (!room.branchId || !p.branchId || p.branchId === room.branchId),
+      );
       setAvailableServices(services);
-      // Pre-select current services
+      // Pre-select current services. Match each name to AT MOST ONE service
+      // to keep the selection list aligned with the actual count of services
+      // running in this room.
       const currentNames = room.serviceNames || [];
-      const preSelected = services.filter(s => currentNames.includes(s.name));
+      const preSelected = [];
+      const seen = new Set();
+      for (const name of currentNames) {
+        if (seen.has(name)) continue;
+        const match = services.find((s) => s.name === name);
+        if (match) {
+          preSelected.push(match);
+          seen.add(name);
+        }
+      }
       setSelectedUpgradeServices(preSelected);
       setUpgradeDuration(room.serviceDuration || 60);
       setUpgradeModal({ isOpen: true, room });
@@ -469,6 +489,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             // Preserve any non-service items (e.g. add-on products) that
             // were on the original receipt; only swap out the services.
             const nonServiceItems = (txn.items || []).filter((it) => it.type !== 'service');
+            const previousServiceItems = (txn.items || []).filter((it) => it.type === 'service');
             const upgradedServiceItems = selectedUpgradeServices.map((s) => ({
               id: s._id || s.id,
               name: s.name,
@@ -489,6 +510,23 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             // silently change tax/discount math without the cashier's say-so.
             const updatedTotal = newSubtotal - (Number(txn.discount) || 0) + (Number(txn.tax) || 0);
 
+            // Append an audit-trail entry so Service History can show the
+            // "upgraded from X to Y" annotation. Each entry captures the
+            // service-name swap and the price delta at the moment of upgrade.
+            const previousServiceTotal = previousServiceItems.reduce(
+              (sum, it) => sum + (Number(it.subtotal) || Number(it.price) || 0),
+              0,
+            );
+            const upgradeEntry = {
+              upgradedAt: new Date().toISOString(),
+              upgradedBy: user?.name || null,
+              fromServices: previousServiceItems.map((it) => it.name),
+              toServices: newServiceNames,
+              fromTotal: Number(txn.totalAmount ?? txn.total ?? txn.subtotal ?? 0),
+              toTotal: updatedTotal,
+            };
+            const upgradeHistory = [...(txn.upgradeHistory || []), upgradeEntry];
+
             await mockApi.transactions.updateTransaction(txn._id, {
               items: updatedItems,
               subtotal: newSubtotal,
@@ -496,6 +534,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
               // Mirror the legacy `total` field too in case any downstream
               // consumer reads from it instead of totalAmount.
               total: updatedTotal,
+              upgradeHistory,
             });
           } else {
             console.warn('[upgradeService] No transaction matched receipt', room.transactionId);

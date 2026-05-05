@@ -161,7 +161,8 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
         status: t.status || 'completed',
         voidedAt: t.voidedAt,
         voidedBy: t.voidedBy,
-        voidReason: t.voidReason
+        voidReason: t.voidReason,
+        upgradeHistory: Array.isArray(t.upgradeHistory) ? t.upgradeHistory : []
         };
       });
 
@@ -569,7 +570,47 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                         {transaction.status === 'voided' && (
                           <span style={{ marginLeft: '6px', background: '#dc2626', color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', textDecoration: 'none', display: 'inline-block' }}>VOIDED</span>
                         )}
+                        {transaction.upgradeHistory.length > 0 && (
+                          <span
+                            title={transaction.upgradeHistory
+                              .map((u, i) =>
+                                `#${i + 1} ${format(parseISO(u.upgradedAt), 'MMM dd h:mm a')} — ${(u.fromServices || []).join(', ') || '(none)'} → ${(u.toServices || []).join(', ')} (₱${Number(u.fromTotal || 0).toLocaleString('en-PH')} → ₱${Number(u.toTotal || 0).toLocaleString('en-PH')}${u.upgradedBy ? `, by ${u.upgradedBy}` : ''})`,
+                              )
+                              .join('\n')}
+                            style={{
+                              marginLeft: '6px',
+                              background: '#7c3aed',
+                              color: '#fff',
+                              fontSize: '0.65rem',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              textDecoration: 'none',
+                              display: 'inline-block',
+                              cursor: 'help',
+                            }}
+                          >
+                            ⬆ UPGRADED ×{transaction.upgradeHistory.length}
+                          </span>
+                        )}
                       </span>
+                      {transaction.upgradeHistory.length > 0 && (() => {
+                        const last = transaction.upgradeHistory[transaction.upgradeHistory.length - 1];
+                        const from = (last.fromServices || []).join(' + ') || '(none)';
+                        const to = (last.toServices || []).join(' + ');
+                        return (
+                          <div
+                            style={{
+                              fontSize: '0.7rem',
+                              color: '#6b7280',
+                              fontStyle: 'italic',
+                              marginTop: '2px',
+                              textDecoration: 'none',
+                            }}
+                          >
+                            Upgraded: {from} → {to}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td>{format(parseISO(transaction.date), 'MMM dd, yyyy h:mm a')}</td>
                     <td>
@@ -716,6 +757,38 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                 </tbody>
               </table>
             </div>
+
+            {selectedTransaction.upgradeHistory && selectedTransaction.upgradeHistory.length > 0 && (
+              <div className="items-section" style={{ marginTop: 'var(--spacing-md)' }}>
+                <h3>Upgrade History</h3>
+                <table className="items-table">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>From</th>
+                      <th>To</th>
+                      <th className="right">Total Change</th>
+                      <th>By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedTransaction.upgradeHistory.map((u, idx) => (
+                      <tr key={idx}>
+                        <td>{format(parseISO(u.upgradedAt), 'MMM dd, yyyy h:mm a')}</td>
+                        <td>{(u.fromServices || []).join(', ') || '—'}</td>
+                        <td>{(u.toServices || []).join(', ')}</td>
+                        <td className="right">
+                          ₱{Number(u.fromTotal || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                          {' → '}
+                          ₱{Number(u.toTotal || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td>{u.upgradedBy || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div className="payment-summary">
               <div className="summary-line">

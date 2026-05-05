@@ -178,7 +178,7 @@ const SUPABASE_TABLE_COLUMNS = {
     'receipt_number', 'gift_certificate_code', 'gift_certificate_amount',
     'card_transaction_id', 'gcash_reference', 'booking_source',
     'room_id', 'room_name', 'is_home_service', 'home_service_address',
-    'employee', 'customer',
+    'employee', 'customer', 'upgrade_history',
     'branch_id', 'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   appointments: [

@@ -44,10 +44,11 @@ class CashDrawerRepository extends BaseRepository {
 
   /**
    * Close a session
-   * Uses Dexie transaction for atomicity to prevent race conditions
+   * Uses Dexie transaction for atomicity to prevent race conditions.
+   * syncQueue must be in scope because BaseRepository.update writes there.
    */
   async closeSession(sessionId, actualCash) {
-    return await db.transaction('rw', db.cashDrawerSessions, async () => {
+    return await db.transaction('rw', [db.cashDrawerSessions, db.syncQueue], async () => {
       const session = await this.getById(sessionId);
       if (!session) throw new Error('Session not found');
 
@@ -71,10 +72,11 @@ class CashDrawerRepository extends BaseRepository {
 
   /**
    * Add transaction to session
-   * Uses Dexie transaction for atomicity to prevent race conditions
+   * Uses Dexie transaction for atomicity to prevent race conditions.
+   * syncQueue must be in scope because BaseRepository.update writes there.
    */
   async addTransaction(sessionId, transaction) {
-    return await db.transaction('rw', db.cashDrawerSessions, async () => {
+    return await db.transaction('rw', [db.cashDrawerSessions, db.syncQueue], async () => {
       const session = await this.getById(sessionId);
       if (!session) throw new Error('Session not found');
 

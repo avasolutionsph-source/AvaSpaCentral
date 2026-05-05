@@ -365,6 +365,18 @@ class SpaDatabase extends Dexie {
         description: 'Added paymentStatus index to purchaseOrders for disbursement integration',
       });
     });
+
+    // Version 13: Fix userId index typo on cashDrawerSessions (was 'oduserId').
+    this.version(13).stores({
+      cashDrawerSessions: '_id, userId, status, openTime, businessId',
+    }).upgrade(async (tx) => {
+      console.log('[Dexie] Upgrading to version 13: fixing userId index on cashDrawerSessions');
+      await tx.table('migrationLog').add({
+        version: 13,
+        timestamp: new Date().toISOString(),
+        description: 'Fixed userId index typo (oduserId -> userId) on cashDrawerSessions',
+      });
+    });
   }
 }
 

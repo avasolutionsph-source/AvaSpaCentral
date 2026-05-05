@@ -941,6 +941,8 @@ const POS = () => {
               homeServiceAddress,
               appliedGC,
               discountType,
+              drawerSessionId: drawerSession?._id || null,
+              drawerShiftId: drawerShift?._id || null,
             };
             setActiveIntentId(intent.id);
           } catch (err) {
@@ -956,15 +958,17 @@ const POS = () => {
         // Save transaction
         await mockApi.transactions.createTransaction(transaction);
 
-        // Add to open cash drawer if payment is cash. Drawer is branch-scoped:
-        // any cashier at the same branch logs to the same drawer day, tagged
-        // with the active shift for per-cashier reporting.
-        if (transaction.paymentMethod === 'Cash' && drawerSession) {
+        // Log EVERY payment method to the drawer (Cash, GCash, Card, GC, QRPh)
+        // so the per-shift / per-day view shows the full picture. Variance is
+        // still computed from method='Cash' only — GCash etc. don't go into
+        // the physical drawer. Drawer is branch-scoped: any cashier at the
+        // same branch logs to the same drawer day, tagged with their shift.
+        if (drawerSession) {
           try {
             await mockApi.cashDrawer.addTransaction(drawerSession._id, {
               type: 'Sale',
               amount: transaction.totalAmount,
-              method: 'Cash',
+              method: transaction.paymentMethod,
               description: transaction.receiptNumber,
               cashierId: user?._id || null,
               cashierName: user?.name || null,
@@ -1182,6 +1186,25 @@ const POS = () => {
       });
     } catch (err) {
       console.warn('[POS] failed to mark QRPh transaction completed locally:', err);
+    }
+
+    // Log to drawer ledger now that the QRPh webhook has confirmed payment.
+    // Variance unaffected (method != 'Cash') but the per-shift breakdown will
+    // include this collection.
+    if (ctx.drawerSessionId) {
+      try {
+        await mockApi.cashDrawer.addTransaction(ctx.drawerSessionId, {
+          type: 'Sale',
+          amount: transaction.totalAmount,
+          method: 'QRPh',
+          description: receiptNumber,
+          cashierId: user?._id || null,
+          cashierName: user?.name || null,
+          shiftId: ctx.drawerShiftId || null
+        });
+      } catch (err) {
+        console.warn('[POS] QRPh drawer logging failed:', err);
+      }
     }
 
     // Gift certificate redemption (mirrors regular branch)

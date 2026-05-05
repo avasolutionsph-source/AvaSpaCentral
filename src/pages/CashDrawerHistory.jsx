@@ -249,6 +249,61 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
       .reduce((sum, t) => sum + (t.amount || 0), 0);
   };
 
+  // Roll up sales by payment method. Source can be the whole session's
+  // transactions[] (for day total), or a filtered subset (for one shift).
+  // Cash entries here count toward the physical drawer; non-cash entries are
+  // for visibility only — variance is still cash-only by design.
+  const breakdownByMethod = (txns) => {
+    const buckets = {};
+    let total = 0;
+    for (const t of txns || []) {
+      const m = t.method || 'Other';
+      buckets[m] = (buckets[m] || 0) + (t.amount || 0);
+      total += t.amount || 0;
+    }
+    return { buckets, total };
+  };
+
+  const PaymentBreakdown = ({ txns, dark }) => {
+    const { buckets, total } = breakdownByMethod(txns);
+    const order = ['Cash', 'GCash', 'Card', 'QRPh', 'GC', 'Other'];
+    const entries = order
+      .map(k => [k, buckets[k] || 0])
+      .concat(Object.entries(buckets).filter(([k]) => !order.includes(k)))
+      .filter(([, v]) => v > 0);
+    if (entries.length === 0) {
+      return <div style={{ fontSize: '12px', color: dark ? 'rgba(255,255,255,0.7)' : '#6b7280' }}>No sales yet.</div>;
+    }
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        {entries.map(([method, amount]) => (
+          <div key={method} style={{
+            background: dark ? 'rgba(255,255,255,0.15)' : '#f3f4f6',
+            color: dark ? '#fff' : '#111827',
+            border: dark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #e5e7eb',
+            borderRadius: '6px', padding: '6px 10px', fontSize: '12px'
+          }}>
+            <div style={{ fontSize: '10px', opacity: 0.75, letterSpacing: '0.5px' }}>{method.toUpperCase()}</div>
+            <div style={{ fontWeight: 700, fontSize: '14px' }}>
+              ₱{amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+        ))}
+        <div style={{
+          background: dark ? '#fbbf24' : '#fef3c7',
+          color: dark ? '#1f2937' : '#92400e',
+          borderRadius: '6px', padding: '6px 10px', fontSize: '12px',
+          marginLeft: 'auto', alignSelf: 'center'
+        }}>
+          <div style={{ fontSize: '10px', opacity: 0.75, letterSpacing: '0.5px' }}>TOTAL</div>
+          <div style={{ fontWeight: 700, fontSize: '14px' }}>
+            ₱{total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const toggleSessionExpand = (sessionId) => {
     setExpandedSessions(prev => {
       const newSet = new Set(prev);
@@ -337,7 +392,11 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
             <div style={{ fontSize: '13px', marginTop: '6px', fontWeight: 600 }}>
               {activeShift
                 ? <>On shift: <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '4px' }}>{activeShift.userName || 'Cashier'}</span> since {format(parseISO(activeShift.startTime), 'h:mm a')}</>
-                : <span style={{ color: '#fbbf24' }}>⚠ No active shift — start one before processing cash sales</span>}
+                : <span style={{ color: '#fbbf24' }}>⚠ No active shift — start one before processing sales</span>}
+            </div>
+            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+              <div style={{ fontSize: '11px', opacity: 0.85, marginBottom: '6px', letterSpacing: '0.5px' }}>SALES TODAY (ALL METHODS)</div>
+              <PaymentBreakdown txns={openDrawer.transactions || []} dark />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -689,6 +748,17 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
               <div style={{ marginTop: '8px', padding: '8px', background: '#fff', borderRadius: '6px', fontWeight: 600, color: '#065f46' }}>
                 Expected end count: ₱{(Number(activeShift.startCount || 0) + computeCashSalesForShift(activeShift._id)).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
               </div>
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '6px' }}>
+                  YOUR SHIFT — ALL PAYMENT METHODS
+                </div>
+                <PaymentBreakdown
+                  txns={(openDrawer?.transactions || []).filter(t => t.shiftId === activeShift._id)}
+                />
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+                  Only Cash counts toward the drawer count. GCash / Card / etc. settle in their own channels.
+                </div>
+              </div>
             </div>
             <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '12px' }}>
               The drawer stays open. The next cashier will Start Shift to take over.
@@ -739,6 +809,15 @@ const CashDrawerHistory = ({ embedded = false, onDataChange }) => {
                 <div>
                   <div style={{ color: '#6b7280', marginBottom: '2px' }}>Expected Cash</div>
                   <div style={{ fontWeight: 700, color: '#065f46' }}>₱{openDrawerExpected.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.5px', marginBottom: '6px' }}>
+                  DAY TOTAL — ALL PAYMENT METHODS
+                </div>
+                <PaymentBreakdown txns={openDrawer.transactions || []} />
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
+                  Variance below is computed on Cash only. GCash / Card / QRPh totals are for reconciling against their own channels (e.g. NextPay dashboard, card terminal).
                 </div>
               </div>
             </div>

@@ -630,7 +630,7 @@ const ReportSheet = ({ data, manual, periodLabel, branchName, showShift, readOnl
           <Field label="Date">{periodLabel}</Field>
           <Field label="Branch">{branchName}</Field>
           {showShift && (
-            <Field label="Shift">
+            <Field label="Coverage">
               <select value={manual.shift || 'Whole Day'} onChange={e => set({ shift: e.target.value })} disabled={readOnly}>
                 <option>AM</option>
                 <option>PM</option>

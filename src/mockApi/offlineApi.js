@@ -116,6 +116,7 @@ export const expensesApi = {
 export const transactionsApi = {
   getTransactions: transactionsAdapter.getTransactions,
   getTransaction: transactionsAdapter.getTransaction,
+  getTransactionByReceiptNumber: transactionsAdapter.getTransactionByReceiptNumber,
   createTransaction: transactionsAdapter.createTransaction,
   updateTransaction: transactionsAdapter.updateTransaction,
   voidTransaction: transactionsAdapter.voidTransaction,

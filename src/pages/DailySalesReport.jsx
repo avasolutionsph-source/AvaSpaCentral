@@ -323,6 +323,21 @@ const DailySalesReport = () => {
       }))
       .sort((a, b) => b.sales - a.sales);
 
+    // Per-cashier breakdown — who rang up the sale, distinct from therapist.
+    // Falls back to legacy txns without cashierId so we don't lose history.
+    const cashierMap = new Map();
+    for (const t of completed) {
+      const id = t.cashierId || 'unattributed';
+      const name = t.cashierName || t.cashier || (id === 'unattributed' ? 'Unattributed' : id);
+      const existing = cashierMap.get(id) || { id, name, txns: 0, sales: 0, cash: 0, nonCash: 0 };
+      existing.txns += 1;
+      existing.sales += t.totalAmount || 0;
+      if (t.paymentMethod === 'Cash') existing.cash += t.totalAmount || 0;
+      else existing.nonCash += t.totalAmount || 0;
+      cashierMap.set(id, existing);
+    }
+    const cashierRows = [...cashierMap.values()].sort((a, b) => b.sales - a.sales);
+
     const expenseMap = new Map();
     for (const e of periodExpenses) {
       const cat = e.category || 'Other';
@@ -373,6 +388,7 @@ const DailySalesReport = () => {
       paymentBuckets,
       serviceRows, serviceTotals,
       therapistRows,
+      cashierRows,
       expenseRows, totalExpenses,
       advanceRows, totalAdvances,
       beginningCash, cashSales, endingCashActual, endingCashExpected,
@@ -709,6 +725,35 @@ const ReportSheet = ({ data, manual, periodLabel, branchName, showShift, readOnl
                 <td>{row.name}</td>
                 <td className="right">{num(row.clients)}</td>
                 <td className="dsr-small">{row.services || '—'}</td>
+                <td className="right">{peso(row.sales)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="dsr-section">
+        <h2>5b. Cashier Performance</h2>
+        <table className="dsr-table">
+          <thead>
+            <tr>
+              <th>Cashier</th>
+              <th className="right">Transactions</th>
+              <th className="right">Cash Sales</th>
+              <th className="right">Non-Cash Sales</th>
+              <th className="right">Total Sales</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data.cashierRows || []).length === 0 && (
+              <tr><td colSpan={5} className="dsr-empty">No cashier activity recorded.</td></tr>
+            )}
+            {(data.cashierRows || []).map(row => (
+              <tr key={row.id}>
+                <td>{row.name}</td>
+                <td className="right">{num(row.txns)}</td>
+                <td className="right">{peso(row.cash)}</td>
+                <td className="right">{peso(row.nonCash)}</td>
                 <td className="right">{peso(row.sales)}</td>
               </tr>
             ))}

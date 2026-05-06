@@ -312,11 +312,23 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       // Add out of range flag to capture data
       captureWithBranch.isOutOfRange = isOutOfRange;
 
+      // For clock-OUT only: tell the API which date the user is targeting.
+      // Without this, "Clock Out (late)" pressed from yesterday view would
+      // close today's open record instead, leaving yesterday stranded.
+      // Clock-IN is always for today (the UI disables it on past dates).
+      if (type === 'out') {
+        captureWithBranch.targetDate = selectedDate;
+      }
+
       if (type === 'in') {
         const result = await mockApi.attendance.clockIn(employeeId, captureWithBranch);
         if (result?.missedClockOut) {
           const missedDate = new Date(result.missedClockOut.date + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
-          showToast(`Warning: ${employeeName} did not clock out last shift (${missedDate}, clocked in at ${result.missedClockOut.clockIn}). Please update their attendance.`, 'warning');
+          let msg = `Warning: ${employeeName} did not clock out last shift (${missedDate}, clocked in at ${result.missedClockOut.clockIn}). Please update their attendance.`;
+          if (result.autoClosedCount > 0) {
+            msg += ` ${result.autoClosedCount} older missed shift${result.autoClosedCount > 1 ? 's were' : ' was'} auto-closed at scheduled end time — please verify.`;
+          }
+          showToast(msg, 'warning');
         }
         if (isOutOfRange) {
           showToast('Clocked in but outside the allowed area. Pending manager approval.', 'warning');

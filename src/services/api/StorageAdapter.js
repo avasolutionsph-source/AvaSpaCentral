@@ -79,6 +79,32 @@ const resolveActiveSchedule = async (employeeId) => {
 };
 
 /**
+ * Estimate a clock-out time for a record using the employee's scheduled end
+ * time on that record's day. Returned in HH:mm. Used for two cases:
+ *   1. Auto-closing stranded prior-day records on a subsequent clock-in
+ *   2. Stamping a manager's "Clock Out (late)" on a past-day record (using
+ *      `nowTime` would falsely produce ~0–1h worked because both clockIn and
+ *      clockOut would land on the same target date)
+ *
+ * Returns null when no schedule / endTime is available — caller decides the
+ * fallback (e.g., flag as missed_clockout, or just keep nowTime).
+ */
+const estimateClockOutFromSchedule = async (employeeId, recordDate) => {
+  try {
+    const scheduleResolution = await resolveActiveSchedule(employeeId);
+    if (scheduleResolution.schedule?.weeklySchedule) {
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const recDate = new Date(recordDate + 'T12:00:00');
+      const dayShift = scheduleResolution.schedule.weeklySchedule[dayNames[recDate.getDay()]];
+      if (dayShift?.endTime) return dayShift.endTime;
+    }
+  } catch (err) {
+    console.warn('[Attendance] estimateClockOutFromSchedule failed for', recordDate, err);
+  }
+  return null;
+};
+
+/**
  * Throw a contextual error for a missing schedule. Centralises the message
  * so clockIn / clockOut stay in sync. Embeds diagnostic info directly in the
  * thrown message so support tickets don't require a DevTools console capture.
@@ -1333,12 +1359,44 @@ export const attendanceAdapter = {
     const targetBranchId = captureData.branchId || null;
     const sameBranch = (a) => !targetBranchId || !a.branchId || a.branchId === targetBranchId;
 
+    // Compute yesterday's date string for the auto-close cutoff below.
+    const yesterdayDate = new Date(now);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
+
     const previousRecords = allRecords
       .filter(a => sameBranch(a) && a.date !== today && a.clockIn && !a.clockOut)
       .sort((a, b) => b.date.localeCompare(a.date));
+    let autoClosedCount = 0;
     if (previousRecords.length > 0) {
       const missed = previousRecords[0];
       missedClockOut = { date: missed.date, clockIn: missed.clockIn };
+
+      // Auto-close stranded records older than yesterday so they don't pile
+      // up indefinitely. Yesterday is preserved on purpose — managers still
+      // get a 24-hour window to close it explicitly via "Clock Out (late)"
+      // on the yesterday view (which now targets the right date — see
+      // clockOut's targetDate handling below).
+      for (const stranded of previousRecords) {
+        if (stranded.date >= yesterdayStr) continue;
+        const estimatedClockOut = await estimateClockOutFromSchedule(employeeId, stranded.date);
+        const update = {
+          autoClosed: true,
+          autoClosedAt: now.toISOString(),
+          autoClosedReason: 'subsequent_clockin',
+        };
+        if (estimatedClockOut) {
+          update.clockOut = estimatedClockOut;
+        } else {
+          // No schedule/endTime to estimate from — flag for manual review
+          // but keep the record open so the Overdue/Missed Clock-Out UI
+          // continues to surface it.
+          update.status = 'missed_clockout';
+        }
+        await storageService.attendance.update(stranded._id, update);
+        autoClosedCount += 1;
+        console.log('[AttendanceAdapter] clockIn - auto-closed stranded record', stranded._id, 'date', stranded.date, 'clockOut', estimatedClockOut || '(none, flagged missed_clockout)');
+      }
     }
 
     // Check if already clocked in today (same branch only)
@@ -1428,6 +1486,7 @@ export const attendanceAdapter = {
       success: true,
       shiftWarning,
       missedClockOut,
+      autoClosedCount,
       attendance: clone({
         ...record,
         employee: employee || null
@@ -1455,19 +1514,39 @@ export const attendanceAdapter = {
     // don't compare clock-out time to clock-in time — clock skew and
     // overnight shifts otherwise wrongly blocked legitimate clock-outs.
 
-    // First try today's records
-    let existing = await storageService.attendance.find(
-      a => String(a.employeeId) === empId && a.date === today && a.clockIn && !a.clockOut
-    );
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
-    // If not found, try yesterday (overnight shift - e.g., clocked in at 8PM, clocking out at 2AM)
-    if (existing.length === 0) {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    // Resolve which date's open record to close. Order:
+    //   1. Caller-supplied targetDate (e.g., "Clock Out (late)" pressed from
+    //      yesterday view — without this, today's open record would be
+    //      closed instead, leaving yesterday stranded forever).
+    //   2. today (regular path)
+    //   3. yesterday (overnight shift falling past midnight)
+    const targetDate = captureData.targetDate || null;
+    const seen = new Set();
+    const candidateDates = [];
+    const addDate = (d) => {
+      if (d && !seen.has(d)) {
+        seen.add(d);
+        candidateDates.push(d);
+      }
+    };
+    addDate(targetDate);
+    addDate(today);
+    addDate(yesterdayStr);
+
+    let existing = [];
+    let resolvedDate = null;
+    for (const d of candidateDates) {
       existing = await storageService.attendance.find(
-        a => String(a.employeeId) === empId && a.date === yesterdayStr && a.clockIn && !a.clockOut
+        a => String(a.employeeId) === empId && a.date === d && a.clockIn && !a.clockOut
       );
+      if (existing.length > 0) {
+        resolvedDate = d;
+        break;
+      }
     }
 
     if (existing.length === 0) {
@@ -1476,8 +1555,20 @@ export const attendanceAdapter = {
 
     const record = existing[0];
 
+    // For an explicit past-day clock-out (manager pressed "Clock Out (late)"
+    // on yesterday view), stamping current time produces nonsense hours —
+    // the record's date is yesterday but clockOut would be today's time. Use
+    // the schedule's endTime instead. Overnight shifts naturally landing on
+    // today via the yesterday fallback are NOT past-day fix-ups (resolvedDate
+    // is yesterday but targetDate wasn't supplied), so they keep nowTime.
+    let clockOutTime = nowTime;
+    if (targetDate && resolvedDate === targetDate && resolvedDate !== today) {
+      const estimated = await estimateClockOutFromSchedule(employeeId, resolvedDate);
+      if (estimated) clockOutTime = estimated;
+    }
+
     const updated = await storageService.attendance.update(record._id, {
-      clockOut: nowTime,
+      clockOut: clockOutTime,
       clockOutPhoto: captureData.photo || null,
       clockOutGps: captureData.location || null,
       isOutOfRange: captureData.isOutOfRange || false,

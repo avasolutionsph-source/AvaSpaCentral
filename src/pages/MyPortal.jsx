@@ -311,7 +311,11 @@ const MyPortal = () => {
         const result = await mockApi.attendance.clockIn(employeeId, captureWithBranch);
         if (result?.missedClockOut) {
           const missedDate = new Date(result.missedClockOut.date + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
-          showToast(`Warning: You did not clock out last shift (${missedDate}, clocked in at ${result.missedClockOut.clockIn}). Please inform your manager.`, 'warning');
+          let msg = `Warning: You did not clock out last shift (${missedDate}, clocked in at ${result.missedClockOut.clockIn}). Please inform your manager.`;
+          if (result.autoClosedCount > 0) {
+            msg += ` ${result.autoClosedCount} older missed shift${result.autoClosedCount > 1 ? 's were' : ' was'} auto-closed at scheduled end time.`;
+          }
+          showToast(msg, 'warning');
         }
         if (isOutOfRange) {
           showToast('Clocked in but you are outside the allowed area. Pending manager approval.', 'warning');

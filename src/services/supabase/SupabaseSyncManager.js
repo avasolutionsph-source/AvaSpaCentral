@@ -595,6 +595,17 @@ class SupabaseSyncManager {
       }
     }, this.config.eventDrivenDebounce);
 
+    // Local writes only need to push — they don't need to pull all 33 tables
+    // because realtime subscriptions already deliver remote changes for the
+    // hot tables. Pulling here would repeat ~33 GETs per local save and was
+    // the dominant source of REST traffic.
+    this._debouncedPush = debounce(() => {
+      if (NetworkDetector.isOnline && authService.currentUser) {
+        console.log('[SupabaseSyncManager] Event-driven push triggered (no pull)');
+        this.pushOnly();
+      }
+    }, this.config.eventDrivenDebounce);
+
     // Unsubscribe function for data change listener
     this._dataChangeUnsubscribe = null;
     // Unsubscribe function for network status listener
@@ -1009,11 +1020,13 @@ class SupabaseSyncManager {
       });
     }
 
-    // EVENT-DRIVEN SYNC: Listen for local data changes and sync immediately (debounced)
+    // EVENT-DRIVEN PUSH: Listen for local data changes and push immediately (debounced).
+    // Pulling on every write was wasteful — realtime subscriptions deliver
+    // cross-device updates, so this only needs to push the new local change.
     if (!this._dataChangeUnsubscribe) {
       this._dataChangeUnsubscribe = dataChangeEmitter.subscribe((change) => {
         console.log('[SupabaseSyncManager] Data changed:', change.entityType, change.operation);
-        this._debouncedSync();
+        this._debouncedPush();
       });
     }
 
@@ -1044,10 +1057,10 @@ class SupabaseSyncManager {
       this._setupRealtimeSubscriptions();
     }
 
-    // Start periodic sync as fallback (every 5 minutes)
-    if (this.config.autoSync) {
-      this._startPeriodicSync();
-    }
+    // No periodic interval — every syncable entity has a realtime
+    // subscription, and the visibility / reconnect handlers already trigger
+    // a reconciliation pull when needed. Polling here would just duplicate
+    // what realtime already delivers.
 
     this._initialized = true;
     console.log('[SupabaseSyncManager] Initialized with event-driven sync');
@@ -1158,18 +1171,29 @@ class SupabaseSyncManager {
 
     console.log('[SupabaseSyncManager] Setting up real-time subscriptions');
 
-    // Subscribe to changes in key tables (expanded for better cross-device sync)
+    // Subscribe to every syncable entity. Each subscription is a websocket
+    // channel — virtually free compared to the periodic REST pulls it
+    // replaces. Covering everything lets us drop the 5-minute safety-net
+    // interval entirely and rely on visibility-handler reconciliation.
     const realtimeEntities = [
-      // Core entities (CRITICAL - must be real-time for cross-device)
+      // Core entities
       'business', 'users', 'businessConfig',
-      // Core operational (must be real-time)
+      // Core operational
       'products', 'employees', 'customers', 'appointments', 'transactions', 'rooms',
-      // Inventory & Financial (important for multi-device)
-      'inventoryMovements', 'cashDrawerSessions', 'giftCertificates', 'expenses',
+      // Inventory & Financial
+      'inventoryMovements', 'cashDrawerSessions', 'cashDrawerShifts',
+      'giftCertificates', 'expenses', 'purchaseOrders',
+      'stockHistory', 'productConsumption',
       // HR (staff coordination)
       'attendance', 'shiftSchedules', 'payrollRequests',
-      // Services & Bookings (critical for service flow)
-      'advanceBookings', 'activeServices', 'suppliers'
+      'payrollConfig', 'payrollConfigLogs',
+      'timeOffRequests', 'otRequests', 'leaveRequests',
+      'cashAdvanceRequests', 'incidentReports',
+      // Services & Bookings
+      'advanceBookings', 'activeServices', 'suppliers',
+      'serviceRotation', 'homeServices', 'loyaltyHistory',
+      // Audit
+      'activityLogs',
     ];
 
     realtimeEntities.forEach(entityType => {
@@ -1417,6 +1441,55 @@ class SupabaseSyncManager {
    */
   async deleteQueueItem(id) {
     await db.syncQueue.delete(id);
+  }
+
+  /**
+   * Push-only operation: drains the local sync queue without pulling.
+   * Used for event-driven updates from local writes (saving an appointment,
+   * a transaction, etc.) where the only thing the server needs is our delta —
+   * remote changes flow back through realtime subscriptions, so a pull would
+   * just be redundant table-wide GETs.
+   */
+  async pushOnly() {
+    if (!isSupabaseConfigured()) {
+      return { success: false, message: 'Supabase not configured' };
+    }
+    if (this._isSyncing) {
+      return { success: false, message: 'Sync already in progress' };
+    }
+    if (!NetworkDetector.isOnline) {
+      return { success: false, message: 'Offline' };
+    }
+    if (!authService.currentUser) {
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    await this.resetStuckItems();
+    this._isSyncing = true;
+    this._notifyListeners({ type: 'sync_start' });
+
+    try {
+      const pushResult = await this._pushChanges();
+      this._lastSync = new Date().toISOString();
+      this._notifyListeners({
+        type: 'sync_complete',
+        pushed: pushResult.pushed,
+        pulled: 0,
+        failed: pushResult.failed,
+      });
+      return {
+        success: true,
+        pushed: pushResult.pushed,
+        pulled: 0,
+        failed: pushResult.failed,
+      };
+    } catch (error) {
+      console.error('[SupabaseSyncManager] Push error:', error);
+      this._notifyListeners({ type: 'sync_error', error: error.message });
+      return { success: false, error: error.message };
+    } finally {
+      this._isSyncing = false;
+    }
   }
 
   /**

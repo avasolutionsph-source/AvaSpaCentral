@@ -85,6 +85,28 @@ class CashAdvanceRequestRepository extends BaseRepository {
       .filter(r => r.status === 'pending' || r.status === 'approved')
       .reduce((sum, r) => sum + (r.amount || 0), 0);
   }
+
+  /**
+   * Approved-but-not-yet-deducted advances for an employee. These are the
+   * rows the payroll calculation should pick up as a "Cash Advance" deduction
+   * on the next saved payroll.
+   */
+  async getApprovedUndeductedByEmployee(employeeId) {
+    const requests = await this.getByEmployee(employeeId);
+    return requests.filter(r => r.status === 'approved' && !r.deductedAt);
+  }
+
+  /**
+   * Mark a cash advance as deducted by a specific saved payroll. Called by
+   * the payroll save flow after a successful saved_payrolls insert so the
+   * advance is not deducted again on a future payroll.
+   */
+  async markDeducted(requestId, payrollId) {
+    return this.update(requestId, {
+      deductedAt: new Date().toISOString(),
+      deductedInPayrollId: payrollId,
+    });
+  }
 }
 
 export default new CashAdvanceRequestRepository();

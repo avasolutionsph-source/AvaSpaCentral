@@ -97,6 +97,9 @@ export default function PayslipModal({ payslip, businessName, onClose }) {
               <div className="payslip-line"><span>PhilHealth Contribution</span><span>{peso(d.philHealth)}</span></div>
               <div className="payslip-line"><span>Pag-IBIG Contribution</span><span>{peso(d.pagibig)}</span></div>
               <div className="payslip-line"><span>Withholding Tax</span><span>{peso(d.withholdingTax)}</span></div>
+              {d.cashAdvance > 0 && (
+                <div className="payslip-line"><span>Cash Advance</span><span>{peso(d.cashAdvance)}</span></div>
+              )}
               <div className="payslip-line total">
                 <span>TOTAL DEDUCTIONS</span>
                 <span>{peso(d.total)}</span>

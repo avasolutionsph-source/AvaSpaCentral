@@ -7,6 +7,7 @@ import PayrollBreakdownPopover from '../components/PayrollBreakdownPopover';
 import PayslipModal from '../components/PayslipModal';
 import { SettingsRepository } from '../services/storage/repositories';
 import { SavedPayrollRepository } from '../services/storage/repositories';
+import { CashAdvanceRequestRepository } from '../services/storage/repositories';
 
 const formatPeso = (value) => `₱${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -271,7 +272,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
     return config?.enabled ? config.rate : 1.0;
   };
 
-  const calculateEmployeePayroll = (employee, startDate, endDate) => {
+  const calculateEmployeePayroll = (employee, startDate, endDate, pendingCashAdvances = []) => {
     // Get attendance for period - attendance uses employeeId field
     const empAttendance = attendance.filter(a => {
       const empId = a.employeeId || a.employee?._id;
@@ -390,12 +391,24 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       pagibig.employee
     );
 
-    // Semi-monthly deductions (divide by 2)
+    // Cash advance deduction: sum of all approved-but-undeducted advances
+    // for this employee. The save flow will mark these as deducted so they
+    // don't get pulled into a future payroll.
+    const cashAdvanceTotal = pendingCashAdvances.reduce(
+      (sum, ca) => sum + Number(ca.amount || 0),
+      0
+    );
+    const cashAdvanceIds = pendingCashAdvances.map(ca => ca._id);
+
+    // Semi-monthly deductions (divide statutory contributions by 2; cash
+    // advances are deducted in full because they're a flat repayment, not a
+    // recurring monthly contribution).
     const totalDeductions = (
       (sss.employee / 2) +
       (philHealth.employee / 2) +
       (pagibig.employee / 2) +
-      (withholdingTax / 2)
+      (withholdingTax / 2) +
+      cashAdvanceTotal
     );
 
     const netPay = grossPay - totalDeductions;
@@ -419,6 +432,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
         philHealth: philHealth.employee / 2,
         pagibig: pagibig.employee / 2,
         withholdingTax: withholdingTax / 2,
+        cashAdvance: cashAdvanceTotal,
         total: totalDeductions
       },
       netPay,
@@ -435,7 +449,11 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       // Store breakdown details for clickable popovers
       _hourlyRate: hourlyRate,
       _commissionDetails: commissionDetails,
-      _monthlyGross: monthlyGross
+      _monthlyGross: monthlyGross,
+      // IDs of cash advances rolled into this row's deductions. The save
+      // flow uses this list to mark them deducted_at = now() so they are
+      // not pulled into a future payroll run.
+      _cashAdvanceIds: cashAdvanceIds
     };
   };
 
@@ -448,7 +466,29 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
     setCalculating(true);
 
     const { startDate, endDate } = getPeriodDates();
-    const calculated = employees.map(emp => calculateEmployeePayroll(emp, startDate, endDate));
+
+    // Fetch approved-but-undeducted cash advances per employee in parallel.
+    // These will be folded into each employee's deductions and the IDs
+    // stashed so the save flow can mark them deducted afterwards.
+    const cashAdvancesByEmployee = {};
+    try {
+      const lookups = await Promise.all(
+        employees.map(emp =>
+          CashAdvanceRequestRepository.getApprovedUndeductedByEmployee(emp._id)
+            .then(list => [emp._id, list])
+            .catch(() => [emp._id, []])
+        )
+      );
+      for (const [empId, list] of lookups) {
+        cashAdvancesByEmployee[empId] = list;
+      }
+    } catch (err) {
+      console.warn('[Payroll] cash advance lookup failed, continuing without:', err);
+    }
+
+    const calculated = employees.map(emp =>
+      calculateEmployeePayroll(emp, startDate, endDate, cashAdvancesByEmployee[emp._id] || [])
+    );
 
     setPayrollData(calculated);
     setCalculating(false);
@@ -556,7 +596,27 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
         rows: payrollData,
         summary,
       };
-      await SavedPayrollRepository.create(payload);
+      const saved = await SavedPayrollRepository.create(payload);
+      const savedPayrollId = saved?.id || null;
+
+      // Mark every cash advance rolled into this payroll as deducted so it
+      // isn't pulled into a future payroll's deductions. Best-effort —
+      // failures here log but don't block the save (the user already saw
+      // the toast and the saved_payrolls row is durable).
+      try {
+        const allCaIds = payrollData.flatMap(row => row._cashAdvanceIds || []);
+        if (allCaIds.length > 0) {
+          await Promise.all(
+            allCaIds.map(caId =>
+              CashAdvanceRequestRepository.markDeducted(caId, savedPayrollId)
+                .catch(e => console.warn('[Payroll] markDeducted failed for', caId, e))
+            )
+          );
+        }
+      } catch (markErr) {
+        console.warn('[Payroll] cash advance mark-deducted batch failed:', markErr);
+      }
+
       showToast('Payroll saved to cloud', 'success');
     } catch (err) {
       console.error('[Payroll] save failed:', err);

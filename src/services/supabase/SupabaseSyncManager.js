@@ -271,6 +271,7 @@ const SUPABASE_TABLE_COLUMNS = {
     'id', 'business_id', 'employee_id', 'employee_name', 'amount', 'reason',
     'status', 'approved_by', 'approved_at', 'rejection_reason', 'branch_id',
     'paid_at', 'paid_by', 'disbursement_id',
+    'deducted_at', 'deducted_in_payroll_id',
     'created_at', 'updated_at'
   ],
   incident_reports: [
@@ -407,6 +408,8 @@ const FIELD_NAME_MAP = {
   requestedDate: 'requested_date',
   approvedBy: 'approved_by',
   approvedAt: 'approved_at',
+  deductedAt: 'deducted_at',
+  deductedInPayrollId: 'deducted_in_payroll_id',
   startDate: 'start_date',
   endDate: 'end_date',
   quantityBefore: 'quantity_before',

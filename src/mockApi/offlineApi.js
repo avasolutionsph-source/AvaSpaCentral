@@ -178,12 +178,23 @@ export const payrollRequestsApi = {
 // Cash Drawer API (now using Dexie)
 export const cashDrawerApi = {
   getSessions: cashDrawerAdapter.getSessions,
+  // Legacy single-session API
   createSession: cashDrawerAdapter.createSession,
   closeSession: cashDrawerAdapter.closeSession,
   addTransaction: cashDrawerAdapter.addTransaction,
   getOpenSession: cashDrawerAdapter.getOpenSession,
   getByDate: cashDrawerAdapter.getByDate,
-  getCurrentDrawer: cashDrawerAdapter.getCurrentDrawer
+  getCurrentDrawer: cashDrawerAdapter.getCurrentDrawer,
+  // Drawer-day + multi-cashier shift API. Without these the UI throws
+  // "Y.cashDrawer.openDrawer is not a function" because callers reach
+  // through this facade instead of the adapter directly.
+  openDrawer: cashDrawerAdapter.openDrawer,
+  closeDrawer: cashDrawerAdapter.closeDrawer,
+  getOpenDrawerForBranch: cashDrawerAdapter.getOpenDrawerForBranch,
+  startShift: cashDrawerAdapter.startShift,
+  endShift: cashDrawerAdapter.endShift,
+  getShiftsBySession: cashDrawerAdapter.getShiftsBySession,
+  getActiveShift: cashDrawerAdapter.getActiveShift,
 };
 
 // Users API (now using Dexie)

@@ -2484,6 +2484,17 @@ const POS = () => {
                         <span>Original Amount:</span>
                         <span>₱{(gcValidation.giftCertificate.amount ?? 0).toLocaleString()}</span>
                       </div>
+                      {gcValidation.giftCertificate.pricePaid != null && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0', color: 'var(--gray-600)', fontSize: '0.85rem' }}>
+                          <span>Sold For:</span>
+                          <span>
+                            ₱{Number(gcValidation.giftCertificate.pricePaid).toLocaleString()}
+                            {gcValidation.giftCertificate.paymentMethod
+                              ? ` (${gcValidation.giftCertificate.paymentMethod})`
+                              : ''}
+                          </span>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--spacing-xs) 0' }}>
                         <span>Discount to Apply:</span>
                         <span style={{ fontWeight: 700, color: 'var(--primary)' }}>

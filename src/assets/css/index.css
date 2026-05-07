@@ -3494,6 +3494,13 @@ select {
   letter-spacing: 0.5px;
 }
 
+.gc-stat-sub {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--gray-400);
+  font-weight: 500;
+}
+
 /* Gift Certificates Grid */
 .gc-grid-enhanced {
   display: grid;
@@ -3639,6 +3646,14 @@ select {
 .gc-badge-partial {
   font-size: 0.8rem;
   color: var(--gray-500);
+}
+
+.gc-sold-info {
+  margin-top: var(--spacing-xs);
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 /* Details Section */

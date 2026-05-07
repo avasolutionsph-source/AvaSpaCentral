@@ -7,7 +7,7 @@ import { supabaseSyncManager } from '../services/supabase';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const GiftCertificates = () => {
-  const { showToast, getEffectiveBranchId } = useApp();
+  const { showToast, getEffectiveBranchId, user } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [giftCertificates, setGiftCertificates] = useState([]);
@@ -22,10 +22,16 @@ const GiftCertificates = () => {
     recipientName: '',
     recipientEmail: '',
     amount: '',
+    pricePaid: '',
+    paymentMethod: 'Cash',
+    buyerName: '',
     expiryDate: '',
     noExpiry: false,
     message: ''
   });
+  // Track whether user manually edited Price Sold so we stop auto-syncing
+  // it to the face-value amount.
+  const [pricePaidTouched, setPricePaidTouched] = useState(false);
 
   const [validateCode, setValidateCode] = useState('');
   const [validationResult, setValidationResult] = useState(null);
@@ -126,8 +132,15 @@ const GiftCertificates = () => {
     const totalValue = scoped
       .filter(gc => getGCStatus(gc) === 'active')
       .reduce((sum, gc) => sum + (gc.balance || 0), 0);
+    // Sum what buyers actually paid across every GC ever sold (regardless of
+    // current status). Falls back to face-value `amount` for legacy records
+    // issued before pricePaid was tracked.
+    const soldRevenue = scoped.reduce(
+      (sum, gc) => sum + (gc.pricePaid != null ? Number(gc.pricePaid) : (gc.amount || 0)),
+      0
+    );
 
-    return { active, redeemed, expired, totalValue };
+    return { active, redeemed, expired, totalValue, soldRevenue };
   };
 
   const getGCStatus = (gc) => {
@@ -143,10 +156,14 @@ const GiftCertificates = () => {
       recipientName: '',
       recipientEmail: '',
       amount: '',
+      pricePaid: '',
+      paymentMethod: 'Cash',
+      buyerName: '',
       expiryDate: format(defaultExpiry, 'yyyy-MM-dd'),
       noExpiry: false,
       message: ''
     });
+    setPricePaidTouched(false);
     setShowCreateModal(true);
   };
 
@@ -158,18 +175,35 @@ const GiftCertificates = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    if (name === 'pricePaid') {
+      setPricePaidTouched(true);
+    }
+    setFormData(prev => {
+      const next = { ...prev, [name]: type === 'checkbox' ? checked : value };
+      // Auto-sync Price Sold to face value until the user touches it.
+      // Most GCs sell at face value; this saves a keystroke and still lets
+      // promo / discounted issues override it freely.
+      if (name === 'amount' && !pricePaidTouched) {
+        next.pricePaid = value;
+      }
+      return next;
+    });
   };
 
   const handleAmountPreset = (amount) => {
-    setFormData(prev => ({ ...prev, amount: amount.toString() }));
+    setFormData(prev => ({
+      ...prev,
+      amount: amount.toString(),
+      pricePaid: pricePaidTouched ? prev.pricePaid : amount.toString()
+    }));
   };
 
   const validateForm = () => {
     if (!formData.recipientName.trim()) { showToast('Recipient name is required', 'error'); return false; }
     if (!formData.recipientEmail.trim()) { showToast('Recipient email is required', 'error'); return false; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail)) { showToast('Invalid email format', 'error'); return false; }
-    if (!formData.amount || parseFloat(formData.amount) <= 0) { showToast('Valid amount is required', 'error'); return false; }
+    if (!formData.amount || parseFloat(formData.amount) <= 0) { showToast('Valid face value is required', 'error'); return false; }
+    if (!formData.pricePaid || parseFloat(formData.pricePaid) <= 0) { showToast('Price sold is required', 'error'); return false; }
     if (!formData.noExpiry && !formData.expiryDate) { showToast('Expiry date is required', 'error'); return false; }
     if (!formData.noExpiry && formData.expiryDate && new Date(formData.expiryDate) < new Date(new Date().toDateString())) {
       showToast('Expiry date cannot be in the past', 'error'); return false;
@@ -187,18 +221,94 @@ const GiftCertificates = () => {
         showToast('Please select a specific branch before issuing a gift certificate', 'error');
         return;
       }
+      const faceValue = parseFloat(formData.amount);
+      const pricePaid = parseFloat(formData.pricePaid);
+      const buyerName = formData.buyerName.trim() || formData.recipientName.trim();
+      const soldAt = new Date().toISOString();
+
       const gcData = {
         recipientName: formData.recipientName.trim(),
         recipientEmail: formData.recipientEmail.trim(),
-        amount: parseFloat(formData.amount),
-        balance: parseFloat(formData.amount),
+        amount: faceValue,
+        balance: faceValue,
+        pricePaid,
+        paymentMethod: formData.paymentMethod,
+        buyerName,
+        soldAt,
+        soldBy: user?.name || null,
+        soldById: user?._id || null,
         expiryDate: formData.noExpiry ? null : formData.expiryDate,
         message: formData.message.trim() || undefined,
         branchId,
       };
 
-      await mockApi.giftCertificates.createGiftCertificate(gcData);
-      showToast('Gift certificate created!', 'success');
+      const result = await mockApi.giftCertificates.createGiftCertificate(gcData);
+      const createdGC = result?.giftCertificate || result;
+
+      // Create a Transaction for the GC sale so it shows up in Sales History,
+      // Reports (Revenue Analysis, P&L, Daily Operations), and the Cash Drawer
+      // — same pipeline POS uses for service/product sales.
+      try {
+        const nowDate = new Date();
+        const todayStr = `${nowDate.getFullYear()}${String(nowDate.getMonth() + 1).padStart(2, '0')}${String(nowDate.getDate()).padStart(2, '0')}`;
+        const sequence = Date.now().toString().slice(-6) + Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const receiptNumber = `GC-${todayStr}-${sequence}`;
+
+        const item = {
+          id: createdGC?._id || createdGC?.code,
+          name: `Gift Certificate ${createdGC?.code || ''}`.trim(),
+          type: 'gift_certificate',
+          quantity: 1,
+          price: pricePaid,
+          subtotal: pricePaid,
+        };
+
+        const transaction = {
+          receiptNumber,
+          date: soldAt,
+          status: 'completed',
+          customer: {
+            name: buyerName,
+            email: formData.recipientEmail.trim(),
+          },
+          items: [item],
+          subtotal: pricePaid,
+          discount: 0,
+          tax: 0,
+          totalAmount: pricePaid,
+          paymentMethod: formData.paymentMethod,
+          amountReceived: pricePaid,
+          change: 0,
+          giftCertificateCode: createdGC?.code,
+          giftCertificateFaceValue: faceValue,
+          bookingSource: 'Walk-in',
+          notes: `Gift certificate sale (face value ₱${faceValue.toLocaleString()})`,
+          branchId,
+          cashier: user?.name || 'Staff',
+          cashierId: user?._id || null,
+          cashierName: user?.name || null,
+        };
+
+        const savedTxn = await mockApi.transactions.createTransaction(transaction);
+
+        // Backlink txn to the GC for traceability (refund / void flows).
+        if (createdGC?._id) {
+          await mockApi.giftCertificates.updateGiftCertificate(createdGC._id, {
+            transactionId: savedTxn?._id,
+            receiptNumber,
+          });
+        }
+      } catch (txnErr) {
+        // GC was created but transaction logging failed. Surface this so the
+        // user knows the sale won't appear in reports until reconciled.
+        console.error('[GiftCertificates] Failed to log sale transaction', txnErr);
+        showToast('Gift certificate created, but failed to log sale to transactions', 'warning');
+        setShowCreateModal(false);
+        loadGiftCertificates();
+        return;
+      }
+
+      showToast('Gift certificate sold and recorded!', 'success');
       setShowCreateModal(false);
       loadGiftCertificates();
     } catch (error) {
@@ -305,8 +415,9 @@ const GiftCertificates = () => {
         </div>
         <div className="gc-stat-card value-stat">
           <div className="gc-stat-content">
-            <div className="gc-stat-value">₱{stats.totalValue.toLocaleString()}</div>
-            <div className="gc-stat-label">Total Active Value</div>
+            <div className="gc-stat-value">₱{stats.soldRevenue.toLocaleString()}</div>
+            <div className="gc-stat-label">Total Sold Revenue</div>
+            <div className="gc-stat-sub">₱{stats.totalValue.toLocaleString()} active liability</div>
           </div>
         </div>
       </div>
@@ -371,6 +482,12 @@ const GiftCertificates = () => {
                       <span className="gc-badge-partial">of ₱{(gc.amount || 0).toLocaleString()}</span>
                     )}
                   </div>
+                  {gc.pricePaid != null && (
+                    <div className="gc-sold-info">
+                      Sold for ₱{Number(gc.pricePaid).toLocaleString()}
+                      {gc.paymentMethod ? ` · ${gc.paymentMethod}` : ''}
+                    </div>
+                  )}
                 </div>
 
                 {/* Details Section */}
@@ -454,9 +571,10 @@ const GiftCertificates = () => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Amount (₱) *</label>
+                  <label>Face Value (₱) *</label>
                   <input type="number" name="amount" value={formData.amount} onChange={handleInputChange}
                     placeholder="0.00" className="form-control" min="0" step="0.01" required />
+                  <small className="form-hint">Worth of the certificate when redeemed</small>
                   <div className="amount-presets">
                     {amountPresets.map(amount => (
                       <button
@@ -469,6 +587,30 @@ const GiftCertificates = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Price Sold (₱) *</label>
+                    <input type="number" name="pricePaid" value={formData.pricePaid} onChange={handleInputChange}
+                      placeholder="0.00" className="form-control" min="0" step="0.01" required />
+                    <small className="form-hint">What the buyer actually paid (for promos / discounts)</small>
+                  </div>
+                  <div className="form-group">
+                    <label>Payment Method *</label>
+                    <select name="paymentMethod" value={formData.paymentMethod} onChange={handleInputChange}
+                      className="form-control" required>
+                      <option value="Cash">Cash</option>
+                      <option value="Card">Card</option>
+                      <option value="GCash">GCash</option>
+                      <option value="QRPh">QRPh</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Buyer Name</label>
+                  <input type="text" name="buyerName" value={formData.buyerName} onChange={handleInputChange}
+                    placeholder="Leave blank to use recipient name" className="form-control" />
                 </div>
                 <div className="form-group">
                   <label>Expiry Date {!formData.noExpiry && '*'}</label>
@@ -541,6 +683,17 @@ const GiftCertificates = () => {
                         <span>Original Amount:</span>
                         <span>₱{validationResult.giftCertificate.amount.toLocaleString()}</span>
                       </div>
+                      {validationResult.giftCertificate.pricePaid != null && (
+                        <div className="gc-detail-row">
+                          <span>Sold For:</span>
+                          <span>
+                            ₱{Number(validationResult.giftCertificate.pricePaid).toLocaleString()}
+                            {validationResult.giftCertificate.paymentMethod
+                              ? ` (${validationResult.giftCertificate.paymentMethod})`
+                              : ''}
+                          </span>
+                        </div>
+                      )}
                       <div className="gc-detail-row">
                         <span>Expires:</span>
                         <span>{validationResult.giftCertificate.expiryDate ? format(parseISO(validationResult.giftCertificate.expiryDate), 'MMM dd, yyyy') : 'No expiry'}</span>

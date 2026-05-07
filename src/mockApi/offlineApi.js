@@ -138,6 +138,7 @@ export const giftCertificatesApi = {
   getGiftCertificate: giftCertificatesAdapter.getGiftCertificate,
   getByCode: giftCertificatesAdapter.getByCode,
   createGiftCertificate: giftCertificatesAdapter.createGiftCertificate,
+  updateGiftCertificate: giftCertificatesAdapter.updateGiftCertificate,
   redeemGiftCertificate: giftCertificatesAdapter.redeemGiftCertificate,
   deleteGiftCertificate: giftCertificatesAdapter.deleteGiftCertificate,
   validateGiftCertificate: giftCertificatesAdapter.validateGiftCertificate

@@ -96,7 +96,7 @@ export interface TransactionItem {
   id: string;
   productId?: string;
   name: string;
-  type: 'product' | 'service';
+  type: 'product' | 'service' | 'gift_certificate';
   quantity: number;
   price: number;
   subtotal: number;
@@ -211,6 +211,17 @@ export interface GiftCertificate extends BaseEntity {
   code: string;
   originalAmount: number;
   balance: number;
+  /** What the buyer actually paid for this GC (may differ from face value for promos). */
+  pricePaid?: number;
+  paymentMethod?: 'Cash' | 'Card' | 'GCash' | 'QRPh' | 'Bank Transfer' | string;
+  buyerName?: string;
+  soldAt?: string;
+  soldBy?: string;
+  soldById?: string;
+  /** Receipt number of the linked sale Transaction. */
+  receiptNumber?: string;
+  /** _id of the linked sale Transaction (for refund / void traceability). */
+  transactionId?: string;
   purchasedBy?: string;
   recipientName?: string;
   recipientEmail?: string;

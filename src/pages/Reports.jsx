@@ -220,9 +220,14 @@ const Reports = ({ embedded = false }) => {
     let gcRevenue = 0;
     txns.forEach(t => {
       t.items?.forEach(item => {
-        // Check if item is a product or service (heuristic based on name)
-        const isProduct = item.type === 'product' || item.name?.toLowerCase().includes('product') || item.name?.toLowerCase().includes('oil') || item.name?.toLowerCase().includes('candle');
-        const isGC = item.name?.toLowerCase().includes('gift') || item.name?.toLowerCase().includes('certificate');
+        // GC sale items are tagged explicitly; fall back to a name heuristic for
+        // legacy rows that predate the typed flag.
+        const isGC = item.type === 'gift_certificate'
+          || item.name?.toLowerCase().includes('gift certificate');
+        const isProduct = !isGC && (item.type === 'product'
+          || item.name?.toLowerCase().includes('product')
+          || item.name?.toLowerCase().includes('oil')
+          || item.name?.toLowerCase().includes('candle'));
         if (isGC) {
           gcRevenue += item.price * item.quantity;
         } else if (isProduct) {
@@ -268,6 +273,9 @@ const Reports = ({ embedded = false }) => {
 
     txns.forEach(t => {
       t.items?.forEach(item => {
+        // GC sales are tracked separately under Revenue Analysis; don't pollute
+        // Service Performance with one row per certificate code.
+        if (item.type === 'gift_certificate') return;
         if (!servicePerformance[item.name]) {
           servicePerformance[item.name] = {
             name: item.name,
@@ -423,6 +431,7 @@ const Reports = ({ embedded = false }) => {
     const services = {};
     txns.forEach(t => {
       t.items?.forEach(item => {
+        if (item.type === 'gift_certificate') return;
         if (!services[item.name]) {
           services[item.name] = { name: item.name, revenue: 0, count: 0 };
         }

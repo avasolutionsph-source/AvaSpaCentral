@@ -1100,6 +1100,13 @@ export const giftCertificatesAdapter = {
     return { success: true, giftCertificate: clone(certificate) };
   },
 
+  async updateGiftCertificate(id, updates) {
+    await delay();
+    const updated = await storageService.giftCertificates.update(id, updates);
+    if (!updated) throw new Error('Gift certificate not found');
+    return { success: true, giftCertificate: clone(updated) };
+  },
+
   async redeemGiftCertificate(code, amount) {
     await delay();
     const certificate = await storageService.giftCertificates.getByCode(code);

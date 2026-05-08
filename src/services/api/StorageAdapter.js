@@ -1170,12 +1170,12 @@ export const notificationsAdapter = {
   async createNotification(data) {
     await delay();
     const created = await NotificationRepo.create({
-      businessId: getRequiredBusinessId(),
       status: 'unread',
       deliveryChannels: ['inapp'],
       createdAt: new Date().toISOString(),
       expiresAt: data.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       ...data,
+      businessId: getRequiredBusinessId(),
     });
     return clone(created);
   },

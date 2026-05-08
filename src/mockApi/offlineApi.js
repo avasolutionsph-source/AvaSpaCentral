@@ -29,7 +29,8 @@ import {
   cashDrawerAdapter,
   shiftSchedulesAdapter,
   usersAdapter,
-  homeServicesAdapter
+  homeServicesAdapter,
+  notificationsAdapter
 } from '../services/api';
 
 // Import APIs that we haven't migrated yet from the original mockApi
@@ -143,8 +144,6 @@ export const giftCertificatesApi = {
   deleteGiftCertificate: giftCertificatesAdapter.deleteGiftCertificate,
   validateGiftCertificate: giftCertificatesAdapter.validateGiftCertificate
 };
-
-import { notificationsAdapter } from '../services/api/StorageAdapter';
 
 export const notificationsApi = {
   getUnreadForUser: notificationsAdapter.getUnreadForUser,

@@ -5,6 +5,7 @@ import { setBusinessContext, clearBusinessContext } from '../services/storage/Ba
 import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 import { db } from '../db';
 import { setAnalyticsBranchFilter } from '../mockApi/mockApi';
+import NotificationService from '../services/notifications/NotificationService';
 
 // Sentinel representing "view data from all branches" for Owner/Manager users.
 // Stored in the same selectedBranch slot (so localStorage persistence Just Works).
@@ -578,6 +579,18 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     setAnalyticsBranchFilter(getEffectiveBranchId());
   }, [user?.role, user?.branchId, selectedBranch?.id, selectedBranch?._allBranches]);
+
+  // Wire the notification service to the current user. setUserContext lets
+  // the producer attribute branch/business. start() begins the realtime
+  // subscription + prune loop. stop() halts the prune loop on logout.
+  useEffect(() => {
+    if (user) {
+      NotificationService.setUserContext(user);
+      NotificationService.start();
+    } else {
+      NotificationService.stop();
+    }
+  }, [user]);
 
   // Select a branch (called from BranchSelect page or the inline switcher)
   const selectBranch = (branch) => {

@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { homeServicesApi, transactionsApi } from '../mockApi/offlineApi';
 import { format, parseISO } from 'date-fns';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 // Import new shared components and hooks
 import { useCrudOperations } from '../hooks';
@@ -288,6 +290,60 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Force a sync of currentTime + reload of room/service data when the tab
+  // becomes visible again. Mobile browsers (especially when the phone goes
+  // into power saving) suspend setInterval and may serve stale local data,
+  // which causes the timer to "disappear" until the page is manually
+  // refreshed. Resync on resume so therapists see the right state instantly.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      setCurrentTime(new Date());
+      try { loadRooms?.(); } catch {}
+      try { loadHomeServices(); } catch {}
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  // Cross-device live updates: when POS / another device starts or ends a
+  // service, refresh both rooms and home services so the therapist's timer
+  // appears (or stops) without a manual reload.
+  useEffect(() => {
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      const watched = ['rooms', 'activeServices', 'homeServices', 'advanceBookings', 'transactions'];
+      if (
+        (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => {
+          try { loadRooms?.(); } catch {}
+          try { loadHomeServices(); } catch {}
+        }, 500);
+      }
+    });
+
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (['rooms', 'activeServices', 'homeServices'].includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => {
+          try { loadRooms?.(); } catch {}
+          try { loadHomeServices(); } catch {}
+        }, 300);
+      }
+    });
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+    };
   }, []);
 
   // Helper function to calculate remaining time for occupied rooms

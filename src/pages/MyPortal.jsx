@@ -14,6 +14,8 @@ import IncidentReportRepository from '../services/storage/repositories/IncidentR
 import { SettingsRepository } from '../services/storage/repositories';
 import { formatTime12Hour } from '../utils/dateUtils';
 import { format } from 'date-fns';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import '../assets/css/hub-pages.css';
 import '../assets/css/pos.css';
 
@@ -229,11 +231,56 @@ const MyPortal = () => {
     }
   };
 
-  // Load today's tasks on mount and refresh every 30 seconds
+  // Load today's tasks on mount + refresh on realtime / data-change /
+  // visibility-resume. The 30s polling is kept as a safety net for
+  // environments where realtime is misbehaving, but it should rarely
+  // be the source of truth anymore.
   useEffect(() => {
     loadTodayTasks();
     const interval = setInterval(loadTodayTasks, 30000);
     return () => clearInterval(interval);
+  }, [user?.employeeId]);
+
+  // Cross-device live updates so a service started from POS / another device
+  // shows up in the therapist's portal immediately instead of after the next
+  // 30s poll. Watches the entities that materially change a therapist's tasks.
+  useEffect(() => {
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      const watched = ['advanceBookings', 'activeServices', 'homeServices', 'rooms', 'appointments', 'transactions'];
+      if (
+        (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadTodayTasks(), 500);
+      }
+    });
+
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (['advanceBookings', 'activeServices', 'homeServices', 'rooms', 'appointments'].includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadTodayTasks(), 300);
+      }
+    });
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadTodayTasks();
+        loadStats();
+        loadTodayAttendance();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [user?.employeeId]);
 
   // Calculate distance between two GPS coordinates using Haversine formula (returns meters)

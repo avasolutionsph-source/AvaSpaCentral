@@ -1,4 +1,5 @@
 import mockApi from '../../mockApi';
+import NotificationRepository from '../storage/repositories/NotificationRepository';
 
 const TYPES = Object.freeze({
   BOOKING_ASSIGNED_THERAPIST: 'booking.assigned.therapist',
@@ -27,6 +28,7 @@ const TYPES = Object.freeze({
 
 let _userContext = null;
 let _deliveryHooks = { playSound: () => {}, showBrowser: () => {} };
+let _pruneIntervalId = null;
 
 const NotificationService = {
   TYPES,
@@ -39,7 +41,9 @@ const NotificationService = {
 
   /** Test seams. */
   _setUserContextForTest(u) { _userContext = u; },
-  _setDeliveryHooksForTest(h) { _deliveryHooks = h; },
+  _setDeliveryHooksForTest(h) {
+    _deliveryHooks = { playSound: () => {}, showBrowser: () => {}, ...h };
+  },
 
   /**
    * Create + dispatch a notification.
@@ -102,23 +106,55 @@ const NotificationService = {
     return false;
   },
 
+  /** Normalize a record that may be in snake_case (raw Supabase row) or
+   *  camelCase (Dexie record). Cross-device realtime payloads come in
+   *  snake_case; local writes are camelCase. */
+  _normalizeRecord(r) {
+    if (!r) return null;
+    return {
+      _id: r._id ?? r.id,
+      targetUserId: r.targetUserId ?? r.target_user_id ?? null,
+      targetRole: r.targetRole ?? r.target_role ?? null,
+      branchId: r.branchId ?? r.branch_id ?? null,
+      businessId: r.businessId ?? r.business_id ?? null,
+      type: r.type,
+      title: r.title,
+      message: r.message,
+      action: r.action,
+      actionLabel: r.actionLabel ?? r.action_label,
+      soundClass: r.soundClass ?? r.sound_class ?? 'oneshot',
+      payload: r.payload ?? {},
+    };
+  },
+
   async start() {
-    // Subscribe to remote-pushed notifications via the sync manager so a
-    // notification minted on another device fires the bell here too.
+    // Lazy-load supabase so initial bundle doesn't pay the SDK cost until
+    // the user is authenticated and start() is actually called.
     const { supabaseSyncManager } = await import('../supabase');
     supabaseSyncManager.subscribe((status) => {
       if (status.type === 'realtime_update' && status.entityType === 'notifications' && status.record) {
-        if (this._isAudience(status.record)) {
-          _deliveryHooks.playSound(status.record);
-          _deliveryHooks.showBrowser(status.record);
+        const normalized = this._normalizeRecord(status.record);
+        if (this._isAudience(normalized)) {
+          _deliveryHooks.playSound(normalized);
+          _deliveryHooks.showBrowser(normalized);
         }
       }
     });
 
     // Hourly prune of expired rows (defensive; expiresAt defaults to 7d).
-    setInterval(() => {
-      import('../storage/repositories/NotificationRepository').then(m => m.default.pruneExpired());
+    if (_pruneIntervalId) clearInterval(_pruneIntervalId);
+    _pruneIntervalId = setInterval(() => {
+      NotificationRepository.pruneExpired().catch(err => {
+        console.error('[NotificationService] pruneExpired failed', err);
+      });
     }, 60 * 60 * 1000);
+  },
+
+  stop() {
+    if (_pruneIntervalId) {
+      clearInterval(_pruneIntervalId);
+      _pruneIntervalId = null;
+    }
   },
 };
 

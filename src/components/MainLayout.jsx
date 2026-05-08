@@ -5,6 +5,7 @@ import mockApi from '../mockApi';
 import OfflineIndicator from './OfflineIndicator';
 import { useSyncStatus } from '../hooks';
 import { useNotifications } from '../hooks/useNotifications';
+import NotificationToastContainer from './NotificationToastContainer';
 import {
   getPreferredOrientation,
   setPreferredOrientation,
@@ -1040,6 +1041,8 @@ const MainLayout = () => {
           })()}
         </nav>
       )}
+
+      <NotificationToastContainer />
     </div>
   );
 };

@@ -243,9 +243,9 @@ const POS = () => {
     };
   }, []);
 
-  const loadPOSData = useCallback(async () => {
+  const loadPOSData = useCallback(async ({ quiet = false } = {}) => {
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
       const [productsData, employeesData, customersData, roomsData] = await Promise.all([
         mockApi.products.getProducts({ active: true }),
         mockApi.employees.getEmployees({ status: 'active' }),
@@ -270,12 +270,47 @@ const POS = () => {
       const uniqueCategories = [...new Set(visibleProducts.filter(branchFilter).map(p => p.category))];
       setCategories(uniqueCategories);
 
-      setLoading(false);
+      if (!quiet) setLoading(false);
     } catch (error) {
-      showToast('Failed to load POS data', 'error');
-      setLoading(false);
+      if (!quiet) {
+        showToast('Failed to load POS data', 'error');
+        setLoading(false);
+      }
     }
-  }, [showToast]);
+  }, [showToast, getEffectiveBranchId]);
+
+  // Cross-device live updates for the POS catalog: products / employees /
+  // customers / rooms can mutate on another terminal (admin device, manager
+  // adjustment) — refresh quietly so the cashier sees the latest catalog
+  // without losing their cart. Visibility resume reloads after sleep.
+  useEffect(() => {
+    const watched = ['products', 'employees', 'customers', 'rooms'];
+    let syncDebounce = null;
+    const unsubRealtime = supabaseSyncManager.subscribe((status) => {
+      if (status?.type === 'realtime_update' && watched.includes(status.entityType)) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadPOSData({ quiet: true }), 500);
+      }
+    });
+    let dataDebounce = null;
+    const unsubData = dataChangeEmitter.subscribe((change) => {
+      if (watched.includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadPOSData({ quiet: true }), 300);
+      }
+    });
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadPOSData({ quiet: true });
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      unsubRealtime();
+      unsubData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [loadPOSData]);
 
   // Load service rotation queue from the API (includes actual service counts)
   const loadRotationQueue = useCallback(async () => {

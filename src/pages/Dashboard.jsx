@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp, ALL_BRANCHES } from '../context/AppContext';
 import mockApi from '../mockApi';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
+import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 // ChartJS is registered globally in main.jsx via utils/chartConfig
 import { Line, Pie, Bar, Doughnut } from 'react-chartjs-2';
 import { DashboardSkeleton } from '../components/Skeleton';
@@ -374,22 +375,48 @@ const Dashboard = () => {
     showToast('Dashboard refreshed', 'success');
   }, [showToast]);
 
-  // Auto-refresh when transactions change (local POS sales)
+  // Auto-refresh when transactions change (local POS sales) plus realtime
+  // echoes from other devices and visibility resume on phone wake.
   useEffect(() => {
-    let debounce = null;
-    const unsubscribe = dataChangeEmitter.subscribe((change) => {
-      if (change.entityType === 'transactions' || change.entityType === 'attendance') {
-        clearTimeout(debounce);
-        debounce = setTimeout(() => loadDashboardData(), 500);
+    const watched = ['transactions', 'attendance', 'expenses', 'products', 'rooms'];
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (watched.includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadDashboardData(), 500);
       }
     });
-    return () => {
-      unsubscribe();
-      clearTimeout(debounce);
+
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status?.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        (status?.type === 'sync_complete' && status?.pulled > 0) ||
+        (status?.type === 'pull_complete' && status?.pulled > 0)
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadDashboardData(), 500);
+      }
+    });
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadDashboardData();
     };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubscribeData();
+      unsubscribeSync();
+      clearTimeout(dataDebounce);
+      clearTimeout(syncDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Periodic refresh for cross-device sync (every 60 seconds)
+  // Periodic refresh as a safety net (every 60 seconds) for environments
+  // where realtime is misbehaving. Should rarely be the source of truth now
+  // that the page reacts to realtime + dataChange + visibility events.
   useEffect(() => {
     const interval = setInterval(() => {
       loadDashboardData();

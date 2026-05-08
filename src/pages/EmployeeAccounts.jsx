@@ -325,6 +325,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     loadData: loadUsers
   } = useCrudOperations({
     entityName: 'account',
+    entityType: 'users',
     api: usersApi,
     initialFormData,
     transformForEdit: (user) => ({

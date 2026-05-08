@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 /**
  * useCrudOperations - Unified hook for CRUD operations with modal, form, and delete management
@@ -28,6 +29,11 @@ import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
  */
 const useCrudOperations = ({
   entityName = 'item',
+  // Table name used by realtime + dataChange events. Defaults to entityName + 's'
+  // which works for employees / suppliers / expenses / products / rooms. Pages
+  // whose underlying table differs (e.g. EmployeeAccounts → 'users') should
+  // pass this explicitly.
+  entityType,
   api,
   initialFormData = {},
   transformForEdit,
@@ -118,6 +124,57 @@ const useCrudOperations = ({
     });
     return unsubscribe;
   }, [loadData]);
+
+  // Silent background reload — used for cross-device realtime echoes,
+  // same-device data-change events, and visibility resume. Skips the loading
+  // spinner so the UI doesn't flash on every incoming event.
+  const silentLoad = useCallback(async () => {
+    if (!apiRef.current?.getAll) return;
+    try {
+      const data = await apiRef.current.getAll();
+      if (isMounted.current) setItems(data || []);
+    } catch {
+      // Silent — background refresh; don't surface a toast for transient errors.
+    }
+  }, []);
+
+  // Cross-device realtime updates + same-device data-change events + tab
+  // visibility resume. Each CRUD page that uses this hook now reacts to
+  // mutations made on other devices and refreshes itself when the user
+  // returns to the tab (mobile sleep / browser background).
+  useEffect(() => {
+    const watched = entityType || (entityName ? `${entityName}s` : null);
+    if (!watched) return undefined;
+
+    let syncDebounce = null;
+    const unsubRealtime = supabaseSyncManager.subscribe((status) => {
+      if (status.type === 'realtime_update' && status.entityType === watched && isMounted.current) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(silentLoad, 500);
+      }
+    });
+
+    let dataDebounce = null;
+    const unsubData = dataChangeEmitter.subscribe((change) => {
+      if (change.entityType === watched && isMounted.current) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(silentLoad, 300);
+      }
+    });
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && isMounted.current) silentLoad();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubRealtime();
+      unsubData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [entityName, entityType, silentLoad]);
 
   // Refresh data (alias for loadData)
   const refresh = loadData;

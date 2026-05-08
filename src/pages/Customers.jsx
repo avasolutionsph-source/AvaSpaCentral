@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, isToday, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const Customers = () => {
   const { showToast, getEffectiveBranchId } = useApp();
@@ -35,17 +37,52 @@ const Customers = () => {
     loadCustomers();
   }, []);
 
-  const loadCustomers = useCallback(async () => {
+  const loadCustomers = useCallback(async ({ quiet = false } = {}) => {
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
       const data = await mockApi.customers.getCustomers();
       setCustomers(data);
-      setLoading(false);
+      if (!quiet) setLoading(false);
     } catch (error) {
-      showToast('Failed to load customers', 'error');
-      setLoading(false);
+      if (!quiet) {
+        showToast('Failed to load customers', 'error');
+        setLoading(false);
+      }
     }
   }, [showToast]);
+
+  // Cross-device live updates + tab-resume refresh: customers can be added
+  // from POS (walk-in), other staff devices, or self-service registration.
+  useEffect(() => {
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status.type === 'realtime_update' && status.entityType === 'customers') ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadCustomers({ quiet: true }), 500);
+      }
+    });
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (change.entityType === 'customers') {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadCustomers({ quiet: true }), 300);
+      }
+    });
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadCustomers({ quiet: true });
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [loadCustomers]);
 
   // Memoized filtered customers list
   const filteredCustomers = useMemo(() => {

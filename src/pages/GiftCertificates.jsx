@@ -66,11 +66,19 @@ const GiftCertificates = () => {
       }
     });
 
+    // Phone wake / tab resume: phones in power saving may serve stale data
+    // after sleep. Reload so balances and statuses reflect the latest state.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadGiftCertificates();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       unsubscribeSync();
       unsubscribeData();
       clearTimeout(syncDebounce);
       clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
 

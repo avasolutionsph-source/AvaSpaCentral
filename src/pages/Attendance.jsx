@@ -83,11 +83,20 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       }
     });
 
+    // Phone wake / tab resume: mobile browsers suspend setInterval and serve
+    // stale local Dexie data after sleep, so the table can show outdated
+    // clock-in/out states until manual refresh. Reload on resume.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadData();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       unsubscribeSync();
       unsubscribeData();
       clearTimeout(syncDebounce);
       clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [selectedDate]);
 

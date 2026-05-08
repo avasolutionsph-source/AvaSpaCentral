@@ -7,6 +7,8 @@ import CameraCapture from '../components/CameraCapture';
 import { LazyImage } from '../components/OptimizedImage';
 import { SettingsRepository } from '../services/storage/repositories';
 import { formatTime12Hour, formatTimeRange } from '../utils/dateUtils';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const Attendance = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
@@ -56,6 +58,38 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Cross-device live updates: when a therapist clocks in/out from another
+  // device, both the realtime channel (Supabase) and the local data emitter
+  // (this device's writes) trigger a debounced reload so the table reflects
+  // the change without requiring a manual refresh or date toggle.
+  useEffect(() => {
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status.type === 'realtime_update' && status.entityType === 'attendance') ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadData(), 500);
+      }
+    });
+
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (change.entityType === 'attendance') {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadData(), 300);
+      }
+    });
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+    };
+  }, [selectedDate]);
 
   // Check if an overnight shift is still active based on shift schedule endTime
   const isOvernightShiftActive = (record, scheduleMap) => {

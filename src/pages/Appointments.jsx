@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
@@ -8,6 +8,8 @@ import { getEmployeesForService, getTherapists } from '../utils/employeeFilters'
 import { ConfirmDialog } from '../components/shared';
 import { supabaseSyncManager } from '../services/supabase';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
+import storageService from '../services/storage';
+import { formatTime12Hour } from '../utils/dateUtils';
 
 const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
   const navigate = useNavigate();
@@ -93,6 +95,147 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
   ];
 
   const bookingSources = ['walk-in', 'phone', 'social-media', 'website'];
+
+  // Service rotation queue state — mirrors POS so walk-in appointments can
+  // also Auto Select / Auto Select (Male/Female) the next-in-rotation
+  // therapist instead of scrolling a dropdown.
+  const [rotationQueue, setRotationQueue] = useState([]);
+  const [nextEmployee, setNextEmployee] = useState(null);
+  const [serviceCountFilter, setServiceCountFilter] = useState('today');
+  const [historicalServiceCounts, setHistoricalServiceCounts] = useState({});
+
+  // Load (and reload) the rotation queue. Same shape as POS: read from the
+  // serviceRotation API, then strict-filter to clocked-in therapists in the
+  // current branch (no receptionists, no other branches).
+  const loadRotationQueue = useCallback(async () => {
+    try {
+      const result = await mockApi.serviceRotation.getRotationQueue();
+      let queue = result.queue || [];
+      const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
+      const therapistIds = new Set(getTherapists(allEmployees).map(e => String(e._id || e.id)));
+      queue = queue.filter(q => therapistIds.has(String(q.employeeId)));
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        const branchEmpIds = new Set(
+          allEmployees.filter(e => e.branchId === effectiveBranchId).map(e => String(e._id || e.id))
+        );
+        queue = queue.filter(q => branchEmpIds.has(String(q.employeeId)));
+      }
+      queue.forEach((q, i) => { q.queuePosition = i + 1; q.isNext = i === 0; });
+      setRotationQueue(queue);
+      setNextEmployee(queue[0] || null);
+    } catch (err) {
+      console.error('[Appointments] Failed to load rotation queue:', err);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Initial queue load + refresh when attendance / serviceRotation events fire
+  // (so a new clock-in elsewhere immediately surfaces in the queue).
+  useEffect(() => {
+    loadRotationQueue();
+    let debounce = null;
+    const unsubscribe = dataChangeEmitter.subscribe((change) => {
+      if (change.entityType === 'attendance' || change.entityType === 'serviceRotation') {
+        clearTimeout(debounce);
+        debounce = setTimeout(loadRotationQueue, 300);
+      }
+    });
+    return () => {
+      unsubscribe();
+      clearTimeout(debounce);
+    };
+  }, [loadRotationQueue]);
+
+  // Historical service counts for the selected filter (Today/Week/Month/All).
+  // Same logic as POS — counts completed transactions per employee.
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        let txns;
+        if (serviceCountFilter === 'today') {
+          txns = await storageService.transactions.getByDate(today);
+        } else if (serviceCountFilter === 'week') {
+          const weekAgo = new Date(now);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          const wk = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+          txns = await storageService.transactions.getByDateRange(wk, today);
+        } else if (serviceCountFilter === 'month') {
+          const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+          txns = await storageService.transactions.getByDateRange(m, today);
+        } else {
+          txns = await storageService.transactions.getAll();
+        }
+        const completed = (txns || []).filter(t => t.status === 'completed');
+        const counts = {};
+        completed.forEach(t => {
+          const empId = t.employeeId || t.employee?.id;
+          if (empId) counts[empId] = (counts[empId] || 0) + 1;
+        });
+        setHistoricalServiceCounts(counts);
+      } catch (err) {
+        console.warn('[Appointments] Failed to load service counts:', err);
+      }
+    };
+    loadCounts();
+  }, [serviceCountFilter]);
+
+  // Therapists currently busy (assigned to an occupied/pending room) should
+  // not show up as auto-pickable — they're already serving someone.
+  const busyEmployeeIds = useMemo(() => {
+    return rooms
+      .filter(r => (r.status === 'occupied' || r.status === 'pending') && r.assignedEmployeeId)
+      .map(r => String(r.assignedEmployeeId));
+  }, [rooms]);
+
+  const availableRotationQueue = useMemo(() => {
+    return rotationQueue.filter(emp => !busyEmployeeIds.includes(String(emp.employeeId)));
+  }, [rotationQueue, busyEmployeeIds]);
+
+  const selectFromRotation = useCallback((employeeId) => {
+    setFormData(prev => ({ ...prev, employeeId }));
+    showToast('Therapist selected from rotation queue', 'info');
+  }, [showToast]);
+
+  const pickAutoTherapist = useCallback((gender = null) => {
+    if (availableRotationQueue.length === 0) {
+      showToast('No clocked-in therapist available in rotation', 'error');
+      return;
+    }
+    // The queue is already branch-filtered in loadRotationQueue, so the
+    // unfiltered employees list is enough to look up gender by ID.
+    const empById = new Map(employees.map(e => [String(e._id), e]));
+    const match = availableRotationQueue.find(q => {
+      if (!gender) return true;
+      const emp = empById.get(String(q.employeeId));
+      return emp && (emp.gender || '').toLowerCase() === gender;
+    });
+    if (!match) {
+      showToast(`No available ${gender} therapist in rotation`, 'error');
+      return;
+    }
+    setFormData(prev => ({ ...prev, employeeId: match.employeeId }));
+    const suffix = gender ? ` (${gender})` : '';
+    showToast(`Auto-selected${suffix}: ${match.employeeName}`, 'success');
+  }, [availableRotationQueue, employees, showToast]);
+
+  const skipInRotation = useCallback(async (employeeId) => {
+    try {
+      await mockApi.serviceRotation.skipEmployee(employeeId);
+      await loadRotationQueue();
+      showToast('Therapist skipped in rotation', 'info');
+    } catch {
+      showToast('Failed to skip therapist', 'error');
+    }
+  }, [loadRotationQueue, showToast]);
+
+  // Show queue UI only when the appointment is for today (or unscheduled);
+  // for future-dated appointments, who's clocked in NOW is irrelevant —
+  // the rotation queue reflects today's attendance.
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const showRotationQueue = !formData.date || formData.date === todayStr;
 
   useEffect(() => {
     let isMounted = true;
@@ -792,6 +935,88 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                     {branchServices.map(s => <option key={s._id} value={s._id}>{s.name} - ₱{s.price}</option>)}
                   </select>
                 </div>
+                {/* Service Rotation Queue — only for today's appointments
+                    (rotation reflects who's clocked in NOW). */}
+                {modalMode === 'create' && showRotationQueue && rotationQueue.length > 0 && (
+                  <div className="rotation-queue-panel">
+                    <div className="rotation-queue-header">
+                      <span className="rotation-queue-title">🔄 Service Rotation Queue</span>
+                      <span className="rotation-queue-count">{availableRotationQueue.length} available</span>
+                    </div>
+                    <div className="rotation-auto-select">
+                      <button type="button" className="rotation-auto-btn"
+                        onClick={() => pickAutoTherapist()}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next therapist in rotation">
+                        Auto Select
+                      </button>
+                      <button type="button" className="rotation-auto-btn male"
+                        onClick={() => pickAutoTherapist('male')}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next male therapist in rotation">
+                        Auto Select (Male)
+                      </button>
+                      <button type="button" className="rotation-auto-btn female"
+                        onClick={() => pickAutoTherapist('female')}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next female therapist in rotation">
+                        Auto Select (Female)
+                      </button>
+                    </div>
+                    <div className="rotation-service-filter">
+                      {[
+                        { key: 'today', label: 'Today' },
+                        { key: 'week', label: 'Week' },
+                        { key: 'month', label: 'Month' },
+                        { key: 'all', label: 'All Time' }
+                      ].map(f => (
+                        <button key={f.key} type="button"
+                          className={`rotation-filter-btn ${serviceCountFilter === f.key ? 'active' : ''}`}
+                          onClick={() => setServiceCountFilter(f.key)}>
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="rotation-queue-list">
+                      {availableRotationQueue.map((emp, index) => (
+                        <div key={emp.employeeId}
+                          className={`rotation-queue-item ${emp.isNext ? 'next-in-line' : ''} ${formData.employeeId === emp.employeeId ? 'selected' : ''}`}
+                          onClick={() => selectFromRotation(emp.employeeId)}>
+                          <div className="rotation-queue-position">
+                            {emp.isNext ? '➡️' : `#${index + 1}`}
+                          </div>
+                          <div className="rotation-queue-info">
+                            <div className="rotation-queue-name">{emp.employeeName}</div>
+                            <div className="rotation-queue-details">
+                              <span className="rotation-clock-in">⏰ {formatTime12Hour(emp.clockInTime)}</span>
+                              <span className="rotation-services">🎯 {historicalServiceCounts[emp.employeeId] || 0} services</span>
+                            </div>
+                          </div>
+                          {emp.isNext && (
+                            <button type="button" className="rotation-skip-btn"
+                              onClick={(e) => { e.stopPropagation(); skipInRotation(emp.employeeId); }}
+                              title="Skip to next person">
+                              ⏭️
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {nextEmployee && !busyEmployeeIds.includes(String(nextEmployee.employeeId)) && (
+                      <div className="rotation-next-indicator">
+                        <strong>Next to serve:</strong> {nextEmployee.employeeName}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {modalMode === 'create' && showRotationQueue && rotationQueue.length === 0 && (
+                  <div className="rotation-no-queue">
+                    <span>⚠️</span>
+                    <p>No therapists clocked in today. Select manually below.</p>
+                  </div>
+                )}
+
                 <div className="form-row">
                   <div className="form-group">
                     <label>Therapist *</label>

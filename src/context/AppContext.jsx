@@ -93,7 +93,7 @@ const rolePermissions = {
   'Receptionist': ['pos', 'products', 'inventory', 'customers', 'appointments', 'attendance', 'payroll', 'rooms',
                    'service-history', 'expenses', 'my-schedule', 'payroll-requests', 'calendar'],
   'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests'],
-  'Rider': ['appointments', 'attendance', 'my-schedule', 'payroll-requests'],
+  'Rider': ['rider-bookings', 'appointments', 'attendance', 'my-schedule', 'payroll-requests'],
   'Utility': ['attendance', 'my-schedule', 'payroll-requests']
 };
 
@@ -123,7 +123,7 @@ const getFirstPageForRole = (role) => {
     case 'Therapist':
       return '/appointments';
     case 'Rider':
-      return '/appointments';
+      return '/rider-bookings';
     case 'Utility':
       return '/attendance';
     default:
@@ -513,6 +513,9 @@ export const AppProvider = ({ children }) => {
     return user?.role === 'Therapist';
   };
 
+  // Check if user is Rider
+  const isRider = () => user?.role === 'Rider';
+
   // Check if user can edit (Owner, Manager, and Branch Owner for their branch)
   const canEdit = () => {
     return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
@@ -659,6 +662,7 @@ export const AppProvider = ({ children }) => {
     isManager,
     isReceptionist,
     isTherapist,
+    isRider,
     isBranchOwner,
     canEdit,
     canEditProducts,

@@ -31,8 +31,11 @@ export function useNotifications(user) {
     [...own, ...role].forEach(n => map.set(n._id, n));
     const merged = [...map.values()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     setNotifications(merged);
-    if (!active && merged.length > 0) setActive(merged[0]);
-  }, [user?._id, user?.role, user?.branchId, active]);
+    // Use functional setActive so we don't need `active` in this callback's
+    // deps — that would invalidate the dataChangeEmitter subscription on
+    // every toast change.
+    setActive(prev => prev ?? merged[0] ?? null);
+  }, [user?._id, user?.role, user?.branchId]);
 
   useEffect(() => {
     if (!user?._id) return;
@@ -47,9 +50,9 @@ export function useNotifications(user) {
   const dismiss = useCallback(async (id) => {
     NotificationSoundManager.stop(id);
     await mockApi.notifications.dismiss(id);
-    if (active?._id === id) setActive(null);
+    setActive(prev => (prev?._id === id ? null : prev));
     refresh();
-  }, [active?._id, refresh]);
+  }, [refresh]);
 
   const dismissAll = useCallback(async () => {
     NotificationSoundManager.stop();

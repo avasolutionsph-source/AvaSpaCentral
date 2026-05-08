@@ -8,6 +8,7 @@ const NotificationSoundManager = {
   /** Sound played once on first call; loop-class fires again every 3s until stop(). */
   play(notification) {
     if (!notification || notification.soundClass === 'silent') return;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('notifSoundEnabled') === 'false') return;
     const audio = audioFactory();
     audio.volume = 0.85;
     audio.play().catch(() => {

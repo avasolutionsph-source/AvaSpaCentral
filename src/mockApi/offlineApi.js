@@ -29,7 +29,8 @@ import {
   cashDrawerAdapter,
   shiftSchedulesAdapter,
   usersAdapter,
-  homeServicesAdapter
+  homeServicesAdapter,
+  notificationsAdapter
 } from '../services/api';
 
 // Import APIs that we haven't migrated yet from the original mockApi
@@ -142,6 +143,15 @@ export const giftCertificatesApi = {
   redeemGiftCertificate: giftCertificatesAdapter.redeemGiftCertificate,
   deleteGiftCertificate: giftCertificatesAdapter.deleteGiftCertificate,
   validateGiftCertificate: giftCertificatesAdapter.validateGiftCertificate
+};
+
+export const notificationsApi = {
+  getUnreadForUser: notificationsAdapter.getUnreadForUser,
+  getUnreadForRole: notificationsAdapter.getUnreadForRole,
+  createNotification: notificationsAdapter.createNotification,
+  markRead: notificationsAdapter.markRead,
+  dismiss: notificationsAdapter.dismiss,
+  dismissAllForUser: notificationsAdapter.dismissAllForUser,
 };
 
 export const purchaseOrdersApi = {
@@ -269,6 +279,7 @@ export default {
   rooms: roomsApi,
   attendance: attendanceApi,
   giftCertificates: giftCertificatesApi,
+  notifications: notificationsApi,
   expenses: expensesApi,
   advanceBooking: advanceBookingApi,
   payrollConfig: payrollConfigApi,

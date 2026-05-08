@@ -27,9 +27,36 @@ vi.mock('../utils/sentry', () => ({
   clearUserContext: vi.fn(),
 }));
 
-vi.mock('../services/storage/BaseRepository', () => ({
-  setBusinessContext: vi.fn(),
-  clearBusinessContext: vi.fn(),
+vi.mock('../services/storage/BaseRepository', () => {
+  // Default export is the BaseRepository class. Tests don't actually invoke
+  // it — they just need the import chain (via NotificationService -> repos)
+  // to resolve.
+  class BaseRepoStub {
+    constructor() {}
+    create() { return Promise.resolve({}); }
+    update() { return Promise.resolve({}); }
+    delete() { return Promise.resolve(); }
+    getById() { return Promise.resolve(null); }
+    find() { return Promise.resolve([]); }
+    getAll() { return Promise.resolve([]); }
+    findByIndex() { return Promise.resolve([]); }
+    findOne() { return Promise.resolve(null); }
+  }
+  return {
+    default: BaseRepoStub,
+    setBusinessContext: vi.fn(),
+    clearBusinessContext: vi.fn(),
+  };
+});
+
+vi.mock('../services/notifications/NotificationService', () => ({
+  default: {
+    setUserContext: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    notify: vi.fn(),
+    TYPES: {},
+  },
 }));
 
 vi.mock('../services/brandingService', () => ({

@@ -51,6 +51,7 @@ const FinanceHub = lazy(() => import('./pages/FinanceHub'));
 const Disbursements = lazy(() => import('./pages/Disbursements'));
 const ServiceHub = lazy(() => import('./pages/ServiceHub'));
 const MyPortal = lazy(() => import('./pages/MyPortal'));
+const RiderBookings = lazy(() => import('./pages/RiderBookings'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -409,6 +410,7 @@ function AppRoutes() {
           <Route path="disbursements" element={<ProtectedRoute page="expenses"><Suspense fallback={<PageLoader />}><Disbursements /></Suspense></ProtectedRoute>} />
           <Route path="service-hub" element={<ProtectedRoute page="rooms"><Suspense fallback={<PageLoader />}><ServiceHub /></Suspense></ProtectedRoute>} />
           <Route path="my-portal" element={<ProtectedRoute page="my-schedule"><Suspense fallback={<PageLoader />}><MyPortal /></Suspense></ProtectedRoute>} />
+          <Route path="rider-bookings" element={<ProtectedRoute page="rider-bookings"><Suspense fallback={<PageLoader />}><RiderBookings /></Suspense></ProtectedRoute>} />
           <Route path="reports" element={<ProtectedRoute page="reports"><Suspense fallback={<PageLoader />}><Reports /></Suspense></ProtectedRoute>} />
           <Route path="calendar" element={<ProtectedRoute page="calendar"><Suspense fallback={<PageLoader />}><Calendar /></Suspense></ProtectedRoute>} />
           <Route path="daet-insights" element={<ProtectedRoute page="daet-insights"><Suspense fallback={<PageLoader />}><DaetInsights /></Suspense></ProtectedRoute>} />

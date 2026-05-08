@@ -4,14 +4,15 @@ import { useApp, ALL_BRANCHES } from '../context/AppContext';
 import mockApi from '../mockApi';
 import OfflineIndicator from './OfflineIndicator';
 import { useSyncStatus } from '../hooks';
-import { formatTime12Hour } from '../utils/dateUtils';
+import { useNotifications } from '../hooks/useNotifications';
+import NotificationToastContainer from './NotificationToastContainer';
 import {
   getPreferredOrientation,
   setPreferredOrientation,
 } from '../utils/orientation';
 
 const MainLayout = () => {
-  const { user, logout, hasPermission, hasManagementAccess, selectedBranch, selectBranch, canSeeAllBranches, getEffectiveBranchId } = useApp();
+  const { user, logout, hasPermission, hasManagementAccess, selectedBranch, selectBranch, canSeeAllBranches } = useApp();
   // Branch Owner and Manager are locked to a single branch — they shouldn't
   // see a switch affordance that would clear their branch and send them to
   // the picker.
@@ -110,7 +111,7 @@ const MainLayout = () => {
   // Check if we're on mobile/tablet
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
-  const [notifications, setNotifications] = useState([]);
+  const { notifications, dismiss, dismissAll } = useNotifications(user);
   const [showNotifications, setShowNotifications] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const notificationRef = React.useRef(null);
@@ -240,424 +241,6 @@ const MainLayout = () => {
     navigate('/login');
   };
 
-
-  // Check for notifications on mount and periodically
-  useEffect(() => {
-    const checkNotifications = async () => {
-      try {
-        // The bell aggregates branch-level operational alerts (inventory low,
-        // pending POs, late arrivals, payroll requests, etc). All of those
-        // are actioned from pages that only Owner / Manager / Branch Owner
-        // can open, so non-management roles get nothing useful from them —
-        // skip the whole loop and let MyPortal own a therapist's own alerts.
-        if (!hasManagementAccess()) {
-          setNotifications([]);
-          return;
-        }
-        const newNotifications = [];
-        const today = new Date();
-        const todayStr = today.toDateString();
-
-        // Active branch for the panel (null = All Branches sentinel → no filter).
-        // Branch-aware sections use this to mirror the corresponding feature
-        // page so a user on Test Branch never sees other branches' alerts.
-        const effectiveBranchId = getEffectiveBranchId();
-        const scopeByBranch = (items) =>
-          effectiveBranchId ? items.filter(x => x.branchId === effectiveBranchId) : items;
-
-        // ===========================================
-        // 1. INVENTORY ALERTS
-        // ===========================================
-        try {
-          const products = await mockApi.products.getProducts();
-
-          // Out of stock products
-          const outOfStock = products.filter(p =>
-            p.type === 'product' && p.stock === 0
-          );
-          if (outOfStock.length > 0) {
-            newNotifications.push({
-              id: 'out-of-stock',
-              type: 'critical',
-              title: 'Out of Stock',
-              message: `${outOfStock.length} product${outOfStock.length > 1 ? 's' : ''} out of stock`,
-              details: outOfStock.slice(0, 5).map(p => p.name),
-              action: '/inventory',
-              actionLabel: 'View Inventory',
-              time: new Date()
-            });
-          }
-
-          // Low stock products
-          const lowStock = products.filter(p =>
-            p.type === 'product' &&
-            p.stock > 0 &&
-            p.stock <= (p.lowStockAlert || 5)
-          );
-          if (lowStock.length > 0) {
-            newNotifications.push({
-              id: 'low-stock',
-              type: 'warning',
-              title: 'Low Stock Alert',
-              message: `${lowStock.length} product${lowStock.length > 1 ? 's' : ''} running low`,
-              details: lowStock.slice(0, 5).map(p => `${p.name} (${p.stock} left)`),
-              action: '/inventory',
-              actionLabel: 'View Inventory',
-              time: new Date()
-            });
-          }
-
-          // Expiring products (within 7 days)
-          const expiringProducts = products.filter(p => {
-            if (!p.expiryDate) return false;
-            const expiry = new Date(p.expiryDate);
-            const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-            return daysUntilExpiry > 0 && daysUntilExpiry <= 7;
-          });
-          if (expiringProducts.length > 0) {
-            newNotifications.push({
-              id: 'expiring-products',
-              type: 'warning',
-              title: 'Products Expiring Soon',
-              message: `${expiringProducts.length} product${expiringProducts.length > 1 ? 's' : ''} expiring within 7 days`,
-              details: expiringProducts.slice(0, 5).map(p => p.name),
-              action: '/inventory',
-              actionLabel: 'View Inventory',
-              time: new Date()
-            });
-          }
-        } catch (e) {
-          console.error('Failed to check inventory:', e);
-        }
-
-        // ===========================================
-        // 2. APPOINTMENT ALERTS
-        // ===========================================
-        try {
-          const appointments = scopeByBranch(await mockApi.appointments.getAppointments());
-
-          // Today's appointments
-          const todayAppointments = appointments.filter(a =>
-            new Date(a.date).toDateString() === todayStr &&
-            a.status === 'confirmed'
-          );
-          if (todayAppointments.length > 0) {
-            newNotifications.push({
-              id: 'today-appointments',
-              type: 'info',
-              title: 'Today\'s Appointments',
-              message: `${todayAppointments.length} appointment${todayAppointments.length > 1 ? 's' : ''} scheduled`,
-              details: todayAppointments.slice(0, 3).map(a => `${a.customerName} at ${a.time}`),
-              action: '/appointments',
-              actionLabel: 'View Appointments',
-              time: new Date()
-            });
-          }
-
-          // Pending appointments needing confirmation
-          const pendingAppointments = appointments.filter(a => a.status === 'pending');
-          if (pendingAppointments.length > 0) {
-            newNotifications.push({
-              id: 'pending-appointments',
-              type: 'warning',
-              title: 'Pending Appointments',
-              message: `${pendingAppointments.length} appointment${pendingAppointments.length > 1 ? 's' : ''} awaiting confirmation`,
-              details: pendingAppointments.slice(0, 3).map(a => `${a.customerName} - ${new Date(a.date).toLocaleDateString()}`),
-              action: '/appointments',
-              actionLabel: 'Review Appointments',
-              time: new Date()
-            });
-          }
-        } catch (e) {
-          console.error('Failed to check appointments:', e);
-        }
-
-        // ===========================================
-        // 3. ATTENDANCE & HR ALERTS
-        // ===========================================
-        try {
-          const attendance = scopeByBranch(await mockApi.attendance.getAttendance());
-          const employees = scopeByBranch(await mockApi.employees.getEmployees());
-
-          // Late arrivals today - use stored status from attendance record
-          const lateArrivals = attendance.filter(a => {
-            if (new Date(a.date).toDateString() !== todayStr) return false;
-            return a.status === 'late';
-          });
-
-          if (lateArrivals.length > 0) {
-            newNotifications.push({
-              id: 'late-arrivals',
-              type: 'warning',
-              title: 'Late Arrivals Today',
-              message: `${lateArrivals.length} employee${lateArrivals.length > 1 ? 's' : ''} arrived late`,
-              details: lateArrivals.slice(0, 3).map(a => {
-                const emp = employees.find(e => e.id === a.employeeId);
-                return emp ? `${emp.firstName} ${emp.lastName} at ${formatTime12Hour(a.clockIn)}` : `Employee at ${formatTime12Hour(a.clockIn)}`;
-              }),
-              action: '/attendance',
-              actionLabel: 'View Attendance',
-              time: new Date()
-            });
-          }
-
-          // Employees not yet clocked in (if past 10 AM)
-          if (today.getHours() >= 10) {
-            const activeEmployees = employees.filter(e => e.status === 'active');
-            const clockedInIds = attendance
-              .filter(a => new Date(a.date).toDateString() === todayStr && a.clockIn)
-              .map(a => a.employeeId);
-            const notClockedIn = activeEmployees.filter(e => !clockedInIds.includes(e.id));
-
-            if (notClockedIn.length > 0 && notClockedIn.length < activeEmployees.length) {
-              newNotifications.push({
-                id: 'not-clocked-in',
-                type: 'info',
-                title: 'Staff Not Clocked In',
-                message: `${notClockedIn.length} employee${notClockedIn.length > 1 ? 's' : ''} not yet clocked in`,
-                details: notClockedIn.slice(0, 3).map(e => `${e.firstName} ${e.lastName}`),
-                action: '/attendance',
-                actionLabel: 'View Attendance',
-                time: new Date()
-              });
-            }
-          }
-        } catch (e) {
-          console.error('Failed to check attendance:', e);
-        }
-
-        // ===========================================
-        // 4. PAYROLL ALERTS
-        // ===========================================
-        try {
-          const payrollRequests = scopeByBranch(await mockApi.payrollRequests.getRequests());
-
-          // Pending payroll requests
-          const pendingRequests = payrollRequests.filter(r => r.status === 'pending');
-          if (pendingRequests.length > 0) {
-            newNotifications.push({
-              id: 'pending-payroll',
-              type: 'warning',
-              title: 'Pending Payroll Requests',
-              message: `${pendingRequests.length} request${pendingRequests.length > 1 ? 's' : ''} awaiting approval`,
-              details: pendingRequests.slice(0, 3).map(r => `${r.type}: ₱${r.amount?.toLocaleString() || '0'}`),
-              action: '/payroll',
-              actionLabel: 'Review Requests',
-              time: new Date()
-            });
-          }
-        } catch (e) {
-          console.error('Failed to check payroll requests:', e);
-        }
-
-        // ===========================================
-        // 5. PURCHASE ORDER ALERTS
-        // ===========================================
-        try {
-          // Pull raw POs and scope by branch so the panel matches the
-          // Purchase Orders page (which renders only the active branch).
-          const orders = scopeByBranch(await mockApi.purchaseOrders.getPurchaseOrders());
-          const pendingOrders = orders.filter(o => o.status === 'pending').length;
-          const approvedOrders = orders.filter(o => o.status === 'approved').length;
-          const pendingPayments = orders.filter(o => o.status === 'received' && !o.paid).length;
-
-          if (pendingOrders > 0) {
-            newNotifications.push({
-              id: 'pending-po',
-              type: 'info',
-              title: 'Pending Purchase Orders',
-              message: `${pendingOrders} PO${pendingOrders > 1 ? 's' : ''} awaiting approval`,
-              details: [`Total pending: ${pendingOrders}`, `Approved: ${approvedOrders}`],
-              action: '/purchase-orders',
-              actionLabel: 'View POs',
-              time: new Date()
-            });
-          }
-
-          if (pendingPayments > 0) {
-            newNotifications.push({
-              id: 'pending-payments',
-              type: 'warning',
-              title: 'PO Payments Due',
-              message: `${pendingPayments} order${pendingPayments > 1 ? 's' : ''} with pending payment`,
-              details: ['Orders received but unpaid'],
-              action: '/purchase-orders',
-              actionLabel: 'View Payments',
-              time: new Date()
-            });
-          }
-        } catch (e) {
-          console.error('Failed to check purchase orders:', e);
-        }
-
-        // ===========================================
-        // 6. EXPENSE ALERTS
-        // ===========================================
-        try {
-          const expenses = scopeByBranch(await mockApi.expenses.getExpenses());
-
-          // Pending expense approvals
-          const pendingExpenses = expenses.filter(e => e.status === 'pending');
-          if (pendingExpenses.length > 0) {
-            const totalPending = pendingExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-            newNotifications.push({
-              id: 'pending-expenses',
-              type: 'info',
-              title: 'Pending Expenses',
-              message: `${pendingExpenses.length} expense${pendingExpenses.length > 1 ? 's' : ''} pending approval`,
-              details: [`Total: ₱${totalPending.toLocaleString()}`, ...pendingExpenses.slice(0, 2).map(e => e.description || e.category)],
-              action: '/expenses',
-              actionLabel: 'Review Expenses',
-              time: new Date()
-            });
-          }
-        } catch (e) {
-          console.error('Failed to check expenses:', e);
-        }
-
-        // ===========================================
-        // 7. GIFT CERTIFICATE ALERTS
-        // ===========================================
-        try {
-          // GCs use strict branch matching (legacy null branchId is treated as
-          // out-of-scope) — mirrors the Gift Certificates page behavior.
-          const giftCerts = scopeByBranch(await mockApi.giftCertificates.getGiftCertificates());
-
-          // Expiring gift certificates (within 30 days)
-          const expiringCerts = giftCerts.filter(gc => {
-            if (!gc.expiryDate || gc.status !== 'active') return false;
-            const expiry = new Date(gc.expiryDate);
-            const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-            return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
-          });
-          if (expiringCerts.length > 0) {
-            newNotifications.push({
-              id: 'expiring-gc',
-              type: 'info',
-              title: 'Gift Certificates Expiring',
-              message: `${expiringCerts.length} certificate${expiringCerts.length > 1 ? 's' : ''} expiring within 30 days`,
-              details: expiringCerts.slice(0, 3).map(gc => `${gc.code}: ₱${gc.balance?.toLocaleString() || gc.amount?.toLocaleString()}`),
-              action: '/gift-certificates',
-              actionLabel: 'View Certificates',
-              time: new Date()
-            });
-          }
-        } catch (e) {
-          console.error('Failed to check gift certificates:', e);
-        }
-
-        // ===========================================
-        // 8. ROOM AVAILABILITY ALERTS
-        // ===========================================
-        try {
-          const rooms = scopeByBranch(await mockApi.rooms.getRooms());
-
-          // Rooms under maintenance
-          const maintenanceRooms = rooms.filter(r => r.status === 'maintenance');
-          if (maintenanceRooms.length > 0) {
-            newNotifications.push({
-              id: 'maintenance-rooms',
-              type: 'warning',
-              title: 'Rooms Under Maintenance',
-              message: `${maintenanceRooms.length} room${maintenanceRooms.length > 1 ? 's' : ''} unavailable`,
-              details: maintenanceRooms.slice(0, 3).map(r => r.name),
-              action: '/rooms',
-              actionLabel: 'View Rooms',
-              time: new Date()
-            });
-          }
-
-          // All rooms occupied (high demand alert)
-          const occupiedRooms = rooms.filter(r => r.status === 'occupied');
-          const availableRooms = rooms.filter(r => r.status === 'available');
-          if (availableRooms.length === 0 && occupiedRooms.length > 0) {
-            newNotifications.push({
-              id: 'all-rooms-occupied',
-              type: 'info',
-              title: 'High Demand',
-              message: 'All rooms currently occupied',
-              details: [`${occupiedRooms.length} room${occupiedRooms.length > 1 ? 's' : ''} in use`],
-              action: '/rooms',
-              actionLabel: 'View Rooms',
-              time: new Date()
-            });
-          }
-        } catch (e) {
-          console.error('Failed to check rooms:', e);
-        }
-
-        // ===========================================
-        // 9. CASH DRAWER ALERTS
-        // ===========================================
-        try {
-          const cashDrawer = await mockApi.cashDrawer.getCurrentDrawer();
-          // Suppress if the open drawer belongs to a different branch.
-          const drawerInScope = !cashDrawer || !effectiveBranchId
-            || !cashDrawer.branchId || cashDrawer.branchId === effectiveBranchId;
-
-          // Cash drawer still open from previous day
-          if (drawerInScope && cashDrawer && cashDrawer.status === 'open') {
-            const openedDate = new Date(cashDrawer.openedAt);
-            if (openedDate.toDateString() !== todayStr) {
-              newNotifications.push({
-                id: 'drawer-open',
-                type: 'critical',
-                title: 'Cash Drawer Open',
-                message: 'Drawer still open from previous day',
-                details: [`Opened: ${openedDate.toLocaleDateString()}`, `Balance: ₱${cashDrawer.currentBalance?.toLocaleString() || '0'}`],
-                action: '/cash-drawer-history',
-                actionLabel: 'Close Drawer',
-                time: new Date()
-              });
-            }
-          }
-        } catch (e) {
-          console.error('Failed to check cash drawer:', e);
-        }
-
-        // ===========================================
-        // 10. CUSTOMER ALERTS
-        // ===========================================
-        try {
-          const customers = await mockApi.customers.getCustomers();
-
-          // Birthday customers today
-          const birthdayCustomers = customers.filter(c => {
-            if (!c.birthDate) return false;
-            const bday = new Date(c.birthDate);
-            return bday.getMonth() === today.getMonth() && bday.getDate() === today.getDate();
-          });
-          if (birthdayCustomers.length > 0) {
-            newNotifications.push({
-              id: 'birthday-customers',
-              type: 'success',
-              title: 'Customer Birthdays',
-              message: `${birthdayCustomers.length} customer${birthdayCustomers.length > 1 ? 's have' : ' has'} a birthday today!`,
-              details: birthdayCustomers.slice(0, 3).map(c => c.name || `${c.firstName} ${c.lastName}`),
-              action: '/customers',
-              actionLabel: 'Send Greetings',
-              time: new Date()
-            });
-          }
-        } catch (e) {
-          console.error('Failed to check customers:', e);
-        }
-
-        setNotifications(newNotifications);
-      } catch (error) {
-        console.error('Failed to check notifications:', error);
-      }
-    };
-
-    checkNotifications();
-
-    // Check every 5 minutes
-    const interval = setInterval(checkNotifications, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-    // Re-run when the user switches branch so attendance counts re-scope
-    // (mirrors the Attendance page's effectiveBranchId filter).
-  }, [selectedBranch?.id, selectedBranch?._allBranches, user?.role, user?.branchId]);
-
   // Close notification dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -670,17 +253,13 @@ const MainLayout = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const dismissNotification = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  };
-
   const handleNotificationAction = (notification) => {
     navigate(notification.action);
     setShowNotifications(false);
   };
 
   const clearAllNotifications = () => {
-    setNotifications([]);
+    dismissAll();
     setShowNotifications(false);
   };
 
@@ -753,6 +332,7 @@ const MainLayout = () => {
     {
       label: 'Personal',
       items: [
+        { path: '/rider-bookings', label: 'My Deliveries', icon: 'pos', page: 'rider-bookings' },
         { path: '/my-portal', label: 'My Portal', icon: 'portal', page: 'my-schedule' },
       ],
       hasDivider: true
@@ -1154,16 +734,18 @@ const MainLayout = () => {
                         <p>No new notifications</p>
                       </div>
                     ) : (
-                      notifications.map((notification) => (
+                      notifications.map((notification) => {
+                        const rowId = notification.id || notification._id;
+                        return (
                         <div
-                          key={notification.id}
-                          className={`notification-item notification-${notification.type}`}
+                          key={rowId}
+                          className={`notification-item notification-${notification.type || 'info'}`}
                         >
                           <div className="notification-icon">
                             {notification.type === 'critical' && '●'}
                             {notification.type === 'warning' && '▲'}
-                            {notification.type === 'info' && '◆'}
                             {notification.type === 'success' && '★'}
+                            {(!notification.type || notification.type === 'info') && '◆'}
                           </div>
                           <div className="notification-content">
                             <div className="notification-title">{notification.title}</div>
@@ -1178,22 +760,30 @@ const MainLayout = () => {
                                 )}
                               </div>
                             )}
-                            <button
-                              className="notification-action-btn"
-                              onClick={() => handleNotificationAction(notification)}
-                            >
-                              {notification.actionLabel}
-                            </button>
+                            {(notification.createdAt || notification.time) && (
+                              <div className="notification-time" style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                                {new Date(notification.createdAt || notification.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            )}
+                            {notification.action && (
+                              <button
+                                className="notification-action-btn"
+                                onClick={() => handleNotificationAction(notification)}
+                              >
+                                {notification.actionLabel || 'Open'}
+                              </button>
+                            )}
                           </div>
                           <button
                             className="notification-dismiss"
-                            onClick={() => dismissNotification(notification.id)}
+                            onClick={() => dismiss(rowId)}
                             aria-label="Dismiss notification"
                           >
                             ✕
                           </button>
                         </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -1452,6 +1042,8 @@ const MainLayout = () => {
           })()}
         </nav>
       )}
+
+      <NotificationToastContainer />
     </div>
   );
 };

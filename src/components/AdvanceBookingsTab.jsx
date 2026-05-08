@@ -4,10 +4,11 @@ import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
 
 const AdvanceBookingsTab = () => {
-  const { user, showToast, isTherapist, canViewAll } = useApp();
+  const { user, showToast, isTherapist, canViewAll, hasManagementAccess } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [advanceBookings, setAdvanceBookings] = useState([]);
+  const [riders, setRiders] = useState([]);
   const [bookingFilter, setBookingFilter] = useState({
     date: '',
     status: 'active' // 'active' | 'all' | 'scheduled' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'pending'
@@ -16,6 +17,13 @@ const AdvanceBookingsTab = () => {
   useEffect(() => {
     loadAdvanceBookings();
   }, [bookingFilter, user]);
+
+  useEffect(() => {
+    (async () => {
+      const employees = await mockApi.employees.getEmployees();
+      setRiders(employees.filter(e => e.role === 'Rider' && e.status === 'active'));
+    })();
+  }, []);
 
   // Fetch online bookings from Supabase
   const fetchOnlineBookings = async () => {
@@ -195,6 +203,24 @@ const AdvanceBookingsTab = () => {
       loadAdvanceBookings();
     } catch (error) {
       showToast('Failed to cancel booking', 'error');
+    }
+  };
+
+  const handleAssignRider = async (booking, riderId) => {
+    const rider = riders.find(r => r._id === riderId);
+    try {
+      await mockApi.advanceBooking.updateAdvanceBooking(booking.id, {
+        riderId: riderId || null,
+        riderName: rider ? `${rider.firstName} ${rider.lastName}` : null,
+        riderAssignedAt: riderId ? new Date().toISOString() : null,
+        riderAssignedBy: user?._id || null,
+      });
+      showToast(rider ? `Assigned to ${rider.firstName}` : 'Rider unassigned', 'success');
+      loadAdvanceBookings();
+      // Notification fires from bookingTriggers.js (Task 13) once it observes
+      // the riderId change — no producer call here.
+    } catch (err) {
+      showToast('Failed to assign rider', 'error');
     }
   };
 
@@ -387,6 +413,22 @@ const AdvanceBookingsTab = () => {
                   <span className="amount">₱{(booking.servicePrice || 0).toFixed(2)}</span>
                 </div>
               </div>
+
+              {booking.isHomeService && (hasManagementAccess() || user?.role === 'Receptionist') && (
+                <div className="booking-rider-assign" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderTop: '1px solid #eee' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500 }}>Rider:</label>
+                  <select
+                    value={booking.riderId || ''}
+                    onChange={(e) => handleAssignRider(booking, e.target.value)}
+                    style={{ flex: 1, padding: '4px 8px', fontSize: '0.85rem' }}
+                  >
+                    <option value="">— Unassigned —</option>
+                    {riders.map(r => (
+                      <option key={r._id} value={r._id}>{r.firstName} {r.lastName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="booking-actions">
                 {['pending', 'scheduled'].includes(booking.status) && (

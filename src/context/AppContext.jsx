@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { authService, supabaseSyncManager, isSupabaseConfigured } from '../services/supabase';
 import { setUserContext, clearUserContext } from '../utils/sentry';
 import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
 import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 import { db } from '../db';
 import { setAnalyticsBranchFilter } from '../mockApi/mockApi';
+import NotificationService from '../services/notifications/NotificationService';
 
 // Sentinel representing "view data from all branches" for Owner/Manager users.
 // Stored in the same selectedBranch slot (so localStorage persistence Just Works).
@@ -92,7 +93,7 @@ const rolePermissions = {
   'Receptionist': ['pos', 'products', 'inventory', 'customers', 'appointments', 'attendance', 'payroll', 'rooms',
                    'service-history', 'expenses', 'my-schedule', 'payroll-requests', 'calendar'],
   'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests'],
-  'Rider': ['appointments', 'attendance', 'my-schedule', 'payroll-requests'],
+  'Rider': ['rider-bookings', 'appointments', 'attendance', 'my-schedule', 'payroll-requests'],
   'Utility': ['attendance', 'my-schedule', 'payroll-requests']
 };
 
@@ -122,7 +123,7 @@ const getFirstPageForRole = (role) => {
     case 'Therapist':
       return '/appointments';
     case 'Rider':
-      return '/appointments';
+      return '/rider-bookings';
     case 'Utility':
       return '/attendance';
     default:
@@ -145,6 +146,10 @@ export const AppProvider = ({ children }) => {
   const [syncStatus, setSyncStatus] = useState({ isOnline: false, isSyncing: false });
   const [selectedBranch, setSelectedBranch] = useState(null); // { id, name, slug, ... } or null
   const [initialSyncing, setInitialSyncing] = useState(false);
+
+  // Holds the teardown returned by startAllNotificationTriggers() so a
+  // logout-then-login cycle doesn't accumulate duplicate listeners.
+  const triggersUnsubRef = useRef(null);
 
   // Initialize app - check for existing session
   // Load and apply branding (color theme) from Supabase
@@ -512,6 +517,9 @@ export const AppProvider = ({ children }) => {
     return user?.role === 'Therapist';
   };
 
+  // Check if user is Rider
+  const isRider = () => user?.role === 'Rider';
+
   // Check if user can edit (Owner, Manager, and Branch Owner for their branch)
   const canEdit = () => {
     return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
@@ -578,6 +586,34 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     setAnalyticsBranchFilter(getEffectiveBranchId());
   }, [user?.role, user?.branchId, selectedBranch?.id, selectedBranch?._allBranches]);
+
+  // Wire the notification service to the current user. setUserContext lets
+  // the producer attribute branch/business. start() begins the realtime
+  // subscription + prune loop. stop() halts the prune loop on logout.
+  useEffect(() => {
+    if (user) {
+      NotificationService.setUserContext(user);
+      NotificationService.start();
+      let cancelled = false;
+      // Lazy-import triggers so a logged-out tab doesn't subscribe.
+      import('../services/notifications/triggers').then(m => {
+        if (cancelled) return;
+        // Tear down any prior subscription before starting a fresh set so
+        // logout-then-login doesn't accumulate listeners.
+        if (triggersUnsubRef.current) {
+          try { triggersUnsubRef.current(); } catch {}
+        }
+        triggersUnsubRef.current = m.startAllNotificationTriggers();
+      });
+      return () => { cancelled = true; };
+    } else {
+      if (triggersUnsubRef.current) {
+        try { triggersUnsubRef.current(); } catch {}
+        triggersUnsubRef.current = null;
+      }
+      NotificationService.stop();
+    }
+  }, [user]);
 
   // Select a branch (called from BranchSelect page or the inline switcher)
   const selectBranch = (branch) => {
@@ -646,6 +682,7 @@ export const AppProvider = ({ children }) => {
     isManager,
     isReceptionist,
     isTherapist,
+    isRider,
     isBranchOwner,
     canEdit,
     canEditProducts,

@@ -25,6 +25,7 @@ import type {
   User,
   SyncQueueItem,
   SyncMetadata,
+  Notification,
 } from '../types';
 
 // Extended types for tables not in main entities
@@ -92,6 +93,11 @@ interface AdvanceBooking extends BaseEntity {
   services?: string[];
   employeeId?: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  /** Employee (Rider role) responsible for transport for home-service bookings. */
+  riderId?: string | null;
+  riderName?: string | null;
+  riderAssignedAt?: string | null;
+  riderAssignedBy?: string | null;
 }
 
 interface ActiveService extends BaseEntity {
@@ -267,6 +273,9 @@ class SpaDatabase extends Dexie {
   // Home Services
   homeServices!: Table<HomeService, string>;
 
+  // Notifications (v15)
+  notifications!: Table<Notification, string>;
+
   // Schema migration tracking
   migrationLog!: Table<MigrationLog, number>;
 
@@ -412,6 +421,23 @@ class SpaDatabase extends Dexie {
         description: 'Added cashDrawerShifts table; indexed branchId/openDate on cashDrawerSessions; indexed cashierId/shiftId on transactions',
       });
     });
+
+    // Version 15: Notifications table + riderId on advanceBookings.
+    // - notifications: per-business persistent log of operational alerts; indexed
+    //   on targetUserId + status so the bell can read the unread set in O(log n).
+    // - advanceBookings: add riderId index so the rider's dashboard can pull only
+    //   their assigned home-service jobs without scanning every row.
+    this.version(15).stores({
+      notifications: '_id, businessId, branchId, targetUserId, targetRole, type, status, createdAt, expiresAt',
+      advanceBookings: '_id, status, employeeId, riderId, branchId, businessId, bookingDateTime',
+    }).upgrade(async (tx) => {
+      console.log('[Dexie] Upgrading to version 15: notifications + riderId');
+      await tx.table('migrationLog').add({
+        version: 15,
+        timestamp: new Date().toISOString(),
+        description: 'Added notifications table; indexed riderId on advanceBookings',
+      });
+    });
   }
 }
 
@@ -470,6 +496,7 @@ export const {
   leaveRequests,
   cashAdvanceRequests,
   incidentReports,
+  notifications,
   migrationLog,
 } = db;
 

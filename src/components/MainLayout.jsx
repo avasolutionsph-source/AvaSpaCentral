@@ -332,6 +332,7 @@ const MainLayout = () => {
     {
       label: 'Personal',
       items: [
+        { path: '/rider-bookings', label: 'My Deliveries', icon: 'pos', page: 'rider-bookings' },
         { path: '/my-portal', label: 'My Portal', icon: 'portal', page: 'my-schedule' },
       ],
       hasDivider: true

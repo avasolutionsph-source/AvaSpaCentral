@@ -1,4 +1,4 @@
-let audioFactory = () => new Audio('/sounds/notification.mp3');
+let audioFactory = () => new Audio('/sounds/notification.wav');
 const activeLoops = new Map(); // notificationId -> { interval, audio }
 
 const NotificationSoundManager = {

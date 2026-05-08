@@ -590,6 +590,10 @@ export const AppProvider = ({ children }) => {
     if (user) {
       NotificationService.setUserContext(user);
       NotificationService.start();
+      // Lazy-import triggers so a logged-out tab doesn't subscribe.
+      import('../services/notifications/triggers').then(m => {
+        m.startAllNotificationTriggers();
+      });
     } else {
       NotificationService.stop();
     }

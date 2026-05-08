@@ -1,5 +1,5 @@
 let audioFactory = () => new Audio('/sounds/notification.mp3');
-let activeLoops = new Map(); // notificationId -> intervalId
+const activeLoops = new Map(); // notificationId -> intervalId
 
 const NotificationSoundManager = {
   _resetForTest() { activeLoops.clear(); },
@@ -14,7 +14,8 @@ const NotificationSoundManager = {
       // Autoplay blocked — happens before any user interaction. Browser will
       // surface our visual toast + Notification API banner anyway.
     });
-    if (notification.soundClass === 'loop') {
+    // Loop class requires a stable _id so stop(id) can target it later.
+    if (notification.soundClass === 'loop' && notification._id) {
       // Avoid double-loops if the same id is fed twice.
       if (activeLoops.has(notification._id)) return;
       const interval = setInterval(() => {

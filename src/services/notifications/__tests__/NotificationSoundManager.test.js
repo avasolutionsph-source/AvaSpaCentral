@@ -34,10 +34,25 @@ describe('NotificationSoundManager', () => {
   });
 
   it('stop() with no id stops every active loop', () => {
+    const audios = [];
+    NotificationSoundManager._injectAudioFactoryForTest(() => { const a = new FakeAudio(); audios.push(a); return a; });
     NotificationSoundManager.play({ _id: 'a', soundClass: 'loop' });
     NotificationSoundManager.play({ _id: 'b', soundClass: 'loop' });
+    expect(NotificationSoundManager.hasActiveLoop()).toBe(true);
+    const beforeStop = audios.length;
     NotificationSoundManager.stop();
+    expect(NotificationSoundManager.hasActiveLoop()).toBe(false);
     vi.advanceTimersByTime(10000);
-    // No throw; second play does nothing because state is cleared.
+    expect(audios.length).toBe(beforeStop); // no new audios after stop
+  });
+
+  it('does not double-schedule when same id is played twice', () => {
+    const audios = [];
+    NotificationSoundManager._injectAudioFactoryForTest(() => { const a = new FakeAudio(); audios.push(a); return a; });
+    NotificationSoundManager.play({ _id: 'a', soundClass: 'loop' });
+    NotificationSoundManager.play({ _id: 'a', soundClass: 'loop' });
+    // Two immediate plays (one per call) plus one interval tick at 3s = 3, not 4.
+    vi.advanceTimersByTime(3000);
+    expect(audios.length).toBe(3);
   });
 });

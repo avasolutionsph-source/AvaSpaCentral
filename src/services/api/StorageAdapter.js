@@ -13,6 +13,7 @@
 import storageService from '../storage';
 import { mockDatabase } from '../../mockApi/mockData';
 import { TimeOffRequestRepository, HomeServiceRepository, SettingsRepository } from '../storage/repositories';
+import NotificationRepo from '../storage/repositories/NotificationRepository';
 import { authService, supabase, isSupabaseConfigured, supabaseSyncManager } from '../supabase';
 import { db } from '../../db';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
@@ -1151,6 +1152,45 @@ export const giftCertificatesAdapter = {
     }
     return { valid: true, message: 'Gift certificate is valid', giftCertificate: clone(certificate) };
   }
+};
+
+// =============================================================================
+// NOTIFICATIONS API ADAPTER
+// =============================================================================
+
+export const notificationsAdapter = {
+  async getUnreadForUser(userId) {
+    await delay();
+    return clone(await NotificationRepo.getUnreadFor(userId));
+  },
+  async getUnreadForRole(role, branchId) {
+    await delay();
+    return clone(await NotificationRepo.getUnreadForRole(role, branchId));
+  },
+  async createNotification(data) {
+    await delay();
+    const created = await NotificationRepo.create({
+      businessId: getRequiredBusinessId(),
+      status: 'unread',
+      deliveryChannels: ['inapp'],
+      createdAt: new Date().toISOString(),
+      expiresAt: data.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      ...data,
+    });
+    return clone(created);
+  },
+  async markRead(id) {
+    await delay();
+    return clone(await NotificationRepo.markRead(id));
+  },
+  async dismiss(id) {
+    await delay();
+    return clone(await NotificationRepo.dismiss(id));
+  },
+  async dismissAllForUser(userId) {
+    await delay();
+    return NotificationRepo.dismissAllFor(userId);
+  },
 };
 
 // =============================================================================
@@ -2412,6 +2452,7 @@ export default {
   transactions: transactionsAdapter,
   appointments: appointmentsAdapter,
   giftCertificates: giftCertificatesAdapter,
+  notifications: notificationsAdapter,
   purchaseOrders: purchaseOrdersAdapter,
   attendance: attendanceAdapter,
   activityLogs: activityLogsAdapter,

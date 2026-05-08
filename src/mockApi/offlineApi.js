@@ -144,6 +144,17 @@ export const giftCertificatesApi = {
   validateGiftCertificate: giftCertificatesAdapter.validateGiftCertificate
 };
 
+import { notificationsAdapter } from '../services/api/StorageAdapter';
+
+export const notificationsApi = {
+  getUnreadForUser: notificationsAdapter.getUnreadForUser,
+  getUnreadForRole: notificationsAdapter.getUnreadForRole,
+  createNotification: notificationsAdapter.createNotification,
+  markRead: notificationsAdapter.markRead,
+  dismiss: notificationsAdapter.dismiss,
+  dismissAllForUser: notificationsAdapter.dismissAllForUser,
+};
+
 export const purchaseOrdersApi = {
   getPurchaseOrders: purchaseOrdersAdapter.getPurchaseOrders,
   getPurchaseOrder: purchaseOrdersAdapter.getPurchaseOrder,
@@ -269,6 +280,7 @@ export default {
   rooms: roomsApi,
   attendance: attendanceApi,
   giftCertificates: giftCertificatesApi,
+  notifications: notificationsApi,
   expenses: expensesApi,
   advanceBooking: advanceBookingApi,
   payrollConfig: payrollConfigApi,

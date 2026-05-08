@@ -20,6 +20,8 @@ import { advanceBookingApi } from '../mockApi/advanceBookingApi';
 import mockApi from '../mockApi';
 import { formatTime12Hour } from '../utils/dateUtils';
 import '../assets/css/hub-pages.css';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const Calendar = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -112,6 +114,49 @@ const Calendar = () => {
       isMounted = false;
     };
   }, [currentDate, view]);
+
+  // Cross-device live updates + tab-resume refresh: schedule data is
+  // mutated from POS, Appointments, and Attendance flows on other devices.
+  // Calls the underlying loaders directly (not loadAllData) so the page-level
+  // spinner doesn't flicker on background refreshes.
+  useEffect(() => {
+    const watched = ['appointments', 'advanceBookings', 'attendance', 'shifts', 'employees', 'customers', 'products', 'services', 'rooms'];
+    const reload = () => {
+      loadAppointments();
+      loadAttendance();
+      loadShifts();
+      loadDropdowns();
+    };
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(reload, 500);
+      }
+    });
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (watched.includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(reload, 300);
+      }
+    });
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') reload();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadDropdowns = async (isMounted = true) => {
     try {

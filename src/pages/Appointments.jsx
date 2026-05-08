@@ -6,6 +6,8 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterv
 import AdvanceBookingsTab from '../components/AdvanceBookingsTab';
 import { getEmployeesForService, getTherapists } from '../utils/employeeFilters';
 import { ConfirmDialog } from '../components/shared';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
   const navigate = useNavigate();
@@ -130,9 +132,9 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
     };
   }, []);
 
-  const loadData = async () => {
+  const loadData = async ({ quiet = false } = {}) => {
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
       const [appts, emps, custs, prods, rms] = await Promise.all([
         mockApi.appointments.getAppointments(),
         mockApi.employees.getEmployees(),
@@ -145,12 +147,53 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
       setCustomers(custs);
       setServices(prods.filter(p => p.type === 'service' && p.active));
       setRooms(rms);
-      setLoading(false);
+      if (!quiet) setLoading(false);
     } catch (error) {
-      showToast('Failed to load appointments', 'error');
-      setLoading(false);
+      if (!quiet) {
+        showToast('Failed to load appointments', 'error');
+        setLoading(false);
+      }
     }
   };
+
+  // Cross-device live updates + tab-resume refresh: when bookings/customers/
+  // employees/services/rooms change on another device or when this tab regains
+  // focus, refresh the data quietly (no spinner flicker on background updates).
+  useEffect(() => {
+    const watched = ['appointments', 'advanceBookings', 'employees', 'customers', 'products', 'services', 'rooms'];
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadData({ quiet: true }), 500);
+      }
+    });
+
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (watched.includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadData({ quiet: true }), 300);
+      }
+    });
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadData({ quiet: true });
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Check availability when relevant form fields change
   useEffect(() => {

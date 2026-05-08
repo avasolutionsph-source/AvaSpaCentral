@@ -5,6 +5,8 @@ import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
 import { StockHistoryRepository } from '../services/storage/repositories';
 import { ManageOrder } from '../components/shared';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const Inventory = ({ embedded = false, onDataChange }) => {
   const navigate = useNavigate();
@@ -63,19 +65,62 @@ const Inventory = ({ embedded = false, onDataChange }) => {
     applyFilters();
   }, [inventory, searchQuery, filterStatus, filterCategory]);
 
-  const loadInventory = async () => {
+  const loadInventory = async ({ quiet = false } = {}) => {
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
       const data = await mockApi.products.getProducts();
       // Filter only products (not services) for inventory
       const products = data.filter(p => p.type === 'product');
       setInventory(products);
-      setLoading(false);
+      if (!quiet) setLoading(false);
     } catch (error) {
-      showToast('Failed to load inventory', 'error');
-      setLoading(false);
+      if (!quiet) {
+        showToast('Failed to load inventory', 'error');
+        setLoading(false);
+      }
     }
   };
+
+  // Cross-device live updates + tab-resume refresh: stock levels mutate on
+  // every POS sale and from purchase-order receipts on other devices.
+  useEffect(() => {
+    const watched = ['products', 'suppliers', 'purchaseOrders', 'stockHistory'];
+    const reload = () => {
+      loadInventory({ quiet: true });
+      loadStockHistory();
+      loadReorderSuggestions();
+      loadSuppliers();
+    };
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(reload, 500);
+      }
+    });
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (watched.includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(reload, 300);
+      }
+    });
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') reload();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadStockHistory = async () => {
     try {

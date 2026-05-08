@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { authService, supabaseSyncManager, isSupabaseConfigured } from '../services/supabase';
 import { setUserContext, clearUserContext } from '../utils/sentry';
 import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
@@ -146,6 +146,10 @@ export const AppProvider = ({ children }) => {
   const [syncStatus, setSyncStatus] = useState({ isOnline: false, isSyncing: false });
   const [selectedBranch, setSelectedBranch] = useState(null); // { id, name, slug, ... } or null
   const [initialSyncing, setInitialSyncing] = useState(false);
+
+  // Holds the teardown returned by startAllNotificationTriggers() so a
+  // logout-then-login cycle doesn't accumulate duplicate listeners.
+  const triggersUnsubRef = useRef(null);
 
   // Initialize app - check for existing session
   // Load and apply branding (color theme) from Supabase
@@ -590,11 +594,23 @@ export const AppProvider = ({ children }) => {
     if (user) {
       NotificationService.setUserContext(user);
       NotificationService.start();
+      let cancelled = false;
       // Lazy-import triggers so a logged-out tab doesn't subscribe.
       import('../services/notifications/triggers').then(m => {
-        m.startAllNotificationTriggers();
+        if (cancelled) return;
+        // Tear down any prior subscription before starting a fresh set so
+        // logout-then-login doesn't accumulate listeners.
+        if (triggersUnsubRef.current) {
+          try { triggersUnsubRef.current(); } catch {}
+        }
+        triggersUnsubRef.current = m.startAllNotificationTriggers();
       });
+      return () => { cancelled = true; };
     } else {
+      if (triggersUnsubRef.current) {
+        try { triggersUnsubRef.current(); } catch {}
+        triggersUnsubRef.current = null;
+      }
       NotificationService.stop();
     }
   }, [user]);

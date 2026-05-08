@@ -10,12 +10,16 @@ export default function RiderBookings() {
   const { user, showToast } = useApp();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Separate flag for non-initial reloads (realtime refreshes) so the page
+  // doesn't flicker back to the spinner every time advanceBookings changes.
+  const [refreshing, setRefreshing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isInitial = false) => {
     if (!user?.employeeId) { setBookings([]); setLoading(false); return; }
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
+      else setRefreshing(true);
       const all = await mockApi.advanceBooking.listAdvanceBookings();
       const mine = all.filter(b => b.riderId === user.employeeId && b.isHomeService);
       const filtered = showHistory
@@ -25,13 +29,16 @@ export default function RiderBookings() {
       setBookings(filtered);
     } catch (err) {
       showToast('Failed to load bookings', 'error');
-    } finally { setLoading(false); }
+    } finally {
+      if (isInitial) setLoading(false);
+      else setRefreshing(false);
+    }
   }, [user?.employeeId, showHistory, showToast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(true); }, [load]);
   useEffect(() => {
     const unsub = dataChangeEmitter.subscribe(c => {
-      if (c.entityType === 'advanceBookings') load();
+      if (c.entityType === 'advanceBookings') load(false);
     });
     return () => unsub();
   }, [load]);
@@ -62,7 +69,7 @@ export default function RiderBookings() {
             <div key={b.id} className={`rider-booking-card status-${b.status}`}>
               <div className="rider-booking-time">{format(parseISO(b.bookingDateTime), 'MMM d, h:mm a')}</div>
               <div className="rider-booking-service">{b.serviceName}</div>
-              <div className="rider-booking-status">{b.status.replace('-', ' ')}</div>
+              <div className="rider-booking-status">{b.status.replaceAll('-', ' ')}</div>
               <div className="rider-booking-client">
                 <div className="rider-booking-name">{b.clientName}</div>
                 {b.clientPhone && (

@@ -311,3 +311,38 @@ export interface User extends BaseEntity {
   status: 'active' | 'inactive';
   last_login?: string;
 }
+
+export type NotificationStatus = 'unread' | 'read' | 'dismissed' | 'archived';
+export type NotificationSoundClass = 'loop' | 'oneshot' | 'silent';
+
+export interface Notification extends BaseEntity {
+  /** business this notification belongs to (RLS scope). */
+  businessId: string;
+  /** branch scope; null = applies to all branches. */
+  branchId?: string | null;
+  /** Specific user this targets. Set EITHER this OR targetRole, not both. */
+  targetUserId?: string | null;
+  /** Role(s) this targets. Used when broadcasting to e.g. all Managers. */
+  targetRole?: string | string[] | null;
+  /** Stable identifier across producers, e.g. 'booking.assigned.therapist'. */
+  type: string;
+  title: string;
+  message: string;
+  /** Free-form context — booking id, transaction id, item names, etc. */
+  payload?: Record<string, unknown>;
+  /** Where the bell + toast deep-link to. */
+  action?: string;
+  actionLabel?: string;
+  /** Loop = ring every 3s until viewed; oneshot = single chime; silent = bell-only. */
+  soundClass: NotificationSoundClass;
+  /** Channels we attempted to deliver on (telemetry; v1 = ['inapp', 'browser']). */
+  deliveryChannels: ('inapp' | 'browser' | 'push')[];
+  status: NotificationStatus;
+  createdAt: string;
+  /** Set when targetUser opens the action route or clicks Dismiss. */
+  dismissedAt?: string | null;
+  /** Set when bell or toast first renders this. */
+  readAt?: string | null;
+  /** Auto-archive after this datetime (default = createdAt + 7 days). */
+  expiresAt?: string;
+}

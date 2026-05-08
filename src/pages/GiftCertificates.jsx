@@ -200,8 +200,9 @@ const GiftCertificates = () => {
 
   const validateForm = () => {
     if (!formData.recipientName.trim()) { showToast('Recipient name is required', 'error'); return false; }
-    if (!formData.recipientEmail.trim()) { showToast('Recipient email is required', 'error'); return false; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail)) { showToast('Invalid email format', 'error'); return false; }
+    if (formData.recipientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail)) {
+      showToast('Invalid email format', 'error'); return false;
+    }
     if (!formData.amount || parseFloat(formData.amount) <= 0) { showToast('Valid face value is required', 'error'); return false; }
     if (!formData.pricePaid || parseFloat(formData.pricePaid) <= 0) { showToast('Price sold is required', 'error'); return false; }
     if (!formData.noExpiry && !formData.expiryDate) { showToast('Expiry date is required', 'error'); return false; }
@@ -565,9 +566,9 @@ const GiftCertificates = () => {
                       placeholder="Enter name" className="form-control" required />
                   </div>
                   <div className="form-group">
-                    <label>Recipient Email *</label>
+                    <label>Recipient Email</label>
                     <input type="email" name="recipientEmail" value={formData.recipientEmail} onChange={handleInputChange}
-                      placeholder="email@example.com" className="form-control" required />
+                      placeholder="Optional" className="form-control" />
                   </div>
                 </div>
                 <div className="form-group">

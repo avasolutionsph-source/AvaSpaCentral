@@ -51,4 +51,20 @@ describe('NotificationService.notify()', () => {
     expect(soundSpy).toHaveBeenCalledWith(expect.objectContaining({ soundClass: 'loop' }));
     expect(bridgeSpy).toHaveBeenCalled();
   });
+
+  it('marks the row as recently-delivered so a realtime echo of our own write is skipped', async () => {
+    // Producer-is-also-audience case (Owner logged in at POS firing an
+    // inventory low-stock notification targeted at role Owner). The
+    // Supabase realtime channel echoes our write back; the listener uses
+    // _recentlyDelivered to skip the second delivery — otherwise the
+    // chime plays twice for one notification.
+    NotificationService._setDeliveryHooksForTest({ playSound: vi.fn(), showBrowser: vi.fn() });
+    const created = await NotificationService.notify({
+      type: 'booking.assigned.therapist', targetUserId: 'u1',
+      title: 't', message: 'm', soundClass: 'oneshot',
+    });
+    expect(NotificationService._wasRecentlyDelivered(created._id)).toBe(true);
+    // Sanity: an unrelated id is not in the window.
+    expect(NotificationService._wasRecentlyDelivered('does-not-exist')).toBe(false);
+  });
 });

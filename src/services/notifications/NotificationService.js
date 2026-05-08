@@ -30,6 +30,20 @@ let _userContext = null;
 let _deliveryHooks = { playSound: () => {}, showBrowser: () => {} };
 let _pruneIntervalId = null;
 
+// IDs that we've already delivered locally on the producer device. The
+// Supabase realtime channel echoes our own writes back, so without this set
+// the producer would play the sound twice (once from notify(), once from the
+// realtime listener) whenever it happens to be the audience too. Entries
+// auto-expire after 10 s — long enough to swallow the echo, short enough that
+// the set never grows.
+const _recentlyDelivered = new Set();
+const _ECHO_WINDOW_MS = 10000;
+const _markDelivered = (id) => {
+  if (!id) return;
+  _recentlyDelivered.add(id);
+  setTimeout(() => _recentlyDelivered.delete(id), _ECHO_WINDOW_MS);
+};
+
 const NotificationService = {
   TYPES,
 
@@ -44,6 +58,7 @@ const NotificationService = {
   _setDeliveryHooksForTest(h) {
     _deliveryHooks = { playSound: () => {}, showBrowser: () => {}, ...h };
   },
+  _wasRecentlyDelivered(id) { return _recentlyDelivered.has(id); },
 
   /**
    * Create + dispatch a notification.
@@ -85,6 +100,9 @@ const NotificationService = {
     // BaseRepository.create() already emits a dataChange event, so the bell
     // hook will refresh automatically — no need to re-emit here.
     if (this._isAudience(created)) {
+      // Mark BEFORE playing so the realtime echo (which can land in <10ms on
+      // a fast connection) finds the ID already in the set and skips.
+      _markDelivered(created._id);
       _deliveryHooks.playSound(created);
       _deliveryHooks.showBrowser(created);
     }
@@ -134,7 +152,14 @@ const NotificationService = {
     supabaseSyncManager.subscribe((status) => {
       if (status.type === 'realtime_update' && status.entityType === 'notifications' && status.record) {
         const normalized = this._normalizeRecord(status.record);
+        // Skip the echo of our own write — the producer device already played
+        // the sound directly from notify(). Without this guard, when the
+        // producer is also the audience (e.g. Owner logged in at POS firing
+        // an inventory low-stock notification targeted at role Owner), the
+        // chime plays twice.
+        if (normalized?._id && _recentlyDelivered.has(normalized._id)) return;
         if (this._isAudience(normalized)) {
+          _markDelivered(normalized._id);
           _deliveryHooks.playSound(normalized);
           _deliveryHooks.showBrowser(normalized);
         }

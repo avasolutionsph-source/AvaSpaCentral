@@ -537,8 +537,23 @@ export const serviceRotationApi = {
       return parseInt(timeA || '0') - parseInt(timeB || '0');
     });
 
+    // Dedup by employeeId. Multi-device sync races and orphan rows can
+    // leave more than one open clock-in row per therapist for the same
+    // day; without this guard they appear as #2 and #3 in the rotation
+    // queue with identical name + clock-in time. Keep the earliest row
+    // (already sorted above) so the queue mirrors when the therapist
+    // actually started.
+    const seenEmpIds = new Set();
+    const dedupedClockIn = [];
+    for (const att of allClockedIn) {
+      const empId = String(att.employee?._id || att.employeeId);
+      if (seenEmpIds.has(empId)) continue;
+      seenEmpIds.add(empId);
+      dedupedClockIn.push(att);
+    }
+
     // Build queue with employee details (no service counts yet)
-    const queue = allClockedIn.map((att, index) => {
+    const queue = dedupedClockIn.map((att, index) => {
       const empId = String(att.employee?._id || att.employeeId);
       return {
         employeeId: empId,

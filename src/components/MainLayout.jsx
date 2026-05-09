@@ -6,6 +6,7 @@ import OfflineIndicator from './OfflineIndicator';
 import { useSyncStatus } from '../hooks';
 import { useNotifications } from '../hooks/useNotifications';
 import NotificationToastContainer from './NotificationToastContainer';
+import NotificationPermissionBanner from './NotificationPermissionBanner';
 import {
   getPreferredOrientation,
   setPreferredOrientation,
@@ -386,6 +387,12 @@ const MainLayout = () => {
 
   return (
     <div className="main-layout">
+      {/* Persistent banner shown only when the OS-level notification
+          permission is 'denied'. Self-detects the user's platform and
+          shows targeted instructions so non-technical users aren't
+          stuck digging through browser/OS settings on their own. */}
+      <NotificationPermissionBanner />
+
       {/* Offline/Sync Status Indicator */}
       <OfflineIndicator />
 

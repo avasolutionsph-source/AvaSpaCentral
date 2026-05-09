@@ -14,7 +14,6 @@ import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, upsertSettings, applyColorTheme, getSettingsByKeys } from '../services/brandingService';
 import { HERO_FONTS } from '../pages/BookingPage';
 import BrowserNotificationBridge from '../services/notifications/BrowserNotificationBridge';
-import UpdatePanel from '../components/UpdatePanel';
 
 const derivePayrollLogChanges = (log) => {
   if (Array.isArray(log?.changes)) return log.changes;
@@ -2498,12 +2497,6 @@ const Settings = () => {
             Payments
           </button>
         )}
-        <button
-          className={`settings-tab ${activeTab === 'update' ? 'active' : ''}`}
-          onClick={() => setActiveTab('update')}
-        >
-          Update
-        </button>
       </div>
 
       {activeTab === 'gps' ? (
@@ -3849,21 +3842,6 @@ const Settings = () => {
                 </button>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-      ) : activeTab === 'update' ? (
-      <div className="settings-content">
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <div className="settings-section-icon">🔄</div>
-            <div className="settings-section-title">
-              <h2>Update App</h2>
-              <p>Pull the latest version of Daet Massage &amp; Spa without reinstalling. Your offline records and sync queue stay intact.</p>
-            </div>
-          </div>
-          <div className="settings-section-body">
-            <UpdatePanel />
           </div>
         </div>
       </div>

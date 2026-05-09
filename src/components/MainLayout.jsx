@@ -349,6 +349,7 @@ const MainLayout = () => {
       label: 'System',
       items: [
         { path: '/settings', label: 'Settings', icon: 'settings', page: 'settings' },
+        { path: '/app-update', label: 'Update', icon: 'update', page: 'app-update' },
       ],
       hasDivider: false
     }
@@ -371,7 +372,8 @@ const MainLayout = () => {
       sensei: '◬',
       ai: '◍',
       logs: '≡',
-      settings: '⚙'
+      settings: '⚙',
+      update: '↻'
     };
     return icons[iconName] || '•';
   };

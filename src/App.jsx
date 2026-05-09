@@ -26,6 +26,7 @@ const CustomerRegister = lazy(() => import('./pages/CustomerRegister'));
 const CustomerProfile = lazy(() => import('./pages/CustomerProfile'));
 const Install = lazy(() => import('./pages/Install'));
 const Update = lazy(() => import('./pages/Update'));
+const AppUpdate = lazy(() => import('./pages/AppUpdate'));
 
 // Lazy loaded pages (code splitting for better initial load)
 const Products = lazy(() => import('./pages/Products'));
@@ -417,6 +418,7 @@ function AppRoutes() {
           <Route path="ai-chatbot" element={<ProtectedRoute page="ai-chatbot"><Suspense fallback={<PageLoader />}><AIChatbot /></Suspense></ProtectedRoute>} />
           <Route path="ai-insights" element={<ProtectedRoute page="dashboard"><Suspense fallback={<PageLoader />}><AIInsights /></Suspense></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute page="settings"><Suspense fallback={<PageLoader />}><Settings /></Suspense></ProtectedRoute>} />
+          <Route path="app-update" element={<ProtectedRoute page="app-update"><Suspense fallback={<PageLoader />}><AppUpdate /></Suspense></ProtectedRoute>} />
           {/* Analytics Routes */}
           <Route path="analytics/products" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><ProductAnalytics /></Suspense></ProtectedRoute>} />
           <Route path="analytics/inventory" element={<ProtectedRoute page="analytics"><Suspense fallback={<PageLoader />}><InventoryAnalytics /></Suspense></ProtectedRoute>} />

@@ -80,21 +80,25 @@ const migrateOrphanedData = async (businessId) => {
 const AppContext = createContext();
 
 // Role permissions mapping
+// 'app-update' is granted to every role on purpose: pulling the latest PWA
+// build is a self-service utility, not a privileged action, and roles
+// without Settings access (Receptionist / Therapist / Rider / Utility)
+// would otherwise have no in-app way to refresh their installed build.
 const rolePermissions = {
   'Owner': ['dashboard', 'pos', 'products', 'employees', 'customers', 'appointments', 'attendance', 'rooms',
             'gift-certificates', 'expenses', 'payroll', 'my-schedule', 'shift-schedules', 'payroll-requests', 'cash-drawer-history',
-            'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings'],
+            'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings', 'app-update'],
   'Manager': ['dashboard', 'pos', 'products', 'inventory', 'employees', 'customers', 'appointments', 'attendance',
               'payroll', 'rooms', 'service-history', 'gift-certificates', 'expenses', 'ai-chatbot', 'daet-insights', 'analytics', 'settings',
-              'my-schedule', 'shift-schedules', 'payroll-requests', 'calendar', 'cash-drawer-history'],
+              'my-schedule', 'shift-schedules', 'payroll-requests', 'calendar', 'cash-drawer-history', 'app-update'],
   'Branch Owner': ['dashboard', 'pos', 'products', 'employees', 'customers', 'appointments', 'attendance', 'rooms',
                    'gift-certificates', 'expenses', 'payroll', 'my-schedule', 'shift-schedules', 'payroll-requests', 'cash-drawer-history',
-                   'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings'],
+                   'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings', 'app-update'],
   'Receptionist': ['pos', 'products', 'inventory', 'customers', 'appointments', 'attendance', 'payroll', 'rooms',
-                   'service-history', 'expenses', 'my-schedule', 'payroll-requests', 'calendar'],
-  'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests'],
-  'Rider': ['rider-bookings', 'appointments', 'attendance', 'my-schedule', 'payroll-requests'],
-  'Utility': ['attendance', 'my-schedule', 'payroll-requests']
+                   'service-history', 'expenses', 'my-schedule', 'payroll-requests', 'calendar', 'app-update'],
+  'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests', 'app-update'],
+  'Rider': ['rider-bookings', 'appointments', 'attendance', 'my-schedule', 'payroll-requests', 'app-update'],
+  'Utility': ['attendance', 'my-schedule', 'payroll-requests', 'app-update']
 };
 
 // Action-level permissions (finer-grained than page access).

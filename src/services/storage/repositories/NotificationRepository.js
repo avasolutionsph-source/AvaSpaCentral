@@ -1,4 +1,5 @@
 import BaseRepository from '../BaseRepository';
+import dataChangeEmitter from '../../sync/DataChangeEmitter';
 
 class NotificationRepository extends BaseRepository {
   constructor() {
@@ -11,6 +12,33 @@ class NotificationRepository extends BaseRepository {
     // (Web Push) rather than realtime sync of this table — see
     // NotificationService._invokeNotifyPush.
     super('notifications', { trackSync: false });
+  }
+
+  // BaseRepository only fires dataChangeEmitter when trackSync is on
+  // (the emit is paired with the sync-queue write). Since notifications
+  // are intentionally local-only the bell hook would otherwise miss
+  // every create / dismiss until the next page mount — meaning the
+  // toast wouldn't appear when a service was assigned, only after a
+  // refresh, and dismiss/markRead wouldn't update the bell badge live.
+  // Override the CRUD methods to emit on the local-only path too.
+  async create(data) {
+    const item = await super.create(data);
+    dataChangeEmitter.emit({ entityType: this.tableName, operation: 'create', entityId: item._id });
+    return item;
+  }
+
+  async update(id, data) {
+    const item = await super.update(id, data);
+    dataChangeEmitter.emit({ entityType: this.tableName, operation: 'update', entityId: id });
+    return item;
+  }
+
+  async delete(id) {
+    const ok = await super.delete(id);
+    if (ok) {
+      dataChangeEmitter.emit({ entityType: this.tableName, operation: 'delete', entityId: id });
+    }
+    return ok;
   }
 
   async getUnreadFor(userId) {

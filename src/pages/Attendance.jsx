@@ -19,6 +19,7 @@ const Attendance = ({ embedded = false, onDataChange }) => {
   const [employees, setEmployees] = useState([]);
   const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
   const [overdueClockOuts, setOverdueClockOuts] = useState([]);
+  const [overdueExpanded, setOverdueExpanded] = useState(false);
   const [scheduleMap, setScheduleMap] = useState({});
 
   const [showClockModal, setShowClockModal] = useState(false);
@@ -709,29 +710,53 @@ const Attendance = ({ embedded = false, onDataChange }) => {
         </div>
       )}
 
-      {/* Overdue / Missed Clock-Out Reminders */}
+      {/* Overdue / Missed Clock-Out Reminders — collapsed by default so the
+          banner doesn't crowd the page; click the header to expand details. */}
       {overdueClockOuts.length > 0 && hasManagementAccess() && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
-          <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem', fontSize: '0.95rem' }}>
-            {isViewingToday ? `Overdue Clock-Outs (${overdueClockOuts.length})` : `Missed Clock-Outs (${overdueClockOuts.length})`}
-          </div>
-          <p style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: '0.75rem' }}>
-            {isViewingToday
-              ? "These employees haven't clocked out yet and their shift has ended:"
-              : "These employees clocked in but never clocked out:"}
-          </p>
-          {overdueClockOuts.map((record, idx) => (
-            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < overdueClockOuts.length - 1 ? '1px solid #fcd34d' : 'none' }}>
-              <span style={{ fontSize: '0.85rem', color: '#78350f' }}>
-                <strong>{record.employeeName}</strong> — clocked in at {formatTime12Hour(record.clockIn)}
+        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: overdueExpanded ? '0.75rem 1rem 1rem' : '0.5rem 0.75rem', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            onClick={() => setOverdueExpanded(v => !v)}
+            aria-expanded={overdueExpanded}
+            aria-controls="overdue-clockouts-details"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              width: '100%', padding: 0, border: 'none', background: 'transparent',
+              cursor: 'pointer', color: '#92400e', fontWeight: 600, fontSize: '0.9rem',
+              textAlign: 'left',
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span aria-hidden="true">⚠️</span>
+              <span>
+                {isViewingToday ? 'Overdue Clock-Outs' : 'Missed Clock-Outs'} ({overdueClockOuts.length})
               </span>
-              {record.shiftEndTime && (
-                <span style={{ fontSize: '0.8rem', color: '#b45309' }}>
-                  Shift ended at {formatTime12Hour(record.shiftEndTime)}
-                </span>
-              )}
+            </span>
+            <span aria-hidden="true" style={{ fontSize: '0.75rem', opacity: 0.75 }}>
+              {overdueExpanded ? 'Hide ▲' : 'View ▼'}
+            </span>
+          </button>
+          {overdueExpanded && (
+            <div id="overdue-clockouts-details" style={{ marginTop: '0.75rem' }}>
+              <p style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: '0.75rem' }}>
+                {isViewingToday
+                  ? "These employees haven't clocked out yet and their shift has ended:"
+                  : "These employees clocked in but never clocked out:"}
+              </p>
+              {overdueClockOuts.map((record, idx) => (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < overdueClockOuts.length - 1 ? '1px solid #fcd34d' : 'none' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#78350f' }}>
+                    <strong>{record.employeeName}</strong> — clocked in at {formatTime12Hour(record.clockIn)}
+                  </span>
+                  {record.shiftEndTime && (
+                    <span style={{ fontSize: '0.8rem', color: '#b45309' }}>
+                      Shift ended at {formatTime12Hour(record.shiftEndTime)}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 

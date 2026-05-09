@@ -14,6 +14,7 @@ import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, upsertSettings, applyColorTheme, getSettingsByKeys } from '../services/brandingService';
 import { HERO_FONTS } from '../pages/BookingPage';
 import BrowserNotificationBridge from '../services/notifications/BrowserNotificationBridge';
+import PushSubscriptionService from '../services/notifications/PushSubscriptionService';
 
 const derivePayrollLogChanges = (log) => {
   if (Array.isArray(log?.changes)) return log.changes;
@@ -94,6 +95,25 @@ const Settings = () => {
   const handleAllowBrowser = async () => {
     const result = await BrowserNotificationBridge.requestPermission();
     setBrowserPerm(result);
+    // If granted, also subscribe this device to Web Push so notifications
+    // reach the OS even when the app/tab is closed. Failures are non-fatal:
+    // foreground notifications still work, the user just won't get pushes
+    // until the issue is resolved (e.g. PWA installed on iOS).
+    if (result === 'granted' && user) {
+      const sub = await PushSubscriptionService.subscribe({
+        userId: user.id || user._id,
+        branchId: user.branchId ?? null,
+      });
+      if (!sub.ok) {
+        console.warn('[push] subscribe after permission grant failed:', sub.reason);
+        if (sub.reason === 'subscribe_failed') {
+          showToast(
+            'Browser notifications enabled, but background push could not register on this device. On iPhone, install the app to your Home Screen to receive locked-screen alerts.',
+            'info',
+          );
+        }
+      }
+    }
   };
 
   // Tracks which branch-scoped settings the currently-selected branch has

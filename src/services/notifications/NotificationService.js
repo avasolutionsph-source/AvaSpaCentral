@@ -107,7 +107,46 @@ const NotificationService = {
       _deliveryHooks.showBrowser(created);
     }
 
+    // Fire Web Push for off-device + closed-app delivery. Fire-and-forget
+    // so a slow / failing push round-trip never blocks the local bell, and
+    // wrap in a try/catch because supabase.functions.invoke can throw on
+    // network errors.
+    this._invokeNotifyPush(created).catch((err) => {
+      console.warn('[NotificationService] notify-push invoke failed', err?.message || err);
+    });
+
     return created;
+  },
+
+  async _invokeNotifyPush(created) {
+    if (!created) return;
+    // Skip when running against tests / no Supabase — local-only mode.
+    const { supabase, isSupabaseConfigured } = await import('../supabase');
+    if (!isSupabaseConfigured()) return;
+
+    const payload = {
+      notification: {
+        id: created._id,
+        type: created.type,
+        title: created.title,
+        message: created.message,
+        action: created.action ?? null,
+        soundClass: created.soundClass ?? 'oneshot',
+        targetUserId: created.targetUserId ?? null,
+        targetRole: created.targetRole ?? null,
+        branchId: created.branchId ?? _userContext?.branchId ?? null,
+        businessId: created.businessId ?? _userContext?.businessId ?? null,
+      },
+    };
+
+    const { error } = await supabase.functions.invoke('notify-push', {
+      body: payload,
+    });
+    if (error) {
+      // Don't surface to the user — push is best-effort. Log so it's
+      // visible in devtools when debugging.
+      console.warn('[NotificationService] notify-push returned error', error.message || error);
+    }
   },
 
   _isAudience(n) {

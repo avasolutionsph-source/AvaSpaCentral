@@ -9,6 +9,18 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // injectManifest lets us own the service worker source so we can add
+      // a Web Push handler. Workbox still precaches the build manifest via
+      // the __WB_MANIFEST placeholder injected into src/sw.ts.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
+        // The custom SW pulls in workbox-* runtime helpers that bloat past
+        // the default 2 MB threshold; loosen to a still-conservative 4 MB.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
       includeAssets: ['favicon.png', 'images/**/*'],
       manifest: {
         name: 'Daet Massage & Spa',
@@ -43,86 +55,12 @@ export default defineConfig(({ mode }) => ({
           }
         ]
       },
-      workbox: {
-        // Cache all assets including lazy-loaded chunks
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
-        // SPA fallback - serve index.html for all navigation requests
-        navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api/],
-        // Runtime caching strategies
-        // Skip waiting so new SW activates immediately
-        skipWaiting: true,
-        clientsClaim: true,
-        runtimeCaching: [
-          {
-            // Cache JS chunks - NetworkFirst so users always get latest when online
-            urlPattern: /\.js$/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'js-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
-              },
-              networkTimeoutSeconds: 10
-            }
-          },
-          {
-            // Cache CSS files - NetworkFirst so users always get latest when online
-            urlPattern: /\.css$/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'css-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
-              },
-              networkTimeoutSeconds: 10
-            }
-          },
-          {
-            // Cache API responses (mock API data stored in IndexedDB anyway)
-            urlPattern: /^https:\/\/api\./i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            // Cache images - StaleWhileRevalidate so new images appear on next visit
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'images-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              }
-            }
-          },
-          {
-            // Cache fonts
-            urlPattern: /\.(?:woff|woff2|ttf|otf|eot)$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'fonts-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-              }
-            }
-          }
-        ]
-      },
+      // Runtime cache strategies + skipWaiting/clientsClaim now live inside
+      // src/sw.ts. The runtime config above (injectManifest.globPatterns)
+      // controls precaching; everything else is plain Workbox in the SW.
       devOptions: {
-        enabled: true // Enable PWA in development for testing
+        enabled: true, // Enable PWA in development for testing
+        type: 'module', // injectManifest mode requires module-type SW in dev
       }
     })
   ],

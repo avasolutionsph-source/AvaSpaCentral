@@ -6,6 +6,7 @@ import { getBrandingSettings, applyColorTheme } from '../services/brandingServic
 import { db } from '../db';
 import { setAnalyticsBranchFilter } from '../mockApi/mockApi';
 import NotificationService from '../services/notifications/NotificationService';
+import PushSubscriptionService from '../services/notifications/PushSubscriptionService';
 
 // Sentinel representing "view data from all branches" for Owner/Manager users.
 // Stored in the same selectedBranch slot (so localStorage persistence Just Works).
@@ -598,6 +599,23 @@ export const AppProvider = ({ children }) => {
     if (user) {
       NotificationService.setUserContext(user);
       NotificationService.start();
+
+      // Re-subscribe to Web Push if the user previously granted permission
+      // on this device. Idempotent: returns the existing subscription when
+      // one is already in place. Failures (no VAPID key, iOS without
+      // installed PWA, offline) are logged but not surfaced — push is a
+      // best-effort enhancement on top of foreground notifications.
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        PushSubscriptionService.subscribe({
+          userId: user.id || user._id,
+          branchId: user.branchId ?? null,
+        }).then((res) => {
+          if (!res.ok) {
+            console.warn('[push] resubscribe skipped:', res.reason);
+          }
+        });
+      }
+
       let cancelled = false;
       // Lazy-import triggers so a logged-out tab doesn't subscribe.
       import('../services/notifications/triggers').then(m => {
@@ -616,6 +634,11 @@ export const AppProvider = ({ children }) => {
         triggersUnsubRef.current = null;
       }
       NotificationService.stop();
+      // On logout, drop the push subscription so the next user on the
+      // same device gets a fresh endpoint that's correctly attributed.
+      PushSubscriptionService.unsubscribe().catch((err) => {
+        console.warn('[push] unsubscribe on logout failed:', err);
+      });
     }
   }, [user]);
 

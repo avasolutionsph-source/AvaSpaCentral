@@ -6,6 +6,7 @@ import { getBrandingSettings, applyColorTheme } from '../services/brandingServic
 import { db } from '../db';
 import { setAnalyticsBranchFilter } from '../mockApi/mockApi';
 import NotificationService from '../services/notifications/NotificationService';
+import NotificationSoundManager from '../services/notifications/NotificationSoundManager';
 import PushSubscriptionService from '../services/notifications/PushSubscriptionService';
 
 // Sentinel representing "view data from all branches" for Owner/Manager users.
@@ -600,17 +601,24 @@ export const AppProvider = ({ children }) => {
       NotificationService.setUserContext(user);
       NotificationService.start();
 
-      // Browser notifications are mandatory for every role. The OS-level
-      // permission prompt requires *transient activation* (a recent click /
-      // keypress) on Firefox + Safari, and is restricted on Chrome too —
-      // calling Notification.requestPermission() directly from this effect
-      // would silently no-op on most browsers because no user gesture is
-      // active by the time React settles the user state. So we defer the
-      // prompt to the very next click / keydown on the document, which is
-      // guaranteed to carry transient activation. Once granted (now or
-      // previously), subscribe this device to Web Push so alerts reach the
-      // OS even when the tab is closed.
-      let permissionListenerCleanup = null;
+      // Notifications are mandatory for every role and have *two* separate
+      // browser-level locks that both need a real user gesture:
+      //
+      //   1. Notification.requestPermission() — needs transient activation
+      //      on Firefox/Safari (and is increasingly restricted on Chrome),
+      //      so calling it from this effect would silently no-op.
+      //   2. Audio.play() autoplay policy — even with permission granted,
+      //      .play() throws NotAllowedError until *some* audio has been
+      //      successfully played from a user gesture in this session.
+      //      Background triggers (push, realtime) hit this hard: the SW
+      //      forwards a push to the focused tab, NotificationSoundManager
+      //      tries to play, browser blocks it, no chime ever fires.
+      //
+      // Both unlock paths share the same fix: install a one-shot capture-
+      // phase listener for the *next* click/keydown on the document, then
+      // do BOTH operations from inside that handler (which carries the
+      // gesture activation).
+      let gestureListenerCleanup = null;
       const subscribePush = () => {
         PushSubscriptionService.subscribe({
           userId: user.id || user._id,
@@ -622,40 +630,44 @@ export const AppProvider = ({ children }) => {
         });
       };
       if (typeof Notification !== 'undefined' && typeof document !== 'undefined') {
+        // Always subscribe push when permission is already granted; this is
+        // independent of the gesture flow below.
         if (Notification.permission === 'granted') {
           subscribePush();
-        } else if (Notification.permission === 'default') {
-          const promptOnGesture = () => {
-            // Detach immediately — we only ever want one prompt per session.
-            // Doing this before requestPermission() also prevents a re-entrant
-            // call if the click that grants permission also bubbles.
-            document.removeEventListener('click', promptOnGesture, true);
-            document.removeEventListener('keydown', promptOnGesture, true);
-            try {
-              const result = Notification.requestPermission();
-              // requestPermission returns a Promise on modern browsers but a
-              // legacy callback signature on older ones; both shapes resolve
-              // to a permission string.
-              Promise.resolve(result)
-                .then((perm) => {
-                  if (perm === 'granted') subscribePush();
-                })
-                .catch((err) => {
-                  console.warn('[notifications] requestPermission rejected:', err);
-                });
-            } catch (err) {
-              console.warn('[notifications] requestPermission threw:', err);
+        }
+        // Skip the gesture handler entirely if both audio is already
+        // unlocked (somehow) AND permission is non-default.
+        const needsAudioUnlock = !NotificationSoundManager.isUnlocked();
+        const needsPermission = Notification.permission === 'default';
+        if (needsAudioUnlock || needsPermission) {
+          const onFirstGesture = () => {
+            document.removeEventListener('click', onFirstGesture, true);
+            document.removeEventListener('keydown', onFirstGesture, true);
+            // Audio unlock is the more important of the two — without it,
+            // even a granted permission produces a silent OS notification
+            // because our in-app loop chime is autoplay-blocked.
+            NotificationSoundManager.unlock();
+            if (Notification.permission === 'default') {
+              try {
+                Promise.resolve(Notification.requestPermission())
+                  .then((perm) => {
+                    if (perm === 'granted') subscribePush();
+                  })
+                  .catch((err) => {
+                    console.warn('[notifications] requestPermission rejected:', err);
+                  });
+              } catch (err) {
+                console.warn('[notifications] requestPermission threw:', err);
+              }
             }
           };
-          // Capture phase so we win the race against React handlers that
-          // stopPropagation() — login itself uses click handlers and the
-          // very first post-login click would otherwise be eaten before
-          // bubbling here.
-          document.addEventListener('click', promptOnGesture, true);
-          document.addEventListener('keydown', promptOnGesture, true);
-          permissionListenerCleanup = () => {
-            document.removeEventListener('click', promptOnGesture, true);
-            document.removeEventListener('keydown', promptOnGesture, true);
+          // Capture phase so React handlers that call stopPropagation() on
+          // their click events don't eat our chance to unlock.
+          document.addEventListener('click', onFirstGesture, true);
+          document.addEventListener('keydown', onFirstGesture, true);
+          gestureListenerCleanup = () => {
+            document.removeEventListener('click', onFirstGesture, true);
+            document.removeEventListener('keydown', onFirstGesture, true);
           };
         }
       }
@@ -675,7 +687,7 @@ export const AppProvider = ({ children }) => {
         cancelled = true;
         // Detach the gesture listener if the user logs out before granting
         // — otherwise it would leak across user sessions.
-        if (permissionListenerCleanup) permissionListenerCleanup();
+        if (gestureListenerCleanup) gestureListenerCleanup();
       };
     } else {
       if (triggersUnsubRef.current) {

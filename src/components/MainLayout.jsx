@@ -7,6 +7,8 @@ import { useSyncStatus } from '../hooks';
 import { useNotifications } from '../hooks/useNotifications';
 import NotificationToastContainer from './NotificationToastContainer';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
+import NotificationService from '../services/notifications/NotificationService';
+import NotificationSoundManager from '../services/notifications/NotificationSoundManager';
 import {
   getPreferredOrientation,
   setPreferredOrientation,
@@ -261,6 +263,30 @@ const MainLayout = () => {
 
   const clearAllNotifications = () => {
     dismissAll();
+    setShowNotifications(false);
+  };
+
+  // Manual end-to-end self-test for the alert pipeline. Fires from a real
+  // user click so it both unlocks audio (in case the global gesture handler
+  // missed it) and creates a notification routed to the current user only,
+  // which exercises every layer: NotificationService.notify → mockApi
+  // create → audience match → playSound + showBrowser → toast surface.
+  // If this stays silent, the audio chain is broken; if there is no toast
+  // either, the producer/audience match is broken; if there is no OS
+  // banner, the browser permission is the culprit.
+  const handleSelfTestAlert = () => {
+    NotificationSoundManager.unlock();
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch {}
+    }
+    if (!user?._id) return;
+    NotificationService.notify({
+      type: 'app.update.available',
+      targetUserId: user._id,
+      title: 'Test alert',
+      message: 'If you saw a banner and heard a chime, alerts are working on this device.',
+      soundClass: 'oneshot',
+    }).catch((err) => console.warn('[self-test] notify failed', err));
     setShowNotifications(false);
   };
 
@@ -694,14 +720,24 @@ const MainLayout = () => {
                 <div className="notification-dropdown">
                   <div className="notification-header">
                     <h3>Notifications</h3>
-                    {notifications.length > 0 && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
                       <button
+                        type="button"
                         className="clear-all-btn"
-                        onClick={clearAllNotifications}
+                        onClick={handleSelfTestAlert}
+                        title="Send yourself a test alert to verify sound + banner work on this device"
                       >
-                        Clear All
+                        Test alert
                       </button>
-                    )}
+                      {notifications.length > 0 && (
+                        <button
+                          className="clear-all-btn"
+                          onClick={clearAllNotifications}
+                        >
+                          Clear All
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="notification-list">
                     {/* Sync queue — pinned to top so failed/pending sync is visible

@@ -40,9 +40,47 @@ if (typeof localStorage !== 'undefined') {
   try { localStorage.removeItem('notifSoundEnabled'); } catch {}
 }
 
+// Tracks whether the browser's autoplay restriction has been lifted for
+// this document/session. HTML5 Audio.play() is blocked until any audio
+// has been successfully started from a user gesture. Once unlocked,
+// every subsequent .play() — including from background triggers like
+// service-worker push messages — works without restriction. This flag
+// flips inside unlock() once the silent priming play() resolves.
+let _unlocked = false;
+
 const NotificationSoundManager = {
-  _resetForTest() { activeLoops.clear(); },
+  _resetForTest() { activeLoops.clear(); _unlocked = false; },
   _injectAudioFactoryForTest(f) { audioFactory = f; },
+  isUnlocked() { return _unlocked; },
+
+  /** Lift the browser's audio autoplay restriction for this session.
+   *  MUST be called from a user gesture handler (click / keydown) —
+   *  calling it elsewhere will be silently rejected by the browser
+   *  and _unlocked stays false. Idempotent: subsequent calls short-
+   *  circuit. Returns a Promise that resolves to true on success. */
+  unlock() {
+    if (_unlocked) return Promise.resolve(true);
+    let audio;
+    try {
+      audio = audioFactory();
+    } catch {
+      return Promise.resolve(false);
+    }
+    // Near-silent volume so the unlock chime is inaudible in practice
+    // but the play() call still satisfies the autoplay policy.
+    audio.volume = 0.0001;
+    return Promise.resolve(audio.play())
+      .then(() => {
+        try { audio.pause(); audio.currentTime = 0; } catch {}
+        try { audio.volume = LOOP_VOLUME; } catch {}
+        _unlocked = true;
+        return true;
+      })
+      .catch((err) => {
+        console.warn('[notif sound] audio unlock failed:', err?.message || err);
+        return false;
+      });
+  },
 
   /** Sound played once on first call; loop-class fires again every 2s
    *  until stop(), with an extra triple-chime burst on the very first

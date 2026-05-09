@@ -63,13 +63,18 @@ export function useNotifications(user) {
     return () => unsub();
   }, [user?._id, refresh]);
 
-  // Auto-hide the active toast after a few seconds. The notification
-  // remains 'unread' in the repo so the bell count is unchanged — only
-  // the toast card retreats. Loop-class sounds are stopped at the same
-  // moment so the user doesn't keep hearing a chime with no visible
-  // source.
+  // Auto-hide the active toast after a few seconds for one-shot pings
+  // (status updates, info pings) — they don't need the user's hands.
+  // Loop-class notifications (booking assigned, rotation turn, drawer
+  // alerts) are deliberately persistent: the chime repeats every 3 s
+  // and the toast stays put until the therapist / rider taps Open or
+  // Stop. Without this exemption the auto-hide also silenced the
+  // looping chime after 5 s, which defeats its whole purpose — the
+  // therapist might miss a booking assignment because the alert went
+  // quiet before they reached the screen.
   useEffect(() => {
     if (!active) return;
+    if (active.soundClass === 'loop') return;
     const id = active._id;
     if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     autoHideTimerRef.current = setTimeout(() => {
@@ -84,7 +89,7 @@ export function useNotifications(user) {
     return () => {
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     };
-  }, [active?._id, refresh]);
+  }, [active?._id, active?.soundClass, refresh]);
 
   const dismiss = useCallback(async (id) => {
     NotificationSoundManager.stop(id);

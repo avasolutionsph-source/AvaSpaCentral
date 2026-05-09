@@ -11749,7 +11749,28 @@ a:focus:not(:focus-visible),
 .notif-toast-loop { border-left-color: var(--error); }
 .notif-toast-title { font-weight: 700; color: var(--gray-900); }
 .notif-toast-message { font-size: 0.875rem; color: var(--gray-600); }
-.notif-toast-actions { display: flex; gap: var(--spacing-sm); justify-content: flex-end; }
+/* Loop-class toasts (urgent assignments, drawer alerts, rotation
+   turns) need full-width, centered, oversized buttons. The default
+   right-aligned small buttons made Confirm easy to mis-tap on a phone
+   and the chime would keep ringing. Oneshot toasts keep the compact
+   right-aligned layout — they're info pings, not calls to action. */
+.notif-toast-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+}
+.notif-toast-loop .notif-toast-actions {
+  justify-content: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+}
+.notif-toast-loop .notif-toast-actions .btn {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.875rem 1rem;
+  min-height: 48px;
+}
 @keyframes notif-toast-in {
   from { opacity: 0; transform: translateX(20px); }
   to   { opacity: 1; transform: translateX(0); }

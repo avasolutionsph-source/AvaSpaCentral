@@ -2,12 +2,37 @@
 import NotificationService from '../NotificationService';
 import mockApi from '../../../mockApi';
 
+// In-memory guard — fast no-op for the hourly setInterval.
 let lastRun = null;
+
+// Persistent guard — prevents the daily checks from re-firing on every
+// page reload (without it, lastRun resets to null and we'd spam the bell
+// each time the user hits Update or refreshes the tab).
+const LAST_RUN_KEY = 'daetspa.dailyTriggers.lastRun';
+
+function readPersistedLastRun() {
+  try {
+    return localStorage.getItem(LAST_RUN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedLastRun(value) {
+  try {
+    localStorage.setItem(LAST_RUN_KEY, value);
+  } catch {}
+}
 
 async function runDailyChecks() {
   const today = new Date().toDateString();
   if (lastRun === today) return;
+  if (readPersistedLastRun() === today) {
+    lastRun = today;
+    return;
+  }
   lastRun = today;
+  writePersistedLastRun(today);
 
   // Expiring products within 7 days.
   try {
@@ -29,12 +54,20 @@ async function runDailyChecks() {
     }
   } catch {}
 
-  // Drawer left open from previous day.
+  // Drawer left open from previous day. The CashDrawerRepository writes
+  // both `openTime` (ISO timestamp) and `openDate` ('YYYY-MM-DD') when
+  // a drawer is opened — never `openedAt`. Reading the wrong field gave
+  // us new Date(undefined) → Invalid Date, which never equals `today`,
+  // so the notification fired for *every* open drawer on every reload
+  // with the message "Opened Invalid Date". Use openTime + a validity
+  // check, fall back to openDate, and bail when neither is parsable
+  // rather than spamming a meaningless alert.
   try {
     const drawer = await mockApi.cashDrawer.getCurrentDrawer();
     if (drawer && drawer.status === 'open') {
-      const opened = new Date(drawer.openedAt);
-      if (opened.toDateString() !== today) {
+      const stamp = drawer.openTime || drawer.openDate || null;
+      const opened = stamp ? new Date(stamp) : null;
+      if (opened && !Number.isNaN(opened.getTime()) && opened.toDateString() !== today) {
         await NotificationService.notify({
           type: NotificationService.TYPES.DRAWER_OPEN_FROM_PREV_DAY,
           targetRole: ['Manager', 'Owner', 'Branch Owner'],

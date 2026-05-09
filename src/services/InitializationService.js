@@ -72,6 +72,15 @@ class InitializationService {
       //     dead entries on every device that already had them.
       await this._purgeStaleNotificationSyncEntries();
 
+      // 3c. One-time cleanup: drop the false-alarm "Cash drawer still open
+      //     — Opened Invalid Date" notifications produced by the previous
+      //     dailyTriggers bug. They cycled into the bell on every reload
+      //     because the trigger compared `Invalid Date.toDateString()` to
+      //     today's date (always !==) and so fired for every open drawer.
+      //     The trigger is fixed in this build; this just clears the
+      //     backlog so the bell badge reflects reality on next mount.
+      await this._purgeFalseAlarmDrawerNotifications();
+
       // 4. Note: Old SyncManager removed - SupabaseSyncManager is initialized in AppContext
       // NetworkDetector.start();
       // SyncManager.initialize();
@@ -107,6 +116,27 @@ class InitializationService {
     } catch (err) {
       // Non-fatal — the app still works, the queue UI just stays noisy.
       console.warn('[InitService] Failed to purge notification sync entries:', err);
+    }
+  }
+
+  /**
+   * Drop the "Cash drawer still open — Opened Invalid Date" rows that the
+   * old buggy dailyTriggers fan-out left behind. Matched by exact message
+   * so we don't accidentally clear a legitimate drawer-still-open ping
+   * that the corrected trigger fires going forward.
+   */
+  async _purgeFalseAlarmDrawerNotifications() {
+    try {
+      const removed = await db.notifications
+        .where('type')
+        .equals('drawer.open.from.previous.day')
+        .filter((n) => n.message === 'Opened Invalid Date')
+        .delete();
+      if (removed > 0) {
+        console.log(`[InitService] Purged ${removed} false-alarm drawer notifications`);
+      }
+    } catch (err) {
+      console.warn('[InitService] Failed to purge false-alarm drawer notifications:', err);
     }
   }
 

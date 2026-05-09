@@ -600,12 +600,14 @@ export const AppProvider = ({ children }) => {
       NotificationService.setUserContext(user);
       NotificationService.start();
 
-      // Re-subscribe to Web Push if the user previously granted permission
-      // on this device. Idempotent: returns the existing subscription when
-      // one is already in place. Failures (no VAPID key, iOS without
-      // installed PWA, offline) are logged but not surfaced — push is a
-      // best-effort enhancement on top of foreground notifications.
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      // Browser notifications are mandatory for every role — auto-prompt on
+      // login when the permission is still 'default' so the user doesn't
+      // have to hunt for a button in Settings. Once granted (now or
+      // previously), subscribe this device to Web Push so alerts reach the
+      // OS even when the tab is closed. The OS-level prompt itself can't be
+      // bypassed; if the user blocks it, the app keeps working with
+      // in-tab toasts only.
+      const subscribePush = () => {
         PushSubscriptionService.subscribe({
           userId: user.id || user._id,
           branchId: user.branchId ?? null,
@@ -614,6 +616,19 @@ export const AppProvider = ({ children }) => {
             console.warn('[push] resubscribe skipped:', res.reason);
           }
         });
+      };
+      if (typeof Notification !== 'undefined') {
+        if (Notification.permission === 'granted') {
+          subscribePush();
+        } else if (Notification.permission === 'default') {
+          Notification.requestPermission()
+            .then((result) => {
+              if (result === 'granted') subscribePush();
+            })
+            .catch((err) => {
+              console.warn('[notifications] auto requestPermission failed:', err);
+            });
+        }
       }
 
       let cancelled = false;

@@ -13,8 +13,6 @@ import { authService } from '../services/supabase';
 import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import { getBrandingSettings, saveBrandingSettings, uploadBrandingImage, upsertSettings, applyColorTheme, getSettingsByKeys } from '../services/brandingService';
 import { HERO_FONTS } from '../pages/BookingPage';
-import BrowserNotificationBridge from '../services/notifications/BrowserNotificationBridge';
-import PushSubscriptionService from '../services/notifications/PushSubscriptionService';
 
 const derivePayrollLogChanges = (log) => {
   if (Array.isArray(log?.changes)) return log.changes;
@@ -82,39 +80,9 @@ const Settings = () => {
   // Tab state for switching between Settings and Activity Logs
   const [activeTab, setActiveTab] = useState('settings');
 
-  // Notifications (per-device preferences). The localStorage key gates
-  // NotificationSoundManager.play() — default is enabled when key is unset.
-  const [soundOn, setSoundOn] = useState(() => localStorage.getItem('notifSoundEnabled') !== 'false');
-  const [browserPerm, setBrowserPerm] = useState(() => BrowserNotificationBridge.permission());
-
-  const handleSoundToggle = (e) => {
-    setSoundOn(e.target.checked);
-    localStorage.setItem('notifSoundEnabled', e.target.checked ? 'true' : 'false');
-  };
-
-  const handleAllowBrowser = async () => {
-    const result = await BrowserNotificationBridge.requestPermission();
-    setBrowserPerm(result);
-    // If granted, also subscribe this device to Web Push so notifications
-    // reach the OS even when the app/tab is closed. Failures are non-fatal:
-    // foreground notifications still work, the user just won't get pushes
-    // until the issue is resolved (e.g. PWA installed on iOS).
-    if (result === 'granted' && user) {
-      const sub = await PushSubscriptionService.subscribe({
-        userId: user.id || user._id,
-        branchId: user.branchId ?? null,
-      });
-      if (!sub.ok) {
-        console.warn('[push] subscribe after permission grant failed:', sub.reason);
-        if (sub.reason === 'subscribe_failed') {
-          showToast(
-            'Browser notifications enabled, but background push could not register on this device. On iPhone, install the app to your Home Screen to receive locked-screen alerts.',
-            'info',
-          );
-        }
-      }
-    }
-  };
+  // Notifications are mandatory for every role and cannot be toggled here:
+  // permission is auto-requested on login (see AppContext), sound always
+  // plays. This block intentionally has no per-device controls.
 
   // Tracks which branch-scoped settings the currently-selected branch has
   // already saved. Drives the per-section "Configure now" banners so empty
@@ -3867,39 +3835,6 @@ const Settings = () => {
       </div>
       ) : (
       <div className="settings-content">
-        {/* Notifications — per-device preferences, visible to all roles */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <div className="settings-section-icon">🔔</div>
-            <div className="settings-section-title">
-              <h2>Notifications</h2>
-              <p>Control how alerts reach you on this device.</p>
-            </div>
-          </div>
-          <div className="settings-section-body">
-            <label
-              className="checkbox-label"
-              style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center', marginBottom: 'var(--spacing-md)' }}
-            >
-              <input type="checkbox" checked={soundOn} onChange={handleSoundToggle} />
-              <span>Play sound on new alerts</span>
-            </label>
-            <div style={{ display: 'flex', gap: 'var(--spacing-md)', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleAllowBrowser}
-                disabled={browserPerm === 'granted' || browserPerm === 'denied' || browserPerm === 'unsupported'}
-              >
-                Allow browser notifications
-              </button>
-              <span style={{ fontSize: '0.875rem', color: 'var(--gray-600)' }}>
-                Status: <strong>{browserPerm}</strong>
-              </span>
-            </div>
-          </div>
-        </div>
-
         {/* Business Information */}
         <div className="settings-section">
           <div className="settings-section-header">

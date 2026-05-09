@@ -158,7 +158,34 @@ self.addEventListener('push', (event) => {
     },
   } as unknown as NotificationOptions;
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  // Hand the push to focused clients first so the in-app sound loop +
+  // vibration (NotificationSoundManager) fires even when the user has
+  // the app open on their phone. The OS card alone plays a single
+  // chime — the in-app loop is what actually holds attention. If no
+  // client is focused (app backgrounded / phone locked / not running)
+  // we fall back to the OS notification so it surfaces in the system
+  // notification tray with the aggressive vibration pattern.
+  event.waitUntil(
+    (async () => {
+      try {
+        const clientList = await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true,
+        });
+        const focusedClient = clientList.find((c) => (c as WindowClient).focused);
+        if (focusedClient) {
+          focusedClient.postMessage({
+            type: 'NOTIFICATION_PUSH',
+            payload: data,
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('[sw push] client dispatch failed', err);
+      }
+      await self.registration.showNotification(title, options);
+    })(),
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {

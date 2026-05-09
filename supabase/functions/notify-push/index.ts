@@ -77,7 +77,30 @@ serve(async (req) => {
     // 1. Resolve recipient user ids.
     let userIds: string[] = [];
     if (n.targetUserId) {
-      userIds = [n.targetUserId];
+      // Some producers (e.g. POS room-assignment trigger) only have the
+      // employee row id and pass it as targetUserId when the linked
+      // employee.userId isn't populated. Try users.id first, then fall
+      // back to users.employee_id so the push lands on the right account
+      // either way.
+      const { data: byUserId, error: byUserIdErr } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', n.targetUserId);
+      if (byUserIdErr) {
+        return jsonResponse({ error: 'recipient_lookup_failed', detail: byUserIdErr.message }, 500);
+      }
+      if (byUserId && byUserId.length > 0) {
+        userIds = byUserId.map((u: { id: string }) => u.id);
+      } else {
+        const { data: byEmpId, error: byEmpIdErr } = await supabase
+          .from('users')
+          .select('id')
+          .eq('employee_id', n.targetUserId);
+        if (byEmpIdErr) {
+          return jsonResponse({ error: 'recipient_lookup_failed', detail: byEmpIdErr.message }, 500);
+        }
+        userIds = (byEmpId ?? []).map((u: { id: string }) => u.id);
+      }
     } else if (n.targetRole) {
       const roles = Array.isArray(n.targetRole) ? n.targetRole : [n.targetRole];
       let q = supabase.from('users').select('id').in('role', roles);

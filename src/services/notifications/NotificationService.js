@@ -29,6 +29,7 @@ const TYPES = Object.freeze({
 let _userContext = null;
 let _deliveryHooks = { playSound: () => {}, showBrowser: () => {} };
 let _pruneIntervalId = null;
+let _swMessageHandler = null;
 
 // IDs that we've already delivered locally on the producer device. The
 // Supabase realtime channel echoes our own writes back, so without this set
@@ -151,7 +152,15 @@ const NotificationService = {
 
   _isAudience(n) {
     if (!_userContext) return false;
-    if (n.targetUserId && n.targetUserId === _userContext._id) return true;
+    if (n.targetUserId) {
+      // Match either the user's account id OR their linked employee id —
+      // some producers (e.g. POS room-assignment trigger) only know the
+      // employee row id and fall back to that when an employee.userId
+      // link isn't populated. Without this fallback the foreground bell
+      // stays silent on devices logged in as the assigned therapist.
+      if (n.targetUserId === _userContext._id) return true;
+      if (n.targetUserId === _userContext.employeeId) return true;
+    }
     if (n.targetRole) {
       const roles = Array.isArray(n.targetRole) ? n.targetRole : [n.targetRole];
       if (roles.includes(_userContext.role)) {
@@ -161,6 +170,45 @@ const NotificationService = {
       }
     }
     return false;
+  },
+
+  /**
+   * Foreground delivery path for Web Push messages. The service worker
+   * forwards every push to the focused tab here instead of firing an OS
+   * notification — the in-app loop sound + vibration cycle is what
+   * actually holds attention when the receiver has the app open. Writes
+   * the row to local Dexie so the bell badge tracks correctly, then
+   * runs the same playSound delivery hook the producer side does.
+   */
+  async deliverFromPush(payload) {
+    if (!_userContext || !payload?.id) return;
+    if (_recentlyDelivered.has(payload.id)) return;
+    _markDelivered(payload.id);
+
+    const n = {
+      _id: payload.id,
+      type: payload.type,
+      title: payload.title,
+      message: payload.message,
+      action: payload.action ?? null,
+      soundClass: payload.soundClass ?? 'oneshot',
+      targetUserId: _userContext._id,
+      branchId: _userContext.branchId ?? null,
+      status: 'unread',
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      await NotificationRepository.create(n);
+    } catch (err) {
+      // Bell may not refresh, but we still want the audible alert.
+      console.warn('[NotificationService] deliverFromPush write failed', err?.message || err);
+    }
+
+    _deliveryHooks.playSound(n);
+    // Skip showBrowser — we are the foreground tab; the visible toast +
+    // chime already cover the "look at me" surface and an OS card on top
+    // would just stack a duplicate banner.
   },
 
   /** Normalize a record that may be in snake_case (raw Supabase row) or
@@ -205,6 +253,19 @@ const NotificationService = {
       }
     });
 
+    // Listen for Web Push messages forwarded from the service worker. The
+    // SW posts here when the tab is focused so the in-app sound + vibrate
+    // loop fires (the OS notification alone only chimes once). Stable
+    // handler reference so removeEventListener in stop() finds it.
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+      _swMessageHandler = (event) => {
+        const data = event.data;
+        if (!data || data.type !== 'NOTIFICATION_PUSH' || !data.payload) return;
+        this.deliverFromPush(data.payload);
+      };
+      navigator.serviceWorker.addEventListener('message', _swMessageHandler);
+    }
+
     // Hourly prune of expired rows (defensive; expiresAt defaults to 7d).
     if (_pruneIntervalId) clearInterval(_pruneIntervalId);
     _pruneIntervalId = setInterval(() => {
@@ -218,6 +279,10 @@ const NotificationService = {
     if (_pruneIntervalId) {
       clearInterval(_pruneIntervalId);
       _pruneIntervalId = null;
+    }
+    if (_swMessageHandler && typeof navigator !== 'undefined' && navigator.serviceWorker) {
+      navigator.serviceWorker.removeEventListener('message', _swMessageHandler);
+      _swMessageHandler = null;
     }
   },
 };

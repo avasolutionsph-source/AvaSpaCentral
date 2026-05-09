@@ -47,11 +47,18 @@ export function startBookingTriggers() {
         seenIds.assignedTherapist.add(key);
         const emp = await findEmployee(b.employeeId);
         if (emp) {
+          // Format the booking time defensively — a row with a missing or
+          // unparseable bookingDateTime would otherwise produce literal
+          // "at Invalid Date" in the message.
+          const start = b.bookingDateTime ? new Date(b.bookingDateTime) : null;
+          const timeText = (start && !Number.isNaN(start.getTime()))
+            ? start.toLocaleString('en-PH', { hour: '2-digit', minute: '2-digit' })
+            : 'soon';
           await NotificationService.notify({
             type: NotificationService.TYPES.BOOKING_ASSIGNED_THERAPIST,
             targetUserId: emp.userId || emp._id,
             title: 'New booking assigned',
-            message: `${b.clientName} • ${b.serviceName} at ${new Date(b.bookingDateTime).toLocaleString('en-PH', { hour: '2-digit', minute: '2-digit' })}`,
+            message: `${b.clientName} • ${b.serviceName} at ${timeText}`,
             action: '/appointments',
             actionLabel: 'View',
             soundClass: 'loop',

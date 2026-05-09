@@ -600,13 +600,17 @@ export const AppProvider = ({ children }) => {
       NotificationService.setUserContext(user);
       NotificationService.start();
 
-      // Browser notifications are mandatory for every role — auto-prompt on
-      // login when the permission is still 'default' so the user doesn't
-      // have to hunt for a button in Settings. Once granted (now or
+      // Browser notifications are mandatory for every role. The OS-level
+      // permission prompt requires *transient activation* (a recent click /
+      // keypress) on Firefox + Safari, and is restricted on Chrome too —
+      // calling Notification.requestPermission() directly from this effect
+      // would silently no-op on most browsers because no user gesture is
+      // active by the time React settles the user state. So we defer the
+      // prompt to the very next click / keydown on the document, which is
+      // guaranteed to carry transient activation. Once granted (now or
       // previously), subscribe this device to Web Push so alerts reach the
-      // OS even when the tab is closed. The OS-level prompt itself can't be
-      // bypassed; if the user blocks it, the app keeps working with
-      // in-tab toasts only.
+      // OS even when the tab is closed.
+      let permissionListenerCleanup = null;
       const subscribePush = () => {
         PushSubscriptionService.subscribe({
           userId: user.id || user._id,
@@ -617,17 +621,42 @@ export const AppProvider = ({ children }) => {
           }
         });
       };
-      if (typeof Notification !== 'undefined') {
+      if (typeof Notification !== 'undefined' && typeof document !== 'undefined') {
         if (Notification.permission === 'granted') {
           subscribePush();
         } else if (Notification.permission === 'default') {
-          Notification.requestPermission()
-            .then((result) => {
-              if (result === 'granted') subscribePush();
-            })
-            .catch((err) => {
-              console.warn('[notifications] auto requestPermission failed:', err);
-            });
+          const promptOnGesture = () => {
+            // Detach immediately — we only ever want one prompt per session.
+            // Doing this before requestPermission() also prevents a re-entrant
+            // call if the click that grants permission also bubbles.
+            document.removeEventListener('click', promptOnGesture, true);
+            document.removeEventListener('keydown', promptOnGesture, true);
+            try {
+              const result = Notification.requestPermission();
+              // requestPermission returns a Promise on modern browsers but a
+              // legacy callback signature on older ones; both shapes resolve
+              // to a permission string.
+              Promise.resolve(result)
+                .then((perm) => {
+                  if (perm === 'granted') subscribePush();
+                })
+                .catch((err) => {
+                  console.warn('[notifications] requestPermission rejected:', err);
+                });
+            } catch (err) {
+              console.warn('[notifications] requestPermission threw:', err);
+            }
+          };
+          // Capture phase so we win the race against React handlers that
+          // stopPropagation() — login itself uses click handlers and the
+          // very first post-login click would otherwise be eaten before
+          // bubbling here.
+          document.addEventListener('click', promptOnGesture, true);
+          document.addEventListener('keydown', promptOnGesture, true);
+          permissionListenerCleanup = () => {
+            document.removeEventListener('click', promptOnGesture, true);
+            document.removeEventListener('keydown', promptOnGesture, true);
+          };
         }
       }
 
@@ -642,7 +671,12 @@ export const AppProvider = ({ children }) => {
         }
         triggersUnsubRef.current = m.startAllNotificationTriggers();
       });
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+        // Detach the gesture listener if the user logs out before granting
+        // — otherwise it would leak across user sessions.
+        if (permissionListenerCleanup) permissionListenerCleanup();
+      };
     } else {
       if (triggersUnsubRef.current) {
         try { triggersUnsubRef.current(); } catch {}

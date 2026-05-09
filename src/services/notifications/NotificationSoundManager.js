@@ -34,9 +34,10 @@ function vibrate(pattern) {
   }
 }
 
-function isSoundMuted() {
-  return typeof localStorage !== 'undefined'
-    && localStorage.getItem('notifSoundEnabled') === 'false';
+// Defensive: clear any leftover mute flag from the old Settings toggle so
+// devices that were muted before this change start ringing again.
+if (typeof localStorage !== 'undefined') {
+  try { localStorage.removeItem('notifSoundEnabled'); } catch {}
 }
 
 const NotificationSoundManager = {
@@ -45,11 +46,9 @@ const NotificationSoundManager = {
 
   /** Sound played once on first call; loop-class fires again every 2s
    *  until stop(), with an extra triple-chime burst on the very first
-   *  play. Vibration always fires regardless of the sound-mute toggle
-   *  so a device on silent still announces incoming alerts. */
+   *  play. Sound is mandatory for every role — there is no mute toggle. */
   play(notification) {
     if (!notification || notification.soundClass === 'silent') return;
-    const muted = isSoundMuted();
     // Loop class requires a stable _id so stop(id) can target it later.
     if (notification.soundClass === 'loop' && notification._id) {
       // Avoid double-loops if the same id is fed twice.
@@ -60,7 +59,6 @@ const NotificationSoundManager = {
       loopAudio.volume = LOOP_VOLUME;
 
       const playSound = () => {
-        if (muted) return;
         try {
           loopAudio.currentTime = 0;
         } catch {
@@ -94,14 +92,12 @@ const NotificationSoundManager = {
       return;
     }
     // Oneshot path: fire-and-forget single play + a single short buzz.
-    if (!muted) {
-      const audio = audioFactory();
-      audio.volume = LOOP_VOLUME;
-      audio.play().catch(() => {
-        // Autoplay blocked — happens before any user interaction. Browser will
-        // surface our visual toast + Notification API banner anyway.
-      });
-    }
+    const audio = audioFactory();
+    audio.volume = LOOP_VOLUME;
+    audio.play().catch(() => {
+      // Autoplay blocked — happens before any user interaction. Browser will
+      // surface our visual toast + Notification API banner anyway.
+    });
     vibrate(VIBRATE_ONESHOT);
   },
 

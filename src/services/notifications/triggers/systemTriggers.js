@@ -23,13 +23,44 @@ export function startSystemTriggers() {
     }
   });
 
+  // controllerchange fires for THREE distinct reasons; we only want to
+  // ping the user for one of them:
+  //   1. First-time SW install (no previous controller). Don't notify —
+  //      this is "the app is now offline-capable", not "an update is
+  //      ready". The PWA install banner already covers that journey.
+  //   2. Post-hard-reset install (UpdatePanel just called unregister()
+  //      then reloaded; the page has no controller until the new SW
+  //      activates). Don't notify — the user just deliberately updated;
+  //      pinging "Update available" right after they tapped Update is
+  //      what made the loop on the user's screen.
+  //   3. Background update on a long-running session (existing controller
+  //      replaced by a new one). DO notify — this is the only case where
+  //      "Update available" is true.
+  // Track the previous controller and only fire when both sides exist
+  // and they differ.
+  let prevController = (typeof navigator !== 'undefined' && navigator.serviceWorker)
+    ? navigator.serviceWorker.controller
+    : null;
+
   const onUpdate = () => {
+    const nextController = navigator.serviceWorker.controller;
+    if (!prevController) {
+      // Cases 1 & 2: nothing to replace. Snapshot the new controller for
+      // the next swap and stay quiet.
+      prevController = nextController;
+      return;
+    }
+    if (!nextController || nextController === prevController) {
+      // Same SW still in charge (possible during reactivation) — also quiet.
+      return;
+    }
+    prevController = nextController;
     NotificationService.notify({
       type: NotificationService.TYPES.APP_UPDATE_AVAILABLE,
       targetRole: ALL_ROLES,
       title: 'Update available',
       message: 'A new version of Daet Spa is ready. Tap to reload.',
-      action: '/update',
+      action: '/app-update',
       soundClass: 'oneshot',
     });
   };

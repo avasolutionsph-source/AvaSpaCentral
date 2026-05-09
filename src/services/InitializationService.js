@@ -81,6 +81,14 @@ class InitializationService {
       //     backlog so the bell badge reflects reality on next mount.
       await this._purgeFalseAlarmDrawerNotifications();
 
+      // 3d. One-time cleanup: drop stale "Update available" notifications.
+      //     The previous systemTriggers fired on every controllerchange
+      //     event, including the one right after a user-tapped Update.
+      //     Result: every press of Update added a fresh "Update available"
+      //     row to the bell. The trigger is fixed in this build; clear
+      //     the backlog so users don't see the historical pile-up.
+      await this._purgeStaleUpdateAvailableNotifications();
+
       // 4. Note: Old SyncManager removed - SupabaseSyncManager is initialized in AppContext
       // NetworkDetector.start();
       // SyncManager.initialize();
@@ -137,6 +145,29 @@ class InitializationService {
       }
     } catch (err) {
       console.warn('[InitService] Failed to purge false-alarm drawer notifications:', err);
+    }
+  }
+
+  /**
+   * Drop "Update available" notifications that the old controllerchange-
+   * fires-on-every-event logic stacked into the bell. The corrected
+   * trigger (only fires when an EXISTING controller is replaced) ships
+   * in this build, so backfilled rows from earlier are noise. We don't
+   * have a fingerprint to distinguish a legitimate from a buggy fire,
+   * so this drops every existing app.update.available row at boot — the
+   * fixed trigger will replace it with a real one only when warranted.
+   */
+  async _purgeStaleUpdateAvailableNotifications() {
+    try {
+      const removed = await db.notifications
+        .where('type')
+        .equals('app.update.available')
+        .delete();
+      if (removed > 0) {
+        console.log(`[InitService] Purged ${removed} stale app.update.available notifications`);
+      }
+    } catch (err) {
+      console.warn('[InitService] Failed to purge stale update notifications:', err);
     }
   }
 

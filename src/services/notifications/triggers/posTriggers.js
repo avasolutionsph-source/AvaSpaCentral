@@ -1,7 +1,7 @@
 // src/services/notifications/triggers/posTriggers.js
-import dataChangeEmitter from '../../sync/DataChangeEmitter';
 import NotificationService from '../NotificationService';
 import mockApi from '../../../mockApi';
+import { triggerSubscribe } from './_subscribe';
 
 const seenPaid = new Set();
 const seenOnline = new Set();
@@ -31,7 +31,7 @@ function therapistTargetUserId(emp) {
 }
 
 export function startPosTriggers() {
-  return dataChangeEmitter.subscribe(async (change) => {
+  return triggerSubscribe(async (change) => {
     // QRPh transaction completion
     if (change.entityType === 'transactions' && change.operation === 'update' && change.entityId) {
       try {

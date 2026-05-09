@@ -1,7 +1,7 @@
 // src/services/notifications/triggers/hrTriggers.js
-import dataChangeEmitter from '../../sync/DataChangeEmitter';
 import NotificationService from '../NotificationService';
 import mockApi from '../../../mockApi';
+import { triggerSubscribe } from './_subscribe';
 
 const HR_ENTITIES = ['otRequests', 'leaveRequests', 'cashAdvanceRequests', 'incidentReports', 'payrollRequests'];
 
@@ -41,7 +41,7 @@ async function findEmployee(empId) {
 }
 
 export function startHRTriggers() {
-  return dataChangeEmitter.subscribe(async (change) => {
+  return triggerSubscribe(async (change) => {
     if (!HR_ENTITIES.includes(change.entityType)) return;
     if (!change.entityId) return;
 

@@ -1,6 +1,6 @@
-import dataChangeEmitter from '../../sync/DataChangeEmitter';
 import NotificationService from '../NotificationService';
 import mockApi from '../../../mockApi';
+import { triggerSubscribe } from './_subscribe';
 
 // Module-level dedupe sets: each key is `${stage}:${bookingId}[:targetUserId]`.
 // Reset on page reload — that's fine because data-change events only fire
@@ -31,7 +31,7 @@ async function findBooking(bookingId) {
 }
 
 export function startBookingTriggers() {
-  return dataChangeEmitter.subscribe(async (change) => {
+  return triggerSubscribe(async (change) => {
     if (change.entityType !== 'advanceBookings') return;
     if (change.operation === 'delete') return;
     if (!change.entityId) return;

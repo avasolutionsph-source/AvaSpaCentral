@@ -1,13 +1,13 @@
 // src/services/notifications/triggers/inventoryTriggers.js
-import dataChangeEmitter from '../../sync/DataChangeEmitter';
 import NotificationService from '../NotificationService';
 import mockApi from '../../../mockApi';
+import { triggerSubscribe } from './_subscribe';
 
 const seenOOS = new Set();
 const seenLow = new Set();
 
 export function startInventoryTriggers() {
-  return dataChangeEmitter.subscribe(async (change) => {
+  return triggerSubscribe(async (change) => {
     if (change.entityType !== 'products' || !change.entityId) return;
     if (change.operation === 'delete') return;
 

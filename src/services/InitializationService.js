@@ -184,11 +184,14 @@ class InitializationService {
   }
 
   /**
-   * Per-boot sweep over unread loop-class notifications. Drops any whose
-   * referenced room / advance booking / home service is gone or no longer
-   * in 'pending', so the therapist phone doesn't re-toast a stale "New
-   * service assigned" card for work that's already started, completed,
-   * cancelled, or whose room was deleted.
+   * Per-boot sweep over unread loop-class notifications. Loops are
+   * intentionally Confirm-tap-only — a status change alone (e.g. Start
+   * Service flipping a room to 'occupied') doesn't silence them, because
+   * the user might have missed the alert entirely. So we only drop a
+   * loop here when its target entity is *gone* (the row was deleted,
+   * not merely advanced). That covers the genuinely-dead case where
+   * there's nothing left to confirm against, without prematurely
+   * silencing chimes for rooms / bookings that are still around.
    *
    * Soft-best-effort: any error during lookup leaves the row alone (we
    * never delete a notification we can't classify).
@@ -205,39 +208,31 @@ class InitializationService {
       let dropped = 0;
       for (const n of candidates) {
         const { roomId, bookingId, homeServiceId } = n.payload || {};
-        let stillActive = true;
+        let targetMissing = false;
         try {
           if (roomId) {
             const room = await db.rooms.get(roomId);
-            stillActive = !!room && room.status === 'pending';
+            targetMissing = !room;
           } else if (homeServiceId) {
             const hs = await db.homeServices.get(homeServiceId);
-            stillActive = !!hs && hs.status === 'pending';
+            targetMissing = !hs;
           } else if (bookingId) {
             // advanceBookings rows can use either `id` or `_id` as primary
             // key depending on origin (Supabase realtime put vs local
-            // create), so look both up.
+            // create), so look both up before declaring it gone.
             const byId = await db.advanceBookings.get(bookingId);
-            const all = byId
-              ? [byId]
-              : await db.advanceBookings.where('id').equals(bookingId).toArray();
-            const booking = all[0];
-            // The original assigned ping is only relevant while the booking
-            // is still queued for the assignee. Once it's confirmed, in
-            // progress, completed, cancelled, or gone, the loop is stale.
-            stillActive = !!booking && (booking.status === 'pending' || booking.status === 'scheduled' || !booking.status);
-          } else {
-            // No payload key we know about — leave it alone, manual
-            // dismissal will eventually clear it.
-            stillActive = true;
+            if (!byId) {
+              const byPk = await db.advanceBookings.where('id').equals(bookingId).toArray();
+              targetMissing = byPk.length === 0;
+            }
           }
         } catch {
-          // Treat lookup errors as "active" so we never drop a row we
+          // Treat lookup errors as "present" so we never drop a row we
           // couldn't verify.
-          stillActive = true;
+          targetMissing = false;
         }
 
-        if (!stillActive) {
+        if (targetMissing) {
           try {
             await db.notifications.update(n._id, {
               status: 'dismissed',
@@ -250,7 +245,7 @@ class InitializationService {
         }
       }
       if (dropped > 0) {
-        console.log(`[InitService] Dismissed ${dropped} stale loop notifications`);
+        console.log(`[InitService] Dismissed ${dropped} loop notifications with missing targets`);
       }
     } catch (err) {
       console.warn('[InitService] _purgeStaleLoopNotifications failed:', err);

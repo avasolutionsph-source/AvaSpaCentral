@@ -20,7 +20,7 @@ export default function NotificationToast({ notification, onDismiss }) {
           </button>
         )}
         <button className="btn btn-secondary btn-sm" onClick={() => onDismiss(notification._id)}>
-          Stop
+          Confirm
         </button>
       </div>
     </div>

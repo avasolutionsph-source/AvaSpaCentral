@@ -117,19 +117,18 @@ export function startBookingTriggers() {
       }
     }
 
-    // 4. Service starting (status -> in-progress). Two things happen here:
-    //    a) Any active loop chimes still ringing for this booking — most
-    //       importantly the "new booking assigned" loop the therapist /
-    //       rider has been hearing — fall silent. The user asked for
-    //       this explicitly: alerts should keep looping until the service
-    //       actually starts, then stop.
-    //    b) A short one-shot "client arrived" ping fires for the assigned
-    //       therapist as confirmation. Used to be a loop, but a loop here
-    //       defeats (a) — the in-progress status IS the service-start
-    //       moment, so an alert that loops past it is contradictory.
+    // 4. Service starting (status -> in-progress). Fires a short
+    //    "client arrived" one-shot ping for the assigned therapist as
+    //    confirmation that the service has started.
+    //
+    //    The "new booking assigned" loop chime is NOT auto-stopped here.
+    //    Stopping the chime is now strictly a Confirm-tap action on the
+    //    toast — Start Service alone shouldn't silence the alert (a phone
+    //    in a pocket doesn't catch the service-start moment, and an alert
+    //    that goes quiet without acknowledgement defeats the loud-alarm
+    //    purpose).
     if ((b.status === 'in-progress' || b.status === 'in_progress') && !seenIds.arrived.has(b.id)) {
       seenIds.arrived.add(b.id);
-      await NotificationService.stopLoopsForBooking(b.id);
       if (b.employeeId) {
         const emp = await findEmployee(b.employeeId);
         if (emp) {

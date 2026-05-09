@@ -43,13 +43,27 @@ export function useNotifications(user) {
     [...own, ...role].forEach(n => map.set(n._id, n));
     const merged = [...map.values()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     setNotifications(merged);
-    // Promote the first not-yet-toasted unread notification to the active
-    // toast slot. Use functional setter so we don't need `active` in deps —
-    // that would invalidate the dataChangeEmitter subscription on every
-    // toast change.
+    // Promote a notification to the active toast slot. Priority:
+    //   1. Latest unread loop chime — these are "Confirm to silence"
+    //      alerts (new service assigned, drawer variance, rotation
+    //      turn). A loop arriving while the user has an older loop
+    //      still on screen MUST preempt; otherwise a fresh urgent
+    //      assignment would silently queue behind a stale one and
+    //      only surface after the older one is dismissed (the bug
+    //      that made "new service assigned" appear only after the
+    //      previous service was cancelled).
+    //   2. Otherwise keep prev if it's still in the unread set —
+    //      avoids flicker when an unrelated row updates.
+    //   3. Otherwise pick the first untoasted candidate.
+    // toastedIdsRef tracks per-session "user has already acted on
+    // this" — confirmed loops, expired oneshots — so we never
+    // resurrect a dismissed toast.
     setActive(prev => {
-      if (prev) return prev;
-      return merged.find(n => !toastedIdsRef.current.has(n._id)) ?? null;
+      const candidates = merged.filter(n => !toastedIdsRef.current.has(n._id));
+      const latestLoop = candidates.find(n => n.soundClass === 'loop');
+      if (latestLoop) return latestLoop;
+      if (prev && merged.some(n => n._id === prev._id)) return prev;
+      return candidates[0] ?? null;
     });
   }, [user?._id, user?.role, user?.branchId]);
 

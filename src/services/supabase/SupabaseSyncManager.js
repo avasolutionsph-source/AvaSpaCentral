@@ -571,6 +571,10 @@ const FIELD_NAME_MAP = {
 class SupabaseSyncManager {
   constructor() {
     this._isSyncing = false;
+    // Set when a dataChange fires while a sync is in flight; the
+    // finally blocks of pushOnly() / sync() drain it so the local
+    // change always lands on the server.
+    this._pendingPush = false;
     this._listeners = [];
     this._lastSync = null;
     this._subscriptions = [];
@@ -1457,8 +1461,17 @@ class SupabaseSyncManager {
     if (!isSupabaseConfigured()) {
       return { success: false, message: 'Supabase not configured' };
     }
+    // Previously this returned early if _isSyncing was true and the
+    // triggering dataChange was lost — the room-assignment write would
+    // sit in the local queue until the next user action kicked another
+    // sync, which is the exact bug therapists hit when the producer
+    // had a long-running pull / push in flight while assigning. Now we
+    // mark "another push is needed" and the in-flight sync re-fires
+    // pushOnly when it finishes (see _drainPendingPush in the finally
+    // blocks of sync() / pushOnly()).
     if (this._isSyncing) {
-      return { success: false, message: 'Sync already in progress' };
+      this._pendingPush = true;
+      return { success: false, message: 'Sync in progress; queued retry' };
     }
     if (!NetworkDetector.isOnline) {
       return { success: false, message: 'Offline' };
@@ -1492,7 +1505,27 @@ class SupabaseSyncManager {
       return { success: false, error: error.message };
     } finally {
       this._isSyncing = false;
+      this._drainPendingPush();
     }
+  }
+
+  /**
+   * If a dataChange fired while we were busy syncing, run a fresh
+   * pushOnly now so the local change actually lands on the server
+   * instead of waiting for the next manual sync. Idempotent — the
+   * pending flag resets before re-entering pushOnly so a fresh sync
+   * inside that call can set it again if more writes arrived.
+   */
+  _drainPendingPush() {
+    if (!this._pendingPush) return;
+    this._pendingPush = false;
+    // Defer to a microtask so the current sync's listeners see the
+    // 'sync_complete' state before we reset _isSyncing under them.
+    Promise.resolve().then(() => {
+      this.pushOnly().catch((err) =>
+        console.warn('[SupabaseSyncManager] drain pending push failed:', err)
+      );
+    });
   }
 
   /**
@@ -1563,6 +1596,7 @@ class SupabaseSyncManager {
       return { success: false, error: error.message };
     } finally {
       this._isSyncing = false;
+      this._drainPendingPush();
     }
   }
 

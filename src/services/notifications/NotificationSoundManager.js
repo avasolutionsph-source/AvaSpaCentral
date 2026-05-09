@@ -74,6 +74,25 @@ const NotificationSoundManager = {
         try { audio.pause(); audio.currentTime = 0; } catch {}
         try { audio.volume = LOOP_VOLUME; } catch {}
         _unlocked = true;
+        // Wake up any loops that were started before unlock — their
+        // initial playSound() calls were silently rejected by the
+        // autoplay policy and the loop's setInterval continues firing,
+        // but each tick still re-plays a now-paused Audio element. The
+        // user hears nothing. After unlock, force a fresh play() on
+        // every active loop's audio so the chime becomes audible
+        // immediately rather than waiting for the next tick (which on
+        // some browsers also stays silent because the element entered
+        // a 'blocked' state).
+        activeLoops.forEach((entry) => {
+          try {
+            entry.audio.currentTime = 0;
+          } catch {
+            // currentTime can throw before metadata loads — harmless.
+          }
+          try {
+            entry.audio.play().catch(() => {});
+          } catch {}
+        });
         return true;
       })
       .catch((err) => {

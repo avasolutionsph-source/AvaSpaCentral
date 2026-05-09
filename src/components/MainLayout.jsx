@@ -23,6 +23,29 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Bridge SW NOTIFICATION_CLICK messages → React navigation + audio
+  // unlock. The SW posts this when the user taps the OS notification
+  // banner. Without a listener the click just focused the existing
+  // tab/page (no navigation) and the in-app loop stayed silent because
+  // the audio context was never unlocked. Tapping a notification IS a
+  // user activation in Chrome's autoplay policy, so triggering unlock
+  // here from the resulting message handler is the moment the loop
+  // chime can start playing audibly.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+    const onSwMessage = (event) => {
+      const data = event.data;
+      if (!data || data.type !== 'NOTIFICATION_CLICK') return;
+      // unlock() iterates active loops and re-plays them after the
+      // autoplay policy lifts, so the chime becomes audible right
+      // after the user lands in the app.
+      try { NotificationSoundManager.unlock(); } catch {}
+      if (data.action) navigate(data.action);
+    };
+    navigator.serviceWorker.addEventListener('message', onSwMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onSwMessage);
+  }, [navigate]);
+
   // Inline branch switcher — renders a dropdown of branches anchored under the
   // sidebar brand header. Replaces the old "clear + navigate to /select-branch"
   // flow because that path redirects through RequireBranch, which silently

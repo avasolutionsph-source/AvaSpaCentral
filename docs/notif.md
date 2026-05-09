@@ -7,12 +7,19 @@ whether it loops or one-shots.
 Sound classes:
 
 - **`loop`** — opens with a triple-chime burst (immediate + 250 ms +
-  500 ms) at full volume, then keeps ringing every 2 seconds. Toast
-  stays on screen until the user taps Open or Stop. Locked-phone push
-  uses `requireInteraction: true` plus a longer vibration pattern so
-  the OS notification card persists too. Reserved for actions the user
-  has to take (booking assignments, client-arrived, etc.) — tuned to
-  be impossible to miss across a busy spa floor.
+  500 ms) at full volume + an aggressive 4-buzz vibration pattern
+  (`[800, 200, 800, 200, 800, 200, 800]`, ~3.2 s of activity) so a
+  device on silent in a pocket still announces itself. After the
+  opening, keeps ringing every 2 seconds with a shorter follow-up
+  vibration (`[400, 100, 400]`) per tick. Toast stays on screen until
+  the user taps Open or Stop. Locked-phone push uses
+  `requireInteraction: true` so the OS notification card persists.
+  Reserved for actions the user has to take (booking assignments,
+  client-arrived, etc.) — tuned to be impossible to miss across a
+  busy spa floor.
+
+  Vibration fires regardless of the foreground sound-mute toggle, so
+  staff who turn off chimes still feel the device buzz.
 - **`oneshot`** — single chime, toast retreats after 5 seconds (the
   notification stays in the bell so the count is unchanged). Locked-phone
   push is a regular dismissible card. Used for info / status updates.

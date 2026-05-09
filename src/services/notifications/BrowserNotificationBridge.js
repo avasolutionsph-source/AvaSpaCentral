@@ -34,7 +34,11 @@ const BrowserNotificationBridge = {
         tag: notification._id,
         renotify: true,
         requireInteraction: notification.soundClass === 'loop',
-        vibrate: notification.soundClass === 'loop' ? [200, 100, 200, 100, 200] : [200],
+        // Aggressive pattern for loop-class so a phone on silent / face-down
+        // still announces itself when the OS surfaces this notification.
+        vibrate: notification.soundClass === 'loop'
+          ? [800, 200, 800, 200, 800, 200, 800]
+          : [200],
         data: { action: notification.action, id: notification._id },
       });
       n.onclick = () => {

@@ -148,10 +148,9 @@ self.addEventListener('push', (event) => {
     tag: data.id || data.type || 'daet-spa',
     renotify: true,
     requireInteraction: isLoop,
-    // Longer + repeating vibration for loop-class so time-critical alerts
-    // (rotation turn, booking-starting-soon) actually surface; shorter
-    // single buzz for one-shot info pings.
-    vibrate: isLoop ? [200, 100, 200, 100, 200] : [200],
+    // Aggressive pattern for loop-class so a phone on silent / face-down
+    // still announces itself; shorter single buzz for one-shot info pings.
+    vibrate: isLoop ? [800, 200, 800, 200, 800, 200, 800] : [200],
     data: {
       action: data.action || '/',
       id: data.id || null,

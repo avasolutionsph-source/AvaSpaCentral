@@ -77,6 +77,12 @@ export function startPosTriggers() {
     // listen for that transition and ping the therapist with the room +
     // customer details and a redirect to /rooms where they tap "Start" to
     // begin the timer.
+    //
+    // The same branch also handles the inverse: when the therapist taps
+    // "Start Service" the room flips to 'occupied' — that's the moment the
+    // looping "new service" chime should fall silent. The booking trigger
+    // does the same thing for advance bookings (status -> in-progress); we
+    // mirror that here keyed by roomId because walk-ins have no booking row.
     if (change.entityType === 'rooms' && change.operation === 'update' && change.entityId) {
       try {
         const room = await mockApi.rooms.getRoom(change.entityId);
@@ -103,6 +109,27 @@ export function startPosTriggers() {
               });
             }
           }
+        } else if (room && room.status !== 'pending') {
+          // Pending → anything else (most commonly 'occupied' when the
+          // therapist taps Start Service, but also 'available' if the
+          // assignment is cancelled). Either way, the loop chime tied to
+          // this room is no longer relevant — stop it on every device that
+          // has been hearing it.
+          await NotificationService.stopLoopsForRoom(room._id);
+        }
+      } catch (e) { /* swallow */ }
+    }
+
+    // Home service starting — flips status to 'occupied' the same way an
+    // in-spa room does. Stop the loop tied to this homeServiceId so the
+    // therapist (and any rider still hearing the broadcast loop) falls
+    // silent the instant Start Service is tapped.
+    if (change.entityType === 'homeServices' && change.operation === 'update' && change.entityId) {
+      try {
+        const all = await mockApi.homeServices.getHomeServices();
+        const hs = all.find((h) => h._id === change.entityId);
+        if (hs && hs.status && hs.status !== 'pending') {
+          await NotificationService.stopLoopsForHomeService(hs._id);
         }
       } catch (e) { /* swallow */ }
     }

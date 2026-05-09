@@ -223,7 +223,27 @@ const NotificationService = {
    *  off), so each device's bookingTriggers fires independently when
    *  the realtime update for the booking lands. */
   async stopLoopsForBooking(bookingId) {
-    if (!bookingId) return 0;
+    return this._stopLoopsBy('bookingId', bookingId);
+  },
+
+  /** Walk-in / POS counterpart of stopLoopsForBooking. The
+   *  POS room-assignment loop is keyed by roomId (no booking row
+   *  exists for walk-ins), so the booking-id matcher would never
+   *  find it. Called when the therapist taps Start Service and the
+   *  room moves from 'pending' to 'occupied'. */
+  async stopLoopsForRoom(roomId) {
+    return this._stopLoopsBy('roomId', roomId);
+  },
+
+  /** Home-service counterpart. Loops on the therapist phone keyed
+   *  by homeServiceId. Called when the home service transitions out
+   *  of pending. */
+  async stopLoopsForHomeService(homeServiceId) {
+    return this._stopLoopsBy('homeServiceId', homeServiceId);
+  },
+
+  async _stopLoopsBy(field, value) {
+    if (!value) return 0;
     let rows;
     try {
       rows = await NotificationRepository.find(
@@ -232,10 +252,10 @@ const NotificationService = {
           n.soundClass === 'loop' &&
           n.status === 'unread' &&
           n.payload &&
-          n.payload.bookingId === bookingId,
+          n.payload[field] === value,
       );
     } catch (err) {
-      console.warn('[NotificationService] stopLoopsForBooking lookup failed', err);
+      console.warn('[NotificationService] _stopLoopsBy lookup failed', err);
       return 0;
     }
     for (const row of rows) {

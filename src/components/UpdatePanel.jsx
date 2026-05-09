@@ -20,10 +20,25 @@ const STATUS = {
   IDLE: 'idle',
   UPDATING: 'updating',
   ERROR: 'error',
+  JUST_UPDATED: 'just_updated',
 };
 
+// sessionStorage flag set right before the cache-busting reload, then read
+// on the next mount so the user lands on a "✓ Updated" state instead of
+// the bare Update button — without that confirmation users assume the
+// click did nothing and keep tapping.
+const POST_UPDATE_FLAG = 'daet-spa-post-update';
+
 export default function UpdatePanel() {
-  const [status, setStatus] = useState(STATUS.IDLE);
+  const [status, setStatus] = useState(() => {
+    try {
+      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(POST_UPDATE_FLAG)) {
+        sessionStorage.removeItem(POST_UPDATE_FLAG);
+        return STATUS.JUST_UPDATED;
+      }
+    } catch {}
+    return STATUS.IDLE;
+  });
   const [message, setMessage] = useState('');
 
   async function performUpdate() {
@@ -32,6 +47,7 @@ export default function UpdatePanel() {
 
     if (!('serviceWorker' in navigator)) {
       // No SW support — just hard-reload with cache busting.
+      markPostUpdateFlag();
       reloadWithCacheBust();
       return;
     }
@@ -56,7 +72,16 @@ export default function UpdatePanel() {
     }
 
     setMessage('Reloading…');
+    markPostUpdateFlag();
     reloadWithCacheBust();
+  }
+
+  function markPostUpdateFlag() {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(POST_UPDATE_FLAG, '1');
+      }
+    } catch {}
   }
 
   function reloadWithCacheBust() {
@@ -66,19 +91,26 @@ export default function UpdatePanel() {
   }
 
   const isBusy = status === STATUS.UPDATING;
+  const justUpdated = status === STATUS.JUST_UPDATED;
 
   return (
     <div>
-      {(status === STATUS.UPDATING || status === STATUS.ERROR) && (
+      {(status === STATUS.UPDATING || status === STATUS.ERROR || justUpdated) && (
         <div
           style={{ ...styles.statusBox, ...statusStyle(status) }}
           role="status"
           aria-live="polite"
         >
           <strong style={{ display: 'block', marginBottom: '4px' }}>
-            {status === STATUS.UPDATING ? 'Updating…' : 'Something went wrong'}
+            {status === STATUS.UPDATING && 'Updating…'}
+            {status === STATUS.ERROR && 'Something went wrong'}
+            {justUpdated && '✓ App is up to date'}
           </strong>
-          <span style={{ fontSize: '0.9rem' }}>{message}</span>
+          <span style={{ fontSize: '0.9rem' }}>
+            {justUpdated
+              ? 'You are on the latest version. No need to tap Update again.'
+              : message}
+          </span>
         </div>
       )}
 
@@ -86,9 +118,9 @@ export default function UpdatePanel() {
         type="button"
         onClick={performUpdate}
         disabled={isBusy}
-        style={{ ...styles.btn, ...styles.btnPrimary }}
+        style={{ ...styles.btn, ...styles.btnPrimary, ...(justUpdated ? styles.btnMuted : {}) }}
       >
-        {isBusy ? 'Updating…' : 'Update'}
+        {isBusy ? 'Updating…' : justUpdated ? 'Update again' : 'Update'}
       </button>
 
       <p style={styles.hint}>
@@ -102,6 +134,9 @@ export default function UpdatePanel() {
 function statusStyle(status) {
   if (status === STATUS.ERROR) {
     return { background: '#FEF2F2', borderColor: '#EF4444', color: '#991B1B' };
+  }
+  if (status === STATUS.JUST_UPDATED) {
+    return { background: '#ECFDF5', borderColor: '#10B981', color: '#065F46' };
   }
   return { background: '#F3F4F6', borderColor: '#D1D5DB', color: '#374151' };
 }
@@ -125,6 +160,13 @@ const styles = {
   btnPrimary: {
     background: '#7F1D1D',
     color: '#fff',
+  },
+  // Softer styling once the app has just updated, so the next "Update
+  // again" press feels deliberate rather than reflexive.
+  btnMuted: {
+    background: '#fff',
+    color: '#7F1D1D',
+    borderColor: '#7F1D1D',
   },
   hint: {
     marginTop: 12,

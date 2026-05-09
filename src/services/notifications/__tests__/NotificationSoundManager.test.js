@@ -21,19 +21,25 @@ describe('NotificationSoundManager', () => {
     expect(audios.length).toBe(1); // no second instance
   });
 
-  it('loops loop-class every 3s until stop is called', () => {
+  it('loops loop-class every 2s until stop is called, with an opening triple-chime burst', () => {
     const audios = [];
     NotificationSoundManager._injectAudioFactoryForTest(() => { const a = new FakeAudio(); audios.push(a); return a; });
     NotificationSoundManager.play({ _id: 'a', soundClass: 'loop' });
     // Single Audio instance reused across ticks (no allocation per tick).
     expect(audios.length).toBe(1);
+    // Immediate first play.
     expect(audios[0].play).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(3000);
-    expect(audios.length).toBe(1);
+    // Triple-chime burst: one extra ring at +250 ms, another at +500 ms.
+    vi.advanceTimersByTime(250);
     expect(audios[0].play).toHaveBeenCalledTimes(2);
-    vi.advanceTimersByTime(3000);
-    expect(audios.length).toBe(1);
+    vi.advanceTimersByTime(250);
     expect(audios[0].play).toHaveBeenCalledTimes(3);
+    // Then the steady 2 s loop kicks in. Total elapsed at this assertion
+    // is 2000 ms from start, which is exactly the first interval tick.
+    vi.advanceTimersByTime(1500);
+    expect(audios[0].play).toHaveBeenCalledTimes(4);
+    vi.advanceTimersByTime(2000);
+    expect(audios[0].play).toHaveBeenCalledTimes(5);
     NotificationSoundManager.stop('a');
     const playsAtStop = audios[0].play.mock.calls.length;
     vi.advanceTimersByTime(6000);
@@ -72,9 +78,11 @@ describe('NotificationSoundManager', () => {
     expect(audios.length).toBe(1);
     // One immediate play from the first call, and the second call is a no-op.
     expect(audios[0].play).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(3000);
-    // After one tick: still one Audio, total play() calls now 2 (immediate + tick).
+    vi.advanceTimersByTime(2000);
+    // 2 s elapsed: immediate + 250 ms burst + 500 ms burst + 2000 ms tick = 4 plays.
+    // Confirms that the duplicate-id play() really did short-circuit instead
+    // of stacking another set of timers.
     expect(audios.length).toBe(1);
-    expect(audios[0].play).toHaveBeenCalledTimes(2);
+    expect(audios[0].play).toHaveBeenCalledTimes(4);
   });
 });

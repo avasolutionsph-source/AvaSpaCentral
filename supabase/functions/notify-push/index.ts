@@ -144,35 +144,57 @@ serve(async (req) => {
       soundClass: n.soundClass ?? 'oneshot',
     });
 
+    // Loop-class alerts (new service assigned, drawer alert, rotation
+    // turn) need to keep ringing until the recipient actually reacts.
+    // A single push only triggers ONE OS-level chime + vibrate, then
+    // the device goes silent — easy to miss when the phone is in a
+    // pocket or face-down. Fire the same push 3× spaced 3 s apart for
+    // loop class so the recipient gets ~9 s of repeated buzzes from
+    // the OS even when the app is fully closed. Each push shares the
+    // same notification tag, so renotify:true on the SW side replays
+    // the chime/vibrate without stacking visible banners.
+    //
+    // Oneshot pings (payment received, info status) fire once. The
+    // user has the in-app toast as their primary cue; a single push
+    // is sufficient.
+    const isLoop = (n.soundClass ?? 'oneshot') === 'loop';
+    const burstCount = isLoop ? 3 : 1;
+    const burstSpacingMs = 3000;
+
     let sent = 0;
     let failed = 0;
     const expiredIds: string[] = [];
 
-    await Promise.all(
-      subs.map(async (s: { id: string; endpoint: string; p256dh: string; auth: string }) => {
-        try {
-          // deno-lint-ignore no-explicit-any
-          await (webpush as any).sendNotification(
-            {
-              endpoint: s.endpoint,
-              keys: { p256dh: s.p256dh, auth: s.auth },
-            },
-            pushPayload,
-            { TTL: 60 * 60 * 24 }, // 24h delivery window
-          );
-          sent += 1;
-        } catch (err) {
-          failed += 1;
-          // deno-lint-ignore no-explicit-any
-          const status = (err as any)?.statusCode;
-          if (status === 404 || status === 410) {
-            expiredIds.push(s.id);
-          } else {
-            console.error('[notify-push] send failed', status, (err as Error)?.message);
-          }
+    const sendOne = async (s: { id: string; endpoint: string; p256dh: string; auth: string }) => {
+      try {
+        // deno-lint-ignore no-explicit-any
+        await (webpush as any).sendNotification(
+          {
+            endpoint: s.endpoint,
+            keys: { p256dh: s.p256dh, auth: s.auth },
+          },
+          pushPayload,
+          { TTL: 60 * 60 * 24 }, // 24h delivery window
+        );
+        sent += 1;
+      } catch (err) {
+        failed += 1;
+        // deno-lint-ignore no-explicit-any
+        const status = (err as any)?.statusCode;
+        if (status === 404 || status === 410) {
+          if (!expiredIds.includes(s.id)) expiredIds.push(s.id);
+        } else {
+          console.error('[notify-push] send failed', status, (err as Error)?.message);
         }
-      }),
-    );
+      }
+    };
+
+    for (let i = 0; i < burstCount; i += 1) {
+      await Promise.all(subs.map(sendOne));
+      if (i < burstCount - 1) {
+        await new Promise((resolve) => setTimeout(resolve, burstSpacingMs));
+      }
+    }
 
     // 4. Garbage-collect expired subscriptions.
     if (expiredIds.length > 0) {

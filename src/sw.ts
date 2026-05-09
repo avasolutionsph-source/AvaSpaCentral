@@ -125,7 +125,7 @@ registerRoute(
 
 self.addEventListener('push', (event) => {
   const data = (() => {
-    if (!event.data) return null;
+    if (!event.data) return {};
     try {
       return event.data.json();
     } catch {
@@ -133,7 +133,11 @@ self.addEventListener('push', (event) => {
     }
   })();
 
-  if (!data) return;
+  // Always continue past the parse — userVisibleOnly:true in the
+  // subscribe call obliges us to show a notification on every push.
+  // Returning early here on missing/empty payload made Chrome show a
+  // generic "site updated" fallback (or, on some Android builds,
+  // nothing at all), which was the closed-app silence the user saw.
 
   const title = data.title || 'Daet Massage & Spa';
   const isLoop = data.soundClass === 'loop';
@@ -142,15 +146,22 @@ self.addEventListener('push', (event) => {
   // NotificationOptions doesn't yet include `renotify` or `vibrate` even
   // though every modern push browser supports both.
   const options = {
-    body: data.message || '',
+    body: data.message || 'New activity',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
     tag: data.id || data.type || 'daet-spa',
     renotify: true,
     requireInteraction: isLoop,
-    // Aggressive pattern for loop-class so a phone on silent / face-down
-    // still announces itself; shorter single buzz for one-shot info pings.
-    vibrate: isLoop ? [800, 200, 800, 200, 800, 200, 800] : [200],
+    // Loop-class: extended buzz train (~12s) per push so a phone on
+    // silent / face-down / in-pocket still announces itself even when
+    // the app is fully closed and only the OS notification can speak.
+    // The producer's notify-push call also fires multiple pushes for
+    // loop alerts (see notify-push/index.ts) so each push replays this
+    // pattern with renotify:true, giving roughly 30 s of continuous
+    // attention before the recipient must react manually.
+    vibrate: isLoop
+      ? [1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000, 300, 1000]
+      : [200],
     data: {
       action: data.action || '/',
       id: data.id || null,

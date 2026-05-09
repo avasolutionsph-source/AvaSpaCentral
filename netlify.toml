@@ -29,6 +29,14 @@
 # Build environment settings
 [build.environment]
   NODE_VERSION = "18"
+  # VAPID public key for Web Push subscribe(). Safe to commit — the public
+  # half is embedded in the client bundle anyway. The matching private key
+  # lives only in the Supabase notify-push Edge Function secrets. Without
+  # this, PushSubscriptionService.subscribe() bails with reason
+  # 'no_vapid_key', push_subscriptions stays empty, and notify-push has no
+  # endpoints to fan out to — so therapists get no chime / OS notification
+  # when a service is assigned.
+  VITE_VAPID_PUBLIC_KEY = "BJevK8uEEGxbeSQ65B-npMjoHf6XXHY-pyhDipHsbX6zbQzWCM8_d7XjSSyCCuUTpLtA7CgFY59tiNT6BiPjRc4"
 
 # Security Headers
 [[headers]]

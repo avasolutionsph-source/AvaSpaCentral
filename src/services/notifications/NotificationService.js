@@ -1,5 +1,6 @@
 import mockApi from '../../mockApi';
 import NotificationRepository from '../storage/repositories/NotificationRepository';
+import NotificationSoundManager from './NotificationSoundManager';
 
 const TYPES = Object.freeze({
   BOOKING_ASSIGNED_THERAPIST: 'booking.assigned.therapist',
@@ -209,6 +210,45 @@ const NotificationService = {
     // Skip showBrowser — we are the foreground tab; the visible toast +
     // chime already cover the "look at me" surface and an OS card on top
     // would just stack a duplicate banner.
+  },
+
+  /** Stop every active loop chime tied to a booking and mark the
+   *  underlying notification rows as dismissed. Called by booking
+   *  triggers when a booking transitions to a terminal/active state
+   *  (e.g. status -> in-progress means the service is starting and
+   *  the "you have an assignment" loop should fall silent). Idempotent
+   *  and safe to call when no loops are active.
+   *
+   *  Per-device only: NotificationRepository is local-only (trackSync
+   *  off), so each device's bookingTriggers fires independently when
+   *  the realtime update for the booking lands. */
+  async stopLoopsForBooking(bookingId) {
+    if (!bookingId) return 0;
+    let rows;
+    try {
+      rows = await NotificationRepository.find(
+        (n) =>
+          n &&
+          n.soundClass === 'loop' &&
+          n.status === 'unread' &&
+          n.payload &&
+          n.payload.bookingId === bookingId,
+      );
+    } catch (err) {
+      console.warn('[NotificationService] stopLoopsForBooking lookup failed', err);
+      return 0;
+    }
+    for (const row of rows) {
+      // Local audio + vibration stop is the load-bearing effect for the
+      // user — the dismiss() write is bookkeeping for the bell badge.
+      NotificationSoundManager.stop(row._id);
+      try {
+        await NotificationRepository.dismiss(row._id);
+      } catch (err) {
+        console.warn('[NotificationService] dismiss after service-start failed', err);
+      }
+    }
+    return rows.length;
   },
 
   /** Normalize a record that may be in snake_case (raw Supabase row) or

@@ -117,27 +117,43 @@ export function startBookingTriggers() {
       }
     }
 
-    // 4. Client arrived (status -> in-progress).
-    if ((b.status === 'in-progress' || b.status === 'in_progress') && !seenIds.arrived.has(b.id) && b.employeeId) {
+    // 4. Service starting (status -> in-progress). Two things happen here:
+    //    a) Any active loop chimes still ringing for this booking — most
+    //       importantly the "new booking assigned" loop the therapist /
+    //       rider has been hearing — fall silent. The user asked for
+    //       this explicitly: alerts should keep looping until the service
+    //       actually starts, then stop.
+    //    b) A short one-shot "client arrived" ping fires for the assigned
+    //       therapist as confirmation. Used to be a loop, but a loop here
+    //       defeats (a) — the in-progress status IS the service-start
+    //       moment, so an alert that loops past it is contradictory.
+    if ((b.status === 'in-progress' || b.status === 'in_progress') && !seenIds.arrived.has(b.id)) {
       seenIds.arrived.add(b.id);
-      const emp = await findEmployee(b.employeeId);
-      if (emp) {
-        await NotificationService.notify({
-          type: NotificationService.TYPES.BOOKING_CLIENT_ARRIVED,
-          targetUserId: emp.userId || emp._id,
-          title: 'Client arrived',
-          message: `${b.clientName} is ready — service starting now`,
-          action: '/appointments',
-          soundClass: 'loop',
-          payload: { bookingId: b.id },
-          branchId: b.branchId,
-        });
+      await NotificationService.stopLoopsForBooking(b.id);
+      if (b.employeeId) {
+        const emp = await findEmployee(b.employeeId);
+        if (emp) {
+          await NotificationService.notify({
+            type: NotificationService.TYPES.BOOKING_CLIENT_ARRIVED,
+            targetUserId: emp.userId || emp._id,
+            title: 'Client arrived',
+            message: `${b.clientName} is ready — service starting now`,
+            action: '/appointments',
+            soundClass: 'oneshot',
+            payload: { bookingId: b.id },
+            branchId: b.branchId,
+          });
+        }
       }
     }
 
-    // 5. Completed -> manager / receptionist broadcast.
+    // 5. Completed -> manager / receptionist broadcast. Defensive
+    //    stopLoopsForBooking too in case any loop chime (e.g. from older
+    //    cached code that hasn't picked up the in-progress stop yet) is
+    //    still ringing on the therapist's device.
     if (b.status === 'completed' && !seenIds.completed.has(b.id)) {
       seenIds.completed.add(b.id);
+      await NotificationService.stopLoopsForBooking(b.id);
       await NotificationService.notify({
         type: NotificationService.TYPES.BOOKING_COMPLETED,
         targetRole: ['Manager', 'Owner', 'Branch Owner', 'Receptionist'],

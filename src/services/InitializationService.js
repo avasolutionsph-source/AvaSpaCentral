@@ -13,6 +13,7 @@ import storageService from './storage';
 // import { SyncManager, NetworkDetector } from './sync';
 import { mockDatabase } from '../mockApi/mockData';
 import { PayrollRequestRepository, SettingsRepository, ServiceRotationRepository } from './storage/repositories';
+import { db } from '../db';
 
 class InitializationService {
   constructor() {
@@ -62,6 +63,15 @@ class InitializationService {
       // 3. Migrate any legacy localStorage data
       await this._migrateLocalStorage();
 
+      // 3b. One-time cleanup: drop sync_queue entries for `notifications`.
+      //     The Supabase `notifications` table was never created (Web Push
+      //     uses notify-push instead), so these rows can never succeed.
+      //     Older builds enqueued them with trackSync: true; the current
+      //     build no longer does, but pre-existing rows would otherwise
+      //     keep cycling through retries and fill the Sync Queue UI with
+      //     dead entries on every device that already had them.
+      await this._purgeStaleNotificationSyncEntries();
+
       // 4. Note: Old SyncManager removed - SupabaseSyncManager is initialized in AppContext
       // NetworkDetector.start();
       // SyncManager.initialize();
@@ -75,6 +85,28 @@ class InitializationService {
       console.error('[InitService] Initialization failed:', error);
       this._initPromise = null;
       throw error;
+    }
+  }
+
+  /**
+   * Drop sync_queue entries whose entityType is 'notifications'. They
+   * target a Supabase table that was never created and would otherwise
+   * cycle indefinitely through 'pending' → 'failed' (retries=3) and
+   * back, polluting the Sync Queue UI. Idempotent — runs every startup
+   * but does nothing once the queue is clean.
+   */
+  async _purgeStaleNotificationSyncEntries() {
+    try {
+      const removed = await db.syncQueue
+        .where('entityType')
+        .equals('notifications')
+        .delete();
+      if (removed > 0) {
+        console.log(`[InitService] Purged ${removed} stale notification sync_queue entries`);
+      }
+    } catch (err) {
+      // Non-fatal — the app still works, the queue UI just stays noisy.
+      console.warn('[InitService] Failed to purge notification sync entries:', err);
     }
   }
 

@@ -148,17 +148,18 @@ serve(async (req) => {
     // turn) need to keep ringing until the recipient actually reacts.
     // A single push only triggers ONE OS-level chime + vibrate, then
     // the device goes silent — easy to miss when the phone is in a
-    // pocket or face-down. Fire the same push 3× spaced 3 s apart for
-    // loop class so the recipient gets ~9 s of repeated buzzes from
-    // the OS even when the app is fully closed. Each push shares the
-    // same notification tag, so renotify:true on the SW side replays
-    // the chime/vibrate without stacking visible banners.
+    // pocket or face-down. Fire the same push 6× spaced 3 s apart for
+    // loop class so the recipient gets ~18 s of bursts plus the trailing
+    // vibrate pattern, ~30 s of continuous attention even when the app
+    // is fully closed. Each push shares the same notification tag, so
+    // renotify:true on the SW side replays the chime/vibrate without
+    // stacking visible banners.
     //
     // Oneshot pings (payment received, info status) fire once. The
     // user has the in-app toast as their primary cue; a single push
     // is sufficient.
     const isLoop = (n.soundClass ?? 'oneshot') === 'loop';
-    const burstCount = isLoop ? 3 : 1;
+    const burstCount = isLoop ? 6 : 1;
     const burstSpacingMs = 3000;
 
     let sent = 0;

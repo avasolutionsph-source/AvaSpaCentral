@@ -77,6 +77,19 @@ export function useNotifications(user) {
     return () => unsub();
   }, [user?._id, refresh]);
 
+  // Whenever the active toast becomes a loop notification — including on
+  // app open after a closed-app push — make sure the in-app chime is
+  // running. play() is idempotent (skipped if the same _id is already
+  // looping), so calling it on every active change is safe. Without
+  // this, opening the app after the producer's Web Push delivered the
+  // OS notification would surface the toast but leave the device
+  // silent until the next push burst.
+  useEffect(() => {
+    if (!active) return;
+    if (active.soundClass !== 'loop') return;
+    NotificationSoundManager.play(active);
+  }, [active?._id, active?.soundClass]);
+
   // Auto-hide the active toast after a few seconds for one-shot pings
   // (status updates, info pings) — they don't need the user's hands.
   // Loop-class notifications (booking assigned, rotation turn, drawer

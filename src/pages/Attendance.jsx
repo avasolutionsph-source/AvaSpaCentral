@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, isBranchLockedRole } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO, differenceInMinutes, isAfter, startOfDay, subDays, addDays } from 'date-fns';
 import CameraCapture from '../components/CameraCapture';
@@ -268,7 +268,19 @@ const Attendance = ({ embedded = false, onDataChange }) => {
     const employeeId = !hasManagementAccess() ? user?.employeeId : quickEmployeeId;
 
     if (!employeeId) {
-      showToast('Please select an employee', 'error');
+      // Therapists/Riders/Receptionists won't see the manager dropdown,
+      // so "select an employee" is incorrect for them — surface the real
+      // cause (account isn't linked to an employee record) and the action
+      // they need to ask their manager for. Managers still see the
+      // original prompt because they DO have a selector.
+      if (!hasManagementAccess()) {
+        showToast(
+          'Your account is not linked to an employee record yet. Ask your manager to link it in Employee Accounts before you clock in.',
+          'error',
+        );
+      } else {
+        showToast('Please select an employee', 'error');
+      }
       return;
     }
 
@@ -313,7 +325,19 @@ const Attendance = ({ embedded = false, onDataChange }) => {
       // the new record gets filtered out and the table still shows ABSENT.
       const branchId = getEffectiveBranchId();
       if (!branchId) {
-        showToast('Please select a specific branch before clocking in (not "All Branches").', 'error');
+        // Branch-locked staff (Therapist/Receptionist/Rider/Utility/etc.)
+        // can't pick "All Branches" — getEffectiveBranchId returns null
+        // because their user record has no branchId assigned at all. The
+        // generic "select a specific branch" message has no resolution
+        // path for them. Direct them to ask their manager instead.
+        if (isBranchLockedRole(user?.role)) {
+          showToast(
+            'Your account has no branch assigned yet. Ask your manager to set your branch in Employee Accounts before you clock in.',
+            'error',
+          );
+        } else {
+          showToast('Please select a specific branch before clocking in (not "All Branches").', 'error');
+        }
         setShowCamera(false);
         setPendingClockAction(null);
         return;

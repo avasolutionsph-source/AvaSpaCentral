@@ -72,6 +72,21 @@ export function startPosTriggers() {
       });
     }
 
+    // Room deletion (cleanup, force-clear, branch reorg) — stop any loop
+    // chime that was hanging off this room. If we don't, the chime would
+    // keep ringing forever because the 'pending → !pending' branch below
+    // only matches updates, not deletes.
+    if (change.entityType === 'rooms' && change.operation === 'delete' && change.entityId) {
+      try {
+        await NotificationService.stopLoopsForRoom(change.entityId);
+      } catch (e) { /* swallow */ }
+    }
+    if (change.entityType === 'homeServices' && change.operation === 'delete' && change.entityId) {
+      try {
+        await NotificationService.stopLoopsForHomeService(change.entityId);
+      } catch (e) { /* swallow */ }
+    }
+
     // Walk-in service assignment via POS checkout. POS.processCheckout sets
     // the chosen room to status='pending' with the assignedEmployeeId, so we
     // listen for that transition and ping the therapist with the room +

@@ -89,6 +89,18 @@ class InitializationService {
       //     the backlog so users don't see the historical pile-up.
       await this._purgeStaleUpdateAvailableNotifications();
 
+      // 3e. Per-boot sweep: drop unread loop-class notifications whose
+      //     target entity is no longer in 'pending'. Loops are designed
+      //     to ring until the action is taken (Start Service, accept
+      //     booking, etc.). On a device that was offline / closed when
+      //     the action happened on another device, the local row stays
+      //     'unread' and re-toasts on next open even though the service
+      //     is long since started, completed, or cancelled. Without
+      //     this sweep the therapist's phone keeps showing "New service
+      //     assigned" for rooms that don't exist or have already moved
+      //     past pending.
+      await this._purgeStaleLoopNotifications();
+
       // 4. Note: Old SyncManager removed - SupabaseSyncManager is initialized in AppContext
       // NetworkDetector.start();
       // SyncManager.initialize();
@@ -168,6 +180,80 @@ class InitializationService {
       }
     } catch (err) {
       console.warn('[InitService] Failed to purge stale update notifications:', err);
+    }
+  }
+
+  /**
+   * Per-boot sweep over unread loop-class notifications. Drops any whose
+   * referenced room / advance booking / home service is gone or no longer
+   * in 'pending', so the therapist phone doesn't re-toast a stale "New
+   * service assigned" card for work that's already started, completed,
+   * cancelled, or whose room was deleted.
+   *
+   * Soft-best-effort: any error during lookup leaves the row alone (we
+   * never delete a notification we can't classify).
+   */
+  async _purgeStaleLoopNotifications() {
+    try {
+      const candidates = await db.notifications
+        .where('soundClass')
+        .equals('loop')
+        .filter((n) => n && n.status === 'unread' && n.payload)
+        .toArray();
+      if (candidates.length === 0) return;
+
+      let dropped = 0;
+      for (const n of candidates) {
+        const { roomId, bookingId, homeServiceId } = n.payload || {};
+        let stillActive = true;
+        try {
+          if (roomId) {
+            const room = await db.rooms.get(roomId);
+            stillActive = !!room && room.status === 'pending';
+          } else if (homeServiceId) {
+            const hs = await db.homeServices.get(homeServiceId);
+            stillActive = !!hs && hs.status === 'pending';
+          } else if (bookingId) {
+            // advanceBookings rows can use either `id` or `_id` as primary
+            // key depending on origin (Supabase realtime put vs local
+            // create), so look both up.
+            const byId = await db.advanceBookings.get(bookingId);
+            const all = byId
+              ? [byId]
+              : await db.advanceBookings.where('id').equals(bookingId).toArray();
+            const booking = all[0];
+            // The original assigned ping is only relevant while the booking
+            // is still queued for the assignee. Once it's confirmed, in
+            // progress, completed, cancelled, or gone, the loop is stale.
+            stillActive = !!booking && (booking.status === 'pending' || booking.status === 'scheduled' || !booking.status);
+          } else {
+            // No payload key we know about — leave it alone, manual
+            // dismissal will eventually clear it.
+            stillActive = true;
+          }
+        } catch {
+          // Treat lookup errors as "active" so we never drop a row we
+          // couldn't verify.
+          stillActive = true;
+        }
+
+        if (!stillActive) {
+          try {
+            await db.notifications.update(n._id, {
+              status: 'dismissed',
+              dismissedAt: new Date().toISOString(),
+            });
+            dropped += 1;
+          } catch (err) {
+            console.warn('[InitService] failed to dismiss stale loop notification', n._id, err);
+          }
+        }
+      }
+      if (dropped > 0) {
+        console.log(`[InitService] Dismissed ${dropped} stale loop notifications`);
+      }
+    } catch (err) {
+      console.warn('[InitService] _purgeStaleLoopNotifications failed:', err);
     }
   }
 

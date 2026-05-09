@@ -2,9 +2,15 @@ import BaseRepository from '../BaseRepository';
 
 class NotificationRepository extends BaseRepository {
   constructor() {
-    // trackSync: notifications sync across devices so a phone marking "read"
-    // clears the bell on the manager's laptop too.
-    super('notifications', { trackSync: true });
+    // Notifications are local-only. The Supabase `notifications` table was
+    // never created, so trackSync: true used to enqueue rows that never
+    // landed and surfaced as "Could not find the table 'public.notifications'
+    // in the schema cache" failures in the Sync Queue UI.
+    //
+    // Cross-device delivery now goes through the notify-push Edge Function
+    // (Web Push) rather than realtime sync of this table — see
+    // NotificationService._invokeNotifyPush.
+    super('notifications', { trackSync: false });
   }
 
   async getUnreadFor(userId) {

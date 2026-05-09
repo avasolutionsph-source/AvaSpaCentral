@@ -36,6 +36,14 @@ export function startBookingTriggers() {
     if (change.operation === 'delete') return;
     if (!change.entityId) return;
 
+    // The producer device — the one that actually performed the write —
+    // is the single source of truth for emitting a notification. If we
+    // also ran notify() here on remote-origin (Supabase realtime) events,
+    // every other device would re-fire the same notify-push round-trip
+    // and the recipient phone would hear the loop chime twice (once
+    // from the local realtime trigger, once from the producer's push).
+    if (change.origin === 'remote') return;
+
     // Refetch the record. The emitter doesn't carry it.
     const b = await findBooking(change.entityId);
     if (!b) return;

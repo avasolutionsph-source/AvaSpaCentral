@@ -32,8 +32,25 @@ function therapistTargetUserId(emp) {
 
 export function startPosTriggers() {
   return triggerSubscribe(async (change) => {
+    // The producer device — the one that actually performed the write —
+    // is the single source of truth for emitting a notification. It runs
+    // notify(), persists the row, and invokes the notify-push Edge
+    // Function which fans out to every subscribed device (including the
+    // producer's own, deduped via _recentlyDelivered).
+    //
+    // Other devices receive the same write via Supabase realtime and
+    // would otherwise re-fire notify() here — producing a second
+    // notification row and a second Web Push round-trip. The therapist
+    // would hear the chime twice (once from the local realtime trigger,
+    // once from the producer's push) and Confirm would only stop one
+    // of them, leaving the other looping in the background.
+    //
+    // We still let stop-loop helpers run on remote origin (those are
+    // idempotent local state) but skip every notify() emission.
+    const isRemote = change.origin === 'remote';
+
     // QRPh transaction completion
-    if (change.entityType === 'transactions' && change.operation === 'update' && change.entityId) {
+    if (!isRemote && change.entityType === 'transactions' && change.operation === 'update' && change.entityId) {
       try {
         const t = await mockApi.transactions.getTransaction(change.entityId);
         if (t?.paymentMethod === 'QRPh' && t.status === 'completed' && !seenPaid.has(t._id)) {
@@ -58,7 +75,7 @@ export function startPosTriggers() {
     // Dexie table; this is a placeholder. If your codebase uses a different
     // entity for online bookings, adapt accordingly. Skip silently when no
     // such entity exists.)
-    if (change.entityType === 'onlineBookings' && change.operation === 'create' && change.entityId) {
+    if (!isRemote && change.entityType === 'onlineBookings' && change.operation === 'create' && change.entityId) {
       if (seenOnline.has(change.entityId)) return;
       seenOnline.add(change.entityId);
       await NotificationService.notify({
@@ -98,7 +115,7 @@ export function startPosTriggers() {
     // Confirm on the toast — otherwise a phone in a pocket goes silent
     // the instant Start Service is bumped, which is the opposite of what
     // we want for a loud "may na-assign sa'yo" alert.
-    if (change.entityType === 'rooms' && change.operation === 'update' && change.entityId) {
+    if (!isRemote && change.entityType === 'rooms' && change.operation === 'update' && change.entityId) {
       try {
         const room = await mockApi.rooms.getRoom(change.entityId);
         if (room?.status === 'pending' && room.assignedEmployeeId) {
@@ -133,7 +150,7 @@ export function startPosTriggers() {
     // active rider in the branch gets the address so whoever's free can
     // drive the therapist there. Riders aren't pre-assigned at POS today,
     // so it's a role broadcast — they coordinate among themselves.
-    if (change.entityType === 'homeServices' && change.operation === 'create' && change.entityId) {
+    if (!isRemote && change.entityType === 'homeServices' && change.operation === 'create' && change.entityId) {
       if (seenHomeServices.has(change.entityId)) return;
       seenHomeServices.add(change.entityId);
       try {

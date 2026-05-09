@@ -40,9 +40,15 @@ registerRoute(
 );
 
 // Runtime cache: JS/CSS chunks (NetworkFirst so users always get the
-// latest when online).
+// latest when online). Same-origin only — without the origin filter
+// every cross-origin <link rel=stylesheet> (Google Fonts, etc.) gets
+// intercepted, fetched through the SW, and runs into the page's CSP
+// connect-src restrictions. The browser handles those directly.
 registerRoute(
-  ({ request }) => request.destination === 'script' || request.destination === 'style',
+  ({ request, url }) => {
+    if (url.origin !== self.location.origin) return false;
+    return request.destination === 'script' || request.destination === 'style';
+  },
   new NetworkFirst({
     cacheName: 'static-resources',
     networkTimeoutSeconds: 10,

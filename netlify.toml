@@ -39,7 +39,37 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(self)"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self' data: https://fonts.gstatic.com;"
+    # connect-src now lists fonts.googleapis.com + fonts.gstatic.com so the
+    # service worker's runtime cache can fetch + revalidate Google Fonts
+    # stylesheets without tripping CSP. Without this the SW logs
+    # "Refused to connect to fonts.googleapis.com" for every page that
+    # imports a custom font, leaks an uncaught no-response error from
+    # workbox, and never warms the fonts cache.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; font-src 'self' data: https://fonts.gstatic.com;"
+
+# Don't cache the SPA shell — every navigation must validate against the
+# server so the user picks up new chunk hashes immediately after a deploy.
+# Without this the browser can serve a stale index.html that references
+# /assets/<old-hash>.js / .css filenames that already 404 on the new deploy,
+# which surfaces as the ErrorBoundary "Something went wrong" page until
+# the user hits hard-refresh.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# The service worker must always revalidate so a deploy that ships a new
+# sw.js can replace the running one promptly. Workbox handles versioning
+# internally, but the file itself must not be cached aggressively.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
 
 # Cache static assets
 [[headers]]

@@ -11,10 +11,16 @@ const isChunkLoadError = (error) => {
   return (
     name === 'chunkloaderror' ||
     msg.includes('failed to fetch dynamically imported module') ||
-    msg.includes("loading chunk") ||
+    msg.includes('loading chunk') ||
     msg.includes('loading css chunk') ||
     msg.includes('importing a module script failed') ||
-    msg.includes("expected a javascript module script")
+    msg.includes('expected a javascript module script') ||
+    // Vite's vendor-pdf preloader throws this when a CSS chunk referenced
+    // by a route's lazy import has been unpublished — i.e. the user is on
+    // an old index.html after a deploy and the hashed filename no longer
+    // exists on the server. Same fix as the other chunk-load failures:
+    // hard reload to pull a fresh index.html with current hashes.
+    msg.includes('unable to preload css')
   );
 };
 

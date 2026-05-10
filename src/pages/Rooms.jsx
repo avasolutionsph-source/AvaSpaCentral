@@ -17,6 +17,7 @@ import {
   EmptyState,
   ManageOrder
 } from '../components/shared';
+import PaxBadge from '../components/booking/PaxBadge';
 import { roomValidation, validateWithToast } from '../validation/schemas';
 
 const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderRef }) => {
@@ -175,10 +176,17 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
     }),
     transformForSubmit: (data) => {
       const branchId = getEffectiveBranchId();
+      // Default capacity to 1 when blank or non-positive — every room must
+      // host at least one guest, and downstream UI assumes a sane minimum
+      // (Phase 8.2 multi-pax surfaces capacity on the room card).
+      const parsedCapacity = parseInt(data.capacity, 10);
+      const capacity = Number.isFinite(parsedCapacity) && parsedCapacity > 0
+        ? parsedCapacity
+        : 1;
       return {
         name: data.name.trim(),
         type: data.type,
-        capacity: parseInt(data.capacity),
+        capacity,
         amenities: data.amenities,
         status: data.status,
         ...(branchId && { branchId })
@@ -955,8 +963,32 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                     </div>
                     <div className="customer-info-row">
                       <span>🧑</span>
-                      <span><strong>Customer:</strong> {room.customerName || 'Walk-in'}</span>
+                      <span>
+                        <strong>Customer:</strong> {room.customerName || 'Walk-in'}
+                        {/* Multi-pax (Phase 8.2): badge renders nothing for
+                            single-pax records, so this is a no-op for
+                            legacy rows. */}
+                        <PaxBadge paxCount={room.paxCount} />
+                      </span>
                     </div>
+                    {room.paxCount > 1 && Array.isArray(room.guestNumbers) && room.guestNumbers.length > 0 && (
+                      <div className="customer-info-row">
+                        <span>👥</span>
+                        <span>
+                          <strong>Guests:</strong>{' '}
+                          {(() => {
+                            const nums = [...room.guestNumbers].sort((a, b) => a - b);
+                            const min = nums[0];
+                            const max = nums[nums.length - 1];
+                            // Contiguous run → "1-3", otherwise list them.
+                            const isRange = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
+                            return isRange && nums.length > 1
+                              ? `${min}-${max}`
+                              : nums.join(', ');
+                          })()}
+                        </span>
+                      </div>
+                    )}
                     {room.customerPhone && (
                       <div className="customer-info-row">
                         <span>📞</span>
@@ -981,7 +1013,16 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                 <div className="room-details">
                   <div className="room-detail-row">
                     <span className="room-detail-label">Capacity</span>
-                    <span className="room-detail-value">{room.capacity} {room.capacity === 1 ? 'person' : 'people'}</span>
+                    {/* Default to 1 when capacity is missing/0 — surfaces
+                        the number for cashiers to self-judge, but Phase 8.2
+                        intentionally does NOT enforce this at the room-mark
+                        level (most spas have variable capacity). */}
+                    <span className="room-detail-value">
+                      {(() => {
+                        const cap = Number(room.capacity) > 0 ? Number(room.capacity) : 1;
+                        return `${cap} ${cap === 1 ? 'person' : 'people'}`;
+                      })()}
+                    </span>
                   </div>
                 </div>
 

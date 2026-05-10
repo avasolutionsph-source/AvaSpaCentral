@@ -1297,7 +1297,13 @@ const POS = () => {
               customerEmail = walkInCustomerData.email || null;
             }
 
-            // Set room to pending - therapist will start the timer
+            // Set room to pending - therapist will start the timer.
+            // Multi-pax (Phase 8.2): pass guestNumbers so the room card can
+            // render "Guests 1-3" alongside the N pax badge. Persisted only
+            // in Dexie — no Supabase column for these fields yet.
+            const guestNumbers = paxCount > 1
+              ? guests.map(g => g.guestNumber)
+              : [1];
             await mockApi.rooms.updateRoomStatus(selectedRoom, 'pending', {
               serviceDuration: totalDuration,
               transactionId: receiptNumber,
@@ -1308,6 +1314,7 @@ const POS = () => {
               customerPhone: customerPhone,
               customerEmail: customerEmail,
               paxCount,
+              guestNumbers,
             });
           } catch (error) {
             console.error('Failed to update room/home service status:', error);
@@ -1529,6 +1536,11 @@ const POS = () => {
         const serviceNames = cartSnapshot
           .filter(item => item.type === 'service')
           .map(item => item.name);
+        // Multi-pax (Phase 8.2) — pass paxCount + guestNumbers so the room
+        // card can render the "N pax" badge for QRPh-paid bookings too.
+        const guestNumbers = ctxPaxCount > 1
+          ? ctxGuests.map(g => g.guestNumber)
+          : [1];
         await mockApi.rooms.updateRoomStatus(selectedRoomId, 'pending', {
           serviceDuration: totalDuration,
           transactionId: receiptNumber,
@@ -1538,6 +1550,8 @@ const POS = () => {
           customerName: transaction.customer?.name || null,
           customerPhone: transaction.customer?.phone || null,
           customerEmail: transaction.customer?.email || null,
+          paxCount: ctxPaxCount,
+          guestNumbers,
         });
       } catch (error) {
         console.error('Failed to update room status:', error);

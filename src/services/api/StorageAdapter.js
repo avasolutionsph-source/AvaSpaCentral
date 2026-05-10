@@ -558,6 +558,10 @@ export const roomsAdapter = {
       // Track advance booking info for pay-after transaction creation
       updateData.advanceBookingId = timingData.advanceBookingId || null;
       updateData.paymentTiming = timingData.paymentTiming || null;
+      // Multi-pax occupancy (Phase 8.2): pax count + the guest numbers
+      // sharing this room. Local-only fields — no Supabase column today.
+      updateData.paxCount = timingData.paxCount || 1;
+      updateData.guestNumbers = timingData.guestNumbers || null;
       // Don't set startTime yet - therapist will set it when they start
       updateData.startTime = null;
     }
@@ -580,6 +584,12 @@ export const roomsAdapter = {
       if (timingData.employeeName !== undefined) {
         updateData.assignedEmployeeName = timingData.employeeName;
       }
+      if (timingData.paxCount !== undefined) {
+        updateData.paxCount = timingData.paxCount;
+      }
+      if (timingData.guestNumbers !== undefined) {
+        updateData.guestNumbers = timingData.guestNumbers;
+      }
     } else if (status === 'available') {
       // Clear all data when room becomes available
       updateData.startTime = null;
@@ -593,6 +603,8 @@ export const roomsAdapter = {
       updateData.serviceNames = null;
       updateData.advanceBookingId = null;
       updateData.paymentTiming = null;
+      updateData.paxCount = null;
+      updateData.guestNumbers = null;
     }
 
     const room = await storageService.rooms.update(id, updateData);

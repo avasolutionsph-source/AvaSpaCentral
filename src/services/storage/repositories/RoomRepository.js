@@ -34,11 +34,28 @@ class RoomRepository extends BaseRepository {
 
   /**
    * Set room as occupied
+   *
+   * @param {string} id - Room id
+   * @param {string} appointmentId - Linked appointment / transaction id
+   * @param {Object} [options]
+   * @param {number} [options.paxCount=1]      - Number of guests in this room
+   * @param {number[]} [options.guestNumbers=[1]] - Guest numbers occupying the room
+   *
+   * Backwards compat: 2-arg calls `setOccupied(id, apptId)` keep working.
+   *
+   * NOTE: paxCount / guestNumbers are persisted on the local Dexie record only.
+   * The Supabase `rooms` table has no column for these fields (see
+   * SupabaseSyncManager.SYNCABLE_COLUMNS.rooms), so they will not round-trip
+   * across devices today. Multi-pax detail lives on the linked transaction
+   * (`currentAppointmentId`), and the Rooms page can fall back to that record
+   * when these fields are missing on a synced room.
    */
-  async setOccupied(id, appointmentId) {
+  async setOccupied(id, appointmentId, options = {}) {
     return this.update(id, {
       status: 'occupied',
-      currentAppointmentId: appointmentId
+      currentAppointmentId: appointmentId,
+      currentPaxCount: options.paxCount || 1,
+      currentGuestNumbers: options.guestNumbers || [1]
     });
   }
 
@@ -48,7 +65,9 @@ class RoomRepository extends BaseRepository {
   async setAvailable(id) {
     return this.update(id, {
       status: 'available',
-      currentAppointmentId: null
+      currentAppointmentId: null,
+      currentPaxCount: null,
+      currentGuestNumbers: null
     });
   }
 }

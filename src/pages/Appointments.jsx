@@ -10,6 +10,19 @@ import { supabaseSyncManager } from '../services/supabase';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import storageService from '../services/storage';
 import { formatTime12Hour } from '../utils/dateUtils';
+import PaxBuilder from '../components/booking/PaxBuilder';
+import { summarisePax } from '../utils/booking/multiPax';
+
+// Build a fresh blank guest row for the PaxBuilder.
+const blankGuest = (n) => ({ guestNumber: n, services: [], employeeId: null, isRequestedTherapist: false });
+
+// Longest service stack across all guests (parallel sessions, single time slot).
+const maxGuestDuration = (guests) => {
+  if (!guests || guests.length === 0) return 0;
+  return Math.max(
+    ...guests.map(g => (g.services || []).reduce((s, svc) => s + (svc.duration || 0), 0))
+  );
+};
 
 const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
   const navigate = useNavigate();
@@ -85,7 +98,9 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
     time: '',
     duration: 60,
     bookingSource: 'walk-in',
-    notes: ''
+    notes: '',
+    paxCount: 1,
+    guests: [blankGuest(1)],
   });
 
   const timeSlots = [
@@ -338,14 +353,87 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Check availability when relevant form fields change
+  // Check availability when relevant form fields change.
+  //
+  // Two paths:
+  //   - paxCount === 1 → existing single-resource adapter call (returns the
+  //     prettified { therapist, room } shape the UI already renders).
+  //   - paxCount  > 1 → call the repository's options-object signature directly
+  //     so we can validate every guest's therapist + the (single) room in one
+  //     shot. Map the raw conflicts back to the same { therapist, room } shape
+  //     so the existing warning banners still render unchanged.
   useEffect(() => {
     const checkAvailability = async () => {
-      if (!formData.date || !formData.time || !formData.duration) {
+      if (!formData.date || !formData.time) {
         setConflicts({ therapist: null, room: null });
         return;
       }
 
+      const isMulti = formData.paxCount > 1;
+      const scheduledDateTime = `${formData.date}T${formData.time}:00`;
+
+      if (isMulti) {
+        const employeeIds = (formData.guests || [])
+          .map(g => g.employeeId)
+          .filter(Boolean);
+        const roomIds = formData.roomId ? [formData.roomId] : [];
+        const duration = maxGuestDuration(formData.guests);
+
+        if (employeeIds.length === 0 && roomIds.length === 0) {
+          setConflicts({ therapist: null, room: null });
+          return;
+        }
+        if (!duration) {
+          setConflicts({ therapist: null, room: null });
+          return;
+        }
+
+        setCheckingAvailability(true);
+        try {
+          const raw = await storageService.appointments.checkConflicts({
+            employeeIds,
+            roomIds,
+            scheduledDateTime,
+            duration,
+            excludeId: modalMode === 'edit' ? selectedAppointment?._id : null,
+          });
+          let therapist = null;
+          let room = null;
+          for (const c of raw) {
+            const reason = c.reason || '';
+            if (reason.startsWith('therapist:') && !therapist) {
+              const start = new Date(c.scheduledDateTime);
+              therapist = {
+                time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+                therapistName: c.employee?.firstName ? `${c.employee.firstName} ${c.employee.lastName}` : 'Therapist',
+                serviceName: c.service?.name || 'Service',
+                customerName: c.customer?.name || 'Customer',
+                duration: c.duration || 60,
+              };
+            } else if (reason.startsWith('room:') && !room) {
+              const start = new Date(c.scheduledDateTime);
+              room = {
+                time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+                roomName: c.room?.name || 'Room',
+                serviceName: c.service?.name || 'Service',
+                duration: c.duration || 60,
+              };
+            }
+          }
+          setConflicts({ therapist, room });
+        } catch (error) {
+          // Silent fail for availability check
+        } finally {
+          setCheckingAvailability(false);
+        }
+        return;
+      }
+
+      // Single-pax path — unchanged.
+      if (!formData.duration) {
+        setConflicts({ therapist: null, room: null });
+        return;
+      }
       if (!formData.employeeId && !formData.roomId) {
         setConflicts({ therapist: null, room: null });
         return;
@@ -372,7 +460,7 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
     // Debounce the availability check
     const timeoutId = setTimeout(checkAvailability, 300);
     return () => clearTimeout(timeoutId);
-  }, [formData.employeeId, formData.roomId, formData.date, formData.time, formData.duration, modalMode, selectedAppointment]);
+  }, [formData.employeeId, formData.roomId, formData.date, formData.time, formData.duration, formData.paxCount, formData.guests, modalMode, selectedAppointment]);
 
   // Scope every dropdown source to the active branch so a brand-new branch
   // does not surface customers / employees / rooms that belong to a sibling
@@ -424,7 +512,8 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
     setConflicts({ therapist: null, room: null });
     setFormData({
       customerId: '', customerName: '', serviceId: '', employeeId: '', roomId: '',
-      date: selectedDateStr, time: '', duration: 60, bookingSource: 'walk-in', notes: ''
+      date: selectedDateStr, time: '', duration: 60, bookingSource: 'walk-in', notes: '',
+      paxCount: 1, guests: [blankGuest(1)]
     });
     setShowModal(true);
   };
@@ -444,7 +533,11 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
       time: format(apptDate, 'h:mm a'),
       duration: appointment.duration || 60,
       bookingSource: appointment.bookingSource || 'walk-in',
-      notes: appointment.notes || ''
+      notes: appointment.notes || '',
+      // Edit mode falls back to single-pax — multi-pax editing is a later task.
+      // Legacy serviceId/employeeId on the row still drive the existing inputs.
+      paxCount: 1,
+      guests: [blankGuest(1)]
     });
     setShowModal(true);
   };
@@ -476,8 +569,22 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
       showToast('Customer is required', 'error');
       return false;
     }
-    if (!formData.serviceId) { showToast('Service is required', 'error'); return false; }
-    if (!formData.employeeId) { showToast('Employee is required', 'error'); return false; }
+
+    const isMulti = formData.paxCount > 1;
+    if (isMulti) {
+      const guests = formData.guests || [];
+      // Every guest must have at least one service. Therapist may be empty
+      // (Auto rotation) — same flexibility as POS.
+      for (let i = 0; i < guests.length; i++) {
+        if (!guests[i].services || guests[i].services.length === 0) {
+          showToast(`Guest ${i + 1} needs at least one service`, 'error');
+          return false;
+        }
+      }
+    } else {
+      if (!formData.serviceId) { showToast('Service is required', 'error'); return false; }
+      if (!formData.employeeId) { showToast('Employee is required', 'error'); return false; }
+    }
     if (!formData.date) { showToast('Date is required', 'error'); return false; }
     if (!formData.time) { showToast('Time is required', 'error'); return false; }
 
@@ -500,18 +607,68 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
 
     try {
       const branchId = getEffectiveBranchId();
-      const appointmentData = {
-        customerId: formData.customerId || undefined,
-        customerName: !formData.customerId ? formData.customerName.trim() : undefined,
-        serviceId: formData.serviceId,
-        employeeId: formData.employeeId,
-        roomId: formData.roomId || undefined,
-        scheduledDateTime: `${formData.date}T${formData.time}:00`,
-        duration: parseInt(formData.duration),
-        bookingSource: formData.bookingSource,
-        notes: formData.notes.trim() || undefined,
-        ...(branchId && { branchId })
-      };
+      const isMulti = formData.paxCount > 1;
+
+      let appointmentData;
+      if (isMulti) {
+        // Build a flat items array in the shape summarisePax expects.
+        // Therapist names are looked up off the (already-loaded) employees list
+        // so guestSummary stays useful even when the appointment row is read
+        // by code that doesn't re-hydrate employee references.
+        const empById = new Map(employees.map(e => [String(e._id), e]));
+        const items = [];
+        for (const g of formData.guests) {
+          const emp = g.employeeId ? empById.get(String(g.employeeId)) : null;
+          const employeeName = emp ? `${emp.firstName} ${emp.lastName}`.trim() : undefined;
+          for (const svc of (g.services || [])) {
+            items.push({
+              guestNumber: g.guestNumber,
+              name: svc.name,
+              employeeId: g.employeeId || undefined,
+              employee: employeeName ? { name: employeeName } : undefined,
+              employeeName,
+              price: svc.price,
+              quantity: 1,
+            });
+          }
+        }
+        const guestSummary = summarisePax(items);
+        const firstGuest = formData.guests[0];
+        const firstService = firstGuest?.services?.[0];
+
+        appointmentData = {
+          customerId: formData.customerId || undefined,
+          customerName: !formData.customerId ? formData.customerName.trim() : undefined,
+          // Legacy single-resource fields mirror the first guest so existing
+          // calendar / list code that reads appointment.serviceId / employeeId
+          // keeps rendering something meaningful.
+          serviceId: firstService?.productId,
+          employeeId: firstGuest?.employeeId || undefined,
+          roomId: formData.roomId || undefined,
+          scheduledDateTime: `${formData.date}T${formData.time}:00`,
+          duration: maxGuestDuration(formData.guests),
+          bookingSource: formData.bookingSource,
+          notes: formData.notes.trim() || undefined,
+          // New multi-pax fields.
+          paxCount: formData.paxCount,
+          guestSummary,
+          ...(branchId && { branchId })
+        };
+      } else {
+        appointmentData = {
+          customerId: formData.customerId || undefined,
+          customerName: !formData.customerId ? formData.customerName.trim() : undefined,
+          serviceId: formData.serviceId,
+          employeeId: formData.employeeId,
+          roomId: formData.roomId || undefined,
+          scheduledDateTime: `${formData.date}T${formData.time}:00`,
+          duration: parseInt(formData.duration),
+          bookingSource: formData.bookingSource,
+          notes: formData.notes.trim() || undefined,
+          paxCount: 1,
+          ...(branchId && { branchId })
+        };
+      }
 
       if (modalMode === 'create') {
         await mockApi.appointments.createAppointment(appointmentData);
@@ -928,6 +1085,59 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                       placeholder="Enter customer name" className="form-control" />
                   </div>
                 )}
+                {/* Number of guests — staff form supports 1-30. When > 1 the
+                    single-pax service / rotation / therapist controls are
+                    swapped for the PaxBuilder so each guest picks their own. */}
+                {modalMode === 'create' && (
+                  <div className="form-group">
+                    <label>Number of guests</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={formData.paxCount}
+                      onChange={(e) => {
+                        const raw = parseInt(e.target.value, 10);
+                        const next = Number.isFinite(raw) ? Math.min(30, Math.max(1, raw)) : 1;
+                        setFormData(prev => {
+                          const current = prev.guests || [];
+                          let guests;
+                          if (next > current.length) {
+                            guests = [
+                              ...current,
+                              ...Array.from({ length: next - current.length }, (_, i) => blankGuest(current.length + i + 1)),
+                            ];
+                          } else {
+                            guests = current.slice(0, next).map((g, i) => ({ ...g, guestNumber: i + 1 }));
+                          }
+                          return { ...prev, paxCount: next, guests };
+                        });
+                      }}
+                      onWheel={(e) => e.target.blur()}
+                      className="form-control"
+                      style={{ maxWidth: 120 }}
+                    />
+                  </div>
+                )}
+                {modalMode === 'create' && formData.paxCount > 1 ? (
+                  <div className="form-group">
+                    <label>Guests</label>
+                    <PaxBuilder
+                      paxCount={formData.paxCount}
+                      guests={formData.guests}
+                      onChange={(g) => setFormData(prev => ({ ...prev, guests: g }))}
+                      services={branchServices}
+                      therapists={branchEmployees
+                        .filter(e => {
+                          // Only therapists can serve — receptionists etc. aren't selectable.
+                          const role = (e.role || '').toLowerCase();
+                          return role === 'therapist' || role === 'massage therapist' || role.includes('therapist');
+                        })
+                        .map(e => ({ _id: e._id, name: `${e.firstName || ''} ${e.lastName || ''}`.trim() }))}
+                      mode="staff"
+                    />
+                  </div>
+                ) : (
                 <div className="form-group">
                   <label>Service *</label>
                   <select name="serviceId" value={formData.serviceId} onChange={handleInputChange} className="form-control" required>
@@ -935,9 +1145,12 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                     {branchServices.map(s => <option key={s._id} value={s._id}>{s.name} - ₱{s.price}</option>)}
                   </select>
                 </div>
+                )}
                 {/* Service Rotation Queue — only for today's appointments
-                    (rotation reflects who's clocked in NOW). */}
-                {modalMode === 'create' && showRotationQueue && rotationQueue.length > 0 && (
+                    (rotation reflects who's clocked in NOW). Hidden in
+                    multi-pax mode: each guest picks their own therapist
+                    (Auto/specific) inside the PaxBuilder. */}
+                {modalMode === 'create' && formData.paxCount === 1 && showRotationQueue && rotationQueue.length > 0 && (
                   <div className="rotation-queue-panel">
                     <div className="rotation-queue-header">
                       <span className="rotation-queue-title">🔄 Service Rotation Queue</span>
@@ -1010,7 +1223,7 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                   </div>
                 )}
 
-                {modalMode === 'create' && showRotationQueue && rotationQueue.length === 0 && (
+                {modalMode === 'create' && formData.paxCount === 1 && showRotationQueue && rotationQueue.length === 0 && (
                   <div className="rotation-no-queue">
                     <span>⚠️</span>
                     <p>No therapists clocked in today. Select manually below.</p>
@@ -1018,21 +1231,23 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                 )}
 
                 <div className="form-row">
-                  <div className="form-group">
-                    <label>Therapist *</label>
-                    <select name="employeeId" value={formData.employeeId} onChange={handleInputChange} className="form-control" required>
-                      <option value="">Select therapist...</option>
-                      {(() => {
-                        const selectedService = branchServices.find(s => s._id === formData.serviceId);
-                        const availableTherapists = formData.serviceId
-                          ? getEmployeesForService(branchEmployees, selectedService)
-                          : getTherapists(branchEmployees);
-                        return availableTherapists.map(e => (
-                          <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>
-                        ));
-                      })()}
-                    </select>
-                  </div>
+                  {formData.paxCount === 1 && (
+                    <div className="form-group">
+                      <label>Therapist *</label>
+                      <select name="employeeId" value={formData.employeeId} onChange={handleInputChange} className="form-control" required>
+                        <option value="">Select therapist...</option>
+                        {(() => {
+                          const selectedService = branchServices.find(s => s._id === formData.serviceId);
+                          const availableTherapists = formData.serviceId
+                            ? getEmployeesForService(branchEmployees, selectedService)
+                            : getTherapists(branchEmployees);
+                          return availableTherapists.map(e => (
+                            <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>
+                          ));
+                        })()}
+                      </select>
+                    </div>
+                  )}
                   <div className="form-group">
                     <label>Room</label>
                     <select name="roomId" value={formData.roomId} onChange={handleInputChange} className="form-control">
@@ -1046,11 +1261,24 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                     <label>Date *</label>
                     <input type="date" name="date" value={formData.date} onChange={handleInputChange} className="form-control" required min={format(new Date(), 'yyyy-MM-dd')} />
                   </div>
-                  <div className="form-group">
-                    <label>Duration (min)</label>
-                    <input type="number" name="duration" value={formData.duration} onChange={handleInputChange}
-                      onWheel={(e) => e.target.blur()} className="form-control" min="15" step="15" />
-                  </div>
+                  {formData.paxCount === 1 ? (
+                    <div className="form-group">
+                      <label>Duration (min)</label>
+                      <input type="number" name="duration" value={formData.duration} onChange={handleInputChange}
+                        onWheel={(e) => e.target.blur()} className="form-control" min="15" step="15" />
+                    </div>
+                  ) : (
+                    <div className="form-group">
+                      <label>Duration (min)</label>
+                      <input
+                        type="number"
+                        value={maxGuestDuration(formData.guests)}
+                        readOnly
+                        className="form-control"
+                        title="Auto-computed from each guest's longest service stack"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Time *</label>

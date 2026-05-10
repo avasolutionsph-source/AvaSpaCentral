@@ -219,7 +219,11 @@ const Calendar = () => {
           notes: booking.specialRequests || '',
           isHomeService: booking.isHomeService,
           clientPhone: booking.clientPhone,
-          clientAddress: booking.clientAddress
+          clientAddress: booking.clientAddress,
+          // Carry pax fields through so the calendar can show "· Npx" suffix
+          // and the detail modal can list each guest's service / therapist.
+          paxCount: booking.paxCount,
+          guestSummary: booking.guestSummary
         };
       });
 
@@ -413,12 +417,19 @@ const Calendar = () => {
   // Get event display info
   const getEventDisplay = (event) => {
     switch (event.type) {
-      case 'appointment':
+      case 'appointment': {
+        // Multi-pax bookings get a "· Npx" suffix on the customer name so
+        // the calendar tile reveals group size at a glance. Single-pax
+        // events keep the original "{customer} - {service}" format.
+        const customerLabel = event.paxCount && event.paxCount > 1
+          ? `${event.customer} · ${event.paxCount}px`
+          : event.customer;
         return {
           label: event.startTime ? formatTime12hr(event.startTime) : 'Appt',
-          title: `${event.customer} - ${event.service}`,
+          title: `${customerLabel} - ${event.service}`,
           className: `event-appointment event-${event.status}`
         };
+      }
       case 'attendance':
         return {
           label: event.clockIn || (event.status === 'absent' ? 'Absent' : '-'),
@@ -761,7 +772,11 @@ const Calendar = () => {
                           onClick={() => openEventDetail(event)}
                           title={display.title}
                         >
-                          {event.type === 'appointment' ? event.customer : event.employeeName}
+                          {event.type === 'appointment'
+                            ? (event.paxCount && event.paxCount > 1
+                                ? `${event.customer} · ${event.paxCount}px`
+                                : event.customer)
+                            : event.employeeName}
                         </div>
                       );
                     }
@@ -884,6 +899,40 @@ const Calendar = () => {
               </span>
             </div>
           </div>
+          {selectedEvent.paxCount && selectedEvent.paxCount > 1 && (
+            <div className="event-guests">
+              <h4>Guests ({selectedEvent.paxCount})</h4>
+              {Array.isArray(selectedEvent.guestSummary) && selectedEvent.guestSummary.length > 0 ? (
+                <ul style={{ paddingLeft: 18, margin: '6px 0' }}>
+                  {(() => {
+                    // Group rows by guestNumber so a guest with multiple
+                    // services renders as ONE line ("Guest 1 - A + B - Ana ₱X")
+                    // instead of N. Mirrors PaxBadge tooltip layout.
+                    const byGuest = new Map();
+                    for (const row of selectedEvent.guestSummary) {
+                      const key = row.guestNumber || 0;
+                      if (!byGuest.has(key)) byGuest.set(key, []);
+                      byGuest.get(key).push(row);
+                    }
+                    const sortedKeys = Array.from(byGuest.keys()).sort((a, b) => a - b);
+                    return sortedKeys.map(key => {
+                      const rows = byGuest.get(key);
+                      const services = rows.map(r => r.serviceName).filter(Boolean).join(' + ');
+                      const therapist = rows[0].employeeName || rows[0].employeeId || 'Auto';
+                      const total = rows.reduce((s, r) => s + Number(r.price || 0), 0);
+                      return (
+                        <li key={key}>
+                          Guest {key} — {services} ({therapist} ₱{total.toLocaleString()})
+                        </li>
+                      );
+                    });
+                  })()}
+                </ul>
+              ) : (
+                <p style={{ fontStyle: 'italic', color: '#888' }}>{selectedEvent.paxCount} guests (details unavailable)</p>
+              )}
+            </div>
+          )}
           {selectedEvent.notes && (
             <div className="event-notes">
               <h4>Notes</h4>

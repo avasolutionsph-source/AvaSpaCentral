@@ -93,6 +93,11 @@ const AdvanceBookingsTab = () => {
           source: 'online',
           referenceNumber: ob.reference_number,
           branchId: ob.branch_id,
+          // Multi-pax fields populated by BookingPage when paxCount > 1.
+          // Snake-case in Supabase -> camelCase for the shared booking-card UI
+          // so PaxBadge (which already renders below) shows N pax + tooltip.
+          paxCount: ob.pax_count,
+          guestSummary: ob.guest_summary,
         };
       });
     } catch (err) {

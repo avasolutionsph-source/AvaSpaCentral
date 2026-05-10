@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
@@ -29,6 +30,9 @@ export default function RiderBookings() {
   const [refreshing, setRefreshing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusId = searchParams.get('focus');
+  const lastHandledFocusRef = useRef(null);
 
   const selectedBooking = useMemo(
     () => bookings.find(b => b.id === selectedBookingId) || null,
@@ -70,6 +74,21 @@ export default function RiderBookings() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [selectedBooking]);
+
+  // Auto-open detail modal from ?focus=<bookingId> URL param.
+  // Waits for bookings to load. The dataChangeEmitter subscription above will
+  // re-fire this effect once the booking arrives in the local list.
+  useEffect(() => {
+    if (!focusId || lastHandledFocusRef.current === focusId) return;
+    if (bookings.length === 0) return;
+    const found = bookings.find(b => b.id === focusId);
+    if (found) {
+      setSelectedBookingId(focusId);
+      lastHandledFocusRef.current = focusId;
+      // Strip the param so a refresh doesn't re-open after the user closes.
+      setSearchParams({}, { replace: true });
+    }
+  }, [focusId, bookings, setSearchParams]);
 
   const openCard = (id) => setSelectedBookingId(id);
   const cardKeyDown = (e, id) => {

@@ -12,11 +12,69 @@
 
 import storageService from '../storage';
 import { mockDatabase } from '../../mockApi/mockData';
-import { TimeOffRequestRepository, HomeServiceRepository, SettingsRepository } from '../storage/repositories';
+import {
+  TimeOffRequestRepository,
+  HomeServiceRepository,
+  SettingsRepository,
+  PayrollConfigRepository,
+  LoyaltyHistoryRepository,
+  CustomerRepository,
+} from '../storage/repositories';
 import NotificationRepo from '../storage/repositories/NotificationRepository';
 import { authService, supabase, isSupabaseConfigured, supabaseSyncManager } from '../supabase';
 import { db } from '../../db';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
+
+/**
+ * Award loyalty points for a completed transaction.
+ *
+ * Points formula:
+ *   base = floor(transaction.totalAmount)         (1 peso = 1 point, rounded down)
+ *   if (loyalty.multiplyByPax === true)
+ *       earned = base * (transaction.paxCount || 1)
+ *   else
+ *       earned = base
+ *
+ * No-op when:
+ *   - transaction has no customerId (walk-in / anonymous)
+ *   - totalAmount is zero / negative
+ *   - the customer record can't be found
+ *
+ * Failures are swallowed so a flaky loyalty write never breaks checkout — the
+ * core transaction has already been persisted before this runs.
+ */
+const awardLoyaltyForTransaction = async (transaction) => {
+  try {
+    const customerId = transaction?.customerId;
+    if (!customerId) return;
+
+    const total = Number(transaction.totalAmount ?? transaction.total ?? 0);
+    if (!Number.isFinite(total) || total <= 0) return;
+
+    const base = Math.floor(total);
+    if (base <= 0) return;
+
+    const multiplyByPax = !!(await PayrollConfigRepository.get('loyalty.multiplyByPax'));
+    const pax = Number(transaction.paxCount) || 1;
+    const earned = multiplyByPax ? base * pax : base;
+    if (earned <= 0) return;
+
+    const customer = await CustomerRepository.getById(customerId);
+    if (!customer) return;
+
+    const updated = await CustomerRepository.updateLoyaltyPoints(customerId, earned, 'add');
+    const description = multiplyByPax && pax > 1
+      ? `Earned from transaction (${pax} pax × ${base} pts)`
+      : 'Earned from transaction';
+
+    await LoyaltyHistoryRepository.addEarned(customerId, earned, description, {
+      transactionId: transaction._id || transaction.id,
+      balanceAfter: updated?.loyaltyPoints,
+    });
+  } catch (err) {
+    console.warn('[StorageAdapter] awardLoyaltyForTransaction failed:', err);
+  }
+};
 
 // No artificial delay - Dexie is already async and fast
 const delay = () => Promise.resolve();
@@ -730,8 +788,11 @@ export const transactionsAdapter = {
   async createTransaction(data) {
     await delay();
 
-    // Wrap in Dexie transaction for atomicity - if stock update fails, transaction is rolled back
-    return await db.transaction('rw', [db.transactions, db.products, db.syncQueue], async () => {
+    // Wrap in Dexie transaction for atomicity - if stock update fails,
+    // transaction is rolled back. Loyalty awarding runs *after* the txn
+    // closes so it can touch tables (customers, loyaltyHistory) that aren't
+    // in the rw scope above without expanding the lock.
+    const result = await db.transaction('rw', [db.transactions, db.products, db.syncQueue], async () => {
       const transaction = await storageService.transactions.create({
         ...data,
         businessId: getRequiredBusinessId(), // Required for sync to work
@@ -802,6 +863,19 @@ export const transactionsAdapter = {
 
       return { success: true, transaction: clone(transaction) };
     });
+
+    // Best-effort loyalty award (swallowed on failure so it never blocks
+    // checkout). Runs outside the dexie transaction above because it touches
+    // customers + loyaltyHistory, which aren't in its rw scope.
+    try {
+      if (result?.transaction) {
+        await awardLoyaltyForTransaction(result.transaction);
+      }
+    } catch (err) {
+      console.warn('[StorageAdapter] post-createTransaction loyalty award failed:', err);
+    }
+
+    return result;
   },
 
   async updateTransaction(id, data) {

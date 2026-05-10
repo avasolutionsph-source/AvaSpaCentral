@@ -337,11 +337,27 @@ const initPayrollConfig = async () => {
   return defaultPayrollConfig;
 };
 
+// Whitelist of legacy payroll-rate keys. The payroll_config table is now also
+// used by other namespaces (`loyalty.*`, `booking.*`) — those keys store plain
+// scalars and would crash the legacy "rate card" UI in Settings if returned
+// here. Filtering on this whitelist keeps the legacy form's contract intact.
+const PAYROLL_RATE_KEYS = new Set(Object.keys(defaultPayrollConfig));
+
 export const payrollConfigApi = {
   // Get current payroll configuration
   async getPayrollConfig() {
     await delay();
-    return clone(await initPayrollConfig());
+    const all = await initPayrollConfig();
+    const filtered = {};
+    for (const [key, value] of Object.entries(all)) {
+      // Only return entries shaped like a rate card (has .label + .rate). This
+      // also defensively guards against any legacy installs where unknown keys
+      // crept into payrollConfig before the namespaced split.
+      if (PAYROLL_RATE_KEYS.has(key) && value && typeof value === 'object' && 'label' in value && 'rate' in value) {
+        filtered[key] = value;
+      }
+    }
+    return clone(filtered);
   },
 
   // Update payroll configuration (Owner only) - uses repositories for event-driven sync
@@ -427,10 +443,16 @@ export const payrollConfigApi = {
       'Reset all payroll settings to default values'
     );
 
-    // Reset to defaults using repository (event-driven sync)
-    const allConfigs = await PayrollConfigRepository.getAll();
-    for (const key of Object.keys(allConfigs)) {
-      await PayrollConfigRepository.delete(key);
+    // Reset to defaults using repository (event-driven sync). Only touch the
+    // rate keys — namespaced keys like `loyalty.multiplyByPax` and
+    // `booking.maxPaxPublic` belong to other Settings sections and must not be
+    // wiped by the "Reset Payroll Settings" button.
+    for (const key of Object.keys(defaultPayrollConfig)) {
+      try {
+        await PayrollConfigRepository.delete(key);
+      } catch (err) {
+        // Key may not exist yet — that's fine.
+      }
     }
     for (const [key, value] of Object.entries(defaultPayrollConfig)) {
       await PayrollConfigRepository.set(key, value);

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, subDays, addDays, startOfMonth, endOfMonth, differenceInDays, parseISO, isSameDay, startOfWeek, endOfWeek } from 'date-fns';
 import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
+import { aggregateEmployeePerformance } from '../utils/reports/commission';
 // jsPDF is loaded dynamically in handleExportPDF to reduce initial bundle size
 
 const Reports = ({ embedded = false }) => {
@@ -329,18 +330,16 @@ const Reports = ({ embedded = false }) => {
       };
     });
 
-    // Aggregate data from transactions - employee is at transaction level, not item level
-    txns.forEach(t => {
-      const empId = t.employee?.id || t.employeeId;
-      if (empId && employeePerformance[empId]) {
-        const itemsCount = t.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1;
-        const revenue = t.totalAmount || t.total || 0;
-        const commission = t.employee?.commission || (revenue * 0.10);
-
-        employeePerformance[empId].services += itemsCount;
-        employeePerformance[empId].revenue += revenue;
-        employeePerformance[empId].commission += commission;
-      }
+    // Aggregate revenue/commission per item.employeeId so multi-pax bookings
+    // (each guest with their own therapist) attribute correctly. Falls back to
+    // transaction-level employeeId for legacy / single-pax data.
+    const perItem = aggregateEmployeePerformance(txns);
+    Object.values(perItem).forEach(row => {
+      const empPerf = employeePerformance[row.employeeId];
+      if (!empPerf) return; // unknown / inactive employee — skip
+      empPerf.services += row.services;
+      empPerf.revenue += row.revenue;
+      empPerf.commission += row.commission;
     });
 
     // Aggregate attendance data - uses employeeId field

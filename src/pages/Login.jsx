@@ -3,14 +3,27 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { authService, isSupabaseConfigured } from '../services/supabase';
 
+// Username (only) is persisted under this key when Remember Me is checked.
+// Password is intentionally never stored — that's the browser's password
+// manager job and storing it ourselves would be a regression in security.
+const REMEMBER_USERNAME_KEY = 'spa-erp-remember-username';
+
 const Login = () => {
   const navigate = useNavigate();
   const { login, showToast, getFirstPage, selectedBranch } = useApp();
 
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    rememberMe: false
+  const [formData, setFormData] = useState(() => {
+    let savedUsername = '';
+    try {
+      savedUsername = localStorage.getItem(REMEMBER_USERNAME_KEY) || '';
+    } catch {
+      // localStorage blocked (private mode, quota) — fall back to blank form
+    }
+    return {
+      username: savedUsername,
+      password: '',
+      rememberMe: !!savedUsername,
+    };
   });
 
   const [errors, setErrors] = useState({});
@@ -71,6 +84,19 @@ const Login = () => {
 
     try {
       await login(formData.username, formData.password, formData.rememberMe);
+
+      // Persist or clear the saved username based on the checkbox so the
+      // next visit either pre-fills the field or shows a blank form.
+      try {
+        if (formData.rememberMe) {
+          localStorage.setItem(REMEMBER_USERNAME_KEY, formData.username);
+        } else {
+          localStorage.removeItem(REMEMBER_USERNAME_KEY);
+        }
+      } catch {
+        // localStorage unavailable — proceed with login regardless
+      }
+
       // Redirect to user's first allowed page based on role
       navigate(getFirstPage());
     } catch (error) {

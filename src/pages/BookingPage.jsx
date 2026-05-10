@@ -6,7 +6,43 @@ import { applyColorTheme, getSettingsByKeys } from '../services/brandingService'
 import QRPaymentModal from '../components/QRPaymentModal';
 import { createPaymentIntent } from '../services/payments';
 import { geocodeAddress, haversineKm, transportFeeForDistance } from '../utils/geocoding';
+import PaxBuilder from '../components/booking/PaxBuilder';
+import { summarisePax } from '../utils/booking/multiPax';
 import '../assets/css/booking.css';
+
+// Blank guest row for the multi-pax PaxBuilder. Mirrors the shape used by
+// Appointments.jsx and POS.jsx so summarisePax / downstream code can read
+// it uniformly.
+const blankGuest = (n) => ({ guestNumber: n, services: [], employeeId: null, isRequestedTherapist: false });
+
+// Flatten the multi-pax `guests` array into a flat items list (the shape
+// summarisePax expects and the shape we persist into online_bookings.services).
+// Each entry carries guestNumber and employeeId so per-guest attribution
+// survives into reports and the staff-side appointment view.
+const flattenGuestsToItems = (guestsList, therapistsList = []) => {
+  const therapistById = new Map(
+    (therapistsList || []).map(t => [String(t.id), t])
+  );
+  const items = [];
+  for (const g of guestsList || []) {
+    const t = g.employeeId ? therapistById.get(String(g.employeeId)) : null;
+    const employeeName = t ? `${t.first_name || ''} ${t.last_name || ''}`.trim() : undefined;
+    for (const svc of (g.services || [])) {
+      items.push({
+        guestNumber: g.guestNumber,
+        productId: svc.productId,
+        name: svc.name,
+        price: svc.price,
+        duration: svc.duration,
+        quantity: 1,
+        employeeId: g.employeeId || undefined,
+        employee: employeeName ? { name: employeeName } : undefined,
+        employeeName,
+      });
+    }
+  }
+  return items;
+};
 
 // Available hero fonts for booking page
 const HERO_FONTS = [
@@ -189,6 +225,13 @@ const BookingPage = () => {
   const [genderFilter, setGenderFilter] = useState('all'); // 'all' | 'male' | 'female'
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+
+  // Multi-guest (family / group) booking. Single-person flow is the default
+  // and stays bit-for-bit identical to before — the PaxBuilder only renders
+  // when paxCount > 1, at which point selectedServices / selectedTherapists
+  // are bypassed in favour of per-guest service+therapist picks.
+  const [paxCount, setPaxCount] = useState(1);
+  const [guests, setGuests] = useState([blankGuest(1)]);
 
   // Customer details
   const [customerName, setCustomerName] = useState('');
@@ -689,6 +732,46 @@ const BookingPage = () => {
     return cats.filter(Boolean).sort();
   }, [services]);
 
+  // Adapt the page's Supabase shape to the PaxBuilder shape. PaxBuilder
+  // expects services with `_id` (used as the productId on each pick) and
+  // therapists with `_id` + `name`. The single-flow UI keeps using the
+  // raw `services` / `therapists` arrays directly so nothing changes there.
+  const paxServices = useMemo(
+    () => (services || []).map(s => ({
+      _id: s.id,
+      name: s.name,
+      price: s.price,
+      duration: s.duration,
+      category: s.category,
+    })),
+    [services]
+  );
+  const paxTherapists = useMemo(
+    () => (therapists || []).map(t => ({
+      _id: t.id,
+      name: `${t.first_name || ''} ${t.last_name || ''}`.trim(),
+    })),
+    [therapists]
+  );
+
+  // Resize the `guests` array whenever paxCount changes so PaxBuilder always
+  // gets exactly `paxCount` rows. Existing rows are preserved (so a customer
+  // bumping from 2→3 doesn't lose Guest 1 + Guest 2's picks).
+  const handlePaxCountChange = (raw) => {
+    const next = Number.isFinite(raw) ? Math.min(12, Math.max(1, raw)) : 1;
+    setPaxCount(next);
+    setGuests(prev => {
+      const current = prev || [];
+      if (next > current.length) {
+        return [
+          ...current,
+          ...Array.from({ length: next - current.length }, (_, i) => blankGuest(current.length + i + 1)),
+        ];
+      }
+      return current.slice(0, next).map((g, i) => ({ ...g, guestNumber: i + 1 }));
+    });
+  };
+
   // Filter services based on search, category, and sort
   const filteredServices = useMemo(() => {
     let filtered = services;
@@ -831,14 +914,47 @@ const BookingPage = () => {
     return 0;
   }, [selectedBranch, serviceLocation, distanceFee]);
 
-  // Calculate totals
+  // Calculate totals. Multi-pax sums every guest's services; single-pax keeps
+  // the original `selectedServices` math untouched.
   const servicesTotal = useMemo(() => {
+    if (paxCount > 1) {
+      return (guests || []).reduce((sum, g) => {
+        return sum + (g.services || []).reduce((s, svc) => s + (Number(svc.price) || 0), 0);
+      }, 0);
+    }
     return selectedServices.reduce((sum, service) => sum + (service.price || 0), 0);
-  }, [selectedServices]);
+  }, [selectedServices, paxCount, guests]);
 
   const cartTotal = useMemo(() => {
     return servicesTotal + transportFee;
   }, [servicesTotal, transportFee]);
+
+  // True when the customer has picked at least one service. Single-pax checks
+  // selectedServices; multi-pax requires every guest to have a service so the
+  // floating summary doesn't pretend the booking is ready when Guest 3 is
+  // still empty.
+  const hasAnyServiceSelection = useMemo(() => {
+    if (paxCount > 1) {
+      return (guests || []).every(g => (g.services || []).length > 0);
+    }
+    return selectedServices.length > 0;
+  }, [paxCount, guests, selectedServices]);
+
+  // Total number of service picks across all guests (for the count badge in
+  // the floating summary). Single-pax falls through to the existing length.
+  const totalServiceCount = useMemo(() => {
+    if (paxCount > 1) {
+      return (guests || []).reduce((s, g) => s + (g.services?.length || 0), 0);
+    }
+    return selectedServices.length;
+  }, [paxCount, guests, selectedServices]);
+
+  // Per-guest service rollup for the booking summary preview (and success
+  // page). Uses summarisePax so display matches what the staff side will see.
+  const guestSummaryPreview = useMemo(() => {
+    if (paxCount <= 1) return null;
+    return summarisePax(flattenGuestsToItems(guests, therapists));
+  }, [paxCount, guests, therapists]);
 
   const depositAmount = useMemo(() => {
     return Math.ceil(cartTotal * 0.5); // 50% deposit
@@ -871,8 +987,17 @@ const BookingPage = () => {
 
   // Submit booking
   const handleSubmitBooking = async () => {
-    // Validation
-    if (selectedServices.length === 0) {
+    // Validation. For multi-guest bookings every guest must have picked at
+    // least one service — otherwise it's a half-empty booking that wastes
+    // a slot. Single-guest path validates `selectedServices` exactly as before.
+    if (paxCount > 1) {
+      for (let i = 0; i < (guests || []).length; i++) {
+        if (!guests[i].services || guests[i].services.length === 0) {
+          alert(`Please pick at least one service for Guest ${i + 1}.`);
+          return;
+        }
+      }
+    } else if (selectedServices.length === 0) {
       alert('Please select at least one service.');
       return;
     }
@@ -939,6 +1064,15 @@ const BookingPage = () => {
 
       const reference = generateReference();
 
+      // For multi-pax, the source-of-truth for items is the flattened guests
+      // array — each entry carries guestNumber + employeeId so the staff
+      // appointment view can render per-guest service + preferred therapist.
+      // For single-pax we keep the historical selectedServices shape so any
+      // downstream code that already reads the old shape is unaffected.
+      const isMultiPax = paxCount > 1;
+      const flattenedItems = isMultiPax ? flattenGuestsToItems(guests, therapists) : [];
+      const guestSummary = isMultiPax ? summarisePax(flattenedItems) : null;
+
       // Create booking record
       const bookingData = {
         business_id: business?.id || businessIdOrSlug,
@@ -950,16 +1084,29 @@ const BookingPage = () => {
         notes: customerNotes.trim() || null,
         preferred_date: selectedDate,
         preferred_time: selectedTime,
-        preferred_therapist_id: therapistMode === 'choose' && selectedTherapists.length > 0 ? selectedTherapists[0] : null,
-        preferred_therapists: therapistMode === 'choose' ? selectedTherapists : [],
-        therapist_gender_preference: genderFilter !== 'all' ? genderFilter : null,
-        services: selectedServices.map(s => ({
-          id: s.id,
-          name: s.name,
-          price: s.price,
-          duration: s.duration,
-          category: s.category
-        })),
+        // For multi-pax, the per-guest preferred therapist lives on each
+        // flattened item. The legacy single-resource fields mirror Guest 1
+        // so any list/calendar code that still reads
+        // booking.preferred_therapist_id keeps rendering something sensible.
+        preferred_therapist_id: isMultiPax
+          ? (guests?.[0]?.employeeId || null)
+          : (therapistMode === 'choose' && selectedTherapists.length > 0 ? selectedTherapists[0] : null),
+        preferred_therapists: isMultiPax ? [] : (therapistMode === 'choose' ? selectedTherapists : []),
+        therapist_gender_preference: !isMultiPax && genderFilter !== 'all' ? genderFilter : null,
+        services: isMultiPax
+          ? flattenedItems
+          : selectedServices.map(s => ({
+              id: s.id,
+              name: s.name,
+              price: s.price,
+              duration: s.duration,
+              category: s.category
+            })),
+        // New multi-pax fields. pax_count is always set so the staff side can
+        // tell at a glance how many guests are coming. guest_summary is null
+        // for single-pax so consumers can null-check instead of length-check.
+        pax_count: paxCount,
+        guest_summary: guestSummary,
         total_amount: cartTotal,
         deposit_amount: depositAmount,
         status: 'pending', // pending, confirmed, completed, cancelled
@@ -1310,11 +1457,25 @@ const BookingPage = () => {
           <div className="success-details">
             <p>Thank you, {customerName}!</p>
             <p>We've received your booking request for:</p>
-            <ul>
-              {selectedServices.map(s => (
-                <li key={s.id}>{s.name}</li>
-              ))}
-            </ul>
+            {paxCount > 1 ? (
+              <ul>
+                {(guestSummaryPreview || []).map(g => (
+                  <li key={g.guestNumber}>
+                    <strong>Guest {g.guestNumber}:</strong> {g.serviceName}
+                    {g.employeeName ? ` (with ${g.employeeName})` : ''}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul>
+                {selectedServices.map(s => (
+                  <li key={s.id}>{s.name}</li>
+                ))}
+              </ul>
+            )}
+            {paxCount > 1 && (
+              <p><strong>Group size:</strong> {paxCount} guests</p>
+            )}
             <p><strong>Date:</strong> {selectedDate}</p>
             <p><strong>Time:</strong> {selectedTime}</p>
             <p><strong>Total:</strong> ₱{(cartTotal ?? 0).toLocaleString()}</p>
@@ -1358,9 +1519,12 @@ const BookingPage = () => {
   }
 
   // Calculate current progress step (5 steps: Services, Therapist, Location, Date & Time, Details)
+  // Multi-pax skips the single-flow Therapist step (each guest picks their
+  // own therapist directly inside the PaxBuilder, so there's nothing more to
+  // do here once every guest has at least one service).
   const getCurrentStep = () => {
-    if (selectedServices.length === 0) return 1;
-    if (!selectedTherapist) return 2;
+    if (!hasAnyServiceSelection) return 1;
+    if (paxCount === 1 && !selectedTherapist) return 2;
     if (serviceLocation !== 'in_store' && !serviceAddress) return 3;
     if (!selectedDate || !selectedTime) return 4;
     if (!customerName || !customerPhone) return 5;
@@ -1738,6 +1902,95 @@ const BookingPage = () => {
               <p className="luxe-section-subtitle">Choose from our curated menu of treatments</p>
             </div>
 
+            {/* How many people? — defaults to 1, capped at 12 for self-service.
+                Larger groups should call the spa so we can stage rooms. The
+                stepper lives at the top of the Services section so the
+                customer answers it before picking services for everyone. */}
+            <div
+              className="booking-pax-stepper"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem',
+                padding: '0.85rem 1rem',
+                marginBottom: '1rem',
+                background: '#fafafa',
+                border: '1px solid #e5e7eb',
+                borderRadius: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1f2937' }}>How many people?</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
+                  Booking for a group? Pick up to 12 — we'll let each guest choose their own service.
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  aria-label="Decrease number of people"
+                  onClick={() => handlePaxCountChange(paxCount - 1)}
+                  disabled={paxCount <= 1}
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    border: '1px solid #d1d5db', background: '#fff',
+                    cursor: paxCount <= 1 ? 'not-allowed' : 'pointer',
+                    fontSize: '1.1rem', color: '#374151',
+                    opacity: paxCount <= 1 ? 0.5 : 1,
+                  }}
+                >−</button>
+                <input
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={paxCount}
+                  onChange={(e) => handlePaxCountChange(parseInt(e.target.value, 10))}
+                  onWheel={(e) => e.target.blur()}
+                  aria-label="Number of people"
+                  style={{
+                    width: 56, textAlign: 'center', padding: '0.4rem',
+                    border: '1px solid #d1d5db', borderRadius: 8, fontSize: '1rem',
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="Increase number of people"
+                  onClick={() => handlePaxCountChange(paxCount + 1)}
+                  disabled={paxCount >= 12}
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    border: '1px solid #d1d5db', background: '#fff',
+                    cursor: paxCount >= 12 ? 'not-allowed' : 'pointer',
+                    fontSize: '1.1rem', color: '#374151',
+                    opacity: paxCount >= 12 ? 0.5 : 1,
+                  }}
+                >+</button>
+              </div>
+            </div>
+
+            {/* Multi-guest: per-guest service + (optional) preferred therapist.
+                When paxCount > 1 the single-flow service grid below is replaced
+                by the PaxBuilder so each guest's pick is captured separately.
+                The Choose Therapist section a bit further down only applies to
+                single-guest bookings — we hide it when paxCount > 1. */}
+            {paxCount > 1 ? (
+              <div style={{ marginTop: '0.5rem' }}>
+                <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '0.75rem' }}>
+                  Pick a service (and optionally a preferred therapist) for each guest.
+                </p>
+                <PaxBuilder
+                  paxCount={paxCount}
+                  guests={guests}
+                  onChange={setGuests}
+                  services={paxServices}
+                  therapists={paxTherapists}
+                  mode="public"
+                />
+              </div>
+            ) : (
+            <>
             {/* Search & Filter */}
             <div className="booking-filters">
               <input
@@ -1862,6 +2115,8 @@ const BookingPage = () => {
                 </button>
               </div>
             )}
+            </>
+            )}
           </div>
 
           {/* Date & Time Selection */}
@@ -1968,8 +2223,10 @@ const BookingPage = () => {
               section stays visible (and Auto-Select remains reachable) even
               when the shift schedule filters every specific person out on the
               selected date. The Choose Preferred grid below handles an empty
-              availableTherapists with an inline message. */}
-          {therapists.length > 0 && selectedDate && !isDayClosed && (
+              availableTherapists with an inline message.
+              Hidden when paxCount > 1: each guest picks their own therapist
+              (or "No preference") inside the PaxBuilder above. */}
+          {paxCount === 1 && therapists.length > 0 && selectedDate && !isDayClosed && (
           <div id="section-therapist" className="booking-section luxe-section">
             <div className="luxe-section-header">
               <span className="luxe-section-accent" />
@@ -2443,7 +2700,7 @@ const BookingPage = () => {
             </div>
 
             <div className="floating-summary-panel-body">
-              {selectedServices.length === 0 ? (
+              {totalServiceCount === 0 ? (
                 <div className="luxe-summary-empty">
                   <div className="luxe-summary-empty-icon">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
@@ -2455,9 +2712,26 @@ const BookingPage = () => {
                 <div className="luxe-summary-content">
                   <div className="luxe-summary-grid">
                     <div className="luxe-summary-services">
-                      <h4 className="luxe-summary-label">Selected Services</h4>
+                      <h4 className="luxe-summary-label">
+                        {paxCount > 1 ? `Selected Services (${paxCount} guests)` : 'Selected Services'}
+                      </h4>
                       <div className="summary-items">
-                        {selectedServices.map(service => (
+                        {paxCount > 1 ? (
+                          (guestSummaryPreview || []).map(g => (
+                            <div key={g.guestNumber} className="summary-item" style={{ alignItems: 'flex-start' }}>
+                              <div className="item-info">
+                                <span className="item-name">
+                                  Guest {g.guestNumber}: {g.serviceName || <em style={{ color: '#94a3b8' }}>no service yet</em>}
+                                </span>
+                                {g.employeeName && (
+                                  <span className="item-duration">with {g.employeeName}</span>
+                                )}
+                              </div>
+                              <span className="item-price">₱{(g.price || 0).toLocaleString()}</span>
+                            </div>
+                          ))
+                        ) : (
+                          selectedServices.map(service => (
                           <div key={service.id} className="summary-item">
                             <div className="item-info">
                               <span className="item-name">{service.name}</span>
@@ -2474,7 +2748,8 @@ const BookingPage = () => {
                               ×
                             </button>
                           </div>
-                        ))}
+                          ))
+                        )}
                       </div>
                     </div>
 
@@ -2519,7 +2794,7 @@ const BookingPage = () => {
 
                   <div className="luxe-summary-totals">
                     <div className="luxe-total-row">
-                      <span>Services ({selectedServices.length})</span>
+                      <span>Services ({totalServiceCount})</span>
                       <span>₱{servicesTotal.toLocaleString()}</span>
                     </div>
                     {transportFee > 0 && (
@@ -2554,7 +2829,7 @@ const BookingPage = () => {
                   <button
                     className="submit-booking-btn"
                     onClick={handleSubmitBooking}
-                    disabled={submitting || selectedServices.length === 0 || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
+                    disabled={submitting || !hasAnyServiceSelection || !selectedDate || !selectedTime || !customerName || !customerPhone || customerPhone.replace(/\D/g, '').length !== 11}
                   >
                     {submitting ? 'Submitting...' : 'Confirm Booking'}
                   </button>
@@ -2581,15 +2856,17 @@ const BookingPage = () => {
           }}
         >
           <div className="floating-summary-left">
-            <span className="floating-summary-count">{selectedServices.length}</span>
+            <span className="floating-summary-count">{totalServiceCount}</span>
             <div className="floating-summary-labels">
               <span className="floating-summary-title">
-                {selectedServices.length === 0
+                {totalServiceCount === 0
                   ? 'Booking Summary'
-                  : `${selectedServices.length === 1 ? 'Service' : 'Services'} Selected`}
+                  : paxCount > 1
+                    ? `${paxCount} Guests · ${totalServiceCount} ${totalServiceCount === 1 ? 'Service' : 'Services'}`
+                    : `${totalServiceCount === 1 ? 'Service' : 'Services'} Selected`}
               </span>
               <span className="floating-summary-sub">
-                {selectedServices.length === 0
+                {totalServiceCount === 0
                   ? 'Choose treatments to get started'
                   : selectedDate && selectedTime
                     ? `${selectedTime} • ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`

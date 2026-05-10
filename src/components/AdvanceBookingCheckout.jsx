@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { sanitizePhoneInput, phoneInputProps } from '../utils/phoneInput';
+import PaxBuilder from './booking/PaxBuilder';
+
+// Default empty guest row used when paxCount grows or formData is reset.
+// Matches the shape PaxBuilder expects.
+const blankGuest = (n) => ({
+  guestNumber: n,
+  services: [],
+  employeeId: null,
+  isRequestedTherapist: false,
+});
 
 const AdvanceBookingCheckout = ({
   enabled,
@@ -9,6 +19,10 @@ const AdvanceBookingCheckout = ({
   employees,
   rooms,
   customers,
+  // Catalog data needed for the multi-pax editor (PaxBuilder). Optional —
+  // when omitted, the multi-pax UI degrades to empty service/therapist lists.
+  services = [],
+  therapists = [],
   // Shared customer state from parent
   customerType,
   onCustomerTypeChange,
@@ -26,7 +40,12 @@ const AdvanceBookingCheckout = ({
     isHomeService: false,
     specialRequests: '',
     clientNotes: '',
-    clientAddress: ''
+    clientAddress: '',
+    // Multi-pax state lives inside this component's formData. paxCount=1 keeps
+    // the single-pax flow (services + therapist still come from the outer
+    // POS cart + global picker). paxCount>1 shows a per-guest PaxBuilder.
+    paxCount: 1,
+    guests: [blankGuest(1)]
   });
 
   const [errors, setErrors] = useState({});
@@ -69,9 +88,55 @@ const AdvanceBookingCheckout = ({
         isHomeService: false,
         specialRequests: '',
         clientNotes: '',
-        clientAddress: ''
+        clientAddress: '',
+        paxCount: 1,
+        guests: [blankGuest(1)]
       });
       setErrors({});
+    }
+  };
+
+  // Resize the guests array to match a new paxCount, preserving existing
+  // per-guest selections where possible. Inline (no useEffect) to avoid an
+  // effect-driven feedback loop — same pattern as POS.handlePaxCountChange.
+  const handlePaxCountChange = (next) => {
+    const n = Math.max(1, Math.min(30, parseInt(next, 10) || 1));
+    setBookingData((prev) => {
+      const prevGuests = prev.guests || [];
+      const nextGuests = [];
+      for (let i = 0; i < n; i++) {
+        nextGuests.push(
+          prevGuests[i]
+            ? { ...prevGuests[i], guestNumber: i + 1 }
+            : blankGuest(i + 1)
+        );
+      }
+      const updated = { ...prev, paxCount: n, guests: nextGuests };
+      if (onChange) onChange(updated);
+      return updated;
+    });
+    // Clear the guests-related validation error when shape changes.
+    if (errors.guests) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.guests;
+        return newErrors;
+      });
+    }
+  };
+
+  const handleGuestsChange = (nextGuests) => {
+    setBookingData((prev) => {
+      const updated = { ...prev, guests: nextGuests };
+      if (onChange) onChange(updated);
+      return updated;
+    });
+    if (errors.guests) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.guests;
+        return newErrors;
+      });
     }
   };
 
@@ -137,6 +202,20 @@ const AdvanceBookingCheckout = ({
       }
     }
 
+    // Multi-pax: every guest row must have at least one service so we don't
+    // create a half-empty per-guest booking. Single-pax services come from the
+    // outer cart and are validated in POS.jsx.
+    if ((bookingData.paxCount || 1) > 1) {
+      const guestsList = bookingData.guests || [];
+      const missing = guestsList
+        .map((g, i) => ({ i: i + 1, count: (g.services || []).length }))
+        .filter((g) => g.count === 0)
+        .map((g) => g.i);
+      if (missing.length > 0) {
+        newErrors.guests = `Each guest must have at least one service (missing: Guest ${missing.join(', ')}).`;
+      }
+    }
+
     // Room validation is handled in POS.jsx
 
     setErrors(newErrors);
@@ -175,6 +254,52 @@ const AdvanceBookingCheckout = ({
       </label>
 
       <div className="advance-booking-form">
+        {/* Number of guests stepper — paxCount=1 keeps the single-pax flow
+            (services + therapist still come from the outer cart + global
+            picker). paxCount>1 swaps the per-guest editor in below. */}
+        <div className="form-section">
+          <div className="form-group">
+            <label htmlFor="advance-pax-count">Number of guests</label>
+            <input
+              id="advance-pax-count"
+              type="number"
+              min={1}
+              max={30}
+              value={bookingData.paxCount || 1}
+              onChange={(e) => handlePaxCountChange(e.target.value)}
+              style={{ maxWidth: 120 }}
+            />
+            {(bookingData.paxCount || 1) > 1 && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--gray-600)', marginTop: 'var(--spacing-xs)' }}>
+                Multi-pax booking — pick services and therapist for each guest below.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Multi-pax editor — replaces the single-service flow when paxCount>1.
+            Each guest gets their own services + (optional) requested therapist.
+            On paxCount===1 this section is hidden and the cashier uses the
+            outer cart + global therapist picker (no regression). */}
+        {(bookingData.paxCount || 1) > 1 && (
+          <div className="form-section">
+            <h4>Per-guest services & therapists</h4>
+            <PaxBuilder
+              mode="staff"
+              paxCount={bookingData.paxCount || 1}
+              guests={bookingData.guests || []}
+              onChange={handleGuestsChange}
+              services={services}
+              therapists={therapists}
+            />
+            {errors.guests && (
+              <span className="error-message" style={{ display: 'block', marginTop: 'var(--spacing-sm)' }}>
+                {errors.guests}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Client Information */}
         <div className="form-section">
           <h4>Client Information</h4>

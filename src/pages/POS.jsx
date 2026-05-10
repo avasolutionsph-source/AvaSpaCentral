@@ -888,18 +888,31 @@ const POS = () => {
 
       // If advance booking is enabled, create booking instead of transaction
       if (isAdvanceBooking && advanceBookingData) {
-        // Multi-pax advance booking is wired in Task 6.1 — block it here so a
-        // cashier can't half-create a booking with a single therapist field.
-        if (paxCount > 1) {
-          showToast('Multi-pax advance bookings are coming soon — switch to 1 guest or do a walk-in checkout.', 'error');
-          setCheckoutLoading(false);
-          return;
-        }
         // Basic validation - component handles detailed field validation with inline errors
         if (!advanceBookingData.bookingDateTime) {
           showToast('Please complete all required booking fields', 'error');
           setCheckoutLoading(false);
           return;
+        }
+
+        // Multi-pax advance booking — paxCount + per-guest service/therapist
+        // selections live inside advanceBookingData (managed by
+        // AdvanceBookingCheckout). For paxCount===1 the booking is built from
+        // the outer cart + global therapist (legacy flow, bit-for-bit).
+        const advPaxCount = advanceBookingData.paxCount || 1;
+        const advGuests = advanceBookingData.guests || [];
+        const isMultiPaxBooking = advPaxCount > 1;
+
+        if (isMultiPaxBooking) {
+          // Validate every guest has at least one service before we touch the
+          // database. AdvanceBookingCheckout's validate() also runs but this
+          // is a defensive belt-and-braces check.
+          const empty = advGuests.filter((g) => !(g.services || []).length);
+          if (empty.length > 0) {
+            showToast('Each guest must have at least one service.', 'error');
+            setCheckoutLoading(false);
+            return;
+          }
         }
 
         // Generate transaction ID (local date)
@@ -915,14 +928,54 @@ const POS = () => {
           roomName = room ? room.name : null;
         }
 
-        // Build service name from cart items
-        const serviceName = cart.map(item => item.name).join(' + ');
+        // Resolve booking items + display labels per pax mode.
+        // Multi-pax: flatten guests via the same helper used at checkout.
+        // Single-pax: keep the historical cart-based path verbatim.
+        const advCheckoutItems = isMultiPaxBooking
+          ? flattenGuestsToItems(advGuests)
+          : cart;
 
-        // Calculate total duration (estimated from cart items)
-        const estimatedDuration = cart.reduce((total, item) => {
-          // Assume services take 60 minutes each by default
-          return total + (item.type === 'service' ? 60 * item.quantity : 0);
-        }, 0);
+        // Service-name string for legacy compat. Multi-pax concatenates
+        // every guest row's services so the booking list shows what was
+        // booked at a glance; per-guest detail lives in guestSummary/services.
+        const serviceName = isMultiPaxBooking
+          ? advGuests
+              .map((g) => (g.services || []).map((s) => s.name).join(' + '))
+              .filter(Boolean)
+              .join(' | ')
+          : cart.map((item) => item.name).join(' + ');
+
+        // Total duration estimate. Multi-pax uses the actual service durations
+        // when available so room scheduling reflects the real party size.
+        // Single-pax keeps the old 60-min-per-service heuristic for back-compat.
+        const estimatedDuration = isMultiPaxBooking
+          ? advCheckoutItems.reduce(
+              (total, item) =>
+                total + ((item.type === 'service' && item.duration) ? item.duration : 60),
+              0
+            )
+          : cart.reduce((total, item) => {
+              return total + (item.type === 'service' ? 60 * item.quantity : 0);
+            }, 0);
+
+        // Legacy compat: top-level employeeId is the first guest's therapist
+        // for multi-pax (may be null when everyone is on auto-rotation), or
+        // the global selectedEmployee for single-pax.
+        const legacyEmployeeId = isMultiPaxBooking
+          ? (advGuests[0]?.employeeId || null)
+          : employee._id;
+        const legacyEmployee = legacyEmployeeId
+          ? employees.find((e) => e._id === legacyEmployeeId)
+          : null;
+        const legacyEmployeeName = legacyEmployee
+          ? `${legacyEmployee.firstName} ${legacyEmployee.lastName}`
+          : (isMultiPaxBooking ? null : `${employee.firstName} ${employee.lastName}`);
+
+        // Per-guest summary for reports/receipts. Built from flattened items
+        // so it stays in sync with the source-of-truth services list.
+        const advGuestSummary = isMultiPaxBooking
+          ? summarisePax(advCheckoutItems)
+          : null;
 
         // Use shared customer information
         let clientName, clientPhone, clientEmail, clientAddress;
@@ -943,8 +996,8 @@ const POS = () => {
         // Create advance booking (use consolidated room state)
         const bookingData = {
           bookingDateTime: advanceBookingData.bookingDateTime,
-          employeeId: employee._id,
-          employeeName: `${employee.firstName} ${employee.lastName}`,
+          employeeId: legacyEmployeeId,
+          employeeName: legacyEmployeeName,
           serviceName: serviceName,
           estimatedDuration: estimatedDuration || 60,
           servicePrice: getTotal(),
@@ -962,7 +1015,14 @@ const POS = () => {
           transactionId: transactionId,
           status: 'scheduled',
           specialRequests: advanceBookingData.specialRequests || null,
-          clientNotes: advanceBookingData.clientNotes || null
+          clientNotes: advanceBookingData.clientNotes || null,
+          // Multi-pax fields. paxCount + guestSummary mirror the structure used
+          // by the regular transaction path so reports/receipts render the same.
+          // services[] is the flattened per-guest items list (legacy bookings
+          // didn't carry one — single-pax falls back to the cart shape).
+          paxCount: advPaxCount,
+          guestSummary: advGuestSummary,
+          services: isMultiPaxBooking ? advCheckoutItems : cart
         };
 
         await mockApi.advanceBooking.createAdvanceBooking(bookingData);
@@ -1934,6 +1994,9 @@ const POS = () => {
                 employees={employees}
                 rooms={rooms}
                 customers={customers}
+                // Catalog data for the per-guest editor (PaxBuilder).
+                services={products.filter((p) => p.type === 'service')}
+                therapists={getTherapists(employees)}
                 // Shared customer state
                 customerType={customerType}
                 onCustomerTypeChange={setCustomerType}

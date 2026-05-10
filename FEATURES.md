@@ -11,6 +11,7 @@
 
 1. [Point of Sale (POS)](#1-point-of-sale-pos)
 2. [Advance Booking System](#2-advance-booking-system)
+2A. [Multi-Pax / Group Bookings](#2a-multi-pax--group-bookings)
 3. [Appointments Management](#3-appointments-management)
 4. [Service Hub & Rooms](#4-service-hub--rooms)
 5. [Products & Services](#5-products--services)
@@ -155,6 +156,43 @@ scheduled → in-progress → completed
 - Creates Home Service card in Service Hub
 - Tracked separately from room services
 - GPS tracking for therapist location (future)
+
+---
+
+## 2A. Multi-Pax / Group Bookings
+
+Group bookings let one transaction or appointment cover multiple guests, each with their own service(s) and (optionally) their own therapist. Available across POS, Appointments, Advance Bookings, and the public Online Booking site.
+
+### 2A.1 Pax Limits
+
+| Surface | Min Guests | Max Guests | Notes |
+|---------|:----------:|:----------:|-------|
+| Staff (POS / Appointments / Advance Booking) | 1 | 30 | Higher cap for walk-in groups |
+| Public Online Booking | 1 | 12 | Configurable in Settings |
+
+### 2A.2 Per-Guest Configuration
+- Each guest gets one or more services from the catalogue
+- Each guest can be assigned a specific therapist, OR left as "Auto" / "No preference"
+- Auto-rotation kicks in at checkout/check-in for any guest with no therapist picked, drawing from the same fair-queue used for single-pax bookings
+- Mixed assignments allowed (e.g. Guest 1 picks Maria, Guests 2-4 use auto-rotation)
+
+### 2A.3 Receipt Output
+- One receipt per transaction, divided into clearly labelled per-guest sections (Guest 1, Guest 2, ...)
+- Each section lists that guest's services, therapist, and per-guest subtotal
+- Transaction total, payment, and discount appear once at the bottom
+
+### 2A.4 Reports
+- "Guests served" KPI is reported separately from transaction count (a 4-pax booking = 1 transaction, 4 guests served)
+- Available on Daily, Weekly, and Monthly reports alongside revenue
+
+### 2A.5 Commission
+- Commission distributes per item to the therapist on `items[].employeeId` (per-guest)
+- A multi-pax transaction can pay 4 different therapists from a single ticket
+
+### 2A.6 Loyalty (Optional)
+- Settings toggle: "Multiply loyalty points by pax count"
+- When ON, a 4-pax booking earns 4x the points
+- When OFF (default), one booking earns one set of points regardless of pax count
 
 ---
 

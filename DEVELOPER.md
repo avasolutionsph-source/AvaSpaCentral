@@ -464,6 +464,31 @@ months.forEach(m => {
 
 ---
 
+## Multi-pax data model
+
+Group bookings let one Appointment / AdvanceBooking / Transaction / OnlineBooking cover N guests, each with their own service(s) and (optionally) therapist.
+
+### Schema additions
+- `paxCount` (integer, NOT NULL DEFAULT 1) on `appointments`, `advance_bookings`, `transactions`, `online_bookings` — total guests on the booking.
+- `guestNumber` (integer, default 1) on `TransactionItem` (and `active_services.guest_number`) — which guest the line item belongs to (1-based).
+- `guestSummary` (JSON) — denormalised per-guest breakdown stored on the parent record so reports/receipts can render without re-joining items. Shape: `[{ guestNumber, services: [...], therapistId, therapistName, subtotal }, ...]`.
+
+### Commission rule
+**`items[].employeeId` is authoritative for commission.** When present, payroll/reports attribute the commission to that employee. The top-level `transaction.employeeId` (and the older `transaction.employee` object) is a **legacy fallback only** — used for single-pax transactions written before the multi-pax rollout, or when an item somehow lacks its own `employeeId`. Never write new commission logic that reads `transaction.employeeId` first.
+
+### Helpers — `src/utils/booking/multiPax.js`
+- `expandToGuests(items)` — groups a flat `items[]` array by `guestNumber` into `[{ guestNumber, items: [...] }, ...]`.
+- `summarisePax(items)` — produces the `guestSummary` JSON shape for denormalisation.
+- `computeMultiPaxTotal(items)` — sums per-guest subtotals into the booking total.
+
+### Reusable component — `src/components/booking/PaxBuilder.jsx`
+`<PaxBuilder mode="staff" | "public" guests={...} onChange={...} />` — controlled multi-guest editor used in POS, Appointments, Advance Booking, and the public booking site. `mode="staff"` allows up to 30 pax and exposes therapist pickers; `mode="public"` caps at 12 pax (configurable) and renders therapist as "No preference" by default.
+
+### Backward compatibility
+Legacy single-pax records (written before the schema migration) read transparently as `paxCount = 1, guestNumber = 1` everywhere. The migration sets defaults via `NOT NULL DEFAULT 1`; the verification script at `scripts/backfill-pax-count.sql` is a defensive idempotent re-run.
+
+---
+
 ## File Locations
 
 | Feature | File |

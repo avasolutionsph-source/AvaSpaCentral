@@ -18,6 +18,7 @@ import {
   restInsert,
   restUpdateById,
   restSoftDeleteById,
+  restSelect,
 } from '../brandingService';
 
 /**
@@ -1937,27 +1938,26 @@ class SupabaseSyncManager {
         const metadata = await db.syncMetadata.get(entityType);
         const since = metadata?.lastSyncTimestamp;
 
-        // Build query
-        let query = supabase
-          .from(tableName)
-          .select('*');
+        // Use raw fetch (restSelect) instead of supabase-js. The js client
+        // serialises every REST call behind its internal auth-refresh lock;
+        // when that lock hangs (observed on cross-device login: every pull
+        // times out at 15s while raw fetch to the same project responds in
+        // <500ms) the whole pull cycle stalls. Raw fetch sidesteps the lock
+        // entirely — same pattern as restInsert/restUpdateById on the push
+        // side. AbortController inside restSelect enforces the 15s cap.
+        const idColumn = entityType === 'business' ? 'id' : 'business_id';
+        const buildQuery = (includeSince) => {
+          const parts = [
+            `${idColumn}=eq.${encodeURIComponent(businessId)}`,
+            'select=*',
+          ];
+          if (includeSince && since) {
+            parts.push(`updated_at=gt.${encodeURIComponent(since)}`);
+          }
+          return '?' + parts.join('&');
+        };
 
-        // Special case: businesses table uses 'id' not 'business_id'
-        if (entityType === 'business') {
-          query = query.eq('id', businessId);
-        } else {
-          query = query.eq('business_id', businessId);
-        }
-
-        // Only get updates since last sync (incremental sync)
-        if (since) {
-          query = query.gt('updated_at', since);
-        }
-
-        // Cap the read at 15s. If supabase-js stalls on the auth-refresh
-        // queue (same hang that affects writes), the timeout lets us move
-        // on to the next entity instead of stalling the whole pull cycle.
-        let { data, error } = await withTimeout(query, 15000, `PULL ${tableName}`);
+        let { data, error } = await restSelect(tableName, buildQuery(true), 15000);
 
         if (error) {
           // Table might not exist yet, skip silently
@@ -1965,23 +1965,16 @@ class SupabaseSyncManager {
             continue;
           }
           // Column 'updated_at' doesn't exist - retry without the timestamp filter
-          if (error.message?.includes('updated_at') || error.code === '42703') {
+          if (error.code === '42703' || error.message?.includes('updated_at')) {
             console.warn(`[SupabaseSyncManager] Table ${tableName} missing updated_at column, pulling all records`);
-            // Retry query without the updated_at filter
-            let retryQuery = supabase.from(tableName).select('*');
-            if (entityType === 'business') {
-              retryQuery = retryQuery.eq('id', businessId);
-            } else {
-              retryQuery = retryQuery.eq('business_id', businessId);
-            }
-            const retryResult = await withTimeout(retryQuery, 15000, `PULL ${tableName} (retry)`);
+            const retryResult = await restSelect(tableName, buildQuery(false), 15000);
             if (retryResult.error) {
-              throw retryResult.error;
+              throw new Error(retryResult.error.message);
             }
             data = retryResult.data;
             error = null;
           } else {
-            throw error;
+            throw new Error(error.message);
           }
         }
 

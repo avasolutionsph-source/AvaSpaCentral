@@ -561,3 +561,57 @@ export async function restSoftDeleteById(tableName, id) {
     );
   }
 }
+
+/**
+ * Read rows via direct REST. Used by SupabaseSyncManager pulls so the read
+ * path bypasses the supabase-js client whose internal lock can stall the
+ * entire pull cycle behind a stuck auth refresh (the same hang that affects
+ * writes — manifests on cross-device login as 15s pull timeouts on every
+ * table even though raw fetch to the same project responds in <500ms).
+ *
+ * @param {string} tableName - snake_case Supabase table
+ * @param {string} queryString - PostgREST query, must start with '?'
+ *   (e.g. '?business_id=eq.UUID&select=*')
+ * @param {number} [timeoutMs=15000]
+ * @returns {Promise<{ data: Array | null, error: { message: string, code?: string, status?: number } | null }>}
+ *   Mirrors the supabase-js shape so callers can switch with minimal change.
+ */
+export async function restSelect(tableName, queryString, timeoutMs = 15000) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return { data: null, error: { message: 'Supabase not configured' } };
+  }
+  const accessToken = getAccessTokenSync();
+  try {
+    const res = await fetchWithTimeout(
+      `${SUPABASE_URL}/rest/v1/${tableName}${queryString || ''}`,
+      {
+        method: 'GET',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+      timeoutMs,
+    );
+    if (!res.ok) {
+      let bodyText = '';
+      try { bodyText = await res.text(); } catch {}
+      let code;
+      try { code = JSON.parse(bodyText)?.code; } catch {}
+      return {
+        data: null,
+        error: { message: bodyText || res.statusText, code, status: res.status },
+      };
+    }
+    const data = await res.json();
+    return { data, error: null };
+  } catch (err) {
+    const isAbort = err?.name === 'AbortError';
+    return {
+      data: null,
+      error: {
+        message: isAbort ? `Request aborted after ${timeoutMs}ms` : (err?.message || 'fetch failed'),
+      },
+    };
+  }
+}

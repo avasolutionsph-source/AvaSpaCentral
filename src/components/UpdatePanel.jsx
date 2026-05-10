@@ -1,19 +1,28 @@
 import React, { useState } from 'react';
+import { db } from '../db';
 
 /**
- * Single-button PWA updater. Used by both the public /update recovery
- * page and the in-app /app-update page.
+ * Single-button PWA updater + sync-recovery. Used by both the public
+ * /update recovery page and the in-app /app-update page. One click does
+ * everything a non-technical user might need to recover from a stuck app:
  *
- * One click pulls the latest build by:
- *   1. Clearing the Cache Storage API entries (workbox precache + runtime
- *      caches) so stale assets aren't served.
- *   2. Unregistering the service worker so the next page load fetches a
- *      fresh sw.js and re-installs.
- *   3. Reloading with a cache-busting query param so the HTML/JS round-
- *      trip skips the HTTP cache too.
+ *   1. Clear Cache Storage API entries (workbox precache + runtime caches)
+ *      so stale assets aren't served.
+ *   2. Unregister the service worker so the next load fetches a fresh
+ *      sw.js and re-installs.
+ *   3. Reset stuck sync-queue items (anything left as 'processing' from a
+ *      previous interrupted run, plus 'failed' items so they retry).
+ *      Pending writes are preserved and still get pushed after reload.
+ *   4. Clear sync metadata (last-pull timestamps) so the next sync after
+ *      reload re-pulls every table from cloud — fixes the "no data after
+ *      cross-device login" symptom without touching local records.
+ *   5. Reload with a cache-busting query param so the HTML/JS round-trip
+ *      skips the HTTP cache too.
  *
- * IndexedDB (Dexie) is intentionally NOT cleared — local offline records
- * and the pending sync queue must survive the update.
+ * IndexedDB row data (Dexie tables) is intentionally NOT cleared — local
+ * offline records and the pending sync queue must survive the update.
+ * Only sync bookkeeping (queue status flags + metadata timestamps) is
+ * touched, which is non-destructive.
  */
 
 const STATUS = {
@@ -71,9 +80,46 @@ export default function UpdatePanel() {
       return;
     }
 
+    // Best-effort sync recovery. Non-fatal — if Dexie isn't available
+    // (e.g. private mode, very early load on /update before the app boots)
+    // we still want the cache/SW reset and the reload to proceed.
+    try {
+      await resetStuckSyncState();
+    } catch (err) {
+      console.warn('[UpdatePanel] Sync recovery skipped:', err?.message || err);
+    }
+
     setMessage('Reloading…');
     markPostUpdateFlag();
     reloadWithCacheBust();
+  }
+
+  async function resetStuckSyncState() {
+    if (!db?.syncQueue || !db?.syncMetadata) return;
+
+    // Move 'processing' items back to 'pending' — these were mid-flight
+    // when the app last died/froze and would otherwise sit forever.
+    // Also revive 'failed' items so the next sync gives them a fresh try.
+    const stuck = await db.syncQueue
+      .filter((item) => item.status === 'processing' || item.status === 'failed' || item.status === 'parked')
+      .toArray();
+    for (const item of stuck) {
+      await db.syncQueue.update(item.id, {
+        status: 'pending',
+        retryCount: 0,
+        nextRetryAt: null,
+      });
+    }
+    if (stuck.length > 0) {
+      console.log(`[UpdatePanel] Revived ${stuck.length} stuck sync queue items`);
+    }
+
+    // Wiping sync metadata makes the next _pullChanges treat every table
+    // as "never synced", so it pulls the full server state. Local rows
+    // with pending writes are protected by the pending-id check inside
+    // _pullChanges, so this is safe.
+    await db.syncMetadata.clear();
+    console.log('[UpdatePanel] Cleared sync metadata - next sync will pull all tables from cloud');
   }
 
   function markPostUpdateFlag() {
@@ -124,8 +170,8 @@ export default function UpdatePanel() {
       </button>
 
       <p style={styles.hint}>
-        Pulls the latest version and clears cached files, then reloads.
-        Your offline records and pending sync queue stay intact.
+        Pulls the latest version, clears cached files, and refreshes data
+        from the cloud. Your offline records and pending uploads stay intact.
       </p>
     </div>
   );

@@ -101,6 +101,17 @@ export interface TransactionItem {
   price: number;
   subtotal: number;
   employeeId?: string;
+  /** Per-guest assignment for multi-pax bookings. Omitted = 1. */
+  guestNumber?: number;
+}
+
+// Per-guest summary for multi-pax bookings/transactions
+export interface GuestSummary {
+  guestNumber: number;
+  serviceName: string;
+  employeeId?: string;
+  employeeName?: string;
+  price: number;
 }
 
 // Transaction entity
@@ -137,6 +148,10 @@ export interface Transaction extends BaseEntity {
   notes?: string;
   branchId?: string;
   paymentIntentId?: string;
+  /** Number of guests in this transaction (default 1). */
+  paxCount?: number;
+  /** Per-guest denormalized summary for multi-pax transactions. */
+  guestSummary?: GuestSummary[];
 }
 
 // Payment intent (NextPay QRPh / bank transfer)
@@ -170,6 +185,10 @@ export interface Appointment extends BaseEntity {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
   notes?: string;
   branchId?: string;
+  /** Number of guests in this appointment (default 1). */
+  paxCount?: number;
+  /** Per-guest denormalized summary for multi-pax appointments. */
+  guestSummary?: GuestSummary[];
 }
 
 // Room entity

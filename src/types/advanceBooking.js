@@ -41,6 +41,8 @@
  * @property {string|null} [actualEndTime] - ISO datetime when service actually ended
  * @property {string} createdAt - ISO datetime when booking was created
  * @property {string} updatedAt - ISO datetime when booking was last updated
+ * @property {number} [paxCount] - Number of guests (default 1)
+ * @property {Array<{guestNumber:number, serviceName:string, employeeId?:string, employeeName?:string, price:number}>} [guestSummary] - Per-guest denorm summary
  */
 
 /**

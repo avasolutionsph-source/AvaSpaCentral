@@ -89,13 +89,40 @@ class AppointmentRepository extends BaseRepository {
 
   /**
    * Check for scheduling conflicts
+   *
+   * Dual signature:
+   *   Legacy positional: checkConflicts(employeeId, roomId, scheduledDateTime, duration, excludeId)
+   *   Options object:    checkConflicts({ employeeIds, roomIds, scheduledDateTime, duration, excludeId })
+   *
+   * Returned conflict objects include a `reason` field of the form
+   * `"therapist:<empId>"` or `"room:<roomId>"` so the UI can pinpoint the clash.
    */
-  async checkConflicts(employeeId, roomId, scheduledDateTime, duration, excludeId = null) {
-    const startTime = new Date(scheduledDateTime);
-    const endTime = new Date(startTime.getTime() + duration * 60000);
+  async checkConflicts(arg1, roomIdOrUndefined, scheduledDateTime, duration, excludeId = null) {
+    // Detect options-object signature vs legacy positional
+    const isOptions = arg1 && typeof arg1 === 'object' && !Array.isArray(arg1);
+    const opts = isOptions
+      ? {
+          employeeIds: arg1.employeeIds || [],
+          roomIds: arg1.roomIds || [],
+          scheduledDateTime: arg1.scheduledDateTime,
+          duration: arg1.duration,
+          excludeId: arg1.excludeId || null,
+        }
+      : {
+          employeeIds: arg1 ? [arg1] : [],
+          roomIds: roomIdOrUndefined ? [roomIdOrUndefined] : [],
+          scheduledDateTime,
+          duration,
+          excludeId,
+        };
 
-    const appointments = await this.find(a => {
-      if (excludeId && a._id === excludeId) return false;
+    const startTime = new Date(opts.scheduledDateTime);
+    const endTime = new Date(startTime.getTime() + (opts.duration || 60) * 60000);
+    const empSet = new Set(opts.employeeIds);
+    const roomSet = new Set(opts.roomIds);
+
+    const candidates = await this.find(a => {
+      if (opts.excludeId && a._id === opts.excludeId) return false;
       if (a.status === 'cancelled') return false;
 
       const aStart = new Date(a.scheduledDateTime);
@@ -105,11 +132,15 @@ class AppointmentRepository extends BaseRepository {
       const timeOverlap = startTime < aEnd && endTime > aStart;
       if (!timeOverlap) return false;
 
-      // Check resource conflict
-      return a.employeeId === employeeId || a.roomId === roomId;
+      // Check resource conflict against any requested employee or room
+      return empSet.has(a.employeeId) || roomSet.has(a.roomId);
     });
 
-    return appointments;
+    // Annotate each conflict with a reason (employee match wins over room match)
+    return candidates.map(a => ({
+      ...a,
+      reason: empSet.has(a.employeeId) ? `therapist:${a.employeeId}` : `room:${a.roomId}`,
+    }));
   }
 }
 

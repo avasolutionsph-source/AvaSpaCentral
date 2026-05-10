@@ -242,6 +242,11 @@ const Reports = ({ embedded = false }) => {
     // If no item-level breakdown data is available, show zeros instead of fake estimates
     // (revenue breakdown will be empty until transactions have item.type data)
 
+    // Guests served — sum of paxCount per transaction (defaults to 1 for legacy
+     // single-pax rows). Distinct from transactionCount: a 3-pax booking is
+     // 1 transaction but 3 guests.
+    const guestCount = txns.reduce((s, t) => s + (t.paxCount || 1), 0);
+
     return {
       totalRevenue,
       totalExpenses,
@@ -249,6 +254,7 @@ const Reports = ({ embedded = false }) => {
       margin: safeMargin.toFixed(2),
       avgTransaction: txns.length > 0 ? (totalRevenue / txns.length) : 0,
       transactionCount: txns.length,
+      guestCount,
       revenueByDay,
       revenueByPaymentMethod,
       topServices: calculateTopServices(txns),
@@ -292,15 +298,29 @@ const Reports = ({ embedded = false }) => {
     const roomUtilization = {};
     rooms.forEach(room => {
       const roomBookings = advBookings.filter(b => b.roomId === room._id);
+      // Seat-minutes: each booking occupies the room for estimatedDuration
+      // minutes per guest. A 3-pax 60-min booking is 180 seat-minutes (3 chairs
+      // for 60 min), not 60. Falls back to 60 min when duration is missing.
+      const seatMinutes = roomBookings.reduce(
+        (s, b) => s + ((b.estimatedDuration || 60) * (b.paxCount || 1)),
+        0,
+      );
       roomUtilization[room.name] = {
         name: room.name,
         bookings: roomBookings.length,
+        seatMinutes,
         utilization: Math.min(100, (roomBookings.length / Math.max(1, differenceInDays(new Date(endDate), new Date(startDate)))) * 10)
       };
     });
 
+    // Total guests across the period — counts paxCount on transactions plus
+    // paxCount on advance bookings that haven't yet been rung up at POS.
+    const txnGuests = txns.reduce((s, t) => s + (t.paxCount || 1), 0);
+    const bookingGuests = advBookings.reduce((s, b) => s + (b.paxCount || 1), 0);
+
     return {
       totalAppointments: appts.length + advBookings.length,
+      totalGuests: txnGuests + bookingGuests,
       completedServices: txns.reduce((sum, t) => sum + (t.items?.length || 0), 0),
       servicePerformance: Object.values(servicePerformance).sort((a, b) => b.revenue - a.revenue),
       roomUtilization: Object.values(roomUtilization),
@@ -703,6 +723,7 @@ const Reports = ({ embedded = false }) => {
       const summaryData = [];
       if (reportData.totalRevenue) summaryData.push(['Total Revenue', `₱${(reportData.totalRevenue || 0).toLocaleString()}`]);
       if (reportData.transactionCount) summaryData.push(['Transactions', reportData.transactionCount || 0]);
+      if (reportData.guestCount) summaryData.push(['Guests Served', reportData.guestCount || 0]);
       if (reportData.avgTransaction) summaryData.push(['Avg Transaction', `₱${(reportData.avgTransaction || 0).toLocaleString()}`]);
 
       if (summaryData.length > 0) {
@@ -742,12 +763,27 @@ const Reports = ({ embedded = false }) => {
 
     csv += `${reportName}\nPeriod: ${startDate} to ${endDate}\n\n`;
 
+    // Transactions filtered to the report's date range — used to append
+    // transaction-level and item-level breakdowns (with Pax / Guest # columns)
+    // to the existing summary CSVs without disturbing prior column order.
+    const txnsForExport = filterByDateRange(transactions, 'createdAt');
+
+    // Helper: escape a value for CSV. Wraps in quotes when needed and doubles
+    // any embedded quotes per RFC 4180.
+    const csvCell = (v) => {
+      if (v == null) return '';
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
     if (selectedCategory === 'financial' && selectedReport === 'pl') {
       csv += 'Category,Amount\n';
       csv += `Total Revenue,₱${(reportData.totalRevenue || 0).toLocaleString()}\n`;
       csv += `Total Expenses,₱${(reportData.totalExpenses || 0).toLocaleString()}\n`;
       csv += `Net Profit,₱${(reportData.profit || 0).toLocaleString()}\n`;
       csv += `Profit Margin,${reportData.margin || 0}%\n`;
+      csv += `Transactions,${reportData.transactionCount || 0}\n`;
+      csv += `Guests Served,${reportData.guestCount || 0}\n`;
     } else if (selectedCategory === 'employee' && selectedReport === 'performance') {
       csv += 'Employee,Role,Services,Revenue,Commission,Rating,Attendance\n';
       reportData.employeePerformance?.forEach(emp => {
@@ -757,6 +793,56 @@ const Reports = ({ embedded = false }) => {
       csv += 'Customer,Visits,Total Spent,Last Visit\n';
       reportData.topCustomers?.forEach(c => {
         csv += `"${c.name}",${c.visits || 0},₱${(c.spent || 0).toLocaleString()},"${format(new Date(c.lastVisit), 'yyyy-MM-dd')}"\n`;
+      });
+    }
+
+    // --- Transaction-level breakdown (appended to every CSV) ---------------
+    // One row per transaction. Pax column at the end keeps existing spreadsheet
+    // imports working — new column is purely additive.
+    if (txnsForExport.length > 0) {
+      csv += `\nTransactions\n`;
+      csv += 'Receipt #,Date,Customer,Payment Method,Total,Pax\n';
+      txnsForExport.forEach(t => {
+        const receipt = t.receiptNumber || t.id || t._id || '';
+        const date = t.createdAt || t.date
+          ? format(new Date(t.createdAt || t.date), 'yyyy-MM-dd HH:mm')
+          : '';
+        const customer = t.customer?.name || t.customerName || 'Walk-in';
+        const method = t.paymentMethod || '';
+        const total = (t.totalAmount || t.total || 0);
+        const pax = t.paxCount || 1;
+        csv += [
+          csvCell(receipt),
+          csvCell(date),
+          csvCell(customer),
+          csvCell(method),
+          `₱${total.toLocaleString()}`,
+          pax,
+        ].join(',') + '\n';
+      });
+
+      // --- Item-level breakdown ---------------------------------------------
+      // One row per line item. Guest # at the end identifies which guest in a
+      // multi-pax booking ordered the item (defaults to 1 for legacy items).
+      csv += `\nLine Items\n`;
+      csv += 'Receipt #,Item,Type,Quantity,Unit Price,Subtotal,Guest #\n';
+      txnsForExport.forEach(t => {
+        const receipt = t.receiptNumber || t.id || t._id || '';
+        (t.items || []).forEach(item => {
+          const qty = item.quantity || 1;
+          const price = item.price || 0;
+          const subtotal = item.subtotal || price * qty;
+          const guestNum = item.guestNumber || 1;
+          csv += [
+            csvCell(receipt),
+            csvCell(item.name || ''),
+            csvCell(item.type || ''),
+            qty,
+            `₱${price.toLocaleString()}`,
+            `₱${subtotal.toLocaleString()}`,
+            guestNum,
+          ].join(',') + '\n';
+        });
       });
     }
 
@@ -880,8 +966,18 @@ const Reports = ({ embedded = false }) => {
               <div className="financial-label">Total Revenue</div>
               <div className="financial-value positive">₱{(reportData.totalRevenue || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
               <div className="financial-meta">
-                {reportData.transactionCount || 0} transactions
+                Transactions: {reportData.transactionCount || 0} · Guests served: {reportData.guestCount || 0}
               </div>
+            </div>
+            <div className="financial-card">
+              <div className="financial-label">Transactions</div>
+              <div className="financial-value">{reportData.transactionCount || 0}</div>
+              <div className="financial-meta">Receipts rung up</div>
+            </div>
+            <div className="financial-card">
+              <div className="financial-label">Guests Served</div>
+              <div className="financial-value">{reportData.guestCount || 0}</div>
+              <div className="financial-meta">Total pax across all bookings</div>
             </div>
             <div className="financial-card">
               <div className="financial-label">Average Transaction</div>
@@ -1305,6 +1401,7 @@ const Reports = ({ embedded = false }) => {
                 <tr>
                   <th>Room</th>
                   <th className="right">Bookings</th>
+                  <th className="right">Seat-minutes</th>
                   <th className="right">Utilization</th>
                   <th>Status</th>
                 </tr>
@@ -1314,6 +1411,7 @@ const Reports = ({ embedded = false }) => {
                   <tr key={index}>
                     <td>{room.name}</td>
                     <td className="right">{room.bookings}</td>
+                    <td className="right">{(room.seatMinutes || 0).toLocaleString()}</td>
                     <td className="right">{(room.utilization || 0).toFixed(1)}%</td>
                     <td>
                       <span className={`utilization-badge ${room.utilization > 80 ? 'high' : room.utilization > 50 ? 'medium' : 'low'}`}>
@@ -1472,6 +1570,7 @@ const Reports = ({ embedded = false }) => {
           dayName: format(current, 'EEE'),
           revenue: 0,
           transactions: 0,
+          guests: 0,
           services: 0,
           avgTicket: 0
         };
@@ -1484,6 +1583,7 @@ const Reports = ({ embedded = false }) => {
         if (dayData[txDate]) {
           dayData[txDate].revenue += (t.totalAmount || t.total || 0);
           dayData[txDate].transactions += 1;
+          dayData[txDate].guests = (dayData[txDate].guests || 0) + (t.paxCount || 1);
           dayData[txDate].services += t.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1;
         }
       });
@@ -1496,6 +1596,7 @@ const Reports = ({ embedded = false }) => {
       const dailyData = Object.values(dayData).slice(-14); // Last 14 days
       const totalRevenue = dailyData.reduce((sum, d) => sum + d.revenue, 0);
       const totalTransactions = dailyData.reduce((sum, d) => sum + d.transactions, 0);
+      const totalGuests = dailyData.reduce((sum, d) => sum + (d.guests || 0), 0);
       const totalServices = dailyData.reduce((sum, d) => sum + d.services, 0);
       const avgDailyRevenue = dailyData.length > 0 ? totalRevenue / dailyData.length : 0;
 
@@ -1541,7 +1642,12 @@ const Reports = ({ embedded = false }) => {
             <div className="ops-card">
               <div className="ops-icon">🧾</div>
               <div className="ops-value">{totalTransactions}</div>
-              <div className="ops-label">Total Transactions</div>
+              <div className="ops-label">Transactions</div>
+            </div>
+            <div className="ops-card">
+              <div className="ops-icon">👥</div>
+              <div className="ops-value">{totalGuests}</div>
+              <div className="ops-label">Guests Served</div>
             </div>
             <div className="ops-card">
               <div className="ops-icon">✅</div>
@@ -1596,6 +1702,7 @@ const Reports = ({ embedded = false }) => {
                   <th>Day</th>
                   <th className="right">Revenue</th>
                   <th className="right">Transactions</th>
+                  <th className="right">Guests</th>
                   <th className="right">Services</th>
                   <th className="right">Avg Ticket</th>
                   <th>Performance</th>
@@ -1608,6 +1715,7 @@ const Reports = ({ embedded = false }) => {
                     <td>{day.dayName}</td>
                     <td className="right highlight">₱{day.revenue.toLocaleString()}</td>
                     <td className="right">{day.transactions}</td>
+                    <td className="right">{day.guests || 0}</td>
                     <td className="right">{day.services}</td>
                     <td className="right">₱{day.avgTicket.toLocaleString()}</td>
                     <td>
@@ -1623,6 +1731,7 @@ const Reports = ({ embedded = false }) => {
                   <td colSpan="2"><strong>Total</strong></td>
                   <td className="right"><strong>₱{totalRevenue.toLocaleString()}</strong></td>
                   <td className="right"><strong>{totalTransactions}</strong></td>
+                  <td className="right"><strong>{totalGuests}</strong></td>
                   <td className="right"><strong>{totalServices}</strong></td>
                   <td className="right"><strong>₱{(totalTransactions > 0 ? totalRevenue / totalTransactions : 0).toLocaleString()}</strong></td>
                   <td></td>
@@ -1641,6 +1750,11 @@ const Reports = ({ embedded = false }) => {
             <div className="ops-icon">📅</div>
             <div className="ops-value">{reportData.totalAppointments}</div>
             <div className="ops-label">Total Appointments</div>
+          </div>
+          <div className="ops-card">
+            <div className="ops-icon">👥</div>
+            <div className="ops-value">{reportData.totalGuests || 0}</div>
+            <div className="ops-label">Guests Served</div>
           </div>
           <div className="ops-card">
             <div className="ops-icon">✅</div>

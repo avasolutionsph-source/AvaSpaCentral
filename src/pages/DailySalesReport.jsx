@@ -367,6 +367,11 @@ const DailySalesReport = () => {
     const endingCashExpected = beginningCash + cashSales - totalExpenses - totalAdvances;
 
     const totalClients = completed.length;
+    // Guests served — sum of paxCount per transaction (defaults to 1 for legacy
+    // single-pax rows). Distinct from totalClients (= receipt count): a 3-pax
+    // booking is 1 receipt but 3 guests served. Avg ticket stays per-receipt
+    // so it remains comparable to historical numbers.
+    const guestsServed = completed.reduce((s, t) => s + (t.paxCount || 1), 0);
     const avgTicket = totalClients > 0 ? netSales / totalClients : 0;
     const activeTherapists = employees.filter(e => e.status === 'active').length;
     const therapistsWithSales = empMap.size;
@@ -392,7 +397,7 @@ const DailySalesReport = () => {
       expenseRows, totalExpenses,
       advanceRows, totalAdvances,
       beginningCash, cashSales, endingCashActual, endingCashExpected,
-      totalClients, avgTicket, utilization, peakHoursLabel,
+      totalClients, guestsServed, avgTicket, utilization, peakHoursLabel,
       walkIns, booked,
     };
   }, [transactions, expenses, cashAdvances, cashSessions, employees, inRange]);
@@ -580,7 +585,8 @@ const SavedReportsList = ({ items, onView, onDelete, currentUser }) => {
             <th>Saved</th>
             <th>Saved By</th>
             <th className="right">Net Sales</th>
-            <th className="right">Clients</th>
+            <th className="right">Transactions</th>
+            <th className="right">Guests</th>
             <th />
           </tr>
         </thead>
@@ -598,6 +604,7 @@ const SavedReportsList = ({ items, onView, onDelete, currentUser }) => {
               <td className="dsr-small">{r.saved_by_name || r.savedBy || '—'}</td>
               <td className="right">{peso(r.data?.netSales)}</td>
               <td className="right">{num(r.data?.totalClients)}</td>
+              <td className="right">{num(r.data?.guestsServed ?? r.data?.totalClients)}</td>
               <td className="right">
                 <button className="dsr-link-btn" onClick={() => onView(r)}>View</button>
                 {(r.saved_by_user_id === currentUser?.id || currentUser?.role === 'Owner') && (
@@ -844,7 +851,8 @@ const ReportSheet = ({ data, manual, periodLabel, branchName, showShift, readOnl
       <section className="dsr-section">
         <h2>9. KPI Dashboard</h2>
         <div className="dsr-kpi-grid">
-          <Kpi label="Total Clients" value={num(data.totalClients)} tone={kpiClass(data.totalClients, { goodAbove: 10, warnAbove: 3 })} />
+          <Kpi label="Transactions" value={num(data.totalClients)} tone={kpiClass(data.totalClients, { goodAbove: 10, warnAbove: 3 })} />
+          <Kpi label="Guests Served" value={num(data.guestsServed ?? data.totalClients)} tone={kpiClass(data.guestsServed ?? data.totalClients, { goodAbove: 15, warnAbove: 5 })} />
           <Kpi label="Average Ticket" value={peso(data.avgTicket)} tone={kpiClass(data.avgTicket, { goodAbove: 600, warnAbove: 300 })} />
           <Kpi label="Therapist Utilization" value={`${(data.utilization || 0).toFixed(0)}%`} tone={kpiClass(data.utilization, { goodAbove: 70, warnAbove: 40 })} />
           <Kpi label="Peak Hours" value={data.peakHoursLabel} tone="good" />

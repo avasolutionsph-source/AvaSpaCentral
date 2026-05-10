@@ -1,10 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 
 const HIDDEN_STATUSES = ['completed', 'cancelled', 'no_show'];
+
+const PHP = new Intl.NumberFormat('en-PH', {
+  style: 'currency',
+  currency: 'PHP',
+  minimumFractionDigits: 2,
+});
+const formatPHP = (n) => PHP.format(Number(n ?? 0));
+
+function safeFormat(iso, fmt) {
+  if (!iso) return '—';
+  try { return format(parseISO(iso), fmt); } catch { return '—'; }
+}
+
+function stop(e) { e.stopPropagation(); }
 
 export default function RiderBookings() {
   const { user, showToast } = useApp();
@@ -14,6 +28,12 @@ export default function RiderBookings() {
   // doesn't flicker back to the spinner every time advanceBookings changes.
   const [refreshing, setRefreshing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState(null);
+
+  const selectedBooking = useMemo(
+    () => bookings.find(b => b.id === selectedBookingId) || null,
+    [bookings, selectedBookingId]
+  );
 
   const load = useCallback(async (isInitial = false) => {
     if (!user?.employeeId) { setBookings([]); setLoading(false); return; }
@@ -43,6 +63,22 @@ export default function RiderBookings() {
     return () => unsub();
   }, [load]);
 
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!selectedBooking) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setSelectedBookingId(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selectedBooking]);
+
+  const openCard = (id) => setSelectedBookingId(id);
+  const cardKeyDown = (e, id) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openCard(id);
+    }
+  };
+
   if (loading) return <div className="page-loading"><div className="spinner" /><p>Loading…</p></div>;
 
   return (
@@ -66,14 +102,22 @@ export default function RiderBookings() {
       ) : (
         <div className="rider-bookings-grid">
           {bookings.map(b => (
-            <div key={b.id} className={`rider-booking-card status-${b.status}`}>
+            <div
+              key={b.id}
+              className={`rider-booking-card status-${b.status}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => openCard(b.id)}
+              onKeyDown={(e) => cardKeyDown(e, b.id)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="rider-booking-time">{format(parseISO(b.bookingDateTime), 'MMM d, h:mm a')}</div>
               <div className="rider-booking-service">{b.serviceName}</div>
               <div className="rider-booking-status">{b.status.replaceAll('-', ' ')}</div>
               <div className="rider-booking-client">
                 <div className="rider-booking-name">{b.clientName}</div>
                 {b.clientPhone && (
-                  <a className="rider-booking-phone" href={`tel:${b.clientPhone}`}>{b.clientPhone}</a>
+                  <a className="rider-booking-phone" href={`tel:${b.clientPhone}`} onClick={stop}>{b.clientPhone}</a>
                 )}
               </div>
               {b.clientAddress && (
@@ -83,6 +127,7 @@ export default function RiderBookings() {
                     className="btn btn-secondary btn-sm"
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.clientAddress)}`}
                     target="_blank" rel="noopener noreferrer"
+                    onClick={stop}
                   >
                     Open in Maps
                   </a>
@@ -95,6 +140,155 @@ export default function RiderBookings() {
           ))}
         </div>
       )}
+
+      {selectedBooking && (
+        <BookingDetailModal
+          booking={selectedBooking}
+          onClose={() => setSelectedBookingId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function BookingDetailModal({ booking: b, onClose }) {
+  const mapsUrl = b.clientAddress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.clientAddress)}`
+    : null;
+
+  const hasGuestBreakdown = (b.paxCount ?? 1) > 1 && Array.isArray(b.guestSummary) && b.guestSummary.length > 0;
+  const services = !hasGuestBreakdown && Array.isArray(b.services) ? b.services : null;
+
+  return (
+    <div className="modal-overlay" role="presentation" onClick={onClose}>
+      <div
+        className="modal modal-large"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rider-booking-detail-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 560 }}
+      >
+        <div className="modal-header">
+          <h2 id="rider-booking-detail-title">
+            {safeFormat(b.bookingDateTime, 'MMM d, yyyy · h:mm a')}
+          </h2>
+          <button type="button" className="modal-close" aria-label="Close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body" style={{ display: 'grid', gap: '1rem' }}>
+          <div>
+            <span className={`rider-booking-status status-${b.status}`} style={{ textTransform: 'capitalize' }}>
+              {String(b.status || '').replaceAll('-', ' ').replaceAll('_', ' ')}
+            </span>
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: 0 }} />
+
+          <section>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem' }}>Client</h3>
+            <div><strong>{b.clientName || '—'}</strong></div>
+            {b.clientPhone && (
+              <div><a href={`tel:${b.clientPhone}`}>{b.clientPhone}</a></div>
+            )}
+            {b.clientEmail && (
+              <div style={{ fontSize: '0.9rem', color: '#475569' }}>{b.clientEmail}</div>
+            )}
+            {b.clientAddress && (
+              <div style={{ marginTop: '0.35rem', display: 'grid', gap: '0.35rem' }}>
+                <div>{b.clientAddress}</div>
+                {mapsUrl && (
+                  <a
+                    className="btn btn-secondary btn-sm"
+                    href={mapsUrl}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ justifySelf: 'start' }}
+                  >
+                    Open in Google Maps
+                  </a>
+                )}
+              </div>
+            )}
+          </section>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: 0 }} />
+
+          <section>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem' }}>Services</h3>
+            {hasGuestBreakdown ? (
+              <div style={{ display: 'grid', gap: '0.35rem' }}>
+                {b.guestSummary.map((g, idx) => (
+                  <div key={`${g.guestNumber ?? idx}`} style={{ fontSize: '0.9rem' }}>
+                    Guest {g.guestNumber ?? idx + 1}: {g.serviceName || '—'} — {g.employeeName || 'Unassigned'} {formatPHP(g.price)}
+                  </div>
+                ))}
+              </div>
+            ) : services ? (
+              <div style={{ display: 'grid', gap: '0.35rem' }}>
+                {services.map((s, idx) => (
+                  <div key={idx} style={{ fontSize: '0.9rem' }}>
+                    {s.name || s.serviceName || '—'} {s.price != null && <>· {formatPHP(s.price)}</>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div>{b.serviceName || '—'}</div>
+            )}
+            <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>
+              Total: {formatPHP(b.totalAmount)}
+            </div>
+          </section>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: 0 }} />
+
+          <section>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem' }}>Payment</h3>
+            <div style={{ fontSize: '0.9rem' }}>
+              {(b.paymentMethod || '—')}
+              {' · '}
+              {(b.paymentTiming || '—')}
+              {' · '}
+              {(b.paymentStatus || '—')}
+            </div>
+          </section>
+
+          {(b.specialRequests || b.clientNotes) && (
+            <>
+              <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: 0 }} />
+              <section>
+                <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem' }}>Notes</h3>
+                {b.specialRequests && (
+                  <div style={{ fontSize: '0.9rem' }}>
+                    <strong>Special requests:</strong> {b.specialRequests}
+                  </div>
+                )}
+                {b.clientNotes && (
+                  <div style={{ fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                    <strong>Client notes:</strong> {b.clientNotes}
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+
+          <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: 0 }} />
+
+          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+            Assigned by {b.riderAssignedBy || '—'} on {safeFormat(b.riderAssignedAt, 'MMM d, yyyy h:mm a')}
+          </div>
+        </div>
+        <div className="modal-footer" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          {mapsUrl && (
+            <a
+              className="btn btn-secondary"
+              href={mapsUrl}
+              target="_blank" rel="noopener noreferrer"
+            >
+              Open in Google Maps
+            </a>
+          )}
+          <button type="button" className="btn btn-primary" onClick={onClose}>Close</button>
+        </div>
+      </div>
     </div>
   );
 }

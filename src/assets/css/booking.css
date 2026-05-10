@@ -3219,3 +3219,251 @@ html {
   .floating-summary-total-amount { font-size: 1rem; }
   .floating-summary-cta { padding: 7px 10px; font-size: 0.72rem; }
 }
+
+/* ============================================================================
+ * Multi-pax public booking — service mode toggle + per-guest cards
+ * Rendered only when paxCount > 1 on the customer-facing BookingPage.
+ * ========================================================================== */
+.service-mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  padding: 0.4rem;
+  margin: 1rem 0 1.25rem;
+  background: #f1f5f9;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+}
+.service-mode-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 4px;
+  padding: 0.85rem 1rem;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  color: #475569;
+}
+.service-mode-tab:hover {
+  background: #fff;
+  color: #1f2937;
+}
+.service-mode-tab.active {
+  background: #fff;
+  border-color: var(--color-accent, #1B5E37);
+  color: var(--color-accent, #1B5E37);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+.service-mode-tab-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.service-mode-tab-sub {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 400;
+}
+.service-mode-tab.active .service-mode-tab-sub {
+  color: #475569;
+}
+
+/* Per-guest therapist preferences ('same' mode) */
+.same-pax-therapists {
+  margin-top: 1.5rem;
+  padding: 1.1rem 1.25rem;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+.same-pax-therapists-header h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+.same-pax-therapists-header p {
+  margin: 0 0 0.85rem;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+.same-pax-therapists-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.same-pax-therapist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.55rem 0.75rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+.same-pax-therapist-label {
+  flex: 0 0 88px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+}
+.guest-therapist-select {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.88rem;
+  color: #1f2937;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.guest-therapist-select:hover {
+  border-color: #9ca3af;
+}
+.guest-therapist-select:focus {
+  outline: none;
+  border-color: var(--color-accent, #1B5E37);
+  box-shadow: 0 0 0 3px rgba(27, 94, 55, 0.1);
+}
+
+/* Custom mode — per-guest cards with collapsible service grid */
+.custom-pax-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+}
+.guest-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.guest-card:not(.collapsed) {
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+}
+.guest-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid transparent;
+}
+.guest-card:not(.collapsed) .guest-card-header {
+  border-bottom-color: #e5e7eb;
+  background: #fff;
+}
+.guest-card-title-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+.guest-card-chevron {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+}
+.guest-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+  letter-spacing: 0.01em;
+}
+.guest-card-summary {
+  font-size: 0.82rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.guest-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+.guest-card-subtotal {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-accent, #1B5E37);
+}
+.guest-card-copy-btn {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.guest-card-copy-btn:hover {
+  border-color: var(--color-accent, #1B5E37);
+  color: var(--color-accent, #1B5E37);
+  background: #f0fdf4;
+}
+.guest-card-body {
+  padding: 1rem;
+  background: #fff;
+}
+.guest-services-grid {
+  margin-bottom: 1rem;
+}
+.guest-card-therapist {
+  padding: 0.85rem 1rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.guest-card-therapist-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+@media (max-width: 600px) {
+  .service-mode-toggle {
+    grid-template-columns: 1fr;
+  }
+  .guest-card-header {
+    flex-wrap: wrap;
+  }
+  .guest-card-summary {
+    flex-basis: 100%;
+    margin-left: 1.6rem;
+  }
+  .guest-card-actions {
+    margin-left: auto;
+  }
+  .same-pax-therapist-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+  .same-pax-therapist-label {
+    flex: 0 0 auto;
+  }
+}

@@ -6,7 +6,6 @@ import { applyColorTheme, getSettingsByKeys } from '../services/brandingService'
 import QRPaymentModal from '../components/QRPaymentModal';
 import { createPaymentIntent } from '../services/payments';
 import { geocodeAddress, haversineKm, transportFeeForDistance } from '../utils/geocoding';
-import PaxBuilder from '../components/booking/PaxBuilder';
 import { summarisePax } from '../utils/booking/multiPax';
 import '../assets/css/booking.css';
 
@@ -232,11 +231,21 @@ const BookingPage = () => {
   const [selectedTime, setSelectedTime] = useState('');
 
   // Multi-guest (family / group) booking. Single-person flow is the default
-  // and stays bit-for-bit identical to before — the PaxBuilder only renders
-  // when paxCount > 1, at which point selectedServices / selectedTherapists
-  // are bypassed in favour of per-guest service+therapist picks.
+  // and stays bit-for-bit identical to before. When paxCount > 1 we present
+  // a custom UI (no PaxBuilder) with two modes:
+  //   - 'same'  → reuses single-flow `selectedServices` for everyone, but
+  //               each guest still gets their own therapist preference in
+  //               `samePaxTherapists`.
+  //   - 'custom'→ each guest in `customGuests` gets their own services AND
+  //               therapist (the original PaxBuilder shape).
   const [paxCount, setPaxCount] = useState(1);
-  const [guests, setGuests] = useState([blankGuest(1)]);
+  const [guests, setGuests] = useState([blankGuest(1)]); // legacy, unused now but kept so older readers don't break mid-deploy
+  const [serviceMode, setServiceMode] = useState('same'); // 'same' | 'custom'
+  const [samePaxTherapists, setSamePaxTherapists] = useState([null]);
+  const [customGuests, setCustomGuests] = useState([blankGuest(1)]);
+  // Per-guest collapsed flag for 'custom' mode. Guest 1 starts expanded; rest
+  // start collapsed so the customer isn't overwhelmed with N service grids.
+  const [collapsedGuests, setCollapsedGuests] = useState([false]);
 
   // Customer details
   const [customerName, setCustomerName] = useState('');
@@ -750,35 +759,22 @@ const BookingPage = () => {
     return cats.filter(Boolean).sort();
   }, [services]);
 
-  // Adapt the page's Supabase shape to the PaxBuilder shape. PaxBuilder
-  // expects services with `_id` (used as the productId on each pick) and
-  // therapists with `_id` + `name`. The single-flow UI keeps using the
-  // raw `services` / `therapists` arrays directly so nothing changes there.
-  const paxServices = useMemo(
-    () => (services || []).map(s => ({
-      _id: s.id,
-      name: s.name,
-      price: s.price,
-      duration: s.duration,
-      category: s.category,
-    })),
-    [services]
-  );
-  const paxTherapists = useMemo(
-    () => (therapists || []).map(t => ({
-      _id: t.id,
-      name: `${t.first_name || ''} ${t.last_name || ''}`.trim(),
-    })),
-    [therapists]
-  );
-
-  // Resize the `guests` array whenever paxCount changes so PaxBuilder always
-  // gets exactly `paxCount` rows. Existing rows are preserved (so a customer
-  // bumping from 2→3 doesn't lose Guest 1 + Guest 2's picks).
+  // Resize the per-guest arrays whenever paxCount changes. Existing rows are
+  // preserved (so a customer bumping from 2→3 doesn't lose Guest 1 + Guest 2's
+  // picks); shrinking truncates from the end.
   const handlePaxCountChange = (raw) => {
     const cap = Number.isFinite(maxPaxPublic) && maxPaxPublic > 0 ? maxPaxPublic : 12;
     const next = Number.isFinite(raw) ? Math.min(cap, Math.max(1, raw)) : 1;
+    const wasMulti = paxCount > 1;
     setPaxCount(next);
+    // Going from N>1 down to 1 → reset the toggle so a future bump back up
+    // starts on the friendly default again.
+    if (next === 1) {
+      setServiceMode('same');
+    } else if (!wasMulti) {
+      // First-time multi-pax → always start in 'same'.
+      setServiceMode('same');
+    }
     setGuests(prev => {
       const current = prev || [];
       if (next > current.length) {
@@ -788,6 +784,31 @@ const BookingPage = () => {
         ];
       }
       return current.slice(0, next).map((g, i) => ({ ...g, guestNumber: i + 1 }));
+    });
+    setSamePaxTherapists(prev => {
+      const current = prev || [];
+      if (next > current.length) {
+        return [...current, ...Array.from({ length: next - current.length }, () => null)];
+      }
+      return current.slice(0, next);
+    });
+    setCustomGuests(prev => {
+      const current = prev || [];
+      if (next > current.length) {
+        return [
+          ...current,
+          ...Array.from({ length: next - current.length }, (_, i) => blankGuest(current.length + i + 1)),
+        ];
+      }
+      return current.slice(0, next).map((g, i) => ({ ...g, guestNumber: i + 1 }));
+    });
+    setCollapsedGuests(prev => {
+      const current = prev || [];
+      if (next > current.length) {
+        // New guests start collapsed (Guest 1 was already false from initial state).
+        return [...current, ...Array.from({ length: next - current.length }, () => true)];
+      }
+      return current.slice(0, next);
     });
   };
 
@@ -933,47 +954,81 @@ const BookingPage = () => {
     return 0;
   }, [selectedBranch, serviceLocation, distanceFee]);
 
-  // Calculate totals. Multi-pax sums every guest's services; single-pax keeps
-  // the original `selectedServices` math untouched.
+  // Calculate totals. Three branches:
+  //   single-pax → just sum selectedServices
+  //   multi 'same' → selectedServices total × paxCount (everyone gets the
+  //                  same set so the math is N × set-cost)
+  //   multi 'custom' → sum each customGuests[i].services
   const servicesTotal = useMemo(() => {
-    if (paxCount > 1) {
-      return (guests || []).reduce((sum, g) => {
+    if (paxCount > 1 && serviceMode === 'custom') {
+      return (customGuests || []).reduce((sum, g) => {
         return sum + (g.services || []).reduce((s, svc) => s + (Number(svc.price) || 0), 0);
       }, 0);
     }
-    return selectedServices.reduce((sum, service) => sum + (service.price || 0), 0);
-  }, [selectedServices, paxCount, guests]);
+    const baseSet = selectedServices.reduce((sum, service) => sum + (service.price || 0), 0);
+    if (paxCount > 1 && serviceMode === 'same') return baseSet * paxCount;
+    return baseSet;
+  }, [selectedServices, paxCount, serviceMode, customGuests]);
 
   const cartTotal = useMemo(() => {
     return servicesTotal + transportFee;
   }, [servicesTotal, transportFee]);
 
+  // Build the per-guest array that downstream submit/summary code reads from.
+  // 'same' mode replicates selectedServices for everyone with each guest's
+  // own employeeId; 'custom' mode is just customGuests as-is.
+  const effectiveGuests = useMemo(() => {
+    if (paxCount <= 1) return null;
+    if (serviceMode === 'same') {
+      return (samePaxTherapists || []).map((empId, i) => ({
+        guestNumber: i + 1,
+        services: (selectedServices || []).map(s => ({
+          productId: s.id,
+          name: s.name,
+          price: s.price,
+          duration: s.duration,
+        })),
+        employeeId: empId || null,
+        isRequestedTherapist: false,
+      }));
+    }
+    return (customGuests || []).map((g, i) => ({
+      ...g,
+      guestNumber: i + 1,
+      isRequestedTherapist: false,
+    }));
+  }, [paxCount, serviceMode, samePaxTherapists, selectedServices, customGuests]);
+
   // True when the customer has picked at least one service. Single-pax checks
-  // selectedServices; multi-pax requires every guest to have a service so the
+  // selectedServices; multi 'same' needs at least one service in the shared
+  // list; multi 'custom' requires every guest to have a service so the
   // floating summary doesn't pretend the booking is ready when Guest 3 is
   // still empty.
   const hasAnyServiceSelection = useMemo(() => {
-    if (paxCount > 1) {
-      return (guests || []).every(g => (g.services || []).length > 0);
+    if (paxCount > 1 && serviceMode === 'custom') {
+      return (customGuests || []).every(g => (g.services || []).length > 0);
     }
     return selectedServices.length > 0;
-  }, [paxCount, guests, selectedServices]);
+  }, [paxCount, serviceMode, customGuests, selectedServices]);
 
   // Total number of service picks across all guests (for the count badge in
   // the floating summary). Single-pax falls through to the existing length.
   const totalServiceCount = useMemo(() => {
-    if (paxCount > 1) {
-      return (guests || []).reduce((s, g) => s + (g.services?.length || 0), 0);
+    if (paxCount > 1 && serviceMode === 'custom') {
+      return (customGuests || []).reduce((s, g) => s + (g.services?.length || 0), 0);
+    }
+    if (paxCount > 1 && serviceMode === 'same') {
+      return selectedServices.length * paxCount;
     }
     return selectedServices.length;
-  }, [paxCount, guests, selectedServices]);
+  }, [paxCount, serviceMode, customGuests, selectedServices]);
 
   // Per-guest service rollup for the booking summary preview (and success
   // page). Uses summarisePax so display matches what the staff side will see.
   const guestSummaryPreview = useMemo(() => {
     if (paxCount <= 1) return null;
-    return summarisePax(flattenGuestsToItems(guests, therapists));
-  }, [paxCount, guests, therapists]);
+    return summarisePax(flattenGuestsToItems(effectiveGuests, therapists));
+  }, [paxCount, effectiveGuests, therapists]);
 
   const depositAmount = useMemo(() => {
     return Math.ceil(cartTotal * 0.5); // 50% deposit
@@ -996,6 +1051,77 @@ const BookingPage = () => {
     return selectedServices.some(s => s.id === serviceId);
   };
 
+  // Per-guest service toggle (custom multi-pax mode). Stores the PaxBuilder
+  // shape `{ productId, name, price, duration }` so flattenGuestsToItems can
+  // pass it straight through to the booking row.
+  const toggleCustomGuestService = (guestIndex, service) => {
+    setCustomGuests(prev => {
+      const next = prev.map((g, i) => {
+        if (i !== guestIndex) return g;
+        const current = g.services || [];
+        const exists = current.some(s => s.productId === service.id);
+        const nextServices = exists
+          ? current.filter(s => s.productId !== service.id)
+          : [...current, { productId: service.id, name: service.name, price: service.price, duration: service.duration }];
+        return { ...g, services: nextServices };
+      });
+      return next;
+    });
+  };
+
+  // True/false for "is this service selected for guest N" (custom mode).
+  const isCustomGuestServiceSelected = (guestIndex, serviceId) =>
+    !!(customGuests[guestIndex]?.services || []).some(s => s.productId === serviceId);
+
+  // Copy Guest 1's services + therapist into target guest. Used by the
+  // "Copy from Guest 1" button on Guests 2+.
+  const copyFromGuestOne = (targetIndex) => {
+    if (targetIndex === 0) return;
+    setCustomGuests(prev => {
+      const guest1 = prev[0];
+      if (!guest1) return prev;
+      return prev.map((g, i) => {
+        if (i !== targetIndex) return g;
+        return {
+          ...g,
+          services: (guest1.services || []).map(s => ({ ...s })),
+          employeeId: guest1.employeeId || null,
+        };
+      });
+    });
+  };
+
+  // Toggle the collapsed state of a custom-mode guest card.
+  const toggleGuestCollapsed = (guestIndex) => {
+    setCollapsedGuests(prev => prev.map((c, i) => (i === guestIndex ? !c : c)));
+  };
+
+  // Therapist dropdown options. Reuses the same therapists pool the single
+  // flow uses, so the customer never sees a different roster between modes.
+  const therapistDropdownOptions = useMemo(
+    () => (therapists || []).map(t => ({
+      id: t.id,
+      name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Therapist',
+    })),
+    [therapists]
+  );
+
+  // Inline-style therapist <select>. Returns a small, polished dropdown
+  // matching the existing form-input look-and-feel.
+  const renderTherapistSelect = (value, onChange, idx) => (
+    <select
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value || null)}
+      className="guest-therapist-select"
+      aria-label={`Therapist for Guest ${idx + 1}`}
+    >
+      <option value="">No preference (auto-assign)</option>
+      {therapistDropdownOptions.map(t => (
+        <option key={t.id} value={t.id}>{t.name}</option>
+      ))}
+    </select>
+  );
+
   // Generate booking reference
   const generateReference = () => {
     const prefix = 'BK';
@@ -1006,13 +1132,19 @@ const BookingPage = () => {
 
   // Submit booking
   const handleSubmitBooking = async () => {
-    // Validation. For multi-guest bookings every guest must have picked at
-    // least one service — otherwise it's a half-empty booking that wastes
-    // a slot. Single-guest path validates `selectedServices` exactly as before.
-    if (paxCount > 1) {
-      for (let i = 0; i < (guests || []).length; i++) {
-        if (!guests[i].services || guests[i].services.length === 0) {
-          alert(`Please pick at least one service for Guest ${i + 1}.`);
+    // Validation. For multi-guest 'same' mode the shared selectedServices
+    // list must be non-empty; for 'custom' mode every guest must have at
+    // least one service (otherwise a guest gets a free empty slot wasting
+    // the booking). Single-guest path is unchanged.
+    if (paxCount > 1 && serviceMode === 'same') {
+      if (!selectedServices || selectedServices.length === 0) {
+        alert('Please select at least one service for everyone.');
+        return;
+      }
+    } else if (paxCount > 1 && serviceMode === 'custom') {
+      for (let i = 0; i < (customGuests || []).length; i++) {
+        if (!customGuests[i].services || customGuests[i].services.length === 0) {
+          alert(`Guest ${i + 1} has no services selected.`);
           return;
         }
       }
@@ -1089,7 +1221,7 @@ const BookingPage = () => {
       // For single-pax we keep the historical selectedServices shape so any
       // downstream code that already reads the old shape is unaffected.
       const isMultiPax = paxCount > 1;
-      const flattenedItems = isMultiPax ? flattenGuestsToItems(guests, therapists) : [];
+      const flattenedItems = isMultiPax ? flattenGuestsToItems(effectiveGuests, therapists) : [];
       const guestSummary = isMultiPax ? summarisePax(flattenedItems) : null;
 
       // Create booking record
@@ -1108,7 +1240,7 @@ const BookingPage = () => {
         // so any list/calendar code that still reads
         // booking.preferred_therapist_id keeps rendering something sensible.
         preferred_therapist_id: isMultiPax
-          ? (guests?.[0]?.employeeId || null)
+          ? (effectiveGuests?.[0]?.employeeId || null)
           : (therapistMode === 'choose' && selectedTherapists.length > 0 ? selectedTherapists[0] : null),
         preferred_therapists: isMultiPax ? [] : (therapistMode === 'choose' ? selectedTherapists : []),
         therapist_gender_preference: !isMultiPax && genderFilter !== 'all' ? genderFilter : null,
@@ -1989,152 +2121,297 @@ const BookingPage = () => {
               </div>
             </div>
 
-            {/* Multi-guest: per-guest service + (optional) preferred therapist.
-                When paxCount > 1 the single-flow service grid below is replaced
-                by the PaxBuilder so each guest's pick is captured separately.
-                The Choose Therapist section a bit further down only applies to
-                single-guest bookings — we hide it when paxCount > 1. */}
-            {paxCount > 1 ? (
-              <div style={{ marginTop: '0.5rem' }}>
-                <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '0.75rem' }}>
-                  Pick a service (and optionally a preferred therapist) for each guest.
-                </p>
-                <PaxBuilder
-                  paxCount={paxCount}
-                  guests={guests}
-                  onChange={setGuests}
-                  services={paxServices}
-                  therapists={paxTherapists}
-                  mode="public"
-                />
+            {/* Multi-pax mode toggle. Hidden for single-guest bookings.
+                'same' = one shared service grid + per-guest therapist picker.
+                'custom' = per-guest cards each with their own service grid. */}
+            {paxCount > 1 && (
+              <div className="service-mode-toggle" role="tablist" aria-label="How to pick services for multiple guests">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={serviceMode === 'same'}
+                  className={`service-mode-tab ${serviceMode === 'same' ? 'active' : ''}`}
+                  onClick={() => setServiceMode('same')}
+                >
+                  <span className="service-mode-tab-title">Same services for everyone</span>
+                  <span className="service-mode-tab-sub">Most common — pick once, applies to all guests</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={serviceMode === 'custom'}
+                  className={`service-mode-tab ${serviceMode === 'custom' ? 'active' : ''}`}
+                  onClick={() => setServiceMode('custom')}
+                >
+                  <span className="service-mode-tab-title">Customize per guest</span>
+                  <span className="service-mode-tab-sub">Each guest picks their own treatments</span>
+                </button>
               </div>
-            ) : (
-            <>
-            {/* Search & Filter */}
-            <div className="booking-filters">
-              <input
-                type="text"
-                placeholder="Search services..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="booking-search"
-              />
-              <div className="booking-filter-row">
-                <div className="booking-categories">
-                  <button
-                    className={`category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
-                    onClick={() => setSelectedCategory('all')}
-                  >
-                    All
-                  </button>
-                  {categories.map(cat => (
-                    <button
-                      key={cat}
-                      className={`category-btn ${selectedCategory === cat ? 'active' : ''}`}
-                      onClick={() => setSelectedCategory(cat)}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-                <div className="booking-sort-pills">
-                  {[
-                    { value: 'default', label: 'Our Picks' },
-                    { value: 'best-sellers', label: 'Best Sellers' },
-                    { value: 'price-low', label: '₱ Low-High' },
-                    { value: 'price-high', label: '₱ High-Low' },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      className={`sort-pill ${sortBy === opt.value ? 'active' : ''}`}
-                      onClick={() => setSortBy(opt.value)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            )}
 
-            {/* Services Grid */}
-            <div className="booking-services-grid">
-              {services.length === 0 ? (
-                <div className="no-services">
-                  <p>No services available yet.</p>
-                  <small>Please contact us directly to book an appointment.</small>
-                  {business?.phone && <p style={{marginTop: '1rem'}}>📞 {business.phone}</p>}
-                </div>
-              ) : filteredServices.length === 0 ? (
-                <div className="no-services">
-                  <p>No services match your search.</p>
-                  <small>Try a different search term or category.</small>
-                </div>
-              ) : (
-                (showAllServices || searchTerm.trim() ? filteredServices : filteredServices.slice(0, 9)).map(service => (
-                  <div
-                    key={service.id}
-                    className={`service-card ${isServiceSelected(service.id) ? 'selected' : ''}`}
-                    onClick={() => toggleService(service)}
-                  >
-                    {service.image_url && (
-                      <div className="service-card-image">
-                        <img src={service.image_url} alt={service.name} loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
-                      </div>
-                    )}
-                    {service._salesCount > 0 && (
-                      <span style={{ position: 'absolute', top: service.image_url ? '8px' : '8px', right: '8px', background: 'var(--color-accent, #1B5E37)', color: '#fff', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
-                        Best Seller
-                      </span>
-                    )}
-                    <div className="service-category">{service.category}</div>
-                    <h3 className="service-name">{service.name}</h3>
-                    {service.description && (
-                      <p className="service-description">{service.description}</p>
-                    )}
-                    <div className="service-details">
-                      <span className="service-price">₱{service.price?.toLocaleString()}</span>
-                      {service.duration && (
-                        <span className="service-duration">{service.duration} min</span>
-                      )}
+            {/* SHARED service-picker UI: rendered for paxCount === 1 AND for
+                paxCount > 1 with serviceMode === 'same'. The same selectedServices
+                state drives both — no duplication. */}
+            {(paxCount === 1 || serviceMode === 'same') && (
+              <>
+                {/* Search & Filter */}
+                <div className="booking-filters">
+                  <input
+                    type="text"
+                    placeholder="Search services..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="booking-search"
+                  />
+                  <div className="booking-filter-row">
+                    <div className="booking-categories">
+                      <button
+                        className={`category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
+                        onClick={() => setSelectedCategory('all')}
+                      >
+                        All
+                      </button>
+                      {categories.map(cat => (
+                        <button
+                          key={cat}
+                          className={`category-btn ${selectedCategory === cat ? 'active' : ''}`}
+                          onClick={() => setSelectedCategory(cat)}
+                        >
+                          {cat}
+                        </button>
+                      ))}
                     </div>
-                    <div className="service-select-indicator">
-                      {isServiceSelected(service.id) ? '✓ Selected' : 'Tap to select'}
+                    <div className="booking-sort-pills">
+                      {[
+                        { value: 'default', label: 'Our Picks' },
+                        { value: 'best-sellers', label: 'Best Sellers' },
+                        { value: 'price-low', label: '₱ Low-High' },
+                        { value: 'price-high', label: '₱ High-Low' },
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          className={`sort-pill ${sortBy === opt.value ? 'active' : ''}`}
+                          onClick={() => setSortBy(opt.value)}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-            {/* See More button */}
-            {!searchTerm.trim() && filteredServices.length > 9 && !showAllServices && (
-              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                <button
-                  onClick={() => setShowAllServices(true)}
-                  style={{
-                    background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
-                    padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem',
-                    fontWeight: '500', transition: 'all 0.2s'
-                  }}
-                  onMouseOver={e => { e.target.style.borderColor = 'var(--color-accent, #1B5E37)'; e.target.style.color = 'var(--color-accent, #1B5E37)'; }}
-                  onMouseOut={e => { e.target.style.borderColor = '#d1d5db'; e.target.style.color = '#555'; }}
-                >
-                  See More Services ({filteredServices.length - 9} more)
-                </button>
-              </div>
+                </div>
+
+                {/* Services Grid */}
+                <div className="booking-services-grid">
+                  {services.length === 0 ? (
+                    <div className="no-services">
+                      <p>No services available yet.</p>
+                      <small>Please contact us directly to book an appointment.</small>
+                      {business?.phone && <p style={{marginTop: '1rem'}}>📞 {business.phone}</p>}
+                    </div>
+                  ) : filteredServices.length === 0 ? (
+                    <div className="no-services">
+                      <p>No services match your search.</p>
+                      <small>Try a different search term or category.</small>
+                    </div>
+                  ) : (
+                    (showAllServices || searchTerm.trim() ? filteredServices : filteredServices.slice(0, 9)).map(service => (
+                      <div
+                        key={service.id}
+                        className={`service-card ${isServiceSelected(service.id) ? 'selected' : ''}`}
+                        onClick={() => toggleService(service)}
+                      >
+                        {service.image_url && (
+                          <div className="service-card-image">
+                            <img src={service.image_url} alt={service.name} loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
+                          </div>
+                        )}
+                        {service._salesCount > 0 && (
+                          <span style={{ position: 'absolute', top: service.image_url ? '8px' : '8px', right: '8px', background: 'var(--color-accent, #1B5E37)', color: '#fff', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                            Best Seller
+                          </span>
+                        )}
+                        <div className="service-category">{service.category}</div>
+                        <h3 className="service-name">{service.name}</h3>
+                        {service.description && (
+                          <p className="service-description">{service.description}</p>
+                        )}
+                        <div className="service-details">
+                          <span className="service-price">₱{service.price?.toLocaleString()}</span>
+                          {service.duration && (
+                            <span className="service-duration">{service.duration} min</span>
+                          )}
+                        </div>
+                        <div className="service-select-indicator">
+                          {isServiceSelected(service.id) ? '✓ Selected' : 'Tap to select'}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {/* See More button */}
+                {!searchTerm.trim() && filteredServices.length > 9 && !showAllServices && (
+                  <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                    <button
+                      onClick={() => setShowAllServices(true)}
+                      style={{
+                        background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
+                        padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem',
+                        fontWeight: '500', transition: 'all 0.2s'
+                      }}
+                      onMouseOver={e => { e.target.style.borderColor = 'var(--color-accent, #1B5E37)'; e.target.style.color = 'var(--color-accent, #1B5E37)'; }}
+                      onMouseOut={e => { e.target.style.borderColor = '#d1d5db'; e.target.style.color = '#555'; }}
+                    >
+                      See More Services ({filteredServices.length - 9} more)
+                    </button>
+                  </div>
+                )}
+                {showAllServices && filteredServices.length > 9 && (
+                  <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                    <button
+                      onClick={() => setShowAllServices(false)}
+                      style={{
+                        background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
+                        padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem'
+                      }}
+                    >
+                      Show Less
+                    </button>
+                  </div>
+                )}
+
+                {/* Per-guest therapist preferences ('same' mode only). The same
+                    services apply to everyone but each guest can request their
+                    own therapist (or leave on auto-assign). */}
+                {paxCount > 1 && serviceMode === 'same' && (
+                  <div className="same-pax-therapists">
+                    <div className="same-pax-therapists-header">
+                      <h3>Therapist preferences</h3>
+                      <p>Optional — pick a preferred therapist for each guest, or leave on auto.</p>
+                    </div>
+                    <div className="same-pax-therapists-rows">
+                      {Array.from({ length: paxCount }).map((_, i) => (
+                        <div key={i} className="same-pax-therapist-row">
+                          <span className="same-pax-therapist-label">Guest {i + 1}</span>
+                          {renderTherapistSelect(
+                            samePaxTherapists[i],
+                            (val) => setSamePaxTherapists(prev => prev.map((p, j) => (j === i ? val : p))),
+                            i
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
-            {showAllServices && filteredServices.length > 9 && (
-              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                <button
-                  onClick={() => setShowAllServices(false)}
-                  style={{
-                    background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
-                    padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem'
-                  }}
-                >
-                  Show Less
-                </button>
+
+            {/* CUSTOM mode: per-guest cards. Each card has its own service
+                grid + therapist picker. Guest 1 expanded by default; rest
+                collapsed with a summary header. */}
+            {paxCount > 1 && serviceMode === 'custom' && (
+              <div className="custom-pax-cards">
+                {Array.from({ length: paxCount }).map((_, i) => {
+                  const guest = customGuests[i] || blankGuest(i + 1);
+                  const isCollapsed = !!collapsedGuests[i];
+                  const subtotal = (guest.services || []).reduce((s, sv) => s + (Number(sv.price) || 0), 0);
+                  const therapist = therapistDropdownOptions.find(t => String(t.id) === String(guest.employeeId));
+                  const therapistLabel = therapist ? therapist.name : 'No preference';
+                  return (
+                    <div key={i} className={`guest-card ${isCollapsed ? 'collapsed' : ''}`}>
+                      <div className="guest-card-header">
+                        <button
+                          type="button"
+                          className="guest-card-title-btn"
+                          onClick={() => toggleGuestCollapsed(i)}
+                          aria-expanded={!isCollapsed}
+                        >
+                          <span className="guest-card-chevron" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+                              <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                          </span>
+                          <span className="guest-card-title">Guest {i + 1}</span>
+                          <span className="guest-card-summary">
+                            {(guest.services || []).length === 0
+                              ? <em style={{ color: '#94a3b8' }}>no services yet</em>
+                              : `${(guest.services || []).length} ${(guest.services || []).length === 1 ? 'service' : 'services'} · ${therapistLabel}`}
+                          </span>
+                        </button>
+                        <div className="guest-card-actions">
+                          <span className="guest-card-subtotal">₱{subtotal.toLocaleString()}</span>
+                          {i > 0 && (
+                            <button
+                              type="button"
+                              className="guest-card-copy-btn"
+                              onClick={() => copyFromGuestOne(i)}
+                              title="Copy services and therapist from Guest 1"
+                            >
+                              Copy from Guest 1
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {!isCollapsed && (
+                        <div className="guest-card-body">
+                          {services.length === 0 ? (
+                            <div className="no-services">
+                              <p>No services available yet.</p>
+                            </div>
+                          ) : (
+                            <div className="booking-services-grid guest-services-grid">
+                              {filteredServices.map(service => {
+                                const sel = isCustomGuestServiceSelected(i, service.id);
+                                return (
+                                  <div
+                                    key={service.id}
+                                    className={`service-card ${sel ? 'selected' : ''}`}
+                                    onClick={() => toggleCustomGuestService(i, service)}
+                                  >
+                                    {service.image_url && (
+                                      <div className="service-card-image">
+                                        <img src={service.image_url} alt={service.name} loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
+                                      </div>
+                                    )}
+                                    {service._salesCount > 0 && (
+                                      <span style={{ position: 'absolute', top: service.image_url ? '8px' : '8px', right: '8px', background: 'var(--color-accent, #1B5E37)', color: '#fff', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                                        Best Seller
+                                      </span>
+                                    )}
+                                    <div className="service-category">{service.category}</div>
+                                    <h3 className="service-name">{service.name}</h3>
+                                    {service.description && (
+                                      <p className="service-description">{service.description}</p>
+                                    )}
+                                    <div className="service-details">
+                                      <span className="service-price">₱{service.price?.toLocaleString()}</span>
+                                      {service.duration && (
+                                        <span className="service-duration">{service.duration} min</span>
+                                      )}
+                                    </div>
+                                    <div className="service-select-indicator">
+                                      {sel ? '✓ Selected' : 'Tap to select'}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          <div className="guest-card-therapist">
+                            <label className="guest-card-therapist-label">Preferred therapist for Guest {i + 1}</label>
+                            {renderTherapistSelect(
+                              guest.employeeId,
+                              (val) => setCustomGuests(prev => prev.map((g, j) => (j === i ? { ...g, employeeId: val } : g))),
+                              i
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            )}
-            </>
             )}
           </div>
 
@@ -2244,7 +2521,7 @@ const BookingPage = () => {
               selected date. The Choose Preferred grid below handles an empty
               availableTherapists with an inline message.
               Hidden when paxCount > 1: each guest picks their own therapist
-              (or "No preference") inside the PaxBuilder above. */}
+              (or "No preference") inside the multi-pax section above. */}
           {paxCount === 1 && therapists.length > 0 && selectedDate && !isDayClosed && (
           <div id="section-therapist" className="booking-section luxe-section">
             <div className="luxe-section-header">

@@ -215,6 +215,11 @@ const BookingPage = () => {
   const [existingBookings, setExistingBookings] = useState([]);
   const [bookingCapacitySetting, setBookingCapacitySetting] = useState(14);
   const [bookingWindowSetting, setBookingWindowSetting] = useState(90);
+  // Public-side cap on the number of guests in one booking. Pulled from
+  // payroll_config (booking.maxPaxPublic). Default 12 mirrors the historical
+  // hardcoded UI cap, so behaviour is unchanged for businesses that never
+  // touch the new Settings → Bookings panel.
+  const [maxPaxPublic, setMaxPaxPublic] = useState(12);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   // User selections
@@ -608,6 +613,19 @@ const BookingPage = () => {
             }
           } catch (err) { console.warn('Failed to fetch capacity settings:', err); }
 
+          // Fetch the public pax cap (booking.maxPaxPublic) from payroll_config.
+          // Missing or zero/negative → keep the default 12.
+          try {
+            const paxUrl = `${supabaseUrl}/rest/v1/payroll_config?business_id=eq.${actualBusinessId}&key=eq.booking.maxPaxPublic&select=value`;
+            const paxRes = await fetch(paxUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
+            if (paxRes.ok) {
+              const paxData = await paxRes.json();
+              const raw = paxData?.[0]?.value;
+              const n = Number(raw);
+              if (Number.isFinite(n) && n > 0) setMaxPaxPublic(Math.floor(n));
+            }
+          } catch (err) { console.warn('Failed to fetch public pax cap:', err); }
+
           // Fetch existing bookings for availability check
           try {
             const bookingsUrl = `${supabaseUrl}/rest/v1/online_bookings?business_id=eq.${actualBusinessId}&status=neq.cancelled&select=preferred_date,preferred_time,branch_id`;
@@ -758,7 +776,8 @@ const BookingPage = () => {
   // gets exactly `paxCount` rows. Existing rows are preserved (so a customer
   // bumping from 2→3 doesn't lose Guest 1 + Guest 2's picks).
   const handlePaxCountChange = (raw) => {
-    const next = Number.isFinite(raw) ? Math.min(12, Math.max(1, raw)) : 1;
+    const cap = Number.isFinite(maxPaxPublic) && maxPaxPublic > 0 ? maxPaxPublic : 12;
+    const next = Number.isFinite(raw) ? Math.min(cap, Math.max(1, raw)) : 1;
     setPaxCount(next);
     setGuests(prev => {
       const current = prev || [];
@@ -1924,7 +1943,7 @@ const BookingPage = () => {
               <div>
                 <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#1f2937' }}>How many people?</div>
                 <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
-                  Booking for a group? Pick up to 12 — we'll let each guest choose their own service.
+                  Booking for a group? Pick up to {maxPaxPublic} — we'll let each guest choose their own service.
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1944,7 +1963,7 @@ const BookingPage = () => {
                 <input
                   type="number"
                   min="1"
-                  max="12"
+                  max={maxPaxPublic}
                   value={paxCount}
                   onChange={(e) => handlePaxCountChange(parseInt(e.target.value, 10))}
                   onWheel={(e) => e.target.blur()}
@@ -1958,13 +1977,13 @@ const BookingPage = () => {
                   type="button"
                   aria-label="Increase number of people"
                   onClick={() => handlePaxCountChange(paxCount + 1)}
-                  disabled={paxCount >= 12}
+                  disabled={paxCount >= maxPaxPublic}
                   style={{
                     width: 36, height: 36, borderRadius: '50%',
                     border: '1px solid #d1d5db', background: '#fff',
-                    cursor: paxCount >= 12 ? 'not-allowed' : 'pointer',
+                    cursor: paxCount >= maxPaxPublic ? 'not-allowed' : 'pointer',
                     fontSize: '1.1rem', color: '#374151',
-                    opacity: paxCount >= 12 ? 0.5 : 1,
+                    opacity: paxCount >= maxPaxPublic ? 0.5 : 1,
                   }}
                 >+</button>
               </div>

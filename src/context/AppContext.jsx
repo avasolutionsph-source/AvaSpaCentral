@@ -1,13 +1,19 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { authService, supabaseSyncManager, isSupabaseConfigured } from '../services/supabase';
 import { setUserContext, clearUserContext } from '../utils/sentry';
 import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
 import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 import { db } from '../db';
 import { setAnalyticsBranchFilter } from '../mockApi/mockApi';
+import { PayrollConfigRepository } from '../services/storage/repositories';
 import NotificationService from '../services/notifications/NotificationService';
 import NotificationSoundManager from '../services/notifications/NotificationSoundManager';
 import PushSubscriptionService from '../services/notifications/PushSubscriptionService';
+
+// Defaults for booking pax stepper limits. Public-facing booking page caps
+// group size lower than the staff-facing POS / Appointments / AdvanceBooking
+// flows. Owner can override either via Settings → Bookings.
+const DEFAULT_BOOKING_LIMITS = Object.freeze({ maxPaxPublic: 12, maxPaxStaff: 30 });
 
 // Sentinel representing "view data from all branches" for Owner/Manager users.
 // Stored in the same selectedBranch slot (so localStorage persistence Just Works).
@@ -153,9 +159,46 @@ export const AppProvider = ({ children }) => {
   const [selectedBranch, setSelectedBranch] = useState(null); // { id, name, slug, ... } or null
   const [initialSyncing, setInitialSyncing] = useState(false);
 
+  // Booking pax stepper limits. Loaded once from PayrollConfigRepository on
+  // mount (and again when the user logs in / business context changes). Reading
+  // here once and exposing via context keeps the per-page consumers (BookingPage,
+  // POS, Appointments, AdvanceBookingCheckout) synchronous — the alternative
+  // would be each page running its own async read on render.
+  const [bookingLimits, setBookingLimits] = useState(DEFAULT_BOOKING_LIMITS);
+
   // Holds the teardown returned by startAllNotificationTriggers() so a
   // logout-then-login cycle doesn't accumulate duplicate listeners.
   const triggersUnsubRef = useRef(null);
+
+  // Load booking limits from PayrollConfigRepository (key-value store). Missing
+  // keys fall back to DEFAULT_BOOKING_LIMITS. Exposed as a callback so the
+  // Settings page can refresh the in-memory value immediately after a save
+  // (no full reload required).
+  const refreshBookingLimits = useCallback(async () => {
+    try {
+      const [pubVal, staffVal] = await Promise.all([
+        PayrollConfigRepository.get('booking.maxPaxPublic'),
+        PayrollConfigRepository.get('booking.maxPaxStaff'),
+      ]);
+      const next = {
+        maxPaxPublic: Number.isFinite(Number(pubVal)) && Number(pubVal) > 0
+          ? Number(pubVal) : DEFAULT_BOOKING_LIMITS.maxPaxPublic,
+        maxPaxStaff: Number.isFinite(Number(staffVal)) && Number(staffVal) > 0
+          ? Number(staffVal) : DEFAULT_BOOKING_LIMITS.maxPaxStaff,
+      };
+      setBookingLimits(next);
+    } catch (e) {
+      // Silent fall-back to defaults — limits aren't safety-critical.
+      setBookingLimits(DEFAULT_BOOKING_LIMITS);
+    }
+  }, []);
+
+  // Refresh limits whenever the active business changes (login / branch swap
+  // doesn't change businessId, but a user-switch does). Safe to call before
+  // the user is loaded — the repo will just return undefined for both keys.
+  useEffect(() => {
+    refreshBookingLimits();
+  }, [user?.businessId, refreshBookingLimits]);
 
   // Initialize app - check for existing session
   // Load and apply branding (color theme) from Supabase
@@ -789,6 +832,11 @@ export const AppProvider = ({ children }) => {
     syncStatus,
     triggerSync,
     isCloudSyncEnabled,
+    // Booking limits (max pax for public + staff flows, configurable in
+    // Settings → Bookings). refreshBookingLimits lets Settings.jsx pull the
+    // new values into context immediately after a save.
+    bookingLimits,
+    refreshBookingLimits,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { sanitizePhoneInput, phoneInputProps } from '../utils/phoneInput';
 import PaxBuilder from './booking/PaxBuilder';
+import { useApp } from '../context/AppContext';
 
 // Default empty guest row used when paxCount grows or formData is reset.
 // Matches the shape PaxBuilder expects.
@@ -31,6 +32,11 @@ const AdvanceBookingCheckout = ({
   walkInCustomerData,
   onWalkInDataChange
 }) => {
+  const { bookingLimits } = useApp();
+  // Pax stepper cap for the staff-side advance-booking flow. Default 30
+  // matches the historical hardcoded cap if Settings hasn't been touched.
+  const maxPaxStaff = bookingLimits?.maxPaxStaff || 30;
+
   const [isAdvanceBooking, setIsAdvanceBooking] = useState(enabled || false);
   const [bookingData, setBookingData] = useState({
     bookingDateTime: '',
@@ -100,7 +106,7 @@ const AdvanceBookingCheckout = ({
   // per-guest selections where possible. Inline (no useEffect) to avoid an
   // effect-driven feedback loop — same pattern as POS.handlePaxCountChange.
   const handlePaxCountChange = (next) => {
-    const n = Math.max(1, Math.min(30, parseInt(next, 10) || 1));
+    const n = Math.max(1, Math.min(maxPaxStaff, parseInt(next, 10) || 1));
     setBookingData((prev) => {
       const prevGuests = prev.guests || [];
       const nextGuests = [];
@@ -264,7 +270,7 @@ const AdvanceBookingCheckout = ({
               id="advance-pax-count"
               type="number"
               min={1}
-              max={30}
+              max={maxPaxStaff}
               value={bookingData.paxCount || 1}
               onChange={(e) => handlePaxCountChange(e.target.value)}
               style={{ maxWidth: 120 }}

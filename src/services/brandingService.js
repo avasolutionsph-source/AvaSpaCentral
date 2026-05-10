@@ -297,6 +297,53 @@ export async function upsertSettings(businessId, settings, opts = {}) {
 }
 
 /**
+ * Read one or more payroll_config rows (business-scoped key/value) via raw
+ * REST. Mirrors getSettingsByKeys but for the payroll_config table — used by
+ * the public booking page (which has no signed-in user / Dexie sync) to fetch
+ * server-side overrides like booking.maxPaxPublic.
+ *
+ * Returns an object mapping each present key to its value. Missing keys are
+ * absent from the result.
+ *
+ * @param {string} businessId
+ * @param {string[]} keys
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function getPayrollConfigByKeys(businessId, keys) {
+  const empty = {};
+  if (!businessId || !SUPABASE_URL || !SUPABASE_ANON_KEY || !keys?.length) return empty;
+
+  const accessToken = getAccessTokenSync();
+  const keyList = keys.map(encodeURIComponent).join(',');
+
+  try {
+    const res = await fetchWithTimeout(
+      `${SUPABASE_URL}/rest/v1/payroll_config?business_id=eq.${businessId}&key=in.(${keyList})&select=key,value`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+      12000,
+    );
+
+    if (!res.ok) {
+      console.error('[brandingService] getPayrollConfigByKeys failed:', res.status, await res.text().catch(() => ''));
+      return empty;
+    }
+
+    const rows = await res.json();
+    const out = {};
+    for (const r of rows) out[r.key] = r.value;
+    return out;
+  } catch (err) {
+    console.error('[brandingService] getPayrollConfigByKeys threw:', err);
+    return empty;
+  }
+}
+
+/**
  * Upsert a payroll_config row (business-scoped key/value) via raw REST so it
  * bypasses the supabase-js write hang. The row is matched on
  * (business_id, key) which is the table's unique constraint.

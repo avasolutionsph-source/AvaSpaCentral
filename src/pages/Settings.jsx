@@ -4,7 +4,7 @@ import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
 import { LazyImage } from '../components/OptimizedImage';
-import { SettingsRepository } from '../services/storage/repositories';
+import { SettingsRepository, PayrollConfigRepository } from '../services/storage/repositories';
 import { NetworkDetector } from '../services/sync';
 import { getApiConfig, setApiBaseUrl, loadApiConfig, httpClient } from '../services/api';
 import db from '../db';
@@ -66,7 +66,7 @@ const BRANCH_CONFIG_SECTIONS = [
 ];
 
 const Settings = () => {
-  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId, getEffectiveBranchId, selectedBranch } = useApp();
+  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId, getEffectiveBranchId, selectedBranch, refreshBookingLimits } = useApp();
 
   // Refs that gate auto-refresh of the form state when background sync
   // completes. Without these, a user-edit-in-progress could be clobbered by
@@ -323,6 +323,17 @@ const Settings = () => {
     ownerUsername: '',
     ownerPassword: '',
   });
+
+  // Bookings (pax limits + loyalty multiply-by-pax). All three are stored as
+  // payrollConfig key/value rows so they share the same persistence + sync
+  // pipeline as overtime/holiday rates.
+  //   booking.maxPaxPublic  — guest stepper cap on the public booking page
+  //   booking.maxPaxStaff   — guest stepper cap on POS/Appointments/AdvanceBooking
+  //   loyalty.multiplyByPax — when ON, points awarded × paxCount
+  const [bookingMaxPaxPublic, setBookingMaxPaxPublic] = useState(12);
+  const [bookingMaxPaxStaff, setBookingMaxPaxStaff] = useState(30);
+  const [loyaltyMultiplyByPax, setLoyaltyMultiplyByPax] = useState(false);
+  const [savingBookingsConfig, setSavingBookingsConfig] = useState(false);
 
   // GPS Geofencing State
   const [gpsConfig, setGpsConfig] = useState({ branches: {} });
@@ -1881,6 +1892,49 @@ const Settings = () => {
   // pull_complete handler that lives in the mount-only subscription effect.
   loadPayrollConfigRef.current = loadPayrollConfig;
 
+  // Load Bookings section values (pax limits + loyalty multiplier) from the
+  // payroll_config key/value store. Missing keys fall back to defaults so a
+  // brand-new business has sensible behaviour on first render.
+  const loadBookingsConfig = async () => {
+    try {
+      const [maxPub, maxStaff, multiply] = await Promise.all([
+        PayrollConfigRepository.get('booking.maxPaxPublic'),
+        PayrollConfigRepository.get('booking.maxPaxStaff'),
+        PayrollConfigRepository.get('loyalty.multiplyByPax'),
+      ]);
+      const pubN = Number(maxPub);
+      const staffN = Number(maxStaff);
+      if (Number.isFinite(pubN) && pubN > 0) setBookingMaxPaxPublic(pubN);
+      if (Number.isFinite(staffN) && staffN > 0) setBookingMaxPaxStaff(staffN);
+      setLoyaltyMultiplyByPax(Boolean(multiply));
+    } catch (e) {
+      // Defaults stay — non-fatal.
+    }
+  };
+
+  // Persist Bookings section to payroll_config and refresh the in-memory
+  // bookingLimits exposed by AppContext so consumers (BookingPage / POS /
+  // Appointments / AdvanceBookingCheckout) pick up the new caps without a
+  // page reload.
+  const handleSaveBookingsConfig = async () => {
+    if (!isOwner() && !isBranchOwner()) {
+      showToast('Only the owner or branch owner can modify booking settings', 'error');
+      return;
+    }
+    try {
+      setSavingBookingsConfig(true);
+      await PayrollConfigRepository.set('booking.maxPaxPublic', bookingMaxPaxPublic);
+      await PayrollConfigRepository.set('booking.maxPaxStaff', bookingMaxPaxStaff);
+      await PayrollConfigRepository.set('loyalty.multiplyByPax', !!loyaltyMultiplyByPax);
+      await refreshBookingLimits?.();
+      showToast('Booking settings saved', 'success');
+    } catch (e) {
+      showToast('Failed to save booking settings', 'error');
+    } finally {
+      setSavingBookingsConfig(false);
+    }
+  };
+
   // Data loaders. Re-runs when user.businessId becomes available — without
   // this dep, the loaders would close over a null user (auth restores async)
   // and silently skip the cloud seed, leaving the form on default values.
@@ -1889,6 +1943,7 @@ const Settings = () => {
     loadPayrollConfigRef.current?.();
     loadSyncConfig();
     loadParkedItems();
+    loadBookingsConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.businessId]);
 
@@ -4083,6 +4138,100 @@ const Settings = () => {
                 Save Capacity Settings
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Bookings — pax limits + loyalty multiplier. Stored in payroll_config
+            so they share the existing key/value sync pipeline. */}
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <div className="settings-section-icon">👥</div>
+            <div className="settings-section-title">
+              <h2>Bookings</h2>
+              <p>Maximum guests per booking and loyalty point multipliers</p>
+            </div>
+            {!isOwner() && !isBranchOwner() && (
+              <span className="settings-view-only-badge">View Only</span>
+            )}
+          </div>
+          <div className="settings-section-body">
+            <div className="settings-row">
+              <div className="settings-form-group">
+                <label htmlFor="booking-max-pax-public">Maximum guests per booking (public)</label>
+                <input
+                  id="booking-max-pax-public"
+                  type="number"
+                  className="form-control"
+                  value={bookingMaxPaxPublic}
+                  onChange={(e) => setBookingMaxPaxPublic(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  min="1"
+                  max="100"
+                  disabled={!isOwner() && !isBranchOwner()}
+                />
+                <small style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                  Cap on the public-facing booking page guest stepper. Default 12.
+                </small>
+              </div>
+              <div className="settings-form-group">
+                <label htmlFor="booking-max-pax-staff">Maximum guests per booking (staff)</label>
+                <input
+                  id="booking-max-pax-staff"
+                  type="number"
+                  className="form-control"
+                  value={bookingMaxPaxStaff}
+                  onChange={(e) => setBookingMaxPaxStaff(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  min="1"
+                  max="100"
+                  disabled={!isOwner() && !isBranchOwner()}
+                />
+                <small style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                  Cap on POS / Appointments / Advance Booking guest stepper. Default 30.
+                </small>
+              </div>
+            </div>
+
+            {/* Loyalty: multiply points by pax */}
+            <div className="settings-row" style={{ marginTop: '0.75rem' }}>
+              <div className="settings-form-group" style={{ flex: 1 }}>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                  <span>
+                    <strong>Multiply loyalty points by pax count</strong>
+                    <br />
+                    <small style={{ color: '#6b7280', fontSize: '0.8rem' }}>
+                      When ON, earned points are multiplied by the booking's guest count.
+                      Default OFF — points are computed from the transaction total only.
+                    </small>
+                  </span>
+                  <div
+                    role="switch"
+                    aria-checked={loyaltyMultiplyByPax}
+                    tabIndex={0}
+                    className={`toggle-switch ${loyaltyMultiplyByPax ? 'active' : ''} ${(!isOwner() && !isBranchOwner()) ? 'disabled' : ''}`}
+                    onClick={() => (isOwner() || isBranchOwner()) && setLoyaltyMultiplyByPax(v => !v)}
+                    onKeyDown={(e) => {
+                      if ((e.key === ' ' || e.key === 'Enter') && (isOwner() || isBranchOwner())) {
+                        e.preventDefault();
+                        setLoyaltyMultiplyByPax(v => !v);
+                      }
+                    }}
+                    title={!isOwner() && !isBranchOwner() ? 'Only owner or branch owner can modify' : ''}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {(isOwner() || isBranchOwner()) && (
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSaveBookingsConfig}
+                  disabled={savingBookingsConfig}
+                >
+                  {savingBookingsConfig ? '💾 Saving...' : '💾 Save Booking Settings'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

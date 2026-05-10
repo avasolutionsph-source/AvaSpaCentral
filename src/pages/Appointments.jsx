@@ -28,7 +28,10 @@ const maxGuestDuration = (guests) => {
 const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { showToast, user, canViewAll, isTherapist, getEffectiveBranchId } = useApp();
+  const { showToast, user, canViewAll, isTherapist, getEffectiveBranchId, bookingLimits } = useApp();
+  // Pax stepper cap for the staff-side appointment flow. Default 30 matches
+  // the historical hardcoded cap if Settings hasn't been touched.
+  const maxPaxStaff = bookingLimits?.maxPaxStaff || 30;
 
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState([]);
@@ -1089,8 +1092,9 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                       placeholder="Enter customer name" className="form-control" />
                   </div>
                 )}
-                {/* Number of guests — staff form supports 1-30. When > 1 the
-                    single-pax service / rotation / therapist controls are
+                {/* Number of guests — staff form supports up to maxPaxStaff
+                    (default 30, configurable in Settings → Bookings). When > 1
+                    the single-pax service / rotation / therapist controls are
                     swapped for the PaxBuilder so each guest picks their own. */}
                 {modalMode === 'create' && (
                   <div className="form-group">
@@ -1098,11 +1102,11 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                     <input
                       type="number"
                       min="1"
-                      max="30"
+                      max={maxPaxStaff}
                       value={formData.paxCount}
                       onChange={(e) => {
                         const raw = parseInt(e.target.value, 10);
-                        const next = Number.isFinite(raw) ? Math.min(30, Math.max(1, raw)) : 1;
+                        const next = Number.isFinite(raw) ? Math.min(maxPaxStaff, Math.max(1, raw)) : 1;
                         setFormData(prev => {
                           const current = prev.guests || [];
                           let guests;

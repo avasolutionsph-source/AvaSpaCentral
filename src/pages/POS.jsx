@@ -23,7 +23,10 @@ import '../assets/css/pos.css';
 
 const POS = () => {
   const navigate = useNavigate();
-  const { showToast, user, getEffectiveBranchId } = useApp();
+  const { showToast, user, getEffectiveBranchId, bookingLimits } = useApp();
+  // Pax stepper cap for the staff-side POS flow. Defaults to 30 if Settings
+  // hasn't been touched, matching the historical hardcoded cap.
+  const maxPaxStaff = bookingLimits?.maxPaxStaff || 30;
 
   // Tab state for switching between POS and Gift Certificates
   const [activeTab, setActiveTab] = useState('pos');
@@ -536,7 +539,7 @@ const POS = () => {
   // per-guest selections where possible. Done inline in the handler to avoid
   // an effect-driven feedback loop.
   const handlePaxCountChange = useCallback((next) => {
-    const n = Math.max(1, Math.min(30, parseInt(next, 10) || 1));
+    const n = Math.max(1, Math.min(maxPaxStaff, parseInt(next, 10) || 1));
     setPaxCount(n);
     setGuests((prev) => {
       const out = [];
@@ -549,7 +552,7 @@ const POS = () => {
       }
       return out;
     });
-  }, []);
+  }, [maxPaxStaff]);
 
   const addToCart = useCallback((product) => {
     setCart(prevCart => {
@@ -1821,7 +1824,7 @@ const POS = () => {
               id="pos-pax-count"
               type="number"
               min={1}
-              max={30}
+              max={maxPaxStaff}
               value={paxCount}
               onChange={(e) => handlePaxCountChange(e.target.value)}
               style={{

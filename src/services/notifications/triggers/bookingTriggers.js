@@ -30,6 +30,30 @@ async function findBooking(bookingId) {
   }
 }
 
+// Build per-guest assignment list. For multi-pax bookings with a guestSummary,
+// emit one entry per guest that has an employeeId (skip auto-rotation slots).
+// For single-pax / legacy bookings, fall back to the booking-level employeeId
+// with guestNumber 1.
+function getTherapistAssignments(b) {
+  if (b.guestSummary && Array.isArray(b.guestSummary) && (b.paxCount || 1) > 1) {
+    return b.guestSummary
+      .filter(g => g && g.employeeId)
+      .map(g => ({
+        employeeId: g.employeeId,
+        guestNumber: g.guestNumber,
+        serviceName: g.serviceName || b.serviceName,
+      }));
+  }
+  if (b.employeeId) {
+    return [{
+      employeeId: b.employeeId,
+      guestNumber: 1,
+      serviceName: b.serviceName,
+    }];
+  }
+  return [];
+}
+
 export function startBookingTriggers() {
   return triggerSubscribe(async (change) => {
     if (change.entityType !== 'advanceBookings') return;
@@ -49,31 +73,41 @@ export function startBookingTriggers() {
     if (!b) return;
 
     // 1. Therapist assignment.
-    if (b.employeeId) {
-      const key = `${b.id}:${b.employeeId}`;
-      if (!seenIds.assignedTherapist.has(key)) {
+    //    Multi-pax bookings fan out into one notification per guest whose
+    //    therapist is set. Auto-rotation slots (no employeeId yet) are skipped
+    //    until they get assigned. Single-pax keeps the legacy single-recipient
+    //    path via the guestNumber-1 fallback in getTherapistAssignments.
+    {
+      const assignments = getTherapistAssignments(b);
+      // Defensive time formatter — a row with a missing or unparseable
+      // bookingDateTime would otherwise produce literal "at Invalid Date".
+      const start = b.bookingDateTime ? new Date(b.bookingDateTime) : null;
+      const timeText = (start && !Number.isNaN(start.getTime()))
+        ? start.toLocaleString('en-PH', { hour: '2-digit', minute: '2-digit' })
+        : 'soon';
+      const isMultiPax = (b.paxCount || 1) > 1;
+      for (const a of assignments) {
+        const key = `${b.id}:${a.guestNumber || 1}:${a.employeeId}`;
+        if (seenIds.assignedTherapist.has(key)) continue;
         seenIds.assignedTherapist.add(key);
-        const emp = await findEmployee(b.employeeId);
-        if (emp) {
-          // Format the booking time defensively — a row with a missing or
-          // unparseable bookingDateTime would otherwise produce literal
-          // "at Invalid Date" in the message.
-          const start = b.bookingDateTime ? new Date(b.bookingDateTime) : null;
-          const timeText = (start && !Number.isNaN(start.getTime()))
-            ? start.toLocaleString('en-PH', { hour: '2-digit', minute: '2-digit' })
-            : 'soon';
-          await NotificationService.notify({
-            type: NotificationService.TYPES.BOOKING_ASSIGNED_THERAPIST,
-            targetUserId: emp.userId || emp._id,
-            title: 'New booking assigned',
-            message: `${b.clientName} • ${b.serviceName} at ${timeText}`,
-            action: '/appointments',
-            actionLabel: 'View',
-            soundClass: 'loop',
-            payload: { bookingId: b.id },
-            branchId: b.branchId,
-          });
-        }
+        const emp = await findEmployee(a.employeeId);
+        if (!emp) continue;
+        const guestPrefix = isMultiPax ? `Guest ${a.guestNumber} — ` : '';
+        await NotificationService.notify({
+          type: NotificationService.TYPES.BOOKING_ASSIGNED_THERAPIST,
+          targetUserId: emp.userId || emp._id,
+          title: 'New booking assigned',
+          message: `${guestPrefix}${b.clientName} • ${a.serviceName} at ${timeText}`,
+          action: '/appointments',
+          actionLabel: 'View',
+          soundClass: 'loop',
+          payload: {
+            bookingId: b.id,
+            guestNumber: a.guestNumber,
+            serviceName: a.serviceName,
+          },
+          branchId: b.branchId,
+        });
       }
     }
 
@@ -100,28 +134,52 @@ export function startBookingTriggers() {
     }
 
     // 3. Confirmed.
-    if (b.status === 'confirmed' && !seenIds.confirmed.has(b.id)) {
-      seenIds.confirmed.add(b.id);
-      const targets = [];
-      if (b.employeeId) {
-        const emp = await findEmployee(b.employeeId);
-        if (emp) targets.push(emp.userId || emp._id);
-      }
-      if (b.riderId) {
-        const r = await findEmployee(b.riderId);
-        if (r) targets.push(r.userId || r._id);
-      }
-      for (const uid of targets) {
+    //    For multi-pax, fan out one confirmation per guest's therapist so
+    //    each therapist gets the ack scoped to their own guest. Rider (if
+    //    any) gets one confirmation per booking — there's only one delivery.
+    if (b.status === 'confirmed') {
+      const isMultiPax = (b.paxCount || 1) > 1;
+      const assignments = getTherapistAssignments(b);
+      for (const a of assignments) {
+        const key = `${b.id}:${a.guestNumber || 1}:${a.employeeId}`;
+        if (seenIds.confirmed.has(key)) continue;
+        seenIds.confirmed.add(key);
+        const emp = await findEmployee(a.employeeId);
+        if (!emp) continue;
+        const guestPrefix = isMultiPax ? `Guest ${a.guestNumber} — ` : '';
         await NotificationService.notify({
           type: NotificationService.TYPES.BOOKING_CONFIRMED,
-          targetUserId: uid,
+          targetUserId: emp.userId || emp._id,
           title: 'Booking confirmed',
-          message: `${b.clientName} • ${b.serviceName}`,
+          message: `${guestPrefix}${b.clientName} • ${a.serviceName}`,
           action: '/appointments',
           soundClass: 'oneshot',
-          payload: { bookingId: b.id },
+          payload: {
+            bookingId: b.id,
+            guestNumber: a.guestNumber,
+            serviceName: a.serviceName,
+          },
           branchId: b.branchId,
         });
+      }
+      if (b.riderId) {
+        const riderKey = `${b.id}:rider:${b.riderId}`;
+        if (!seenIds.confirmed.has(riderKey)) {
+          seenIds.confirmed.add(riderKey);
+          const r = await findEmployee(b.riderId);
+          if (r) {
+            await NotificationService.notify({
+              type: NotificationService.TYPES.BOOKING_CONFIRMED,
+              targetUserId: r.userId || r._id,
+              title: 'Booking confirmed',
+              message: `${b.clientName} • ${b.serviceName}`,
+              action: '/appointments',
+              soundClass: 'oneshot',
+              payload: { bookingId: b.id },
+              branchId: b.branchId,
+            });
+          }
+        }
       }
     }
 
@@ -135,22 +193,30 @@ export function startBookingTriggers() {
     //    in a pocket doesn't catch the service-start moment, and an alert
     //    that goes quiet without acknowledgement defeats the loud-alarm
     //    purpose).
-    if ((b.status === 'in-progress' || b.status === 'in_progress') && !seenIds.arrived.has(b.id)) {
-      seenIds.arrived.add(b.id);
-      if (b.employeeId) {
-        const emp = await findEmployee(b.employeeId);
-        if (emp) {
-          await NotificationService.notify({
-            type: NotificationService.TYPES.BOOKING_CLIENT_ARRIVED,
-            targetUserId: emp.userId || emp._id,
-            title: 'Client arrived',
-            message: `${b.clientName} is ready — service starting now`,
-            action: '/appointments',
-            soundClass: 'oneshot',
-            payload: { bookingId: b.id },
-            branchId: b.branchId,
-          });
-        }
+    if (b.status === 'in-progress' || b.status === 'in_progress') {
+      const isMultiPax = (b.paxCount || 1) > 1;
+      const assignments = getTherapistAssignments(b);
+      for (const a of assignments) {
+        const key = `${b.id}:${a.guestNumber || 1}:${a.employeeId}`;
+        if (seenIds.arrived.has(key)) continue;
+        seenIds.arrived.add(key);
+        const emp = await findEmployee(a.employeeId);
+        if (!emp) continue;
+        const guestPrefix = isMultiPax ? `Guest ${a.guestNumber} — ` : '';
+        await NotificationService.notify({
+          type: NotificationService.TYPES.BOOKING_CLIENT_ARRIVED,
+          targetUserId: emp.userId || emp._id,
+          title: 'Client arrived',
+          message: `${guestPrefix}${b.clientName} is ready — service starting now`,
+          action: '/appointments',
+          soundClass: 'oneshot',
+          payload: {
+            bookingId: b.id,
+            guestNumber: a.guestNumber,
+            serviceName: a.serviceName,
+          },
+          branchId: b.branchId,
+        });
       }
     }
 

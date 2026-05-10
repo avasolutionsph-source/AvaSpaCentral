@@ -131,7 +131,11 @@ export default function UpdatePanel() {
   }
 
   function reloadWithCacheBust() {
-    const u = new URL(window.location.origin + '/');
+    // Land on /login after the cache-bust reload. The site root (/) is the
+    // public booking page — sending POS / staff users there after an in-app
+    // update drops them out of the app. /login forwards already-authenticated
+    // sessions to their role's default route.
+    const u = new URL(window.location.origin + '/login');
     u.searchParams.set('_t', Date.now().toString());
     window.location.replace(u.toString());
   }

@@ -100,6 +100,8 @@ export default function RiderBookings() {
 
   if (loading) return <div className="page-loading"><div className="spinner" /><p>Loading…</p></div>;
 
+  const accountMisconfigured = !user?.employeeId;
+
   return (
     <div className="rider-bookings-page">
       <div className="page-header">
@@ -112,6 +114,16 @@ export default function RiderBookings() {
           <span>Show completed</span>
         </label>
       </div>
+
+      {accountMisconfigured && (
+        <div className="alert alert-warning" role="status">
+          <strong>Your account is not linked to an employee record.</strong>
+          <p style={{ margin: '4px 0 0' }}>
+            You won't see any deliveries until an admin links your user account
+            to your Rider employee profile in Employees.
+          </p>
+        </div>
+      )}
 
       {bookings.length === 0 ? (
         <div className="empty-state">

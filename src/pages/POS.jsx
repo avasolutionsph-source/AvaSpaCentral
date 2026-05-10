@@ -9,7 +9,7 @@ import { ConfirmDialog, ManageOrder, EmptyState } from '../components/shared';
 import { getTherapists } from '../utils/employeeFilters';
 import { formatTimeRange, formatTime12Hour } from '../utils/dateUtils';
 import PaxBuilder from '../components/booking/PaxBuilder';
-import { summarisePax, computeMultiPaxTotal } from '../utils/booking/multiPax';
+import { summarisePax, computeMultiPaxTotal, expandToGuests } from '../utils/booking/multiPax';
 import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
 import CashDrawerHistoryTab from './CashDrawerHistory';
@@ -2904,16 +2904,46 @@ const POS = () => {
                 <p style={{ margin: '2px 0', fontSize: '0.85rem' }}>Customer: {receiptData.customer}</p>
               </div>
               <hr style={{ border: 'none', borderTop: '1px dashed var(--color-border)', margin: '0.75rem 0' }} />
-              <table style={{ width: '100%', fontSize: '0.9rem' }}>
-                <tbody>
-                  {receiptData.items.map((item, i) => (
-                    <tr key={i}>
-                      <td>{item.name} x{item.quantity}</td>
-                      <td style={{ textAlign: 'right' }}>₱{(item.subtotal ?? 0).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {receiptData.paxCount > 1 ? (
+                <div style={{ fontSize: '0.9rem' }}>
+                  {expandToGuests(receiptData.items).map(({ guestNumber, items: gItems }) => {
+                    const therapistName = receiptData.guestSummary?.find((g) => g.guestNumber === guestNumber)?.employeeName;
+                    const guestSubtotal = gItems.reduce((s, it) => s + (it.subtotal ?? (it.price ?? 0) * (it.quantity ?? 1)), 0);
+                    return (
+                      <div key={guestNumber} style={{ marginBottom: '0.6rem' }}>
+                        <h4 style={{ margin: '0.25rem 0 0.25rem', fontSize: '0.9rem', fontWeight: 700 }}>
+                          Guest {guestNumber}{therapistName ? ` — ${therapistName}` : ''}
+                        </h4>
+                        <table style={{ width: '100%' }}>
+                          <tbody>
+                            {gItems.map((item, i) => (
+                              <tr key={i}>
+                                <td style={{ paddingLeft: '0.5rem' }}>{item.name} x{item.quantity}</td>
+                                <td style={{ textAlign: 'right' }}>₱{(item.subtotal ?? (item.price ?? 0) * (item.quantity ?? 1)).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                            <tr>
+                              <td style={{ paddingLeft: '0.5rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>Guest {guestNumber} subtotal</td>
+                              <td style={{ textAlign: 'right', fontStyle: 'italic', color: 'var(--text-muted)' }}>₱{guestSubtotal.toLocaleString()}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <table style={{ width: '100%', fontSize: '0.9rem' }}>
+                  <tbody>
+                    {receiptData.items.map((item, i) => (
+                      <tr key={i}>
+                        <td>{item.name} x{item.quantity}</td>
+                        <td style={{ textAlign: 'right' }}>₱{(item.subtotal ?? 0).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
               <hr style={{ border: 'none', borderTop: '1px dashed var(--color-border)', margin: '0.75rem 0' }} />
               <div style={{ fontSize: '0.9rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>

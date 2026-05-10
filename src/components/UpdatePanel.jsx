@@ -38,6 +38,14 @@ const STATUS = {
 // click did nothing and keep tapping.
 const POST_UPDATE_FLAG = 'daet-spa-post-update';
 
+// sessionStorage flag read by SupabaseSyncManager.initialize() on the next
+// boot. When set, init runs forcePull() instead of the normal incremental
+// sync(), so the post-Update reload cannot be starved by a slow/failing
+// push cycle (the symptom: Update reload leaves attendance blank because
+// sync()'s 60s budget is spent on push before pull starts; logout/login
+// works because that path always runs forcePull()).
+const FORCE_PULL_FLAG = 'daet-spa-force-pull-after-update';
+
 export default function UpdatePanel() {
   const [status, setStatus] = useState(() => {
     try {
@@ -126,6 +134,7 @@ export default function UpdatePanel() {
     try {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.setItem(POST_UPDATE_FLAG, '1');
+        sessionStorage.setItem(FORCE_PULL_FLAG, '1');
       }
     } catch {}
   }

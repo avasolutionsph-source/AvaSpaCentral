@@ -1073,6 +1073,22 @@ class SupabaseSyncManager {
     this._initialized = true;
     console.log('[SupabaseSyncManager] Initialized with event-driven sync');
 
+    // UpdatePanel sets this flag right before its cache-bust reload. Honour
+    // it by going through forcePull() instead of sync() — sync() pushes
+    // first and its 60s budget can be consumed entirely by a slow/failing
+    // push cycle, leaving the pull starved (the symptom being a blank
+    // attendance table after Update even though logout/login fills it).
+    let forcePullRequested = false;
+    try {
+      if (typeof sessionStorage !== 'undefined' &&
+          sessionStorage.getItem('daet-spa-force-pull-after-update')) {
+        forcePullRequested = true;
+        sessionStorage.removeItem('daet-spa-force-pull-after-update');
+      }
+    } catch {
+      // sessionStorage blocked — fall back to normal sync path
+    }
+
     // Determine sync strategy based on state
     // IMPORTANT: Check localDataEmpty FIRST because logout clears both data AND storedBusinessId
     if (newBusinessId && localDataEmpty) {
@@ -1083,6 +1099,9 @@ class SupabaseSyncManager {
     } else if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
       // Business account changed - pull fresh data
       console.log('[SupabaseSyncManager] Business account changed - pulling fresh data from Supabase...');
+      await this.forcePull();
+    } else if (newBusinessId && forcePullRequested) {
+      console.log('[SupabaseSyncManager] Post-update force-pull requested by UpdatePanel');
       await this.forcePull();
     } else if (newBusinessId) {
       // Normal case - regular sync (push local changes, pull remote changes)

@@ -8,6 +8,8 @@ import { createPaymentIntent } from '../services/payments';
 import { ConfirmDialog, ManageOrder, EmptyState } from '../components/shared';
 import { getTherapists } from '../utils/employeeFilters';
 import { formatTimeRange, formatTime12Hour } from '../utils/dateUtils';
+import PaxBuilder from '../components/booking/PaxBuilder';
+import { summarisePax, computeMultiPaxTotal } from '../utils/booking/multiPax';
 import GiftCertificatesTab from './GiftCertificates';
 import CustomersTab from './Customers';
 import CashDrawerHistoryTab from './CashDrawerHistory';
@@ -33,6 +35,13 @@ const POS = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
+  // Multi-pax state — paxCount=1 keeps the historical single-pax flow exactly
+  // as it was. paxCount>1 swaps the flat cart for a per-guest <PaxBuilder>.
+  // Each guest has its own services + (optional) requested therapist.
+  const [paxCount, setPaxCount] = useState(1);
+  const [guests, setGuests] = useState([
+    { guestNumber: 1, services: [], employeeId: null, isRequestedTherapist: false },
+  ]);
   const [showManageOrder, setShowManageOrder] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -499,6 +508,49 @@ const POS = () => {
     }
   }, [showToast, getEffectiveBranchId]);
 
+  // Flatten the multi-pax `guests` array into a flat cart-shaped items list
+  // suitable for transaction.items[]. Each entry carries guestNumber and
+  // employeeId so per-guest attribution survives into reports and receipts.
+  const flattenGuestsToItems = useCallback((guestsList) => {
+    const items = [];
+    for (const g of guestsList) {
+      for (const svc of g.services || []) {
+        items.push({
+          id: svc.productId,
+          productId: svc.productId,
+          name: svc.name,
+          type: 'service',
+          price: svc.price,
+          quantity: 1,
+          subtotal: svc.price,
+          duration: svc.duration,
+          guestNumber: g.guestNumber,
+          employeeId: g.employeeId,
+        });
+      }
+    }
+    return items;
+  }, []);
+
+  // Resize the `guests` array to match a new paxCount, preserving existing
+  // per-guest selections where possible. Done inline in the handler to avoid
+  // an effect-driven feedback loop.
+  const handlePaxCountChange = useCallback((next) => {
+    const n = Math.max(1, Math.min(30, parseInt(next, 10) || 1));
+    setPaxCount(n);
+    setGuests((prev) => {
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        out.push(
+          prev[i]
+            ? { ...prev[i], guestNumber: i + 1 }
+            : { guestNumber: i + 1, services: [], employeeId: null, isRequestedTherapist: false }
+        );
+      }
+      return out;
+    });
+  }, []);
+
   const addToCart = useCallback((product) => {
     setCart(prevCart => {
       // Check if product is already in cart
@@ -584,10 +636,19 @@ const POS = () => {
     showToast('Cart cleared', 'info');
   }, [showToast]);
 
+  // Effective cart items — for paxCount===1, this is the existing flat cart
+  // (single-pax behaviour bit-for-bit unchanged). For paxCount>1, this is
+  // the flattened multi-pax guests array. ALL downstream calculations,
+  // checkout, receipt etc. read from this single source of truth.
+  const effectiveCartItems = useMemo(
+    () => (paxCount > 1 ? flattenGuestsToItems(guests) : cart),
+    [paxCount, guests, cart, flattenGuestsToItems]
+  );
+
   // Memoized cart calculations
   const cartSubtotal = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.subtotal, 0);
-  }, [cart]);
+    return effectiveCartItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+  }, [effectiveCartItems]);
 
   const discount = useMemo(() => {
     if (!discountType) return 0;
@@ -630,9 +691,18 @@ const POS = () => {
   const getChange = () => change;
 
   const openCheckout = () => {
-    if (cart.length === 0) {
+    if (effectiveCartItems.length === 0) {
       showToast('Cart is empty. Add items first.', 'error');
       return;
+    }
+    if (paxCount > 1) {
+      // Each guest must have at least one service before we let the cashier
+      // proceed — otherwise the receipt + reports will have phantom guests.
+      const empty = guests.findIndex((g) => !g.services || g.services.length === 0);
+      if (empty >= 0) {
+        showToast(`Guest ${empty + 1} has no service selected`, 'error');
+        return;
+      }
     }
     setShowCheckout(true);
   };
@@ -715,8 +785,17 @@ const POS = () => {
       errors.push('Please enter the client address for home service');
     }
 
-    if (!selectedEmployee) {
+    // For single-pax: a global therapist is required.
+    // For multi-pax: each guest picks their own therapist (or leaves it on
+    // "Auto (rotation)" so the next-in-queue is assigned at completion).
+    if (paxCount === 1 && !selectedEmployee) {
       errors.push('Please select an employee');
+    }
+    if (paxCount > 1) {
+      const empty = guests.findIndex((g) => !g.services || g.services.length === 0);
+      if (empty >= 0) {
+        errors.push(`Guest ${empty + 1} has no service selected`);
+      }
     }
 
     if (!paymentMethod) {
@@ -766,10 +845,22 @@ const POS = () => {
     setCheckoutLoading(true);
 
     try {
-      const employee = employees.find(e => e._id === selectedEmployee);
+      // For single-pax, the global selectedEmployee is the therapist.
+      // For multi-pax, fall back to the first guest's chosen therapist (or
+      // null if every guest is on auto-rotation) — used for legacy display
+      // fields such as transaction.employee.name. Per-guest attribution is
+      // carried inside transaction.items[].employeeId regardless.
+      const primaryEmployeeId =
+        paxCount > 1
+          ? (guests.find((g) => g.employeeId)?.employeeId || null)
+          : selectedEmployee;
+      const employee = primaryEmployeeId
+        ? employees.find((e) => e._id === primaryEmployeeId)
+        : null;
 
-      // Verify employee was found
-      if (!employee) {
+      // Single-pax must have an employee; multi-pax may have none picked
+      // (every guest on auto rotation), in which case employee may be null.
+      if (paxCount === 1 && !employee) {
         showToast('Selected employee not found. Please select again.', 'error');
         setCheckoutLoading(false);
         return;
@@ -797,6 +888,13 @@ const POS = () => {
 
       // If advance booking is enabled, create booking instead of transaction
       if (isAdvanceBooking && advanceBookingData) {
+        // Multi-pax advance booking is wired in Task 6.1 — block it here so a
+        // cashier can't half-create a booking with a single therapist field.
+        if (paxCount > 1) {
+          showToast('Multi-pax advance bookings are coming soon — switch to 1 guest or do a walk-in checkout.', 'error');
+          setCheckoutLoading(false);
+          return;
+        }
         // Basic validation - component handles detailed field validation with inline errors
         if (!advanceBookingData.bookingDateTime) {
           showToast('Please complete all required booking fields', 'error');
@@ -878,12 +976,25 @@ const POS = () => {
         const sequence = Date.now().toString().slice(-6) + Math.floor(Math.random() * 100).toString().padStart(2, '0');
         const receiptNumber = `RCP-${todayStr}-${sequence}`;
 
-        // Calculate commission (handle missing commission data)
-        const commissionAmount = cart.reduce((sum, item) => {
-          if (!item.commission || !item.commission.type) return sum;
-          const commission = item.commission.type === 'percentage'
-            ? (item.subtotal * item.commission.value / 100)
-            : (item.commission.value || 0);
+        // For multi-pax, the source-of-truth for items is the flattened
+        // guests array. For single-pax, the historical flat cart is used —
+        // bit-for-bit unchanged so commissions, itemsUsed, etc. are intact.
+        const checkoutItems = paxCount > 1 ? flattenGuestsToItems(guests) : cart;
+
+        // Calculate commission. Single-pax pulls the commission rule off the
+        // cart entry (which carries it from the product). Multi-pax services
+        // come from PaxBuilder which only stored {productId,name,price,duration},
+        // so we look the rule up from the loaded `products` list.
+        const commissionAmount = checkoutItems.reduce((sum, item) => {
+          let rule = item.commission;
+          if (!rule) {
+            const prod = products.find((p) => p._id === (item.productId || item.id));
+            rule = prod?.commission;
+          }
+          if (!rule || !rule.type) return sum;
+          const commission = rule.type === 'percentage'
+            ? ((item.subtotal || 0) * (rule.value || 0) / 100)
+            : (rule.value || 0);
           return sum + commission;
         }, 0);
 
@@ -901,38 +1012,77 @@ const POS = () => {
           console.warn('[POS] could not resolve active drawer/shift:', err);
         }
 
-        // Build transaction
-        const transaction = {
-          businessId: user?.businessId,
-          branchId: checkoutBranchId,
-          receiptNumber,
-          employeeId: employee._id,
-          date: new Date().toISOString(),
-          items: cart.map(item => ({
+        // Build per-guest summary for multi-pax — denormalised so reports +
+        // receipts can render guest sections without re-deriving from items.
+        // Includes employeeName via lookup so the receipt has it inline.
+        const empById = new Map(employees.map((e) => [String(e._id), e]));
+        const itemsForTxn = checkoutItems.map((item) => {
+          const base = {
             id: item.id,
+            productId: item.productId || item.id,
             name: item.name,
             type: item.type,
             price: item.price,
             quantity: item.quantity,
             subtotal: item.subtotal,
-            itemsUsed: item.itemsUsed || [] // Include linked products for service tracking
-          })),
+            duration: item.duration,
+            itemsUsed: item.itemsUsed || [],
+          };
+          if (paxCount > 1) {
+            const emp = item.employeeId ? empById.get(String(item.employeeId)) : null;
+            base.guestNumber = item.guestNumber;
+            base.employeeId = item.employeeId || null;
+            base.employeeName = emp ? `${emp.firstName} ${emp.lastName}` : null;
+          }
+          return base;
+        });
+        const guestSummary = paxCount > 1 ? summarisePax(itemsForTxn) : undefined;
+        const totalAmount = paxCount > 1
+          // Re-derive from the flattened items so the multi-pax total stays
+          // in sync with the displayed PaxBuilder rows (subtotal+discount+tax
+          // semantics still come from the same memos which read effective items).
+          ? getTotal()
+          : getTotal();
+
+        // Build transaction
+        const transaction = {
+          businessId: user?.businessId,
+          branchId: checkoutBranchId,
+          receiptNumber,
+          // Single-pax: global selectedEmployee. Multi-pax: legacy slot stores
+          // the first guest's therapist (may be null for fully-auto bookings).
+          // Per-item attribution lives in items[].employeeId.
+          employeeId: paxCount > 1 ? (guests[0]?.employeeId || null) : employee._id,
+          date: new Date().toISOString(),
+          items: itemsForTxn,
+          paxCount,
+          guestSummary,
           subtotal: getCartSubtotal(),
           discount: getDiscount(),
           discountType: discountType,
           tax: taxAmount,
-          totalAmount: getTotal(),
+          totalAmount,
           paymentMethod: paymentMethod,
-          amountReceived: paymentMethod === 'Cash' ? parseFloat(amountReceived) : getTotal(),
+          amountReceived: paymentMethod === 'Cash' ? parseFloat(amountReceived) : totalAmount,
           changeAmount: getChange(),
           cardTransactionId: cardTransactionId || null,
           gcashReference: gcashReference || null,
-          employee: {
-            id: employee._id,
-            name: `${employee.firstName} ${employee.lastName}`,
-            position: employee.position,
-            commission: commissionAmount
-          },
+          employee: employee
+            ? {
+                id: employee._id,
+                name: `${employee.firstName} ${employee.lastName}`,
+                position: employee.position,
+                commission: commissionAmount,
+              }
+            : {
+                // Multi-pax with every guest on auto-rotation: no concrete
+                // therapist to attribute to at checkout time. Reports fall
+                // back to per-item employeeId once rotation assigns one.
+                id: null,
+                name: 'Multi-pax (auto rotation)',
+                position: null,
+                commission: commissionAmount,
+              },
           customer: customerType === 'walk-in'
             ? (customerData
                 ? {
@@ -955,6 +1105,8 @@ const POS = () => {
           status: paymentMethod === 'QRPh' ? 'pending' : 'completed',
           roomId: selectedRoom || null,
           roomName: selectedRoom ? rooms.find(r => r._id === selectedRoom)?.name : null,
+          // TODO: multi-room support — Phase 8.2. For now multi-pax in one party
+          // re-uses the single roomId field; service names concatenate below.
           isHomeService: isHomeService,
           homeServiceAddress: isHomeService ? homeServiceAddress : null,
           homeServiceFee: isHomeService ? (parseFloat(homeServiceFee) || 0) : 0,
@@ -991,7 +1143,9 @@ const POS = () => {
             pendingQrphRef.current = {
               transaction: savedTxn,
               receiptNumber,
-              cartSnapshot: cart,
+              // Use the resolved checkoutItems so QRPh finalisation works for
+              // both single- and multi-pax (the multi-pax flat `cart` is empty).
+              cartSnapshot: checkoutItems,
               employee,
               commissionAmount,
               selectedRoomId: selectedRoom,
@@ -1002,6 +1156,9 @@ const POS = () => {
               drawerSessionId: drawerSession?._id || null,
               drawerShiftId: drawerShift?._id || null,
               isRequestedTherapist,
+              paxCount,
+              guests,
+              guestSummary,
             };
             setActiveIntentId(intent.id);
           } catch (err) {
@@ -1055,7 +1212,15 @@ const POS = () => {
         setReceiptData({
           receiptNumber,
           date: new Date(),
-          items: cart.map(item => ({ name: item.name, quantity: item.quantity, price: item.price, subtotal: item.subtotal })),
+          items: checkoutItems.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.subtotal,
+            guestNumber: item.guestNumber,
+          })),
+          paxCount,
+          guestSummary,
           subtotal: getCartSubtotal(),
           discount: getDiscount(),
           discountType,
@@ -1069,31 +1234,51 @@ const POS = () => {
           customer: customerType === 'walk-in' ? (walkInCustomerData.name || 'Walk-in') : (selectedCustomer?.name || 'Walk-in')
         });
 
-        // Record service in rotation queue — but only when the therapist was
-        // picked via auto-rotation. Manually-requested therapists keep their
-        // place in the queue so they're not penalised for being asked for.
-        if (selectedEmployee && !isRequestedTherapist) {
-          try {
-            await mockApi.serviceRotation.recordService(selectedEmployee);
-          } catch (error) {
-            console.error('Failed to record service rotation:', error);
+        // Record service in rotation queue.
+        //  - Single-pax: advance once if the therapist was auto-rotation
+        //    (manual "Requested" picks keep their queue spot).
+        //  - Multi-pax: advance once per guest whose therapist was NOT a
+        //    manual request AND who actually picked someone (auto-rotation
+        //    guests get assigned + recorded later when the room starts).
+        if (paxCount === 1) {
+          if (selectedEmployee && !isRequestedTherapist) {
+            try {
+              await mockApi.serviceRotation.recordService(selectedEmployee);
+            } catch (error) {
+              console.error('Failed to record service rotation:', error);
+            }
+          }
+        } else {
+          for (const g of guests) {
+            if (g.employeeId && !g.isRequestedTherapist) {
+              try {
+                await mockApi.serviceRotation.recordService(g.employeeId);
+              } catch (error) {
+                console.error('Failed to record service rotation for guest', g.guestNumber, error);
+              }
+            }
           }
         }
 
-        // Mark room as pending (waiting for therapist to start service)
+        // Mark room as pending (waiting for therapist to start service).
+        // Multi-pax in one room: concatenate service names across guests so
+        // the room card shows the whole party's services. Per-guest detail
+        // is in the transaction itself; this is just the room display.
+        // TODO: multi-room support (one room per guest) — Phase 8.2.
         if (selectedRoom) {
           try {
-            // Calculate total service duration from cart (services only)
-            const totalDuration = cart.reduce((total, item) => {
-              return total + ((item.type === 'service' && item.duration) ? item.duration * item.quantity : 0);
+            const totalDuration = checkoutItems.reduce((total, item) => {
+              return total + ((item.type === 'service' && item.duration) ? item.duration * (item.quantity || 1) : 0);
             }, 0) || 60; // Default 60 min if no duration
 
-            // Get employee name for display on room card
-            const selectedEmp = employees.find(e => e._id === selectedEmployee);
+            // Room card: prefer the global selectedEmployee (single-pax), or
+            // the first guest's therapist (multi-pax). May be null when every
+            // multi-pax guest is on auto-rotation.
+            const roomEmpId = paxCount > 1 ? (guests[0]?.employeeId || null) : selectedEmployee;
+            const selectedEmp = roomEmpId ? employees.find(e => e._id === roomEmpId) : null;
             const employeeName = selectedEmp ? `${selectedEmp.firstName} ${selectedEmp.lastName}` : null;
 
-            // Get service names for display
-            const serviceNames = cart
+            const serviceNames = checkoutItems
               .filter(item => item.type === 'service')
               .map(item => item.name);
 
@@ -1116,12 +1301,13 @@ const POS = () => {
             await mockApi.rooms.updateRoomStatus(selectedRoom, 'pending', {
               serviceDuration: totalDuration,
               transactionId: receiptNumber,
-              employeeId: selectedEmployee,
+              employeeId: roomEmpId,
               employeeName: employeeName,
               serviceNames: serviceNames,
               customerName: customerName,
               customerPhone: customerPhone,
-              customerEmail: customerEmail
+              customerEmail: customerEmail,
+              paxCount,
             });
           } catch (error) {
             console.error('Failed to update room/home service status:', error);
@@ -1132,17 +1318,15 @@ const POS = () => {
         // Create Home Service card if Home Service was selected
         if (isHomeService && homeServiceAddress) {
           try {
-            // Calculate total service duration from cart (services only)
-            const totalDuration = cart.reduce((total, item) => {
-              return total + ((item.type === 'service' && item.duration) ? item.duration * item.quantity : 0);
+            const totalDuration = checkoutItems.reduce((total, item) => {
+              return total + ((item.type === 'service' && item.duration) ? item.duration * (item.quantity || 1) : 0);
             }, 0) || 60; // Default 60 min if no duration
 
-            // Get employee name for display on home service card
-            const selectedEmp = employees.find(e => e._id === selectedEmployee);
+            const homeEmpId = paxCount > 1 ? (guests[0]?.employeeId || null) : selectedEmployee;
+            const selectedEmp = homeEmpId ? employees.find(e => e._id === homeEmpId) : null;
             const employeeName = selectedEmp ? `${selectedEmp.firstName} ${selectedEmp.lastName}` : null;
 
-            // Get service names for display
-            const serviceNames = cart
+            const serviceNames = checkoutItems
               .filter(item => item.type === 'service')
               .map(item => item.name);
 
@@ -1163,7 +1347,7 @@ const POS = () => {
 
             // Create home service record
             await mockApi.homeServices.createHomeService({
-              employeeId: selectedEmployee,
+              employeeId: homeEmpId,
               employeeName: employeeName,
               customerName: customerName,
               customerPhone: customerPhone,
@@ -1171,7 +1355,8 @@ const POS = () => {
               address: homeServiceAddress,
               serviceNames: serviceNames,
               serviceDuration: totalDuration,
-              transactionId: receiptNumber
+              transactionId: receiptNumber,
+              paxCount,
             });
           } catch (error) {
             console.error('Failed to update room/home service status:', error);
@@ -1182,6 +1367,8 @@ const POS = () => {
 
       // Reset everything
       setCart([]);
+      setPaxCount(1);
+      setGuests([{ guestNumber: 1, services: [], employeeId: null, isRequestedTherapist: false }]);
       setShowCheckout(false);
       resetCheckoutForm();
       if (receiptEnabled) setShowReceipt(true);
@@ -1239,6 +1426,9 @@ const POS = () => {
       homeServiceAddress: wasHomeServiceAddress,
       appliedGC: wasAppliedGC,
       discountType: wasDiscountType,
+      paxCount: ctxPaxCount = 1,
+      guests: ctxGuests = [],
+      guestSummary: ctxGuestSummary,
     } = ctx;
 
     try {
@@ -1284,7 +1474,15 @@ const POS = () => {
     setReceiptData({
       receiptNumber,
       date: new Date(),
-      items: cartSnapshot.map(item => ({ name: item.name, quantity: item.quantity, price: item.price, subtotal: item.subtotal })),
+      items: cartSnapshot.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        subtotal: item.subtotal,
+        guestNumber: item.guestNumber,
+      })),
+      paxCount: ctxPaxCount,
+      guestSummary: ctxGuestSummary,
       subtotal: transaction.subtotal,
       discount: transaction.discount,
       discountType: transaction.discountType,
@@ -1298,13 +1496,27 @@ const POS = () => {
       customer: transaction.customer?.name || 'Walk-in',
     });
 
-    // Rotation queue — skip when the client requested this therapist by name,
-    // mirroring the regular checkout path.
-    if (employee?._id && !ctx.isRequestedTherapist) {
-      try {
-        await mockApi.serviceRotation.recordService(employee._id);
-      } catch (error) {
-        console.error('Failed to record service rotation:', error);
+    // Rotation queue — same rules as the regular branch:
+    //  - single-pax: advance once if not a manual request
+    //  - multi-pax: advance once per guest who picked a real therapist and
+    //    didn't flag it as a manual request
+    if (ctxPaxCount === 1) {
+      if (employee?._id && !ctx.isRequestedTherapist) {
+        try {
+          await mockApi.serviceRotation.recordService(employee._id);
+        } catch (error) {
+          console.error('Failed to record service rotation:', error);
+        }
+      }
+    } else {
+      for (const g of ctxGuests) {
+        if (g.employeeId && !g.isRequestedTherapist) {
+          try {
+            await mockApi.serviceRotation.recordService(g.employeeId);
+          } catch (error) {
+            console.error('Failed to record service rotation for guest', g.guestNumber, error);
+          }
+        }
       }
     }
 
@@ -1357,6 +1569,8 @@ const POS = () => {
 
     // Reset like the regular branch
     setCart([]);
+    setPaxCount(1);
+    setGuests([{ guestNumber: 1, services: [], employeeId: null, isRequestedTherapist: false }]);
     setShowCheckout(false);
     resetCheckoutForm();
     if (receiptEnabled) setShowReceipt(true);
@@ -1508,53 +1722,106 @@ const POS = () => {
         <div className="pos-cart-panel">
           <div className="cart-header">
             <h3>Shopping Cart</h3>
-            <span className="cart-count">{cart.length} items</span>
+            <span className="cart-count">
+              {paxCount > 1 ? `${paxCount} guests` : `${cart.length} items`}
+            </span>
           </div>
 
-          <div className="cart-items">
-            {cart.length === 0 ? (
-              <div className="empty-cart">
-                <p>🛒</p>
-                <p>Your cart is empty</p>
-                <p className="empty-cart-subtitle">Add items to get started</p>
-              </div>
-            ) : (
-              cart.map((item, index) => (
-                <div key={index} className="cart-item">
-                  <div className="cart-item-details">
-                    <h4>{item.name}</h4>
-                    <p className="cart-item-price">₱{(item.price ?? 0).toLocaleString()}</p>
-                  </div>
-                  <div className="cart-item-controls">
-                    <button
-                      className="qty-btn"
-                      onClick={() => updateCartQuantity(index, item.quantity - 1)}
-                    >
-                      −
-                    </button>
-                    <span className="qty-display">{item.quantity}</span>
-                    <button
-                      className="qty-btn"
-                      onClick={() => updateCartQuantity(index, item.quantity + 1)}
-                    >
-                      +
-                    </button>
-                  </div>
-                  <div className="cart-item-total">
-                    <p>₱{(item.subtotal ?? 0).toLocaleString()}</p>
-                    <button
-                      className="remove-btn"
-                      onClick={() => removeFromCart(index)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))
+          {/* Number of guests stepper — paxCount=1 keeps the historical
+              single-pax UI; paxCount>1 swaps in the per-guest PaxBuilder. */}
+          <div
+            className="pax-stepper"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              borderBottom: '1px solid var(--gray-200)',
+              fontSize: '0.9rem',
+            }}
+          >
+            <label htmlFor="pos-pax-count" style={{ fontWeight: 500, color: 'var(--gray-700)' }}>
+              Number of guests:
+            </label>
+            <input
+              id="pos-pax-count"
+              type="number"
+              min={1}
+              max={30}
+              value={paxCount}
+              onChange={(e) => handlePaxCountChange(e.target.value)}
+              style={{
+                width: 64,
+                padding: '0.3rem 0.5rem',
+                border: '1px solid var(--gray-300)',
+                borderRadius: 6,
+                textAlign: 'center',
+              }}
+            />
+            {paxCount > 1 && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>
+                Each guest picks their own service + therapist below.
+              </span>
             )}
           </div>
 
-          {cart.length > 0 && (
+          {paxCount > 1 ? (
+            <div className="cart-items" style={{ padding: '0.5rem 0.75rem' }}>
+              <PaxBuilder
+                paxCount={paxCount}
+                guests={guests}
+                onChange={setGuests}
+                services={products.filter((p) => p.type === 'service')}
+                therapists={getTherapists(employees)}
+                mode="staff"
+              />
+            </div>
+          ) : (
+            <div className="cart-items">
+              {cart.length === 0 ? (
+                <div className="empty-cart">
+                  <p>🛒</p>
+                  <p>Your cart is empty</p>
+                  <p className="empty-cart-subtitle">Add items to get started</p>
+                </div>
+              ) : (
+                cart.map((item, index) => (
+                  <div key={index} className="cart-item">
+                    <div className="cart-item-details">
+                      <h4>{item.name}</h4>
+                      <p className="cart-item-price">₱{(item.price ?? 0).toLocaleString()}</p>
+                    </div>
+                    <div className="cart-item-controls">
+                      <button
+                        className="qty-btn"
+                        onClick={() => updateCartQuantity(index, item.quantity - 1)}
+                      >
+                        −
+                      </button>
+                      <span className="qty-display">{item.quantity}</span>
+                      <button
+                        className="qty-btn"
+                        onClick={() => updateCartQuantity(index, item.quantity + 1)}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="cart-item-total">
+                      <p>₱{(item.subtotal ?? 0).toLocaleString()}</p>
+                      <button
+                        className="remove-btn"
+                        onClick={() => removeFromCart(index)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {effectiveCartItems.length > 0 && (
             <>
               <div className="cart-summary">
                 <div className="summary-row">
@@ -1585,7 +1852,22 @@ const POS = () => {
               </div>
 
               <div className="cart-actions">
-                <button className="btn btn-secondary btn-block" onClick={clearCart}>
+                <button
+                  className="btn btn-secondary btn-block"
+                  onClick={paxCount > 1
+                    ? () => {
+                        // Multi-pax: clear all guest selections (keep the
+                        // pax count so the cashier doesn't lose their place).
+                        setGuests((prev) => prev.map((g) => ({
+                          ...g,
+                          services: [],
+                          employeeId: null,
+                          isRequestedTherapist: false,
+                        })));
+                        showToast('Guest selections cleared', 'info');
+                      }
+                    : clearCart}
+                >
                   Clear Cart
                 </button>
                 <button className="btn btn-primary btn-block" onClick={openCheckout}>
@@ -1757,7 +2039,39 @@ const POS = () => {
                 )}
               </div>
 
-              {/* Employee Selection with Rotation Queue */}
+              {/* Employee Selection with Rotation Queue.
+                  Multi-pax mode: each guest picks their own therapist in
+                  PaxBuilder, so the global picker is hidden and replaced by
+                  a short summary block. */}
+              {paxCount > 1 ? (
+                <div className="checkout-section">
+                  <h4>Therapists (per guest)</h4>
+                  <div style={{
+                    background: 'var(--gray-50)',
+                    border: '1px solid var(--gray-200)',
+                    borderRadius: 6,
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.85rem',
+                    color: 'var(--gray-700)',
+                  }}>
+                    {guests.map((g) => {
+                      const emp = g.employeeId ? employees.find(e => e._id === g.employeeId) : null;
+                      const label = emp
+                        ? `${emp.firstName} ${emp.lastName}${g.isRequestedTherapist ? ' (requested)' : ''}`
+                        : 'Auto (rotation)';
+                      return (
+                        <div key={g.guestNumber} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                          <span>Guest {g.guestNumber}</span>
+                          <span>{label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--gray-500)', marginTop: '0.4rem' }}>
+                    Change therapist per guest in the cart panel.
+                  </p>
+                </div>
+              ) : (
               <div className="checkout-section">
                 <h4>Select Employee *</h4>
 
@@ -1971,6 +2285,7 @@ const POS = () => {
                   </p>
                 )}
               </div>
+              )}
 
               {/* Customer Selection - Hidden when advance booking is enabled */}
               {!isAdvanceBooking && (
@@ -2385,14 +2700,28 @@ const POS = () => {
 
               {/* Cart Summary - Moved to bottom */}
               <div className="checkout-section">
-                <h4>📋 Cart Summary</h4>
+                <h4>📋 Cart Summary{paxCount > 1 ? ` — ${paxCount} guests` : ''}</h4>
                 <div className="checkout-cart-summary">
-                  {cart.map((item, index) => (
-                    <div key={index} className="checkout-item">
-                      <span>{item.name} x{item.quantity}</span>
-                      <span>₱{item.subtotal.toLocaleString()}</span>
-                    </div>
-                  ))}
+                  {paxCount > 1
+                    ? guests.map((g) => (
+                        <div key={g.guestNumber} style={{ marginBottom: '0.4rem' }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--gray-700)' }}>
+                            Guest {g.guestNumber}
+                          </div>
+                          {(g.services || []).map((svc, si) => (
+                            <div key={si} className="checkout-item" style={{ paddingLeft: '0.75rem' }}>
+                              <span>{svc.name}</span>
+                              <span>₱{(svc.price ?? 0).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    : cart.map((item, index) => (
+                        <div key={index} className="checkout-item">
+                          <span>{item.name} x{item.quantity}</span>
+                          <span>₱{item.subtotal.toLocaleString()}</span>
+                        </div>
+                      ))}
                   <div className="checkout-total">
                     <strong>Subtotal:</strong>
                     <strong>₱{getCartSubtotal().toLocaleString()}</strong>

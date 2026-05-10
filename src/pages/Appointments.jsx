@@ -11,6 +11,7 @@ import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import storageService from '../services/storage';
 import { formatTime12Hour } from '../utils/dateUtils';
 import PaxBuilder from '../components/booking/PaxBuilder';
+import PaxBadge from '../components/booking/PaxBadge';
 import { summarisePax } from '../utils/booking/multiPax';
 
 // Build a fresh blank guest row for the PaxBuilder.
@@ -894,7 +895,10 @@ const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
                 <div className="appointment-header">
                   <div>
                     <h3 className="appointment-customer">{appointment.customer?.name || 'Walk-in Customer'}</h3>
-                    <p className="appointment-service">{appointment.service?.name}</p>
+                    <p className="appointment-service">
+                      {appointment.service?.name}
+                      <PaxBadge paxCount={appointment.paxCount} guestSummary={appointment.guestSummary} />
+                    </p>
                   </div>
                   <span className={`appointment-status-badge ${appointment.status}`}>
                     {appointment.status}

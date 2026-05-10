@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
+import PaxBadge from './booking/PaxBadge';
 
 const AdvanceBookingsTab = () => {
   const { user, showToast, isTherapist, canViewAll, hasManagementAccess } = useApp();
@@ -368,7 +369,10 @@ const AdvanceBookingsTab = () => {
                 <div className="booking-details">
                   <div className="detail-row">
                     <span className="detail-icon">💆</span>
-                    <span className="detail-text">{booking.serviceName}</span>
+                    <span className="detail-text">
+                      {booking.serviceName}
+                      <PaxBadge paxCount={booking.paxCount} guestSummary={booking.guestSummary} />
+                    </span>
                   </div>
                   <div className="detail-row">
                     <span className="detail-icon">👤</span>

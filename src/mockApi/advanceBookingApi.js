@@ -2,7 +2,31 @@
 // Frontend-only simulation with Dexie (IndexedDB) persistence
 // Now uses repositories for event-driven sync
 
-import { AdvanceBookingRepository, ActiveServiceRepository } from '../services/storage/repositories';
+import {
+  AdvanceBookingRepository,
+  ActiveServiceRepository,
+  ActivityLogRepository,
+} from '../services/storage/repositories';
+
+// Activity log helper — best-effort, swallowed on failure so a flaky log
+// write never blocks the booking flow.
+const logBookingActivity = async (action, description, booking, extra = {}) => {
+  try {
+    await ActivityLogRepository.log('booking', action, description, {
+      severity: 'info',
+      metadata: {
+        bookingId: booking?._id || booking?.id,
+        customerId: booking?.customerId || null,
+        clientName: booking?.clientName,
+        bookingDateTime: booking?.bookingDateTime,
+        paxCount: booking?.paxCount || 1,
+        ...extra,
+      },
+    });
+  } catch (err) {
+    console.warn('[advanceBookingApi] activity log failed:', err);
+  }
+};
 
 // No artificial delay - Dexie is already async and fast
 const delay = () => Promise.resolve();
@@ -86,6 +110,13 @@ export const advanceBookingApi = {
       ...bookingInput
     });
 
+    await logBookingActivity(
+      'booking.created',
+      `Advance booking created for ${newBooking.clientName || 'customer'}`.trim(),
+      newBooking,
+      { source: 'advance' }
+    );
+
     return clone(newBooking);
   },
 
@@ -158,6 +189,13 @@ export const advanceBookingApi = {
     // Use repository for event-driven sync
     const updatedBooking = await AdvanceBookingRepository.complete(bookingId, 'system');
 
+    await logBookingActivity(
+      'booking.completed',
+      `Advance booking completed for ${updatedBooking?.clientName || booking.clientName || 'customer'}`.trim(),
+      updatedBooking || booking,
+      { source: 'advance' }
+    );
+
     // Find and complete active service using repository
     const activeServices = await ActiveServiceRepository.getByBooking(bookingId);
     let completedService = null;
@@ -187,6 +225,14 @@ export const advanceBookingApi = {
     await initAdvanceBookings();
     // Use repository for event-driven sync
     const updatedBooking = await AdvanceBookingRepository.cancel(bookingId, 'system', reason);
+
+    await logBookingActivity(
+      'booking.cancelled',
+      `Advance booking cancelled for ${updatedBooking?.clientName || 'customer'}`.trim(),
+      updatedBooking,
+      { source: 'advance', reason }
+    );
+
     return clone(updatedBooking);
   },
 

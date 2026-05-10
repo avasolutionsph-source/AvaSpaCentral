@@ -19,6 +19,7 @@ import {
   PayrollConfigRepository,
   LoyaltyHistoryRepository,
   CustomerRepository,
+  ActivityLogRepository,
 } from '../storage/repositories';
 import NotificationRepo from '../storage/repositories/NotificationRepository';
 import { authService, supabase, isSupabaseConfigured, supabaseSyncManager } from '../supabase';
@@ -788,9 +789,9 @@ export const transactionsAdapter = {
   async createTransaction(data) {
     await delay();
 
-    // Wrap in Dexie transaction for atomicity - if stock update fails,
-    // transaction is rolled back. Loyalty awarding runs *after* the txn
-    // closes so it can touch tables (customers, loyaltyHistory) that aren't
+    // Wrap in Dexie transaction for atomicity - if stock update fails, transaction is rolled back.
+    // Loyalty awarding + activity logging run *after* the txn closes so they
+    // can touch tables (customers, loyaltyHistory, activityLogs) that aren't
     // in the rw scope above without expanding the lock.
     const result = await db.transaction('rw', [db.transactions, db.products, db.syncQueue], async () => {
       const transaction = await storageService.transactions.create({
@@ -864,15 +865,31 @@ export const transactionsAdapter = {
       return { success: true, transaction: clone(transaction) };
     });
 
-    // Best-effort loyalty award (swallowed on failure so it never blocks
-    // checkout). Runs outside the dexie transaction above because it touches
-    // customers + loyaltyHistory, which aren't in its rw scope.
+    // Side effects (best-effort, swallowed on failure so they never block
+    // checkout). Run outside the dexie transaction above because they touch
+    // tables not in its rw scope.
     try {
-      if (result?.transaction) {
-        await awardLoyaltyForTransaction(result.transaction);
+      const txnRecord = result?.transaction;
+      if (txnRecord) {
+        await awardLoyaltyForTransaction(txnRecord);
+        await ActivityLogRepository.log(
+          'transaction',
+          'transaction.completed',
+          `Transaction ${txnRecord.receiptNumber || txnRecord._id || ''} completed`.trim(),
+          {
+            severity: 'info',
+            metadata: {
+              transactionId: txnRecord._id || txnRecord.id,
+              receiptNumber: txnRecord.receiptNumber,
+              totalAmount: txnRecord.totalAmount ?? txnRecord.total,
+              customerId: txnRecord.customerId || null,
+              paxCount: txnRecord.paxCount || 1,
+            },
+          }
+        );
       }
     } catch (err) {
-      console.warn('[StorageAdapter] post-createTransaction loyalty award failed:', err);
+      console.warn('[StorageAdapter] post-createTransaction side effects failed:', err);
     }
 
     return result;
@@ -1087,6 +1104,29 @@ export const appointmentsAdapter = {
       ...data,
       status: data.status || 'scheduled'
     });
+
+    // Activity log — best-effort. paxCount included in metadata so
+    // group bookings can be filtered later.
+    try {
+      await ActivityLogRepository.log(
+        'booking',
+        'booking.created',
+        `Appointment booked for ${appointment.customerName || appointment.clientName || 'customer'}`.trim(),
+        {
+          severity: 'info',
+          metadata: {
+            appointmentId: appointment._id || appointment.id,
+            customerId: appointment.customerId || null,
+            employeeId: appointment.employeeId || null,
+            scheduledDateTime: appointment.scheduledDateTime,
+            paxCount: appointment.paxCount || 1,
+          },
+        }
+      );
+    } catch (err) {
+      console.warn('[StorageAdapter] createAppointment activity log failed:', err);
+    }
+
     return { success: true, appointment: clone(appointment) };
   },
 
@@ -1106,6 +1146,34 @@ export const appointmentsAdapter = {
   async updateStatus(id, status) {
     await delay();
     const appointment = await storageService.appointments.update(id, { status });
+
+    // Log cancellations + completions specifically. Other status transitions
+    // (no-show, in-progress, etc.) aren't loud enough to merit a feed entry.
+    if (status === 'cancelled' || status === 'completed') {
+      try {
+        const action = status === 'cancelled' ? 'booking.cancelled' : 'booking.completed';
+        const description = status === 'cancelled'
+          ? `Appointment cancelled for ${appointment?.customerName || appointment?.clientName || 'customer'}`.trim()
+          : `Appointment completed for ${appointment?.customerName || appointment?.clientName || 'customer'}`.trim();
+        await ActivityLogRepository.log(
+          'booking',
+          action,
+          description,
+          {
+            severity: 'info',
+            metadata: {
+              appointmentId: appointment?._id || id,
+              customerId: appointment?.customerId || null,
+              status,
+              paxCount: appointment?.paxCount || 1,
+            },
+          }
+        );
+      } catch (err) {
+        console.warn('[StorageAdapter] updateStatus activity log failed:', err);
+      }
+    }
+
     return { success: true, appointment: clone(appointment) };
   },
 

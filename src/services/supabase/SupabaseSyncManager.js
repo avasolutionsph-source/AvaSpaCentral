@@ -182,12 +182,13 @@ const SUPABASE_TABLE_COLUMNS = {
     'room_id', 'room_name', 'is_home_service', 'home_service_address',
     'employee', 'customer', 'upgrade_history',
     'cashier_id', 'cashier_name', 'shift_id', 'drawer_session_id',
-    'branch_id', 'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+    'branch_id', 'pax_count', 'guest_summary',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   appointments: [
     'id', 'business_id', 'customer_id', 'employee_id', 'room_id',
     'scheduled_date_time', 'duration', 'service_id', 'service_name',
-    'status', 'notes', 'branch_id',
+    'status', 'notes', 'branch_id', 'pax_count',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   expenses: [
@@ -326,13 +327,15 @@ const SUPABASE_TABLE_COLUMNS = {
     'client_name', 'client_phone', 'client_email', 'client_address',
     'payment_method', 'payment_timing', 'payment_status', 'transaction_id',
     'special_requests', 'client_notes', 'cancel_reason', 'cancelled_at',
-    'notes', 'branch_id', 'sync_status', 'deleted', 'deleted_at',
+    'notes', 'branch_id', 'pax_count', 'guest_summary',
+    'sync_status', 'deleted', 'deleted_at',
     'created_at', 'updated_at'
   ],
   active_services: [
     'id', 'business_id', 'room_id', 'advance_booking_id', 'customer_id',
     'employee_id', 'service_id', 'status', 'start_time', 'end_time', 'duration',
-    'branch_id', 'sync_status', 'created_at', 'updated_at'
+    'branch_id', 'guest_number',
+    'sync_status', 'created_at', 'updated_at'
   ],
   home_services: [
     'id', 'business_id', 'employee_id', 'employee_name', 'transaction_id',
@@ -549,6 +552,10 @@ const FIELD_NAME_MAP = {
   currentAppointmentId: 'current_appointment_id',
   serviceDuration: 'service_duration',
   branchId: 'branch_id',
+  // Multi-pax fields
+  paxCount: 'pax_count',
+  guestNumber: 'guest_number',
+  guestSummary: 'guest_summary',
   // Transaction fields
   amountReceived: 'amount_received',
   changeGiven: 'change_given',

@@ -6,6 +6,7 @@ import mockApi from '../mockApi';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import { supabaseSyncManager } from '../services/supabase';
 import useLocationTracker from '../hooks/useLocationTracker';
+import useAutoDispatchScheduler from '../hooks/useAutoDispatchScheduler';
 import PasundoLiveMap from '../components/PasundoLiveMap';
 
 const HIDDEN_STATUSES = ['completed', 'cancelled', 'no_show'];
@@ -467,12 +468,12 @@ export default function RiderBookings() {
     }
   };
 
-  // Live location tracking for the rider. Active whenever this device has at
-  // least one home-service delivery still in pickup state (pasundo requested,
-  // service not yet started/completed/cancelled). One GPS fix per interval is
-  // broadcast to every active delivery so the therapist's Rooms map sees the
-  // rider approach in real time. Stops the instant the last active pasundo
-  // clears, bounding battery + privacy impact to the pickup window.
+  // Live location tracking for the rider. Always on while this page is
+  // mounted so the auto-dispatch scheduler (below) has a fresh GPS reading
+  // even outside of active pasundos. Polls faster (5s) when there's an
+  // active delivery so the therapist's live map feels smooth, slower (10s)
+  // when idle to spare battery. The latest fix is also broadcast to every
+  // active delivery row so both sides see each other on the map.
   const activeDeliveryIds = useMemo(() => {
     return bookings
       .filter(b => b.source === 'homeService' && b.pickupRequestedAt &&
@@ -480,9 +481,13 @@ export default function RiderBookings() {
       .map(b => b.id);
   }, [bookings]);
 
+  const [riderFix, setRiderFix] = useState(null);
   useLocationTracker({
-    active: activeDeliveryIds.length > 0,
+    active: true,
+    intervalMs: activeDeliveryIds.length > 0 ? 5000 : 10000,
     onFix: useCallback(async ({ lat, lng }) => {
+      setRiderFix({ lat, lng, ts: Date.now() });
+      if (activeDeliveryIds.length === 0) return;
       const updatedAt = new Date().toISOString();
       // Fire updates in parallel — each call is independent and the sync layer
       // batches writes downstream. Errors are swallowed silently; the next
@@ -497,6 +502,21 @@ export default function RiderBookings() {
         )
       );
     }, [activeDeliveryIds]),
+  });
+
+  // Auto-dispatch scheduler — watches every in-progress home service in the
+  // rider's branch and flips pickupRequestedAt on once the remaining service
+  // time hits the rider's ETA. The existing pasundo notification trigger
+  // then fires the chime + card automatically.
+  const riderDisplayName = (user?.name
+    || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+    || user?.username
+    || 'Rider').trim();
+  useAutoDispatchScheduler({
+    branchId: user?.branchId || null,
+    riderLocation: riderFix,
+    riderName: riderDisplayName,
+    enabled: !!user?.employeeId && !!user?.branchId,
   });
 
   const openCard = (id) => setSelectedBookingId(id);

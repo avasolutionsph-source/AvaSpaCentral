@@ -55,14 +55,14 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   // source of truth; this is just a UI sugar.
   const [pickupRequesting, setPickupRequesting] = useState({});
 
-  // Live location tracking for the therapist side. Active while a pasundo
-  // is in flight on any non-advance home service — both 'pending' (pickup
-  // requested before the service starts, e.g. ride to the address) and
-  // 'occupied' (mid-service or post-service pickup back to the spa). One
+  // Live location tracking for the therapist side. Active for every non-advance
+  // home service on this device in 'pending' or 'occupied' state — independent
+  // of pasundo flag, so the auto-dispatch scheduler running on the rider's
+  // device always has a fresh therapist position to compute ETA against. One
   // GPS fix per tick is broadcast to every active row simultaneously.
   const therapistActivePickupIds = useMemo(() => {
     return (homeServices || [])
-      .filter(s => !s.isAdvanceBooking && s.pickupRequestedAt && ['pending', 'occupied'].includes(s.status))
+      .filter(s => !s.isAdvanceBooking && ['pending', 'occupied'].includes(s.status))
       .map(s => s._id);
   }, [homeServices]);
 

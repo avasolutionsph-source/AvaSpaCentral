@@ -572,6 +572,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
           serviceDuration: upgradeDuration || newDuration,
           servicePrice: newPrice,
           totalAmount: newPrice,
+          ...branchClaimFields(room),
         });
       } else {
         await mockApi.rooms.updateRoom(room._id, {
@@ -699,6 +700,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         });
         await homeServicesApi.updateHomeService(service._id, {
           startTime,
+          ...branchClaimFields(service),
         });
       }
 
@@ -708,6 +710,21 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
     } catch (error) {
       showToast('Failed to start home service', 'error');
     }
+  };
+
+  // Branch-claim backstop. When a therapist (or any in-branch operator)
+  // touches a home service that has no branchId — Start, Stop, Pasundo,
+  // Upgrade — the SAME write that performs the action stamps the actor's
+  // effective branch on the row. Rationale: the act of operating on the
+  // record is authoritative attribution. After this, the row passes the
+  // rider's strict per-branch filter normally; no bypass needed.
+  // Returns the fields to merge into the update payload (empty when the
+  // row already carries a branchId).
+  const branchClaimFields = (service) => {
+    if (service?.branchId) return {};
+    const claim = getEffectiveBranchId();
+    if (!claim) return {};
+    return { branchId: claim };
   };
 
   // Pasundo — therapist requests a rider pickup at the home-service address.
@@ -728,6 +745,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         || user?.username
         || user?.email
         || 'Therapist').trim();
+      const claim = branchClaimFields(service);
       // Advance-booking home services live on advanceBookings table, not
       // homeServices — only stamp the rows that actually carry the field
       // and rely on the existing advance-booking flow for the rest.
@@ -737,6 +755,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
           pickupRequestedBy: requesterName,
           pickupRequestedByRole: user?.role || 'Therapist',
           pickupRequestedByUserId: user?._id || user?.id || null,
+          ...claim,
         });
       } else {
         await homeServicesApi.updateHomeService(service._id, {
@@ -744,6 +763,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
           pickupRequestedBy: requesterName,
           pickupRequestedByRole: user?.role || 'Therapist',
           pickupRequestedByUserId: user?._id || user?.id || null,
+          ...claim,
         });
       }
       showToast('Rider notified — pasundo on the way', 'success');

@@ -165,15 +165,17 @@ export default function RiderBookings() {
         ? []
         : (homeServices || [])
             .filter(hs => {
-              // Strict match — same branch.
+              // Strict branch match — the rider only sees deliveries
+              // tagged to their branch. NO exceptions. Any therapist
+              // action (Start / Stop / Pasundo) on an untagged record
+              // claims the branchId at write-time (see Rooms.jsx
+              // backfillBranchIfMissing), so by the time a pasundo
+              // notification fires, the record is guaranteed to carry
+              // a proper branchId and pass this filter for the right
+              // riders. Bypassing the filter for "active operational
+              // events" was a tempting shortcut but it re-introduces
+              // the cross-branch leak the user explicitly called out.
               if (hs.branchId && hs.branchId === userBranchId) return true;
-              // Active pasundo always wins. If the therapist tapped
-              // "Pasundo" and the notification reached THIS rider, the
-              // record passed the branch-scoped notify filter already
-              // (or fell back to a wide broadcast on null branchId);
-              // hiding the card afterwards is the worst possible UX —
-              // rider hears the chime, sees no record to act on.
-              if (hs.pickupRequestedAt) return true;
               // Opt-in: untagged legacy rows (branchId === null/undefined).
               // We never show rows with a DIFFERENT valid branchId — that
               // would be the cross-branch leak the strict filter is here

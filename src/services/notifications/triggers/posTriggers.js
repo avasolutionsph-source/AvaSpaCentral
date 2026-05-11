@@ -118,6 +118,23 @@ export function startPosTriggers() {
         const all = await mockApi.homeServices.getHomeServices();
         const hs = all.find((h) => (h._id || h.id) === change.entityId);
         if (hs && hs.pickupRequestedAt && !seenPickupRequests.has(hs._id || hs.id)) {
+          // Strict branch gate. A pasundo notif with null branchId fans
+          // out to every Rider across every branch — exactly the leak the
+          // user called out. Rooms.jsx's branchClaimFields() auto-stamps
+          // branchId on the SAME write that sets pickupRequestedAt, so a
+          // null branchId here means something bypassed that path; log
+          // and skip rather than broadcasting wide.
+          if (!hs.branchId) {
+            console.warn(
+              '[posTriggers] Skipping pasundo notify — home service has no branchId, would have broadcast wide.',
+              { homeServiceId: hs._id || hs.id }
+            );
+            // Mark as seen so we don't keep re-evaluating on every
+            // subsequent update of this row; the action surface (Rooms
+            // Pasundo button) will re-fire once admin fixes the branchId.
+            seenPickupRequests.add(hs._id || hs.id);
+            return;
+          }
           seenPickupRequests.add(hs._id || hs.id);
           const therapist = hs.pickupRequestedBy || hs.employeeName || 'Therapist';
           const where = hs.address || 'home service address';
@@ -133,7 +150,7 @@ export function startPosTriggers() {
             actionLabel: 'View',
             soundClass: 'loop',
             payload: { homeServiceId: hs._id || hs.id },
-            branchId: hs.branchId || null,
+            branchId: hs.branchId,
           });
         }
       } catch (e) { /* swallow */ }

@@ -876,8 +876,16 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                   // Silent fail for booking completion
                 }
               } else {
-                // Delete regular home service card on completion
-                await homeServicesApi.deleteHomeService(service._id);
+                // Mark regular home service as completed (NOT delete).
+                // Soft-deleting hides the row from every device's sync
+                // (Dexie filter skips deleted rows) — the rider then has
+                // no audit trail of a delivery they may have driven. The
+                // status filter on the rider page already hides
+                // 'completed' from the default view; "Show completed"
+                // reveals it.
+                await homeServicesApi.updateHomeServiceStatus(service._id, 'completed', {
+                  completedBy: 'auto-timer',
+                });
               }
 
               showToast(`Home service for ${service.customerName} completed`, 'info');
@@ -1014,9 +1022,17 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             showToast(`Home service stopped: ${stopReason}`, 'info');
           }
         } else {
-          // Delete regular home service card and cancel the linked POS
-          // transaction so Service History stops counting it.
-          await homeServicesApi.deleteHomeService(room._id);
+          // Mark the home service as cancelled (NOT delete). Soft-deleting
+          // hides the row from every device's sync — the rider would see
+          // a notification chime followed by an empty deliveries page
+          // because the cancelled record is filtered out of pulls. Status
+          // 'cancelled' preserves the audit trail; the rider page already
+          // hides cancelled from default view via HIDDEN_STATUSES, so the
+          // card disappears from the active list either way.
+          await homeServicesApi.updateHomeServiceStatus(room._id, 'cancelled', {
+            cancelledBy: actorName,
+            reason: stopReason,
+          });
           await cancelLinkedTransaction(room.transactionId, stopReason, actorDisplay, actorRole);
           showToast(`Home service stopped: ${stopReason}`, 'info');
         }

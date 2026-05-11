@@ -86,45 +86,53 @@ export default function NotificationPermissionBanner() {
   const platform = detectPlatform();
   const steps = INSTRUCTIONS[platform] || INSTRUCTIONS.unknown;
 
+  // Compact inline alert intended to live INSIDE the bell dropdown (between
+  // the header and the notification list). The full-width page banner was
+  // visually noisy — keeping the warning behind the bell click consolidates
+  // every notification-related affordance into a single surface.
   return (
     <div
       role="alert"
       style={{
         background: '#fef3c7',
-        borderBottom: '1px solid #f59e0b',
+        border: '1px solid #f59e0b',
         color: '#78350f',
-        padding: '0.75rem 1rem',
-        fontSize: '0.875rem',
+        borderRadius: '6px',
+        padding: '8px 10px',
+        margin: '8px 10px 0',
+        fontSize: '0.8rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.5rem',
+        gap: '6px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '1.1rem' }}>🔕</span>
-        <strong>Notifications are blocked on this device.</strong>
-        <span>You may miss bookings, payments, and other alerts.</span>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+        <span style={{ fontSize: '1rem', lineHeight: 1.2 }}>🔕</span>
+        <div style={{ flex: 1, lineHeight: 1.35 }}>
+          <strong>Notifications blocked.</strong>{' '}
+          <span style={{ color: '#92400e' }}>You may miss alerts.</span>
+        </div>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
           style={{
-            marginLeft: 'auto',
             background: '#92400e',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            padding: '0.25rem 0.75rem',
-            fontSize: '0.8rem',
+            padding: '3px 8px',
+            fontSize: '0.72rem',
             cursor: 'pointer',
+            whiteSpace: 'nowrap',
           }}
         >
-          {expanded ? 'Hide instructions' : 'How to fix'}
+          {expanded ? 'Hide' : 'How to fix'}
         </button>
       </div>
       {expanded && (
-        <ol style={{ margin: '0.25rem 0 0 1.25rem', padding: 0, lineHeight: 1.5 }}>
+        <ol style={{ margin: '2px 0 0 18px', padding: 0, lineHeight: 1.45, fontSize: '0.78rem' }}>
           {steps.map((step, i) => (
-            <li key={i}>{step}</li>
+            <li key={i} style={{ marginBottom: 2 }}>{step}</li>
           ))}
         </ol>
       )}

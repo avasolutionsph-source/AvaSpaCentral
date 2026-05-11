@@ -436,12 +436,6 @@ const MainLayout = () => {
 
   return (
     <div className="main-layout">
-      {/* Persistent banner shown only when the OS-level notification
-          permission is 'denied'. Self-detects the user's platform and
-          shows targeted instructions so non-technical users aren't
-          stuck digging through browser/OS settings on their own. */}
-      <NotificationPermissionBanner />
-
       {/* Offline/Sync Status Indicator */}
       <OfflineIndicator />
 
@@ -762,6 +756,11 @@ const MainLayout = () => {
                       )}
                     </div>
                   </div>
+                  {/* "Notifications blocked" inline alert — only renders when
+                      Notification.permission === 'denied'. Used to live as a
+                      full-width page banner; consolidated here so every
+                      notification-related affordance is behind the bell. */}
+                  <NotificationPermissionBanner />
                   <div className="notification-list">
                     {/* Sync queue — pinned to top so failed/pending sync is visible
                         alongside business alerts instead of as a separate toolbar. */}

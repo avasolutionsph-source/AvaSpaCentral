@@ -2025,9 +2025,32 @@ const POS = () => {
                         style={{ padding: '0.35rem 0.5rem', border: '1px solid var(--gray-300)', borderRadius: 6, fontSize: '0.85rem' }}
                       >
                         <option value="">Auto (rotation)</option>
-                        {therapistOpts.map((t) => (
-                          <option key={t._id} value={t._id}>Request: {t.name}</option>
-                        ))}
+                        {/* Match the rich label used by the global REQUESTED
+                            THERAPIST dropdown (lines 2437-2488): full name +
+                            position + clock-in / busy status. Disabled options
+                            stay visible but greyed-out so the cashier can see
+                            who's on shift today vs not. */}
+                        {therapistOpts.map((t) => {
+                          const inQueue = rotationQueue.find((q) => String(q.employeeId) === String(t._id));
+                          const isClockedIn = !!inQueue;
+                          const isBusy = busyEmployeeIds.includes(String(t._id));
+                          const canSelect = isClockedIn && !isBusy;
+                          const statusSuffix = isBusy
+                            ? ' (🔴 Doing service)'
+                            : isClockedIn
+                              ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)`
+                              : ' (Not clocked in)';
+                          return (
+                            <option
+                              key={t._id}
+                              value={t._id}
+                              disabled={!canSelect}
+                              style={!canSelect ? { color: '#999999' } : {}}
+                            >
+                              {t.firstName} {t.lastName} - {t.position}{statusSuffix}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   );

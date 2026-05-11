@@ -57,3 +57,23 @@ ALTER TABLE public.transport_requests ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Business isolation" ON public.transport_requests;
 CREATE POLICY "Business isolation" ON public.transport_requests
   FOR ALL USING (business_id = (SELECT business_id FROM public.users WHERE auth_id = (SELECT auth.uid())));
+
+-- Realtime: add to the supabase_realtime publication so the rider's device
+-- gets new transport_requests rows live (no REST poll latency). REPLICA
+-- IDENTITY FULL so UPDATE/DELETE deliver every column for cross-device
+-- card updates (Confirm, Done, etc.). The ALTER PUBLICATION is wrapped in
+-- a DO block because re-adding an already-published table raises an error
+-- on Postgres; this makes the migration idempotent.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'transport_requests'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.transport_requests';
+  END IF;
+END $$;
+
+ALTER TABLE public.transport_requests REPLICA IDENTITY FULL;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { homeServicesApi, transactionsApi } from '../mockApi/offlineApi';
@@ -68,10 +68,18 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       .map(s => s._id);
   }, [homeServices]);
 
+  // Track IDs we just wrote our own GPS to. The dataChangeEmitter would
+  // otherwise reload every home service every 5s, repainting all cards
+  // (visible flicker). Holding these IDs for a short window lets the
+  // subscriber skip the reload for our own writes; remote writes still
+  // pass through.
+  const selfLocationWritesRef = useRef(new Map());
   useLocationTracker({
     active: therapistActivePickupIds.length > 0,
     onFix: useCallback(async ({ lat, lng }) => {
       const updatedAt = new Date().toISOString();
+      const now = Date.now();
+      therapistActivePickupIds.forEach(id => selfLocationWritesRef.current.set(id, now));
       await Promise.allSettled(
         therapistActivePickupIds.map(id =>
           homeServicesApi.updateHomeService(id, {
@@ -410,11 +418,20 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
     let dataDebounce = null;
     const unsubscribeData = dataChangeEmitter.subscribe((change) => {
       if (['rooms', 'activeServices', 'homeServices'].includes(change.entityType)) {
+        // Skip if this is the echo of OUR OWN recent location write — those
+        // happen every 5s while a service is active and would otherwise
+        // re-fire loadHomeServices on every tick, repainting every card.
+        if (change.entityType === 'homeServices' && change.entityId) {
+          const writtenAt = selfLocationWritesRef.current.get(change.entityId);
+          if (writtenAt && Date.now() - writtenAt < 3000) {
+            return;
+          }
+        }
         clearTimeout(dataDebounce);
         dataDebounce = setTimeout(() => {
           try { loadRooms?.(); } catch {}
           try { loadHomeServices(); } catch {}
-        }, 300);
+        }, 800);
       }
     });
 

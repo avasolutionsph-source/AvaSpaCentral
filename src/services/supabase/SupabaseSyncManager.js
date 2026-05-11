@@ -93,7 +93,9 @@ const SYNCABLE_ENTITIES = [
   // Settings & Config (no 'settings' — handled directly via businesses table)
   'businessConfig', 'serviceRotation',
   // Services & Bookings
-  'loyaltyHistory', 'advanceBookings', 'activeServices', 'homeServices'
+  'loyaltyHistory', 'advanceBookings', 'activeServices', 'homeServices',
+  // Pahatid — universal drop-off requests
+  'transportRequests'
 ];
 
 // Map Dexie table names to Supabase table names (snake_case)
@@ -1276,6 +1278,7 @@ class SupabaseSyncManager {
       'payrollConfig', 'payrollConfigLogs', 'timeOffRequests',
       'cashDrawerSessions', 'businessConfig', 'serviceRotation',
       'loyaltyHistory', 'advanceBookings', 'activeServices', 'homeServices',
+      'transportRequests',
       'business', 'users'
     ];
 
@@ -1345,6 +1348,8 @@ class SupabaseSyncManager {
       // Services & Bookings
       'advanceBookings', 'activeServices', 'suppliers',
       'serviceRotation', 'homeServices', 'loyaltyHistory',
+      // Pahatid — universal drop-off requests
+      'transportRequests',
       // Audit
       'activityLogs',
     ];

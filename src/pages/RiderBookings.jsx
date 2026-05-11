@@ -308,10 +308,19 @@ export default function RiderBookings() {
 
   useEffect(() => { load(true); }, [load]);
   useEffect(() => {
+    let debounce = null;
     const unsub = dataChangeEmitter.subscribe(c => {
-      if (['advanceBookings', 'homeServices', 'transportRequests'].includes(c.entityType)) load(false);
+      if (!['advanceBookings', 'homeServices', 'transportRequests'].includes(c.entityType)) return;
+      // Skip the echo of OUR OWN location writes — every 5s otherwise reloads
+      // the entire deliveries list, causing flicker.
+      if (c.entityType === 'homeServices' && c.entityId) {
+        const writtenAt = selfLocationWritesRef.current.get(c.entityId);
+        if (writtenAt && Date.now() - writtenAt < 3000) return;
+      }
+      clearTimeout(debounce);
+      debounce = setTimeout(() => load(false), 800);
     });
-    return () => unsub();
+    return () => { unsub(); clearTimeout(debounce); };
   }, [load]);
 
   // Cross-device live refresh. The dataChangeEmitter only fires for writes
@@ -576,6 +585,9 @@ export default function RiderBookings() {
   }, [bookings]);
 
   const [riderFix, setRiderFix] = useState(null);
+  // Track IDs we just wrote our own GPS to so the dataChange echo doesn't
+  // reload the whole bookings list every tick (caused visible flicker).
+  const selfLocationWritesRef = useRef(new Map());
   useLocationTracker({
     active: true,
     intervalMs: activeDeliveryIds.length > 0 ? 5000 : 10000,
@@ -583,6 +595,8 @@ export default function RiderBookings() {
       setRiderFix({ lat, lng, ts: Date.now() });
       if (activeDeliveryIds.length === 0) return;
       const updatedAt = new Date().toISOString();
+      const now = Date.now();
+      activeDeliveryIds.forEach(id => selfLocationWritesRef.current.set(id, now));
       // Fire updates in parallel — each call is independent and the sync layer
       // batches writes downstream. Errors are swallowed silently; the next
       // tick will retry with a fresh fix anyway.

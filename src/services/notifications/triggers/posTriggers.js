@@ -199,16 +199,17 @@ export function startPosTriggers() {
         // Front-of-house broadcast. The therapist + rider notifs above are
         // narrowly targeted, so a manager/owner/receptionist running POS
         // would otherwise get no acknowledgement that the home service
-        // was logged. One-shot chime, not the looping rider alarm — this
-        // is an FYI, not an action request.
+        // was logged. Loop chime + Open/Confirm dual buttons match the
+        // rider/therapist UX so the cashier doesn't perceive it as a
+        // weaker notification — the Confirm tap is what silences the
+        // chime, Open jumps to the Rooms page.
         await NotificationService.notify({
           type: NotificationService.TYPES.POS_HOMESERVICE_CREATED,
           targetRole: ['Manager', 'Owner', 'Branch Owner', 'Receptionist'],
           title: 'Home service logged',
           message: `${who} • ${services} • ${hs.address || 'address TBD'}`,
           action: '/rooms',
-          actionLabel: 'View',
-          soundClass: 'oneshot',
+          soundClass: 'loop',
           payload: { homeServiceId: hs._id },
           branchId: hs.branchId || null,
         });

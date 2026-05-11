@@ -2627,6 +2627,17 @@ export const homeServicesAdapter = {
 
   async createHomeService(data) {
     await delay();
+    // Surface unbranched creates loudly. Cross-device the rider page filters
+    // strictly by branchId, so an untagged row turns into "notif fires but
+    // no card" — the exact failure mode that was hard to diagnose in field
+    // testing. Don't refuse the create (would break legacy paths), but log
+    // so the dev tools console flags the offender immediately.
+    if (!data?.branchId) {
+      console.warn(
+        '[HomeServices] createHomeService called without branchId — rider page will not see this row until it is backfilled.',
+        { data }
+      );
+    }
     const homeService = await HomeServiceRepository.createService(data);
     return clone(homeService);
   },

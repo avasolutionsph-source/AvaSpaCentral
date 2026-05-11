@@ -92,6 +92,12 @@ export default function RiderBookings() {
   // doesn't flicker back to the spinner every time advanceBookings changes.
   const [refreshing, setRefreshing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  // Opt-in for legacy/untagged home services. Old data created before the
+  // branch-stamping enforcement landed has branchId === null, so the strict
+  // filter hides it. We DON'T want this on by default (untagged could
+  // belong to a different branch — leak risk) but exposing it lets the
+  // rider claim genuinely stale rows after eyeballing the address.
+  const [includeUntagged, setIncludeUntagged] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const focusId = searchParams.get('focus');
@@ -155,7 +161,16 @@ export default function RiderBookings() {
       const homeServiceRows = !userBranchId
         ? []
         : (homeServices || [])
-            .filter(hs => hs.branchId && hs.branchId === userBranchId)
+            .filter(hs => {
+              // Strict match — same branch.
+              if (hs.branchId && hs.branchId === userBranchId) return true;
+              // Opt-in: untagged legacy rows (branchId === null/undefined).
+              // We never show rows with a DIFFERENT valid branchId — that
+              // would be the cross-branch leak the strict filter is here
+              // to prevent.
+              if (includeUntagged && !hs.branchId) return true;
+              return false;
+            })
             .map(hs => ({
           id: hs._id || hs.id,
           source: 'homeService',
@@ -200,7 +215,7 @@ export default function RiderBookings() {
       if (isInitial) setLoading(false);
       else setRefreshing(false);
     }
-  }, [user?.employeeId, user?.branchId, showHistory, showToast]);
+  }, [user?.employeeId, user?.branchId, showHistory, includeUntagged, showToast]);
 
   useEffect(() => { load(true); }, [load]);
   useEffect(() => {
@@ -288,10 +303,18 @@ export default function RiderBookings() {
           <h1>My Deliveries</h1>
           <p>Home-service bookings assigned to you</p>
         </div>
-        <label className="checkbox-label">
-          <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} />
-          <span>Show completed</span>
-        </label>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label className="checkbox-label">
+            <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} />
+            <span>Show completed</span>
+          </label>
+          {(includeUntagged || diag.untagged > 0) && (
+            <label className="checkbox-label" title="Show home services without a branch tag (legacy records).">
+              <input type="checkbox" checked={includeUntagged} onChange={e => setIncludeUntagged(e.target.checked)} />
+              <span>Include untagged ({diag.untagged})</span>
+            </label>
+          )}
+        </div>
       </div>
 
       {accountMisconfigured && (
@@ -346,6 +369,26 @@ export default function RiderBookings() {
               <div style={{ marginTop: 6, fontSize: '0.82rem', color: '#854d0e' }}>
                 Your branch ID: <code>{user?.branchId || '(none)'}</code>
               </div>
+              {diag.untagged > 0 && !includeUntagged && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setIncludeUntagged(true)}
+                  style={{ marginTop: 10 }}
+                >
+                  Show {diag.untagged} untagged legacy record{diag.untagged === 1 ? '' : 's'}
+                </button>
+              )}
+              {includeUntagged && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setIncludeUntagged(false)}
+                  style={{ marginTop: 10 }}
+                >
+                  Hide untagged records
+                </button>
+              )}
             </div>
           )}
         </div>

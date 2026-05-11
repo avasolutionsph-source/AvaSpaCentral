@@ -77,9 +77,17 @@ registerRoute(
   }),
 );
 
-// Runtime cache: images.
+// Runtime cache: images. Same-origin only — without the origin filter
+// every cross-origin map tile (OpenStreetMap, etc.) gets intercepted,
+// fetched through the SW, and the SW's fetch() trips the page's CSP
+// connect-src restrictions (img-src would otherwise let the browser load
+// them directly). Letting the browser handle external images avoids a
+// flood of "no-response" workbox errors in console for every tile load.
 registerRoute(
-  ({ request }) => request.destination === 'image',
+  ({ request, url }) => {
+    if (url.origin !== self.location.origin) return false;
+    return request.destination === 'image';
+  },
   new StaleWhileRevalidate({
     cacheName: 'images-cache',
     plugins: [

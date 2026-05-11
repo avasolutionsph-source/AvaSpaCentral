@@ -1492,6 +1492,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                         pins have arrived. */}
                     {service.pickupRequestedAt && ['pending', 'occupied'].includes(service.status) && !service.isAdvanceBooking && (
                       <PasundoLiveMap
+                        viewerRole="therapist"
                         rider={service.riderCurrentLat != null ? {
                           lat: service.riderCurrentLat,
                           lng: service.riderCurrentLng,

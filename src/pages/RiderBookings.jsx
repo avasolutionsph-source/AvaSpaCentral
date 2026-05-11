@@ -760,6 +760,7 @@ export default function RiderBookings() {
                     the same map on the Rooms page. */}
                 {b.pickupRequestedAt && !['completed', 'cancelled'].includes(b.status) && (
                   <PasundoLiveMap
+                    viewerRole="rider"
                     rider={b.riderCurrentLat != null ? {
                       lat: b.riderCurrentLat,
                       lng: b.riderCurrentLng,

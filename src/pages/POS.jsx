@@ -1415,8 +1415,12 @@ const POS = () => {
               customerEmail = walkInCustomerData.email || null;
             }
 
-            // Create home service record
+            // Create home service record. Stamp branchId so the rider page
+            // (which strict-filters by branch to prevent cross-branch PII
+            // leaks) actually surfaces this record to the right branch's
+            // riders. Same guarantee transactions already get at line 882.
             await mockApi.homeServices.createHomeService({
+              branchId: checkoutBranchId,
               employeeId: homeEmpId,
               employeeName: employeeName,
               customerName: customerName,
@@ -1629,6 +1633,10 @@ const POS = () => {
           .filter(item => item.type === 'service')
           .map(item => item.name);
         await mockApi.homeServices.createHomeService({
+          // Inherit branchId from the saved transaction. Without this
+          // stamp the rider page (strict branch filter) won't surface
+          // QRPh-completed walk-in home services to any rider.
+          branchId: transaction.branchId || null,
           employeeId: employee?._id,
           employeeName: employee ? `${employee.firstName} ${employee.lastName}` : null,
           customerName: transaction.customer?.name || null,

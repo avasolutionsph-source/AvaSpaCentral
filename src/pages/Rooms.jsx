@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { homeServicesApi, transactionsApi } from '../mockApi/offlineApi';
 import { format, parseISO } from 'date-fns';
 import { supabaseSyncManager } from '../services/supabase';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
+import useLocationTracker from '../hooks/useLocationTracker';
+import PasundoLiveMap from '../components/PasundoLiveMap';
 
 // Import new shared components and hooks
 import { useCrudOperations } from '../hooks';
@@ -52,6 +54,33 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   // by homeService._id. The persisted pickupRequestedAt on the row is the
   // source of truth; this is just a UI sugar.
   const [pickupRequesting, setPickupRequesting] = useState({});
+
+  // Live location tracking for the therapist side. Active while a pasundo
+  // is in flight on any non-advance home service — both 'pending' (pickup
+  // requested before the service starts, e.g. ride to the address) and
+  // 'occupied' (mid-service or post-service pickup back to the spa). One
+  // GPS fix per tick is broadcast to every active row simultaneously.
+  const therapistActivePickupIds = useMemo(() => {
+    return (homeServices || [])
+      .filter(s => !s.isAdvanceBooking && s.pickupRequestedAt && ['pending', 'occupied'].includes(s.status))
+      .map(s => s._id);
+  }, [homeServices]);
+
+  useLocationTracker({
+    active: therapistActivePickupIds.length > 0,
+    onFix: useCallback(async ({ lat, lng }) => {
+      const updatedAt = new Date().toISOString();
+      await Promise.allSettled(
+        therapistActivePickupIds.map(id =>
+          homeServicesApi.updateHomeService(id, {
+            therapistCurrentLat: lat,
+            therapistCurrentLng: lng,
+            therapistLocationUpdatedAt: updatedAt,
+          })
+        )
+      );
+    }, [therapistActivePickupIds]),
+  });
 
   // Manage order modal state
   const [showManageOrder, setShowManageOrder] = useState(false);
@@ -1456,6 +1485,26 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                           {service.pickupAcknowledgedBy ? ` — ${service.pickupAcknowledgedBy}` : ''}
                         </span>
                       </div>
+                    )}
+                    {/* Live Grab-style map — only on home services with an
+                        active pasundo. Each side (rider + therapist) publishes
+                        its own GPS every ~15s; this map renders whichever
+                        pins have arrived. */}
+                    {service.pickupRequestedAt && ['pending', 'occupied'].includes(service.status) && !service.isAdvanceBooking && (
+                      <PasundoLiveMap
+                        rider={service.riderCurrentLat != null ? {
+                          lat: service.riderCurrentLat,
+                          lng: service.riderCurrentLng,
+                          updatedAt: service.riderLocationUpdatedAt,
+                          name: service.pickupAcknowledgedBy || 'Rider',
+                        } : null}
+                        therapist={service.therapistCurrentLat != null ? {
+                          lat: service.therapistCurrentLat,
+                          lng: service.therapistCurrentLng,
+                          updatedAt: service.therapistLocationUpdatedAt,
+                          name: 'You',
+                        } : null}
+                      />
                     )}
                   </div>
 

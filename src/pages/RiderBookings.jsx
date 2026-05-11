@@ -5,6 +5,8 @@ import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import { supabaseSyncManager } from '../services/supabase';
+import useLocationTracker from '../hooks/useLocationTracker';
+import PasundoLiveMap from '../components/PasundoLiveMap';
 
 const HIDDEN_STATUSES = ['completed', 'cancelled', 'no_show'];
 
@@ -234,6 +236,13 @@ export default function RiderBookings() {
           // "Rider OTW" once present.
           pickupAcknowledgedAt: hs.pickupAcknowledgedAt || null,
           pickupAcknowledgedBy: hs.pickupAcknowledgedBy || null,
+          // Live location fields — published every ~15s while pasundo active.
+          riderCurrentLat: hs.riderCurrentLat ?? null,
+          riderCurrentLng: hs.riderCurrentLng ?? null,
+          riderLocationUpdatedAt: hs.riderLocationUpdatedAt || null,
+          therapistCurrentLat: hs.therapistCurrentLat ?? null,
+          therapistCurrentLng: hs.therapistCurrentLng ?? null,
+          therapistLocationUpdatedAt: hs.therapistLocationUpdatedAt || null,
         }));
 
       const merged = [...myAdvance, ...homeServiceRows];
@@ -457,6 +466,38 @@ export default function RiderBookings() {
       });
     }
   };
+
+  // Live location tracking for the rider. Active whenever this device has at
+  // least one home-service delivery still in pickup state (pasundo requested,
+  // service not yet started/completed/cancelled). One GPS fix per interval is
+  // broadcast to every active delivery so the therapist's Rooms map sees the
+  // rider approach in real time. Stops the instant the last active pasundo
+  // clears, bounding battery + privacy impact to the pickup window.
+  const activeDeliveryIds = useMemo(() => {
+    return bookings
+      .filter(b => b.source === 'homeService' && b.pickupRequestedAt &&
+        !['completed', 'cancelled'].includes(b.status))
+      .map(b => b.id);
+  }, [bookings]);
+
+  useLocationTracker({
+    active: activeDeliveryIds.length > 0,
+    onFix: useCallback(async ({ lat, lng }) => {
+      const updatedAt = new Date().toISOString();
+      // Fire updates in parallel — each call is independent and the sync layer
+      // batches writes downstream. Errors are swallowed silently; the next
+      // tick will retry with a fresh fix anyway.
+      await Promise.allSettled(
+        activeDeliveryIds.map(id =>
+          mockApi.homeServices.updateHomeService(id, {
+            riderCurrentLat: lat,
+            riderCurrentLng: lng,
+            riderLocationUpdatedAt: updatedAt,
+          })
+        )
+      );
+    }, [activeDeliveryIds]),
+  });
 
   const openCard = (id) => setSelectedBookingId(id);
   const cardKeyDown = (e, id) => {
@@ -711,6 +752,27 @@ export default function RiderBookings() {
                       {b.pickupRequestedBy || b.employeeName || 'therapist'}
                     </span>
                   </div>
+                )}
+                {/* Live map — only on active pasundo deliveries. Shows the
+                    therapist's current location (cyan pin) so the rider can
+                    confirm they're heading to the right spot, and the rider's
+                    own pin (red) so the therapist can see them approach via
+                    the same map on the Rooms page. */}
+                {b.pickupRequestedAt && !['completed', 'cancelled'].includes(b.status) && (
+                  <PasundoLiveMap
+                    rider={b.riderCurrentLat != null ? {
+                      lat: b.riderCurrentLat,
+                      lng: b.riderCurrentLng,
+                      updatedAt: b.riderLocationUpdatedAt,
+                      name: 'You',
+                    } : null}
+                    therapist={b.therapistCurrentLat != null ? {
+                      lat: b.therapistCurrentLat,
+                      lng: b.therapistCurrentLng,
+                      updatedAt: b.therapistLocationUpdatedAt,
+                      name: b.pickupRequestedBy || b.employeeName || 'Therapist',
+                    } : null}
+                  />
                 )}
 
                 {timer && (

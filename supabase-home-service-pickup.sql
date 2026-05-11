@@ -63,6 +63,17 @@ ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_acknowledged_at    
 ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_acknowledged_by          TEXT;
 ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_acknowledged_by_user_id  TEXT;
 
+-- Live location tracking (Grab-style). While a pasundo is active each device
+-- publishes its own GPS fix every ~15s to its row; the other side renders a
+-- map with the two pins. Stops as soon as the pasundo is no longer active so
+-- battery + privacy impact is bounded to the actual pickup window.
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS rider_current_lat          NUMERIC;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS rider_current_lng          NUMERIC;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS rider_location_updated_at  TIMESTAMPTZ;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS therapist_current_lat          NUMERIC;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS therapist_current_lng          NUMERIC;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS therapist_location_updated_at  TIMESTAMPTZ;
+
 -- Optional index — only useful for "active pasundo" queries; skip if your
 -- home-services row count stays small.
 CREATE INDEX IF NOT EXISTS idx_home_services_pickup_pending

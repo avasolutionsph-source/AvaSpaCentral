@@ -1191,6 +1191,10 @@ html {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  /* Reliable cross-axis centering on wide viewports. Without this,
+     flex-column + auto-margin children can drift left because of how
+     align-items: stretch interacts with max-width constraints. */
+  align-items: center;
   position: relative;
   scroll-margin-top: 80px;
 }
@@ -1245,8 +1249,11 @@ html {
   transform: none;
 }
 
-/* Constrain all direct children */
+/* Constrain all direct children. width:100% + max-width is required because
+   the parent uses align-items:center, which would otherwise shrink each
+   child to its intrinsic width. */
 .luxe-section > * {
+  width: 100%;
   max-width: 960px;
   margin-left: auto;
   margin-right: auto;
@@ -3311,8 +3318,40 @@ html {
   font-weight: 600;
   color: #374151;
 }
-.guest-therapist-select {
+.guest-therapist-picker {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.guest-gender-pills {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+.guest-gender-pill {
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.guest-gender-pill:hover {
+  border-color: #9ca3af;
+  color: #1f2937;
+}
+.guest-gender-pill.active {
+  border-color: var(--color-accent, #1B5E37);
+  background: var(--color-accent, #1B5E37);
+  color: #fff;
+  font-weight: 600;
+}
+.guest-therapist-select {
+  width: 100%;
   padding: 0.5rem 0.75rem;
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -3329,6 +3368,11 @@ html {
   outline: none;
   border-color: var(--color-accent, #1B5E37);
   box-shadow: 0 0 0 3px rgba(27, 94, 55, 0.1);
+}
+.guest-therapist-empty {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-style: italic;
 }
 
 /* Custom mode — per-guest cards with collapsible service grid */
@@ -3465,5 +3509,162 @@ html {
   }
   .same-pax-therapist-label {
     flex: 0 0 auto;
+  }
+}
+
+/* ============================================================================
+ * Unified custom mode — active-guest picker + per-card guest dots.
+ * Replaces the old per-guest duplicated service grids: one grid, one search,
+ * compact per-card pills for multi-assign.
+ * ========================================================================== */
+.custom-guest-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  margin: 0 0 1rem;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+.custom-guest-picker-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  margin-right: 0.25rem;
+}
+.custom-guest-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex: 1 1 auto;
+}
+.custom-guest-pill {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 92px;
+}
+.custom-guest-pill:hover {
+  border-color: #9ca3af;
+}
+.custom-guest-pill.active {
+  border-color: var(--color-accent, #1B5E37);
+  background: #f0fdf4;
+  box-shadow: 0 2px 8px rgba(27, 94, 55, 0.12);
+}
+.custom-guest-pill-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1f2937;
+  letter-spacing: 0.01em;
+}
+.custom-guest-pill.active .custom-guest-pill-name {
+  color: var(--color-accent, #1B5E37);
+}
+.custom-guest-pill-meta {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 500;
+}
+.custom-guest-picker-copy {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.custom-guest-picker-copy:hover {
+  border-color: var(--color-accent, #1B5E37);
+  color: var(--color-accent, #1B5E37);
+  background: #f0fdf4;
+}
+
+/* Per-card guest assignment dots. Sits where the "Tap to select" indicator
+   used to live; numbers are guest indices, "All" toggles every guest. */
+.service-card-guest-dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1.25rem 1rem;
+  margin-top: auto;
+}
+.guest-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+.guest-dot:hover {
+  border-color: #9ca3af;
+  color: #1f2937;
+}
+.guest-dot.active {
+  border-color: var(--color-accent, #1B5E37);
+  box-shadow: 0 0 0 2px rgba(27, 94, 55, 0.12);
+}
+.guest-dot.on {
+  background: var(--color-accent, #1B5E37);
+  border-color: var(--color-accent, #1B5E37);
+  color: #fff;
+}
+.guest-dot-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  border: 1px dashed #9ca3af;
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  margin-left: 0.2rem;
+  transition: all 0.15s ease;
+}
+.guest-dot-all:hover {
+  border-color: var(--color-accent, #1B5E37);
+  color: var(--color-accent, #1B5E37);
+}
+.guest-dot-all.on {
+  border-style: solid;
+  background: var(--color-accent, #1B5E37);
+  border-color: var(--color-accent, #1B5E37);
+  color: #fff;
+}
+
+@media (max-width: 600px) {
+  .custom-guest-pill {
+    flex: 1 1 calc(50% - 0.4rem);
+    min-width: 0;
+  }
+  .custom-guest-picker-copy {
+    flex: 1 1 100%;
+    text-align: center;
   }
 }

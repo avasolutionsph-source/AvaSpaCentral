@@ -12,7 +12,7 @@ import '../assets/css/booking.css';
 // Blank guest row for the multi-pax PaxBuilder. Mirrors the shape used by
 // Appointments.jsx and POS.jsx so summarisePax / downstream code can read
 // it uniformly.
-const blankGuest = (n) => ({ guestNumber: n, services: [], employeeId: null, isRequestedTherapist: false });
+const blankGuest = (n) => ({ guestNumber: n, services: [], employeeId: null, genderPref: 'all', isRequestedTherapist: false });
 
 // Flatten the multi-pax `guests` array into a flat items list (the shape
 // summarisePax expects and the shape we persist into online_bookings.services).
@@ -27,6 +27,7 @@ const flattenGuestsToItems = (guestsList, therapistsList = []) => {
     const t = g.employeeId ? therapistById.get(String(g.employeeId)) : null;
     const employeeName = t ? `${t.first_name || ''} ${t.last_name || ''}`.trim() : undefined;
     for (const svc of (g.services || [])) {
+      const pref = g.genderPref && g.genderPref !== 'all' ? g.genderPref : undefined;
       items.push({
         guestNumber: g.guestNumber,
         productId: svc.productId,
@@ -37,6 +38,10 @@ const flattenGuestsToItems = (guestsList, therapistsList = []) => {
         employeeId: g.employeeId || undefined,
         employee: employeeName ? { name: employeeName } : undefined,
         employeeName,
+        // Per-guest gender preference for auto-assign on the backend when
+        // no specific employeeId was chosen. 'all' is omitted to keep the
+        // payload clean.
+        genderPref: pref,
       });
     }
   }
@@ -242,10 +247,14 @@ const BookingPage = () => {
   const [guests, setGuests] = useState([blankGuest(1)]); // legacy, unused now but kept so older readers don't break mid-deploy
   const [serviceMode, setServiceMode] = useState('same'); // 'same' | 'custom'
   const [samePaxTherapists, setSamePaxTherapists] = useState([null]);
+  // Per-guest gender preference parallel to samePaxTherapists. 'all' means
+  // any; 'male'/'female' filters the dropdown to matching employees.
+  const [samePaxGenderPrefs, setSamePaxGenderPrefs] = useState(['all']);
   const [customGuests, setCustomGuests] = useState([blankGuest(1)]);
-  // Per-guest collapsed flag for 'custom' mode. Guest 1 starts expanded; rest
-  // start collapsed so the customer isn't overwhelmed with N service grids.
-  const [collapsedGuests, setCollapsedGuests] = useState([false]);
+  // Custom-mode picker: which guest receives a 1-tap service-card click.
+  // Each card also exposes per-guest pills for explicit multi-assign — this
+  // state is just the default target so the common case is one tap.
+  const [activeGuestIndex, setActiveGuestIndex] = useState(0);
 
   // Customer details
   const [customerName, setCustomerName] = useState('');
@@ -792,6 +801,13 @@ const BookingPage = () => {
       }
       return current.slice(0, next);
     });
+    setSamePaxGenderPrefs(prev => {
+      const current = prev || [];
+      if (next > current.length) {
+        return [...current, ...Array.from({ length: next - current.length }, () => 'all')];
+      }
+      return current.slice(0, next);
+    });
     setCustomGuests(prev => {
       const current = prev || [];
       if (next > current.length) {
@@ -802,14 +818,10 @@ const BookingPage = () => {
       }
       return current.slice(0, next).map((g, i) => ({ ...g, guestNumber: i + 1 }));
     });
-    setCollapsedGuests(prev => {
-      const current = prev || [];
-      if (next > current.length) {
-        // New guests start collapsed (Guest 1 was already false from initial state).
-        return [...current, ...Array.from({ length: next - current.length }, () => true)];
-      }
-      return current.slice(0, next);
-    });
+    // Keep the active picker target inside the new range. Going from 4→2
+    // with activeGuestIndex=3 would otherwise leave it pointing at a guest
+    // that no longer exists.
+    setActiveGuestIndex(prev => Math.min(prev, Math.max(0, next - 1)));
   };
 
   // Filter services based on search, category, and sort
@@ -989,15 +1001,17 @@ const BookingPage = () => {
           duration: s.duration,
         })),
         employeeId: empId || null,
+        genderPref: (samePaxGenderPrefs || [])[i] || 'all',
         isRequestedTherapist: false,
       }));
     }
     return (customGuests || []).map((g, i) => ({
       ...g,
       guestNumber: i + 1,
+      genderPref: g.genderPref || 'all',
       isRequestedTherapist: false,
     }));
-  }, [paxCount, serviceMode, samePaxTherapists, selectedServices, customGuests]);
+  }, [paxCount, serviceMode, samePaxTherapists, samePaxGenderPrefs, selectedServices, customGuests]);
 
   // True when the customer has picked at least one service. Single-pax checks
   // selectedServices; multi 'same' needs at least one service in the shared
@@ -1073,6 +1087,35 @@ const BookingPage = () => {
   const isCustomGuestServiceSelected = (guestIndex, serviceId) =>
     !!(customGuests[guestIndex]?.services || []).some(s => s.productId === serviceId);
 
+  // List of guest indices that currently have this service assigned. Used
+  // by the per-card guest pills in unified custom mode.
+  const guestsWithService = (serviceId) =>
+    (customGuests || [])
+      .map((g, i) => ((g.services || []).some(s => s.productId === serviceId) ? i : -1))
+      .filter(i => i >= 0);
+
+  // "Add this service to every guest" / "Remove from every guest". If at
+  // least one guest is missing it we add; otherwise we remove from all. One
+  // tap covers the common case where the whole group wants the same thing
+  // plus one or two extras per guest.
+  const toggleServiceForAllGuests = (service) => {
+    setCustomGuests(prev => {
+      const everyoneHasIt = prev.every(g =>
+        (g.services || []).some(s => s.productId === service.id)
+      );
+      return prev.map(g => {
+        const current = g.services || [];
+        if (everyoneHasIt) {
+          return { ...g, services: current.filter(s => s.productId !== service.id) };
+        }
+        const has = current.some(s => s.productId === service.id);
+        return has
+          ? g
+          : { ...g, services: [...current, { productId: service.id, name: service.name, price: service.price, duration: service.duration }] };
+      });
+    });
+  };
+
   // Copy Guest 1's services + therapist into target guest. Used by the
   // "Copy from Guest 1" button on Guests 2+.
   const copyFromGuestOne = (targetIndex) => {
@@ -1091,36 +1134,86 @@ const BookingPage = () => {
     });
   };
 
-  // Toggle the collapsed state of a custom-mode guest card.
-  const toggleGuestCollapsed = (guestIndex) => {
-    setCollapsedGuests(prev => prev.map((c, i) => (i === guestIndex ? !c : c)));
-  };
-
   // Therapist dropdown options. Reuses the same therapists pool the single
   // flow uses, so the customer never sees a different roster between modes.
+  // Includes the raw gender ('male'/'female'/'' ) so the multi-pax picker
+  // can filter on it without a second pass through `therapists`.
   const therapistDropdownOptions = useMemo(
     () => (therapists || []).map(t => ({
       id: t.id,
       name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Therapist',
+      gender: (t.gender || '').toLowerCase(),
     })),
     [therapists]
   );
 
-  // Inline-style therapist <select>. Returns a small, polished dropdown
-  // matching the existing form-input look-and-feel.
-  const renderTherapistSelect = (value, onChange, idx) => (
-    <select
-      value={value || ''}
-      onChange={(e) => onChange(e.target.value || null)}
-      className="guest-therapist-select"
-      aria-label={`Therapist for Guest ${idx + 1}`}
-    >
-      <option value="">No preference (auto-assign)</option>
-      {therapistDropdownOptions.map(t => (
-        <option key={t.id} value={t.id}>{t.name}</option>
-      ))}
-    </select>
+  // True when at least one therapist in the roster has a gender stamped.
+  // If nobody does, we hide the gender pills — surfacing a filter that
+  // can never match anyone would feel broken to the customer.
+  const anyTherapistHasGender = useMemo(
+    () => therapistDropdownOptions.some(t => t.gender === 'male' || t.gender === 'female'),
+    [therapistDropdownOptions]
   );
+
+  // Per-guest therapist picker: gender filter pills above the dropdown,
+  // then a dropdown filtered by gender. If the current value points at a
+  // therapist who doesn't match the new gender, we clear it on filter
+  // change so the customer isn't silently booking the "wrong" therapist.
+  const renderTherapistSelect = (value, onChange, idx, genderPref = 'all', onGenderChange = null) => {
+    const filtered = therapistDropdownOptions.filter(t =>
+      genderPref === 'all' ? true : t.gender === genderPref
+    );
+    const valueStillValid = !value || filtered.some(t => String(t.id) === String(value));
+    return (
+      <div className="guest-therapist-picker">
+        {onGenderChange && anyTherapistHasGender && (
+          <div className="guest-gender-pills" role="radiogroup" aria-label={`Preferred gender for Guest ${idx + 1}`}>
+            {[
+              { value: 'all', label: 'Any' },
+              { value: 'female', label: 'Female' },
+              { value: 'male', label: 'Male' },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={genderPref === opt.value}
+                className={`guest-gender-pill ${genderPref === opt.value ? 'active' : ''}`}
+                onClick={() => {
+                  onGenderChange(opt.value);
+                  // Clear stale therapist selection that no longer matches.
+                  if (value) {
+                    const stillOk = opt.value === 'all'
+                      || therapistDropdownOptions.find(t => String(t.id) === String(value))?.gender === opt.value;
+                    if (!stillOk) onChange(null);
+                  }
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <select
+          value={valueStillValid ? (value || '') : ''}
+          onChange={(e) => onChange(e.target.value || null)}
+          className="guest-therapist-select"
+          aria-label={`Therapist for Guest ${idx + 1}`}
+        >
+          <option value="">No preference (auto-assign)</option>
+          {filtered.map(t => {
+            const genderTag = t.gender === 'male' ? ' · M' : t.gender === 'female' ? ' · F' : '';
+            return <option key={t.id} value={t.id}>{t.name}{genderTag}</option>;
+          })}
+        </select>
+        {filtered.length === 0 && genderPref !== 'all' && (
+          <small className="guest-therapist-empty">
+            No {genderPref} therapists on staff. Pick "Any" to see everyone.
+          </small>
+        )}
+      </div>
+    );
+  };
 
   // Generate booking reference
   const generateReference = () => {
@@ -1243,7 +1336,15 @@ const BookingPage = () => {
           ? (effectiveGuests?.[0]?.employeeId || null)
           : (therapistMode === 'choose' && selectedTherapists.length > 0 ? selectedTherapists[0] : null),
         preferred_therapists: isMultiPax ? [] : (therapistMode === 'choose' ? selectedTherapists : []),
-        therapist_gender_preference: !isMultiPax && genderFilter !== 'all' ? genderFilter : null,
+        // For single-pax, use the user-picked genderFilter as before. For
+        // multi-pax, mirror Guest 1's preference at the top level so legacy
+        // staff views keep showing something useful; the authoritative
+        // per-guest preference rides on each flattened service item.
+        therapist_gender_preference: isMultiPax
+          ? (effectiveGuests?.[0]?.genderPref && effectiveGuests[0].genderPref !== 'all'
+              ? effectiveGuests[0].genderPref
+              : null)
+          : (genderFilter !== 'all' ? genderFilter : null),
         services: isMultiPax
           ? flattenedItems
           : selectedServices.map(s => ({
@@ -2149,268 +2250,265 @@ const BookingPage = () => {
               </div>
             )}
 
-            {/* SHARED service-picker UI: rendered for paxCount === 1 AND for
-                paxCount > 1 with serviceMode === 'same'. The same selectedServices
-                state drives both — no duplication. */}
-            {(paxCount === 1 || serviceMode === 'same') && (
-              <>
-                {/* Search & Filter */}
-                <div className="booking-filters">
-                  <input
-                    type="text"
-                    placeholder="Search services..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="booking-search"
-                  />
-                  <div className="booking-filter-row">
-                    <div className="booking-categories">
+            {/* Unified service picker. Single grid for ALL modes (single,
+                same, custom). In custom mode we render an active-guest pill
+                row above the search bar so a tap on a card adds to that
+                guest; the per-card guest dots cover explicit multi-assign
+                without forcing the customer to scroll a separate grid per
+                guest. */}
+            {paxCount > 1 && serviceMode === 'custom' && (
+              <div className="custom-guest-picker" role="tablist" aria-label="Choose which guest to pick services for">
+                <div className="custom-guest-picker-label">Picking for</div>
+                <div className="custom-guest-pills">
+                  {Array.from({ length: paxCount }).map((_, i) => {
+                    const guest = customGuests[i] || blankGuest(i + 1);
+                    const count = (guest.services || []).length;
+                    const subtotal = (guest.services || []).reduce((s, sv) => s + (Number(sv.price) || 0), 0);
+                    return (
                       <button
-                        className={`category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
-                        onClick={() => setSelectedCategory('all')}
+                        key={i}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeGuestIndex === i}
+                        className={`custom-guest-pill ${activeGuestIndex === i ? 'active' : ''}`}
+                        onClick={() => setActiveGuestIndex(i)}
                       >
-                        All
+                        <span className="custom-guest-pill-name">Guest {i + 1}</span>
+                        <span className="custom-guest-pill-meta">
+                          {count === 0 ? 'empty' : `${count} svc · ₱${subtotal.toLocaleString()}`}
+                        </span>
                       </button>
-                      {categories.map(cat => (
-                        <button
-                          key={cat}
-                          className={`category-btn ${selectedCategory === cat ? 'active' : ''}`}
-                          onClick={() => setSelectedCategory(cat)}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="booking-sort-pills">
-                      {[
-                        { value: 'default', label: 'Our Picks' },
-                        { value: 'best-sellers', label: 'Best Sellers' },
-                        { value: 'price-low', label: '₱ Low-High' },
-                        { value: 'price-high', label: '₱ High-Low' },
-                      ].map(opt => (
-                        <button
-                          key={opt.value}
-                          className={`sort-pill ${sortBy === opt.value ? 'active' : ''}`}
-                          onClick={() => setSortBy(opt.value)}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-
-                {/* Services Grid */}
-                <div className="booking-services-grid">
-                  {services.length === 0 ? (
-                    <div className="no-services">
-                      <p>No services available yet.</p>
-                      <small>Please contact us directly to book an appointment.</small>
-                      {business?.phone && <p style={{marginTop: '1rem'}}>📞 {business.phone}</p>}
-                    </div>
-                  ) : filteredServices.length === 0 ? (
-                    <div className="no-services">
-                      <p>No services match your search.</p>
-                      <small>Try a different search term or category.</small>
-                    </div>
-                  ) : (
-                    (showAllServices || searchTerm.trim() ? filteredServices : filteredServices.slice(0, 9)).map(service => (
-                      <div
-                        key={service.id}
-                        className={`service-card ${isServiceSelected(service.id) ? 'selected' : ''}`}
-                        onClick={() => toggleService(service)}
-                      >
-                        {service.image_url && (
-                          <div className="service-card-image">
-                            <img src={service.image_url} alt={service.name} loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
-                          </div>
-                        )}
-                        {service._salesCount > 0 && (
-                          <span style={{ position: 'absolute', top: service.image_url ? '8px' : '8px', right: '8px', background: 'var(--color-accent, #1B5E37)', color: '#fff', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
-                            Best Seller
-                          </span>
-                        )}
-                        <div className="service-category">{service.category}</div>
-                        <h3 className="service-name">{service.name}</h3>
-                        {service.description && (
-                          <p className="service-description">{service.description}</p>
-                        )}
-                        <div className="service-details">
-                          <span className="service-price">₱{service.price?.toLocaleString()}</span>
-                          {service.duration && (
-                            <span className="service-duration">{service.duration} min</span>
-                          )}
-                        </div>
-                        <div className="service-select-indicator">
-                          {isServiceSelected(service.id) ? '✓ Selected' : 'Tap to select'}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                {/* See More button */}
-                {!searchTerm.trim() && filteredServices.length > 9 && !showAllServices && (
-                  <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                    <button
-                      onClick={() => setShowAllServices(true)}
-                      style={{
-                        background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
-                        padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem',
-                        fontWeight: '500', transition: 'all 0.2s'
-                      }}
-                      onMouseOver={e => { e.target.style.borderColor = 'var(--color-accent, #1B5E37)'; e.target.style.color = 'var(--color-accent, #1B5E37)'; }}
-                      onMouseOut={e => { e.target.style.borderColor = '#d1d5db'; e.target.style.color = '#555'; }}
-                    >
-                      See More Services ({filteredServices.length - 9} more)
-                    </button>
-                  </div>
+                {activeGuestIndex > 0 && (
+                  <button
+                    type="button"
+                    className="custom-guest-picker-copy"
+                    onClick={() => copyFromGuestOne(activeGuestIndex)}
+                    title={`Copy Guest 1's services to Guest ${activeGuestIndex + 1}`}
+                  >
+                    Copy from Guest 1
+                  </button>
                 )}
-                {showAllServices && filteredServices.length > 9 && (
-                  <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                    <button
-                      onClick={() => setShowAllServices(false)}
-                      style={{
-                        background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
-                        padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem'
-                      }}
-                    >
-                      Show Less
-                    </button>
-                  </div>
-                )}
-
-                {/* Per-guest therapist preferences ('same' mode only). The same
-                    services apply to everyone but each guest can request their
-                    own therapist (or leave on auto-assign). */}
-                {paxCount > 1 && serviceMode === 'same' && (
-                  <div className="same-pax-therapists">
-                    <div className="same-pax-therapists-header">
-                      <h3>Therapist preferences</h3>
-                      <p>Optional — pick a preferred therapist for each guest, or leave on auto.</p>
-                    </div>
-                    <div className="same-pax-therapists-rows">
-                      {Array.from({ length: paxCount }).map((_, i) => (
-                        <div key={i} className="same-pax-therapist-row">
-                          <span className="same-pax-therapist-label">Guest {i + 1}</span>
-                          {renderTherapistSelect(
-                            samePaxTherapists[i],
-                            (val) => setSamePaxTherapists(prev => prev.map((p, j) => (j === i ? val : p))),
-                            i
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
+              </div>
             )}
 
-            {/* CUSTOM mode: per-guest cards. Each card has its own service
-                grid + therapist picker. Guest 1 expanded by default; rest
-                collapsed with a summary header. */}
-            {paxCount > 1 && serviceMode === 'custom' && (
-              <div className="custom-pax-cards">
-                {Array.from({ length: paxCount }).map((_, i) => {
-                  const guest = customGuests[i] || blankGuest(i + 1);
-                  const isCollapsed = !!collapsedGuests[i];
-                  const subtotal = (guest.services || []).reduce((s, sv) => s + (Number(sv.price) || 0), 0);
-                  const therapist = therapistDropdownOptions.find(t => String(t.id) === String(guest.employeeId));
-                  const therapistLabel = therapist ? therapist.name : 'No preference';
+            {/* Search & Filter — always visible so search works in every mode. */}
+            <div className="booking-filters">
+              <input
+                type="text"
+                placeholder="Search services..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="booking-search"
+              />
+              <div className="booking-filter-row">
+                <div className="booking-categories">
+                  <button
+                    className={`category-btn ${selectedCategory === 'all' ? 'active' : ''}`}
+                    onClick={() => setSelectedCategory('all')}
+                  >
+                    All
+                  </button>
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      className={`category-btn ${selectedCategory === cat ? 'active' : ''}`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <div className="booking-sort-pills">
+                  {[
+                    { value: 'default', label: 'Our Picks' },
+                    { value: 'best-sellers', label: 'Best Sellers' },
+                    { value: 'price-low', label: '₱ Low-High' },
+                    { value: 'price-high', label: '₱ High-Low' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      className={`sort-pill ${sortBy === opt.value ? 'active' : ''}`}
+                      onClick={() => setSortBy(opt.value)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Services Grid */}
+            <div className="booking-services-grid">
+              {services.length === 0 ? (
+                <div className="no-services">
+                  <p>No services available yet.</p>
+                  <small>Please contact us directly to book an appointment.</small>
+                  {business?.phone && <p style={{marginTop: '1rem'}}>📞 {business.phone}</p>}
+                </div>
+              ) : filteredServices.length === 0 ? (
+                <div className="no-services">
+                  <p>No services match your search.</p>
+                  <small>Try a different search term or category.</small>
+                </div>
+              ) : (
+                (showAllServices || searchTerm.trim() ? filteredServices : filteredServices.slice(0, 9)).map(service => {
+                  // Mode-aware selection + click handlers. Custom mode targets
+                  // the active guest; single/same use the shared selection.
+                  const isCustomMode = paxCount > 1 && serviceMode === 'custom';
+                  const selectedForActive = isCustomMode
+                    ? isCustomGuestServiceSelected(activeGuestIndex, service.id)
+                    : isServiceSelected(service.id);
+                  const handleCardClick = () => {
+                    if (isCustomMode) toggleCustomGuestService(activeGuestIndex, service);
+                    else toggleService(service);
+                  };
+                  // For per-card guest dots — which guests already have it.
+                  const guestAssignments = isCustomMode ? guestsWithService(service.id) : null;
                   return (
-                    <div key={i} className={`guest-card ${isCollapsed ? 'collapsed' : ''}`}>
-                      <div className="guest-card-header">
-                        <button
-                          type="button"
-                          className="guest-card-title-btn"
-                          onClick={() => toggleGuestCollapsed(i)}
-                          aria-expanded={!isCollapsed}
-                        >
-                          <span className="guest-card-chevron" aria-hidden="true">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
-                              <path d="M6 9l6 6 6-6"/>
-                            </svg>
-                          </span>
-                          <span className="guest-card-title">Guest {i + 1}</span>
-                          <span className="guest-card-summary">
-                            {(guest.services || []).length === 0
-                              ? <em style={{ color: '#94a3b8' }}>no services yet</em>
-                              : `${(guest.services || []).length} ${(guest.services || []).length === 1 ? 'service' : 'services'} · ${therapistLabel}`}
-                          </span>
-                        </button>
-                        <div className="guest-card-actions">
-                          <span className="guest-card-subtotal">₱{subtotal.toLocaleString()}</span>
-                          {i > 0 && (
-                            <button
-                              type="button"
-                              className="guest-card-copy-btn"
-                              onClick={() => copyFromGuestOne(i)}
-                              title="Copy services and therapist from Guest 1"
-                            >
-                              Copy from Guest 1
-                            </button>
-                          )}
+                    <div
+                      key={service.id}
+                      className={`service-card ${selectedForActive ? 'selected' : ''}`}
+                      onClick={handleCardClick}
+                    >
+                      {service.image_url && (
+                        <div className="service-card-image">
+                          <img src={service.image_url} alt={service.name} loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
                         </div>
+                      )}
+                      {service._salesCount > 0 && (
+                        <span style={{ position: 'absolute', top: service.image_url ? '8px' : '8px', right: '8px', background: 'var(--color-accent, #1B5E37)', color: '#fff', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                          Best Seller
+                        </span>
+                      )}
+                      <div className="service-category">{service.category}</div>
+                      <h3 className="service-name">{service.name}</h3>
+                      {service.description && (
+                        <p className="service-description">{service.description}</p>
+                      )}
+                      <div className="service-details">
+                        <span className="service-price">₱{service.price?.toLocaleString()}</span>
+                        {service.duration && (
+                          <span className="service-duration">{service.duration} min</span>
+                        )}
                       </div>
-
-                      {!isCollapsed && (
-                        <div className="guest-card-body">
-                          {services.length === 0 ? (
-                            <div className="no-services">
-                              <p>No services available yet.</p>
-                            </div>
-                          ) : (
-                            <div className="booking-services-grid guest-services-grid">
-                              {filteredServices.map(service => {
-                                const sel = isCustomGuestServiceSelected(i, service.id);
-                                return (
-                                  <div
-                                    key={service.id}
-                                    className={`service-card ${sel ? 'selected' : ''}`}
-                                    onClick={() => toggleCustomGuestService(i, service)}
-                                  >
-                                    {service.image_url && (
-                                      <div className="service-card-image">
-                                        <img src={service.image_url} alt={service.name} loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
-                                      </div>
-                                    )}
-                                    {service._salesCount > 0 && (
-                                      <span style={{ position: 'absolute', top: service.image_url ? '8px' : '8px', right: '8px', background: 'var(--color-accent, #1B5E37)', color: '#fff', fontSize: '0.65rem', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
-                                        Best Seller
-                                      </span>
-                                    )}
-                                    <div className="service-category">{service.category}</div>
-                                    <h3 className="service-name">{service.name}</h3>
-                                    {service.description && (
-                                      <p className="service-description">{service.description}</p>
-                                    )}
-                                    <div className="service-details">
-                                      <span className="service-price">₱{service.price?.toLocaleString()}</span>
-                                      {service.duration && (
-                                        <span className="service-duration">{service.duration} min</span>
-                                      )}
-                                    </div>
-                                    <div className="service-select-indicator">
-                                      {sel ? '✓ Selected' : 'Tap to select'}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          <div className="guest-card-therapist">
-                            <label className="guest-card-therapist-label">Preferred therapist for Guest {i + 1}</label>
-                            {renderTherapistSelect(
-                              guest.employeeId,
-                              (val) => setCustomGuests(prev => prev.map((g, j) => (j === i ? { ...g, employeeId: val } : g))),
-                              i
-                            )}
-                          </div>
+                      {isCustomMode ? (
+                        <div className="service-card-guest-dots">
+                          {Array.from({ length: paxCount }).map((_, gi) => {
+                            const on = guestAssignments.includes(gi);
+                            return (
+                              <button
+                                key={gi}
+                                type="button"
+                                className={`guest-dot ${on ? 'on' : ''} ${gi === activeGuestIndex ? 'active' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); toggleCustomGuestService(gi, service); }}
+                                aria-label={`${on ? 'Remove from' : 'Add to'} Guest ${gi + 1}`}
+                                title={`${on ? 'Remove from' : 'Add to'} Guest ${gi + 1}`}
+                              >
+                                {gi + 1}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            className={`guest-dot-all ${guestAssignments.length === paxCount ? 'on' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); toggleServiceForAllGuests(service); }}
+                            title={guestAssignments.length === paxCount ? 'Remove from all guests' : 'Add to all guests'}
+                            aria-label={guestAssignments.length === paxCount ? 'Remove from all guests' : 'Add to all guests'}
+                          >
+                            All
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="service-select-indicator">
+                          {selectedForActive ? '✓ Selected' : 'Tap to select'}
                         </div>
                       )}
                     </div>
                   );
-                })}
+                })
+              )}
+            </div>
+            {/* See More button */}
+            {!searchTerm.trim() && filteredServices.length > 9 && !showAllServices && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <button
+                  onClick={() => setShowAllServices(true)}
+                  style={{
+                    background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
+                    padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem',
+                    fontWeight: '500', transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => { e.target.style.borderColor = 'var(--color-accent, #1B5E37)'; e.target.style.color = 'var(--color-accent, #1B5E37)'; }}
+                  onMouseOut={e => { e.target.style.borderColor = '#d1d5db'; e.target.style.color = '#555'; }}
+                >
+                  See More Services ({filteredServices.length - 9} more)
+                </button>
+              </div>
+            )}
+            {showAllServices && filteredServices.length > 9 && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <button
+                  onClick={() => setShowAllServices(false)}
+                  style={{
+                    background: 'none', border: '1px solid #d1d5db', borderRadius: '8px',
+                    padding: '0.6rem 2rem', cursor: 'pointer', color: '#555', fontSize: '0.9rem'
+                  }}
+                >
+                  Show Less
+                </button>
+              </div>
+            )}
+
+            {/* Per-guest therapist preferences for multi-pax bookings. In
+                'same' mode the source is samePaxTherapists; in 'custom' mode
+                each guest stores its own employeeId on customGuests[i]. */}
+            {paxCount > 1 && (
+              <div className="same-pax-therapists">
+                <div className="same-pax-therapists-header">
+                  <h3>Therapist preferences</h3>
+                  <p>
+                    Optional — pick a preferred therapist for each guest, or leave on auto.
+                    {therapists.length === 0 && (
+                      <em style={{ display: 'block', marginTop: 4, color: '#b45309' }}>
+                        No specific therapists available yet for this branch — we'll auto-assign on the day. Pick a gender preference below and we'll try to honor it.
+                      </em>
+                    )}
+                  </p>
+                </div>
+                <div className="same-pax-therapists-rows">
+                  {Array.from({ length: paxCount }).map((_, i) => {
+                    const valueIsSame = serviceMode === 'same';
+                    const value = valueIsSame
+                      ? samePaxTherapists[i]
+                      : (customGuests[i]?.employeeId || null);
+                    const genderPref = valueIsSame
+                      ? (samePaxGenderPrefs[i] || 'all')
+                      : (customGuests[i]?.genderPref || 'all');
+                    const onChange = (val) => {
+                      if (valueIsSame) {
+                        setSamePaxTherapists(prev => prev.map((p, j) => (j === i ? val : p)));
+                      } else {
+                        setCustomGuests(prev => prev.map((g, j) => (j === i ? { ...g, employeeId: val } : g)));
+                      }
+                    };
+                    const onGenderChange = (val) => {
+                      if (valueIsSame) {
+                        setSamePaxGenderPrefs(prev => prev.map((p, j) => (j === i ? val : p)));
+                      } else {
+                        setCustomGuests(prev => prev.map((g, j) => (j === i ? { ...g, genderPref: val } : g)));
+                      }
+                    };
+                    return (
+                      <div key={i} className="same-pax-therapist-row">
+                        <span className="same-pax-therapist-label">Guest {i + 1}</span>
+                        {renderTherapistSelect(value, onChange, i, genderPref, onGenderChange)}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

@@ -243,8 +243,22 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   // Load active home services (both direct home services and advance booking home services)
   const loadHomeServices = async () => {
     try {
-      // Load direct home services (from regular checkout)
-      let services = await homeServicesApi.getActiveHomeServices();
+      // Load ALL home services and filter to "still active" client-side.
+      // getActiveHomeServices() only returns status='in_progress', which
+      // hides POS-created walk-ins (they land as status='scheduled' from
+      // the repository default) — the rider page worked because it loads
+      // them directly, but the Rooms page card never appeared.
+      let services = await homeServicesApi.getHomeServices();
+      services = services
+        .filter(s => s.status === 'scheduled' || s.status === 'pending' || s.status === 'in_progress')
+        .map(s => ({
+          ...s,
+          // Normalize 'scheduled' (repository default for new POS rows) to
+          // 'pending' so the card badge and CSS class — which both branch
+          // on 'pending' vs 'in_progress' — render the right state without
+          // a separate code path for the two near-synonymous statuses.
+          status: s.status === 'scheduled' ? 'pending' : s.status,
+        }));
 
       // Also load home service advance bookings (scheduled/confirmed/in-progress with isHomeService flag)
       let bookings = await mockApi.advanceBooking.listAdvanceBookings();
@@ -271,11 +285,20 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
           scheduledDateTime: b.bookingDateTime, // Keep for display
           isAdvanceBooking: true, // Flag to identify advance booking home services
           paymentTiming: b.paymentTiming,
-          paymentStatus: b.paymentStatus
+          paymentStatus: b.paymentStatus,
+          branchId: b.branchId || null,
         }));
 
       // Merge both sources
       services = [...services, ...homeServiceBookings];
+
+      // Strict branch scoping — mirrors the rooms-list filter at line 421.
+      // When the user has picked a specific branch we only show home
+      // services stamped with that branch; "All Branches" shows everything.
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        services = services.filter(s => s.branchId === effectiveBranchId);
+      }
 
       // Role-based filtering (if therapist, only show their home services)
       if (isTherapist() && user?.employeeId) {

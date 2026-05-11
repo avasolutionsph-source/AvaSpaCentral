@@ -512,27 +512,91 @@ const POS = () => {
   }, [showToast, getEffectiveBranchId]);
 
   // Flatten the multi-pax `guests` array into a flat cart-shaped items list
-  // suitable for transaction.items[]. Each entry carries guestNumber and
-  // employeeId so per-guest attribution survives into reports and receipts.
-  const flattenGuestsToItems = useCallback((guestsList) => {
+  // Cart is the single source of truth for what the booking includes;
+  // guests carry the per-person therapist assignment only. We distribute
+  // service-type cart items to guests by index (cart[i] → guest[i % N])
+  // so cashiers don't have to re-pick services per guest — they already
+  // chose them once when filling the cart. Non-service items (products,
+  // gift certificates, etc.) stay untagged: they're charged to the visit,
+  // not to a specific guest.
+  //
+  // Backwards-compat: AdvanceBookingCheckout still stores services on each
+  // guest row directly (its own per-guest service picker). When the caller
+  // passes guests with non-empty .services AND no cart, fall back to the
+  // legacy "flatten guest.services" behaviour so the advance booking flow
+  // is bit-for-bit unchanged.
+  const flattenGuestsToItems = useCallback((guestsList, cartItems = []) => {
+    const legacyShape = !cartItems?.length
+      && guestsList.some((g) => (g.services || []).length > 0);
+    if (legacyShape) {
+      const items = [];
+      for (const g of guestsList) {
+        for (const svc of g.services || []) {
+          items.push({
+            id: svc.productId,
+            productId: svc.productId,
+            name: svc.name,
+            type: 'service',
+            price: svc.price,
+            quantity: 1,
+            subtotal: svc.price,
+            duration: svc.duration,
+            guestNumber: g.guestNumber,
+            employeeId: g.employeeId,
+          });
+        }
+      }
+      return items;
+    }
+
     const items = [];
-    for (const g of guestsList) {
-      for (const svc of g.services || []) {
+    const n = Math.max(1, guestsList.length);
+    let serviceIdx = 0;
+    for (const item of cartItems) {
+      if (item.type !== 'service') {
+        items.push({ ...item });
+        continue;
+      }
+      const qty = Math.max(1, item.quantity || 1);
+      for (let q = 0; q < qty; q++) {
+        const guest = guestsList[serviceIdx % n] || guestsList[0];
         items.push({
-          id: svc.productId,
-          productId: svc.productId,
-          name: svc.name,
+          id: item.id,
+          productId: item.productId || item.id,
+          name: item.name,
           type: 'service',
-          price: svc.price,
+          price: item.price,
           quantity: 1,
-          subtotal: svc.price,
-          duration: svc.duration,
-          guestNumber: g.guestNumber,
-          employeeId: g.employeeId,
+          subtotal: item.price,
+          duration: item.duration,
+          guestNumber: guest?.guestNumber || (serviceIdx % n) + 1,
+          employeeId: guest?.employeeId || null,
         });
+        serviceIdx++;
       }
     }
     return items;
+  }, []);
+
+  // Mirror of the above for cashier-side display only: returns a map of
+  // guestNumber → array of cart items, useful when rendering the
+  // "Guest N: <services>" lines under each therapist picker.
+  const cartByGuest = useCallback((guestsList, cartItems = []) => {
+    const map = new Map();
+    const n = Math.max(1, guestsList.length);
+    let serviceIdx = 0;
+    for (const item of cartItems) {
+      if (item.type !== 'service') continue;
+      const qty = Math.max(1, item.quantity || 1);
+      for (let q = 0; q < qty; q++) {
+        const guest = guestsList[serviceIdx % n] || guestsList[0];
+        const num = guest?.guestNumber || (serviceIdx % n) + 1;
+        if (!map.has(num)) map.set(num, []);
+        map.get(num).push(item);
+        serviceIdx++;
+      }
+    }
+    return map;
   }, []);
 
   // Resize the `guests` array to match a new paxCount, preserving existing
@@ -644,7 +708,7 @@ const POS = () => {
   // the flattened multi-pax guests array. ALL downstream calculations,
   // checkout, receipt etc. read from this single source of truth.
   const effectiveCartItems = useMemo(
-    () => (paxCount > 1 ? flattenGuestsToItems(guests) : cart),
+    () => (paxCount > 1 ? flattenGuestsToItems(guests, cart) : cart),
     [paxCount, guests, cart, flattenGuestsToItems]
   );
 
@@ -699,11 +763,13 @@ const POS = () => {
       return;
     }
     if (paxCount > 1) {
-      // Each guest must have at least one service before we let the cashier
-      // proceed — otherwise the receipt + reports will have phantom guests.
-      const empty = guests.findIndex((g) => !g.services || g.services.length === 0);
-      if (empty >= 0) {
-        showToast(`Guest ${empty + 1} has no service selected`, 'error');
+      // Cart distributes by index to guests, so we need at least one
+      // service per guest in the cart — otherwise the trailing guests
+      // end up assigned to nothing and the receipt has phantom rows.
+      const serviceCount = cart.filter((i) => i.type === 'service')
+        .reduce((sum, i) => sum + Math.max(1, i.quantity || 1), 0);
+      if (serviceCount < paxCount) {
+        showToast(`Cart has ${serviceCount} service${serviceCount === 1 ? '' : 's'} but ${paxCount} guests. Add more services or reduce guests.`, 'error');
         return;
       }
     }
@@ -795,9 +861,10 @@ const POS = () => {
       errors.push('Please select an employee');
     }
     if (paxCount > 1) {
-      const empty = guests.findIndex((g) => !g.services || g.services.length === 0);
-      if (empty >= 0) {
-        errors.push(`Guest ${empty + 1} has no service selected`);
+      const serviceCount = cart.filter((i) => i.type === 'service')
+        .reduce((sum, i) => sum + Math.max(1, i.quantity || 1), 0);
+      if (serviceCount < paxCount) {
+        errors.push(`Cart has ${serviceCount} service${serviceCount === 1 ? '' : 's'} but ${paxCount} guests`);
       }
     }
 
@@ -934,8 +1001,14 @@ const POS = () => {
         // Resolve booking items + display labels per pax mode.
         // Multi-pax: flatten guests via the same helper used at checkout.
         // Single-pax: keep the historical cart-based path verbatim.
+        // AdvanceBookingCheckout owns its own per-guest service picker, so
+        // each advGuest already carries a .services array. Pass an empty
+        // cart so flattenGuestsToItems falls into its legacy "flatten
+        // guest.services" path — the outer POS `cart` here is the regular
+        // POS cart, not the advance-booking cart, and would otherwise
+        // produce nonsense items for advance bookings.
         const advCheckoutItems = isMultiPaxBooking
-          ? flattenGuestsToItems(advGuests)
+          ? flattenGuestsToItems(advGuests, [])
           : cart;
 
         // Service-name string for legacy compat. Multi-pax concatenates
@@ -1042,7 +1115,7 @@ const POS = () => {
         // For multi-pax, the source-of-truth for items is the flattened
         // guests array. For single-pax, the historical flat cart is used —
         // bit-for-bit unchanged so commissions, itemsUsed, etc. are intact.
-        const checkoutItems = paxCount > 1 ? flattenGuestsToItems(guests) : cart;
+        const checkoutItems = paxCount > 1 ? flattenGuestsToItems(guests, cart) : cart;
 
         // Calculate commission. Single-pax pulls the commission rule off the
         // cart entry (which carries it from the product). Multi-pax services
@@ -1814,7 +1887,9 @@ const POS = () => {
           <div className="cart-header">
             <h3>Shopping Cart</h3>
             <span className="cart-count">
-              {paxCount > 1 ? `${paxCount} guests` : `${cart.length} items`}
+              {paxCount > 1
+                ? `${cart.length} item${cart.length === 1 ? '' : 's'} · ${paxCount} guests`
+                : `${cart.length} items`}
             </span>
           </div>
 
@@ -1851,66 +1926,115 @@ const POS = () => {
             />
             {paxCount > 1 && (
               <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)' }}>
-                Each guest picks their own service + therapist below.
+                Cart services distribute to guests below. Pick a therapist per guest.
               </span>
             )}
           </div>
 
-          {paxCount > 1 ? (
-            <div className="cart-items" style={{ padding: '0.5rem 0.75rem' }}>
-              <PaxBuilder
-                paxCount={paxCount}
-                guests={guests}
-                onChange={setGuests}
-                services={products.filter((p) => p.type === 'service')}
-                therapists={getTherapists(employees)}
-                mode="staff"
-              />
-            </div>
-          ) : (
-            <div className="cart-items">
-              {cart.length === 0 ? (
-                <div className="empty-cart">
-                  <p>🛒</p>
-                  <p>Your cart is empty</p>
-                  <p className="empty-cart-subtitle">Add items to get started</p>
-                </div>
-              ) : (
-                cart.map((item, index) => (
-                  <div key={index} className="cart-item">
-                    <div className="cart-item-details">
-                      <h4>{item.name}</h4>
-                      <p className="cart-item-price">₱{(item.price ?? 0).toLocaleString()}</p>
-                    </div>
-                    <div className="cart-item-controls">
-                      <button
-                        className="qty-btn"
-                        onClick={() => updateCartQuantity(index, item.quantity - 1)}
-                      >
-                        −
-                      </button>
-                      <span className="qty-display">{item.quantity}</span>
-                      <button
-                        className="qty-btn"
-                        onClick={() => updateCartQuantity(index, item.quantity + 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div className="cart-item-total">
-                      <p>₱{(item.subtotal ?? 0).toLocaleString()}</p>
-                      <button
-                        className="remove-btn"
-                        onClick={() => removeFromCart(index)}
-                      >
-                        ✕
-                      </button>
-                    </div>
+          {/* Cart is always visible — multi-pax used to swap this for a
+              PaxBuilder service-checkbox grid, which made cashiers re-pick
+              the same services they already added to the cart. Now the
+              cart is the single source of truth and per-guest therapist
+              assignment lives below it. */}
+          <div className="cart-items">
+            {cart.length === 0 ? (
+              <div className="empty-cart">
+                <p>🛒</p>
+                <p>Your cart is empty</p>
+                <p className="empty-cart-subtitle">Add items to get started</p>
+              </div>
+            ) : (
+              cart.map((item, index) => (
+                <div key={index} className="cart-item">
+                  <div className="cart-item-details">
+                    <h4>{item.name}</h4>
+                    <p className="cart-item-price">₱{(item.price ?? 0).toLocaleString()}</p>
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                  <div className="cart-item-controls">
+                    <button
+                      className="qty-btn"
+                      onClick={() => updateCartQuantity(index, item.quantity - 1)}
+                    >
+                      −
+                    </button>
+                    <span className="qty-display">{item.quantity}</span>
+                    <button
+                      className="qty-btn"
+                      onClick={() => updateCartQuantity(index, item.quantity + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="cart-item-total">
+                    <p>₱{(item.subtotal ?? 0).toLocaleString()}</p>
+                    <button
+                      className="remove-btn"
+                      onClick={() => removeFromCart(index)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Per-guest therapist picker (multi-pax only). One row per guest
+              showing the cart items auto-assigned to that guest by index +
+              a therapist dropdown that supports Auto (rotation) and Specific
+              request (sets isRequestedTherapist=true, same semantics as
+              PaxBuilder's staff mode). */}
+          {paxCount > 1 && cart.length > 0 && (() => {
+            const guestServices = cartByGuest(guests, cart);
+            const therapistOpts = getTherapists(employees);
+            return (
+              <div className="pax-therapists-inline" style={{ padding: '0.75rem', borderTop: '1px solid var(--gray-200)', display: 'grid', gap: '0.6rem' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--gray-700)', letterSpacing: '0.02em' }}>
+                  THERAPIST PER GUEST
+                </div>
+                {guests.map((g, i) => {
+                  const assigned = guestServices.get(g.guestNumber) || [];
+                  const onTherapistChange = (val) => {
+                    setGuests((prev) => prev.map((gg, idx) => (
+                      idx === i
+                        ? { ...gg, employeeId: val || null, isRequestedTherapist: !!val }
+                        : gg
+                    )));
+                  };
+                  return (
+                    <div
+                      key={g.guestNumber}
+                      data-testid={`pos-guest-row-${g.guestNumber}`}
+                      style={{ border: '1px solid var(--gray-200)', borderRadius: 6, padding: '0.5rem 0.6rem', background: '#fff', display: 'grid', gap: '0.3rem' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <strong style={{ fontSize: '0.9rem' }}>Guest {g.guestNumber}</strong>
+                        {g.isRequestedTherapist && (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--color-primary, #800020)', fontWeight: 600 }}>REQUESTED</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--gray-600)' }}>
+                        {assigned.length === 0
+                          ? <em style={{ color: 'var(--gray-400)' }}>No service assigned (add more to the cart)</em>
+                          : assigned.map((s) => s.name).join(', ')}
+                      </div>
+                      <select
+                        aria-label={`Therapist for Guest ${g.guestNumber}`}
+                        value={g.employeeId || ''}
+                        onChange={(e) => onTherapistChange(e.target.value)}
+                        style={{ padding: '0.35rem 0.5rem', border: '1px solid var(--gray-300)', borderRadius: 6, fontSize: '0.85rem' }}
+                      >
+                        <option value="">Auto (rotation)</option>
+                        {therapistOpts.map((t) => (
+                          <option key={t._id} value={t._id}>Request: {t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {effectiveCartItems.length > 0 && (
             <>
@@ -2134,9 +2258,9 @@ const POS = () => {
               </div>
 
               {/* Employee Selection with Rotation Queue.
-                  Multi-pax mode: each guest picks their own therapist in
-                  PaxBuilder, so the global picker is hidden and replaced by
-                  a short summary block. */}
+                  Multi-pax mode: per-guest therapist is picked inline next
+                  to the cart (see pax-therapists-inline block above), so
+                  here we just show a read-only confirmation summary. */}
               {paxCount > 1 ? (
                 <div className="checkout-section">
                   <h4>Therapists (per guest)</h4>

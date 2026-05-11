@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react';
 
-const DEFAULT_INTERVAL_MS = 15000;
-const ONE_SHOT_TIMEOUT_MS = 12000;
+const DEFAULT_INTERVAL_MS = 5000;
+const ONE_SHOT_TIMEOUT_MS = 4500;
 
 // Polls navigator.geolocation.getCurrentPosition while `active` is true, calling
 // `onFix({ lat, lng, accuracy, timestamp })` for every successful read. We use
 // getCurrentPosition on a setInterval rather than watchPosition because the
 // continuous watch keeps GPS hot and burns the rider's battery far faster than
-// a once-every-15s sample, which is plenty for a city-scale "where is my ride"
-// map. The first fix fires immediately so the map isn't empty during the first
-// 15s after a pasundo is requested.
+// a once-every-5s sample, which is close enough to feel "live" on the map.
+// Geolocation timeout < interval so a slow fix never overlaps the next tick.
+// The first fix fires immediately so the map isn't empty during the first 5s
+// after a pasundo is requested.
 export default function useLocationTracker({ active, onFix, intervalMs = DEFAULT_INTERVAL_MS }) {
   const onFixRef = useRef(onFix);
   useEffect(() => { onFixRef.current = onFix; }, [onFix]);

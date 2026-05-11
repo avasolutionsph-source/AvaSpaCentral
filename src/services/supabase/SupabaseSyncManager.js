@@ -211,6 +211,13 @@ const SUPABASE_TABLE_COLUMNS = {
     'employee', 'customer', 'upgrade_history',
     'cashier_id', 'cashier_name', 'shift_id', 'drawer_session_id',
     'branch_id', 'pax_count', 'guest_summary',
+    // Void + cancel audit. voided_* fires from Service History's Void
+    // button; cancelled_* fires when a service is cancelled in Rooms and
+    // the link cascades to the transaction. Both routes must round-trip
+    // through Supabase so reports on other devices reflect the same
+    // exclusion logic ServiceHistory applies locally.
+    'voided_at', 'voided_by', 'void_reason',
+    'cancelled_at', 'cancelled_by', 'cancelled_by_role', 'cancel_reason',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   appointments: [
@@ -354,7 +361,8 @@ const SUPABASE_TABLE_COLUMNS = {
     'room_id', 'room_name', 'is_home_service',
     'client_name', 'client_phone', 'client_email', 'client_address',
     'payment_method', 'payment_timing', 'payment_status', 'transaction_id',
-    'special_requests', 'client_notes', 'cancel_reason', 'cancelled_at',
+    'special_requests', 'client_notes',
+    'cancel_reason', 'cancelled_at', 'cancelled_by', 'cancelled_by_role',
     'notes', 'branch_id', 'pax_count', 'guest_summary',
     'sync_status', 'deleted', 'deleted_at',
     'created_at', 'updated_at'
@@ -534,6 +542,11 @@ const FIELD_NAME_MAP = {
   specialRequests: 'special_requests',
   cancelReason: 'cancel_reason',
   cancelledAt: 'cancelled_at',
+  cancelledBy: 'cancelled_by',
+  cancelledByRole: 'cancelled_by_role',
+  voidReason: 'void_reason',
+  voidedAt: 'voided_at',
+  voidedBy: 'voided_by',
   serviceDuration: 'service_duration',
   employeePosition: 'employee_position',
   isOutOfRange: 'is_out_of_range',

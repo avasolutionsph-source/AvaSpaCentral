@@ -249,6 +249,36 @@ const BranchesTab = () => {
 
       let res;
       if (modalMode === 'create') {
+        // Guard against accidental duplicates. The branches table had no
+        // unique constraint on (business_id, name), so a 2nd "Test Branch"
+        // could land beside the first with a different UUID — POS would
+        // then stamp records with one branchId while users assigned to
+        // the original would never see them. Pre-check by name (case-
+        // insensitive) before INSERT and refuse instead of creating a
+        // mismatched twin.
+        try {
+          const dupRes = await fetch(
+            `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&name=ilike.${encodeURIComponent(formData.name.trim())}&select=id,name&limit=1`,
+            { headers }
+          );
+          if (dupRes.ok) {
+            const existing = await dupRes.json();
+            if (Array.isArray(existing) && existing.length > 0) {
+              showToast(
+                `A branch named "${existing[0].name}" already exists. Pick a different name or edit the existing branch instead.`,
+                'error'
+              );
+              setSaving(false);
+              return;
+            }
+          }
+        } catch (dupErr) {
+          // Dedup check is best-effort — if it fails (network/CORS), the
+          // user will see the underlying create error if Supabase ever
+          // gains a unique constraint. Don't block the legitimate path.
+          console.warn('[BranchesTab] duplicate-name pre-check failed:', dupErr);
+        }
+
         // 1. Create the branch first
         res = await fetch(`${supabaseUrl}/rest/v1/branches`, {
           method: 'POST',
@@ -557,6 +587,64 @@ const BranchesTab = () => {
               <p>Add branches to let customers select their preferred location when booking. Each branch can have different home/hotel service fees.</p>
             </div>
           </div>
+
+          {/* Duplicate-name detector. Two branch rows with the same name and
+              different UUIDs are the root cause of the "rider hears notif but
+              sees no card" issue: POS stamps one branchId, the rider is
+              assigned to the other, and the strict per-branch filter rejects
+              the row. Surface the dupe groups so the admin can spot them
+              before they spread further, and link to the cleanup SQL that
+              merges all references (users, employees, home_services,
+              transactions, advance_bookings, rooms, etc.). */}
+          {(() => {
+            const groups = new Map();
+            for (const b of branches) {
+              const key = (b.name || '').trim().toLowerCase();
+              if (!key) continue;
+              if (!groups.has(key)) groups.set(key, []);
+              groups.get(key).push(b);
+            }
+            const dupes = Array.from(groups.values()).filter(arr => arr.length > 1);
+            if (dupes.length === 0) return null;
+            return (
+              <div
+                role="alert"
+                style={{
+                  margin: '12px 0',
+                  padding: '12px 16px',
+                  background: '#fef2f2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: 8,
+                  color: '#7f1d1d',
+                }}
+              >
+                <strong>⚠ Duplicate branch names detected</strong>
+                <p style={{ margin: '6px 0', fontSize: '0.9rem' }}>
+                  Two or more branches share the same name but have different IDs.
+                  This causes POS, rider, and other branch-scoped pages to disagree on which records belong where.
+                </p>
+                {dupes.map((arr, i) => (
+                  <div key={i} style={{ marginTop: 6, fontSize: '0.85rem' }}>
+                    <strong>"{arr[0].name}"</strong> — {arr.length} copies:
+                    <ul style={{ margin: '4px 0 0 18px' }}>
+                      {arr.map(b => (
+                        <li key={b.id}>
+                          <code style={{ fontSize: '0.78rem' }}>{b.id}</code>
+                          {b.is_active ? '' : ' (inactive)'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                <p style={{ margin: '8px 0 0', fontSize: '0.82rem' }}>
+                  <strong>Fix:</strong> Run <code>supabase-merge-duplicate-branches.sql</code> in
+                  the Supabase SQL Editor to merge all references (users, employees,
+                  home_services, transactions, advance_bookings, rooms, customers, etc.)
+                  from the duplicate UUIDs into a single canonical UUID, then delete the dupes.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Branch List */}
           {branches.length === 0 ? (

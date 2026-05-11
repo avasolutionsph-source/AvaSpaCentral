@@ -72,6 +72,18 @@ export function startBookingTriggers() {
     const b = await findBooking(change.entityId);
     if (!b) return;
 
+    // 0. Terminal-state early-out. When a booking is cancelled (or no-show),
+    //    silence any active assignment loop for that booking and stop here.
+    //    Without this guard, the existing Section-1 assignment notif would
+    //    re-fire on a cancel update — the in-memory seenIds set resets every
+    //    page reload, so the cancel write looks like a brand-new assignment
+    //    to a fresh trigger and rings the loop chime all over again on the
+    //    therapist's device. Cancelling should silence, not re-arm.
+    if (b.status === 'cancelled' || b.status === 'no_show') {
+      try { await NotificationService.stopLoopsForBooking(b.id); } catch {}
+      return;
+    }
+
     // 1. Therapist assignment.
     //    Multi-pax bookings fan out into one notification per guest whose
     //    therapist is set. Auto-rotation slots (no employeeId yet) are skipped

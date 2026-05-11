@@ -118,6 +118,15 @@ export function startPosTriggers() {
     if (!isRemote && change.entityType === 'rooms' && change.operation === 'update' && change.entityId) {
       try {
         const room = await mockApi.rooms.getRoom(change.entityId);
+        // Room moved back to available (service cancelled or completed) —
+        // silence any active assignment chime tied to this room. Without
+        // this, the original "new service assigned" loop keeps ringing
+        // until the therapist taps Confirm even though the service is
+        // gone, which is exactly the false-alarm pattern stopLoopsForRoom
+        // was designed to prevent.
+        if (room?.status === 'available') {
+          await NotificationService.stopLoopsForRoom(change.entityId);
+        }
         if (room?.status === 'pending' && room.assignedEmployeeId) {
           const dedupKey = `${room._id}:${room.transactionId || room.assignedEmployeeId}`;
           if (!seenRoomAssignments.has(dedupKey)) {

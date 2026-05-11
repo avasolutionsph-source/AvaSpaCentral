@@ -828,9 +828,14 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
     // on the booking, home service, AND the underlying transaction. The
     // role suffix (e.g. "Maria Santos (Therapist)") is what lets Service
     // History distinguish a therapist cancellation from a manager override
-    // when auditing.
+    // when auditing. Fallback chain ends at email/username/'User' so we
+    // never persist an empty cancelledBy that surfaces as "by Unknown" in
+    // the badge.
+    const joinedName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
     const actorName = (user?.name
-      || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+      || joinedName
+      || user?.username
+      || user?.email
       || 'User').trim();
     const actorRole = user?.role || 'User';
     const actorDisplay = `${actorName} (${actorRole})`;

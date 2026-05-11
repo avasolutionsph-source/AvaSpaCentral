@@ -1439,12 +1439,21 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                         <span><strong>Pax:</strong> {service.paxCount} guests</span>
                       </div>
                     )}
-                    {service.pickupRequestedAt && (
+                    {service.pickupRequestedAt && !service.pickupAcknowledgedAt && (
                       <div className="info-row" style={{ color: '#92400e' }}>
                         <span>🚖</span>
                         <span>
                           <strong>Pickup requested</strong>
                           {service.pickupRequestedBy ? ` by ${service.pickupRequestedBy}` : ''}
+                        </span>
+                      </div>
+                    )}
+                    {service.pickupAcknowledgedAt && (
+                      <div className="info-row" style={{ color: '#064e3b' }}>
+                        <span>✅</span>
+                        <span>
+                          <strong>Rider on the way</strong>
+                          {service.pickupAcknowledgedBy ? ` — ${service.pickupAcknowledgedBy}` : ''}
                         </span>
                       </div>
                     )}
@@ -1481,11 +1490,13 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                       disabled={!!service.pickupRequestedAt || !!pickupRequesting[service._id]}
                       style={{ width: '100%', marginTop: 'var(--spacing-sm)', fontSize: '0.85rem' }}
                     >
-                      {service.pickupRequestedAt
-                        ? '✅ Pickup requested'
-                        : pickupRequesting[service._id]
-                          ? 'Requesting…'
-                          : '🚖 Pasundo (Request Pickup)'}
+                      {service.pickupAcknowledgedAt
+                        ? `✅ Rider OTW${service.pickupAcknowledgedBy ? ` — ${service.pickupAcknowledgedBy}` : ''}`
+                        : service.pickupRequestedAt
+                          ? '✅ Pickup requested'
+                          : pickupRequesting[service._id]
+                            ? 'Requesting…'
+                            : '🚖 Pasundo (Request Pickup)'}
                     </button>
                   )}
 

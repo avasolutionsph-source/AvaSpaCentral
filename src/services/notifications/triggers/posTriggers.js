@@ -13,6 +13,9 @@ const seenHomeServices = new Set();
 // Pasundo (pickup-request) events dedupe by home_services id; a therapist
 // may flip the flag once and we only want one looping chime per request.
 const seenPickupRequests = new Set();
+// Rider acknowledgement events dedupe by home_services id; one ack per
+// request, single chime to the originating therapist.
+const seenPickupAcks = new Set();
 
 let _employeeCachePromise = null;
 async function lookupEmployee(employeeId) {
@@ -152,6 +155,34 @@ export function startPosTriggers() {
             payload: { homeServiceId: hs._id || hs.id },
             branchId: hs.branchId,
           });
+        }
+
+        // Rider acknowledgement — pings the therapist who tapped Pasundo so
+        // they know help is en route. Targeted at the user id stamped during
+        // the request; falls back to silent skip when no userId was recorded
+        // (legacy rows). One-shot chime — not critical enough for the looping
+        // pasundo-class alert. Also silences the original pasundo loop on
+        // the rider's own device so the chime stops the moment they confirm.
+        if (hs && hs.pickupAcknowledgedAt && !seenPickupAcks.has(hs._id || hs.id)) {
+          seenPickupAcks.add(hs._id || hs.id);
+          // Stop the pasundo loop on the rider's device. Idempotent on the
+          // therapist's device (no loop registered there).
+          try { await NotificationService.stopLoopsForHomeService(hs._id || hs.id); } catch {}
+          const rider = hs.pickupAcknowledgedBy || 'Rider';
+          const targetTherapistId = hs.pickupRequestedByUserId || null;
+          if (targetTherapistId) {
+            await NotificationService.notify({
+              type: NotificationService.TYPES.POS_PICKUP_REQUEST,
+              targetUserId: targetTherapistId,
+              title: 'Rider on the way',
+              message: `${rider} is heading to ${hs.address || 'your location'}`,
+              action: '/rooms',
+              actionLabel: 'Open',
+              soundClass: 'oneshot',
+              payload: { homeServiceId: hs._id || hs.id },
+              branchId: hs.branchId,
+            });
+          }
         }
       } catch (e) { /* swallow */ }
     }

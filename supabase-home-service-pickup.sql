@@ -43,6 +43,14 @@ ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_requested_by          
 ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_requested_by_role     TEXT;
 ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_requested_by_user_id  TEXT;
 
+-- Rider acknowledgement — rider taps "On my way" on the pasundo card.
+-- The therapist's Rooms card flips from "Pickup requested" (yellow) to
+-- "Rider on the way" (green) when this is set, and a one-shot notification
+-- fires to the therapist who originally tapped Pasundo.
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_acknowledged_at          TIMESTAMPTZ;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_acknowledged_by          TEXT;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_acknowledged_by_user_id  TEXT;
+
 -- Advance bookings also get the pickup fields — therapist may run the
 -- service via an advance booking record (scheduled home service), not the
 -- walk-in home_services row. The rider notification handler reads the
@@ -51,6 +59,9 @@ ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_requested_at       
 ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_requested_by          TEXT;
 ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_requested_by_role     TEXT;
 ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_requested_by_user_id  TEXT;
+ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_acknowledged_at          TIMESTAMPTZ;
+ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_acknowledged_by          TEXT;
+ALTER TABLE advance_bookings ADD COLUMN IF NOT EXISTS pickup_acknowledged_by_user_id  TEXT;
 
 -- Optional index — only useful for "active pasundo" queries; skip if your
 -- home-services row count stays small.

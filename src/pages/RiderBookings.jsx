@@ -228,6 +228,12 @@ export default function RiderBookings() {
           // so the rider on standby knows which therapist to fetch.
           pickupRequestedAt: hs.pickupRequestedAt || null,
           pickupRequestedBy: hs.pickupRequestedBy || hs.employeeName || null,
+          pickupRequestedByUserId: hs.pickupRequestedByUserId || null,
+          // Rider acknowledgement — set after the rider taps "On my way" on
+          // their pasundo card. Therapist's Rooms card flips to green
+          // "Rider OTW" once present.
+          pickupAcknowledgedAt: hs.pickupAcknowledgedAt || null,
+          pickupAcknowledgedBy: hs.pickupAcknowledgedBy || null,
         }));
 
       const merged = [...myAdvance, ...homeServiceRows];
@@ -412,6 +418,46 @@ export default function RiderBookings() {
     }
   };
 
+  // Rider's acknowledgement of the therapist's Pasundo. Writes the
+  // pickup_acknowledged_* fields back to the same row the therapist
+  // tapped Pasundo on. Therapist's Rooms card listens for this and
+  // flips from yellow "Pickup requested" to green "Rider OTW", and a
+  // one-shot notification fires to the originating therapist (see
+  // posTriggers.js).
+  const [acknowledging, setAcknowledging] = useState({});
+  const handleAcknowledgePickup = async (booking) => {
+    if (!booking?.id || booking.pickupAcknowledgedAt) return;
+    setAcknowledging(prev => ({ ...prev, [booking.id]: true }));
+    try {
+      const riderName = (user?.name
+        || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+        || user?.username
+        || user?.email
+        || 'Rider').trim();
+      const fields = {
+        pickupAcknowledgedAt: new Date().toISOString(),
+        pickupAcknowledgedBy: riderName,
+        pickupAcknowledgedByUserId: user?._id || user?.id || null,
+      };
+      if (booking.source === 'advanceBooking') {
+        await mockApi.advanceBooking.updateAdvanceBooking(booking.id, fields);
+      } else {
+        await mockApi.homeServices.updateHomeService(booking.id, fields);
+      }
+      showToast('Confirmed — therapist notified you are on the way', 'success');
+      await load(false);
+    } catch (err) {
+      console.error('[acknowledge] failed', err);
+      showToast('Failed to confirm. Try again.', 'error');
+    } finally {
+      setAcknowledging(prev => {
+        const next = { ...prev };
+        delete next[booking.id];
+        return next;
+      });
+    }
+  };
+
   const openCard = (id) => setSelectedBookingId(id);
   const cardKeyDown = (e, id) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -593,7 +639,7 @@ export default function RiderBookings() {
                 </div>
                 <div className="rider-booking-status">{b.status.replaceAll('-', ' ').replaceAll('_', ' ')}</div>
 
-                {b.pickupRequestedAt && (
+                {b.pickupRequestedAt && !b.pickupAcknowledgedAt && (
                   <div
                     className="rider-pickup-callout"
                     role="status"
@@ -608,16 +654,61 @@ export default function RiderBookings() {
                       fontWeight: 600,
                       boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35)',
                       display: 'flex',
-                      alignItems: 'center',
+                      flexDirection: 'column',
                       gap: 8,
                       animation: 'pulse-pickup 1.6s ease-in-out infinite',
                     }}
                   >
-                    <span style={{ fontSize: '1.4rem' }}>🚖</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '1.4rem' }}>🚖</span>
+                      <span>
+                        <strong style={{ fontWeight: 800 }}>PASUNDO</strong>
+                        {' — '}
+                        {b.pickupRequestedBy || b.employeeName || 'Therapist'} needs a pickup
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={(e) => { stop(e); handleAcknowledgePickup(b); }}
+                      disabled={!!acknowledging[b.id]}
+                      style={{
+                        width: '100%',
+                        background: '#065f46',
+                        borderColor: '#064e3b',
+                        color: '#ecfdf5',
+                        fontWeight: 700,
+                        padding: '8px 12px',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      {acknowledging[b.id] ? 'Confirming…' : '✅ Confirm — I\'m on my way'}
+                    </button>
+                  </div>
+                )}
+                {b.pickupAcknowledgedAt && (
+                  <div
+                    className="rider-pickup-acked"
+                    role="status"
+                    style={{
+                      marginTop: 8,
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      background: 'linear-gradient(135deg, #a7f3d0 0%, #34d399 100%)',
+                      border: '2px solid #065f46',
+                      color: '#064e3b',
+                      fontSize: '0.92rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: '1.3rem' }}>✅</span>
                     <span>
-                      <strong style={{ fontWeight: 800 }}>PASUNDO</strong>
-                      {' — '}
-                      {b.pickupRequestedBy || b.employeeName || 'Therapist'} needs a pickup
+                      <strong style={{ fontWeight: 800 }}>Confirmed</strong>
+                      {' — heading to '}
+                      {b.pickupRequestedBy || b.employeeName || 'therapist'}
                     </span>
                   </div>
                 )}

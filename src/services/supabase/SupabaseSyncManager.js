@@ -364,6 +364,11 @@ const SUPABASE_TABLE_COLUMNS = {
     'special_requests', 'client_notes',
     'cancel_reason', 'cancelled_at', 'cancelled_by', 'cancelled_by_role',
     'notes', 'branch_id', 'pax_count', 'guest_summary',
+    // Pasundo + rider acknowledgement — therapist may run a home service via
+    // an advance booking (scheduled) instead of a walk-in home_services row.
+    'pickup_requested_at', 'pickup_requested_by', 'pickup_requested_by_role',
+    'pickup_requested_by_user_id',
+    'pickup_acknowledged_at', 'pickup_acknowledged_by', 'pickup_acknowledged_by_user_id',
     'sync_status', 'deleted', 'deleted_at',
     'created_at', 'updated_at'
   ],
@@ -390,6 +395,10 @@ const SUPABASE_TABLE_COLUMNS = {
     // riders in the branch when pickup_requested_at flips from null.
     'pickup_requested_at', 'pickup_requested_by', 'pickup_requested_by_role',
     'pickup_requested_by_user_id',
+    // Rider acknowledgement — rider taps "On my way" on their pasundo card.
+    // Flips the therapist's Rooms card from yellow to green and fires a
+    // one-shot ping to the originating therapist.
+    'pickup_acknowledged_at', 'pickup_acknowledged_by', 'pickup_acknowledged_by_user_id',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   service_rotation: [
@@ -566,6 +575,9 @@ const FIELD_NAME_MAP = {
   pickupRequestedBy: 'pickup_requested_by',
   pickupRequestedByRole: 'pickup_requested_by_role',
   pickupRequestedByUserId: 'pickup_requested_by_user_id',
+  pickupAcknowledgedAt: 'pickup_acknowledged_at',
+  pickupAcknowledgedBy: 'pickup_acknowledged_by',
+  pickupAcknowledgedByUserId: 'pickup_acknowledged_by_user_id',
   voidReason: 'void_reason',
   voidedAt: 'voided_at',
   voidedBy: 'voided_by',

@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import mockApi from '../mockApi';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
+import { supabaseSyncManager } from '../services/supabase';
 
 const HIDDEN_STATUSES = ['completed', 'cancelled', 'no_show'];
 
@@ -79,6 +80,14 @@ export default function RiderBookings() {
   // Re-render once per second so the inline countdown ticks without
   // refetching from Dexie. Same pattern Rooms.jsx uses for room timers.
   const [nowTick, setNowTick] = useState(() => Date.now());
+  // Diagnostic counters surfaced in the empty state. A common pattern we hit:
+  // the rider receives a notification (which broadcasts wide when the home
+  // service has no branchId), but the strict per-branch card filter rejects
+  // the row. Without these numbers the rider has no way to tell whether
+  // "no deliveries" means "literally nothing in storage" or "data exists
+  // but doesn't carry your branch tag" — the second case is fixable by
+  // admin, but only if surfaced.
+  const [diag, setDiag] = useState({ totalHs: 0, branchedOut: 0, untagged: 0 });
   // Separate flag for non-initial reloads (realtime refreshes) so the page
   // doesn't flicker back to the spinner every time advanceBookings changes.
   const [refreshing, setRefreshing] = useState(false);
@@ -134,6 +143,15 @@ export default function RiderBookings() {
       // the privacy cost — if a record is missing branchId, the admin
       // needs to fix it upstream, not have the rider page paper over it.
       const userBranchId = user?.branchId || null;
+      // Diagnostic snapshot — count what we have BEFORE filtering so the
+      // empty state can explain why nothing rendered. The branch filter
+      // below stays strict (no leak) but the user can now tell whether
+      // their branch tag is the blocker.
+      const totalHs = (homeServices || []).length;
+      const untagged = (homeServices || []).filter(hs => !hs.branchId).length;
+      const branchedOut = (homeServices || []).filter(hs => hs.branchId && hs.branchId !== userBranchId).length;
+      setDiag({ totalHs, branchedOut, untagged });
+
       const homeServiceRows = !userBranchId
         ? []
         : (homeServices || [])
@@ -190,6 +208,30 @@ export default function RiderBookings() {
       if (c.entityType === 'advanceBookings' || c.entityType === 'homeServices') load(false);
     });
     return () => unsub();
+  }, [load]);
+
+  // Cross-device live refresh. The dataChangeEmitter only fires for writes
+  // that happen on THIS device — a home service created by the POS device
+  // wouldn't trip it on the rider's phone until the next manual reload.
+  // Subscribe to the Supabase sync manager so realtime inserts land
+  // immediately on every device. Debounced to avoid a refresh-storm when
+  // an initial pull delivers many rows at once.
+  useEffect(() => {
+    let syncDebounce = null;
+    const unsub = supabaseSyncManager.subscribe((status) => {
+      const watched = ['homeServices', 'advanceBookings'];
+      if (
+        (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => { load(false); }, 400);
+      }
+    });
+    return () => {
+      unsub();
+      clearTimeout(syncDebounce);
+    };
   }, [load]);
 
   // 1-second tick for the inline countdown. Cheap (one setState/sec) and
@@ -276,6 +318,36 @@ export default function RiderBookings() {
         <div className="empty-state">
           <h3>No active deliveries</h3>
           <p>You're all caught up. New assignments will alert you here.</p>
+          {(diag.branchedOut > 0 || diag.untagged > 0) && (
+            <div
+              role="status"
+              style={{
+                marginTop: 12,
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: '#fef9c3',
+                border: '1px solid #facc15',
+                color: '#713f12',
+                fontSize: '0.9rem',
+                textAlign: 'left',
+              }}
+            >
+              <strong>Heads up:</strong> {diag.totalHs} home service{diag.totalHs === 1 ? '' : 's'} in storage but none match your branch.
+              {diag.untagged > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  • <strong>{diag.untagged}</strong> are missing a branch tag (admin needs to verify the POS device's selected branch at checkout).
+                </div>
+              )}
+              {diag.branchedOut > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  • <strong>{diag.branchedOut}</strong> belong to a different branch.
+                </div>
+              )}
+              <div style={{ marginTop: 6, fontSize: '0.82rem', color: '#854d0e' }}>
+                Your branch ID: <code>{user?.branchId || '(none)'}</code>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="rider-bookings-grid">

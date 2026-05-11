@@ -79,11 +79,63 @@ export default function RiderBookings() {
     try {
       if (isInitial) setLoading(true);
       else setRefreshing(true);
-      const all = await mockApi.advanceBooking.listAdvanceBookings();
-      const mine = all.filter(b => b.riderId === user.employeeId && b.isHomeService);
+      // Two parallel streams feed this page:
+      //   1) advance_bookings with riderId === me (explicit assignment via
+      //      the AdvanceBookingsTab "Assign Rider" UI).
+      //   2) homeServices created by POS walk-in checkouts. POS doesn't
+      //      pre-assign a rider — it broadcasts to all Rider users (see
+      //      posTriggers.js). So every rider sees every walk-in home
+      //      service in their branch and they coordinate manually.
+      // Defensive — older callers (and the test harness) may not stub
+      // mockApi.homeServices, so call it through a try/catch wrapper that
+      // collapses any access error to an empty list instead of failing
+      // the whole load.
+      const safeListHomeServices = async () => {
+        try { return (await mockApi.homeServices?.getHomeServices?.()) || []; }
+        catch { return []; }
+      };
+      const [advanceBookings, homeServices] = await Promise.all([
+        mockApi.advanceBooking.listAdvanceBookings(),
+        safeListHomeServices(),
+      ]);
+
+      const myAdvance = advanceBookings
+        .filter(b => b.riderId === user.employeeId && b.isHomeService)
+        .map(b => ({ ...b, source: 'advanceBooking' }));
+
+      // Normalize homeServices to the same shape the card/modal already
+      // render. Single mapping point keeps the JSX free of source-aware
+      // branches and lets the existing therapist/address UI reuse as-is.
+      const userBranchId = user?.branchId || null;
+      const homeServiceRows = (homeServices || [])
+        .filter(hs => !userBranchId || !hs.branchId || hs.branchId === userBranchId)
+        .map(hs => ({
+          id: hs._id || hs.id,
+          source: 'homeService',
+          bookingDateTime: hs.createdAt || hs.scheduledDate || new Date().toISOString(),
+          clientName: hs.customerName || 'Walk-in customer',
+          clientPhone: hs.customerPhone || null,
+          clientEmail: hs.customerEmail || null,
+          clientAddress: hs.address || null,
+          serviceName: Array.isArray(hs.serviceNames)
+            ? (hs.serviceNames.join(' + ') || 'Service')
+            : (hs.serviceNames || 'Service'),
+          paxCount: hs.paxCount || 1,
+          employeeId: hs.employeeId || null,
+          employeeName: hs.employeeName || null,
+          isHomeService: true,
+          status: hs.status || 'scheduled',
+          transactionId: hs.transactionId || null,
+          branchId: hs.branchId || null,
+          servicePrice: hs.servicePrice || null,
+          totalAmount: hs.totalAmount || hs.servicePrice || null,
+          specialRequests: hs.specialRequests || null,
+        }));
+
+      const merged = [...myAdvance, ...homeServiceRows];
       const filtered = showHistory
-        ? mine
-        : mine.filter(b => !HIDDEN_STATUSES.includes(b.status));
+        ? merged
+        : merged.filter(b => !HIDDEN_STATUSES.includes(b.status));
       filtered.sort((a, b) => new Date(a.bookingDateTime) - new Date(b.bookingDateTime));
       setBookings(filtered);
     } catch (err) {
@@ -92,12 +144,12 @@ export default function RiderBookings() {
       if (isInitial) setLoading(false);
       else setRefreshing(false);
     }
-  }, [user?.employeeId, showHistory, showToast]);
+  }, [user?.employeeId, user?.branchId, showHistory, showToast]);
 
   useEffect(() => { load(true); }, [load]);
   useEffect(() => {
     const unsub = dataChangeEmitter.subscribe(c => {
-      if (c.entityType === 'advanceBookings') load(false);
+      if (c.entityType === 'advanceBookings' || c.entityType === 'homeServices') load(false);
     });
     return () => unsub();
   }, [load]);

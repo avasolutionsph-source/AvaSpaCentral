@@ -125,6 +125,34 @@ const TABLE_NAME_MAP = {
   incidentReports: 'incident_reports',
 };
 
+// Per-entity pull cooldowns (ms). Realtime subscriptions deliver live
+// changes for every entity (see _setupRealtimeSubscriptions), so the REST
+// pull in _pullChanges is only a reconciliation safety net for when the
+// websocket drops. Without cooldowns, a tab that triggers visibility
+// events repeatedly would re-pull all ~30 tables on every focus, which
+// dominates traffic on small Supabase instances and produces 522/524
+// timeouts. forcePull() clears syncMetadata first so it bypasses these.
+const DEFAULT_PULL_COOLDOWN_MS = 60 * 1000;
+const PULL_COOLDOWN_MS = {
+  // Hot — operational data that must be fresh on every reconciliation
+  attendance: 0,
+  transactions: 0,
+  appointments: 0,
+  advanceBookings: 0,
+  activeServices: 0,
+  homeServices: 0,
+  cashDrawerSessions: 0,
+  cashDrawerShifts: 0,
+  activityLogs: 0,
+  // Cold — config that rarely changes; trust realtime between long pulls
+  business: 5 * 60 * 1000,
+  businessConfig: 5 * 60 * 1000,
+  payrollConfig: 5 * 60 * 1000,
+  payrollConfigLogs: 5 * 60 * 1000,
+  serviceRotation: 5 * 60 * 1000,
+  // (everything else falls through to DEFAULT_PULL_COOLDOWN_MS)
+};
+
 // Valid Supabase columns per table (prevents sending non-existent columns)
 // This must match your actual Supabase table schemas
 const SUPABASE_TABLE_COLUMNS = {
@@ -1963,6 +1991,14 @@ class SupabaseSyncManager {
         // Get last sync timestamp for this entity
         const metadata = await db.syncMetadata.get(entityType);
         const since = metadata?.lastSyncTimestamp;
+
+        const cooldown = PULL_COOLDOWN_MS[entityType] ?? DEFAULT_PULL_COOLDOWN_MS;
+        if (cooldown > 0 && metadata?.lastPullTimestamp) {
+          const elapsed = Date.now() - new Date(metadata.lastPullTimestamp).getTime();
+          if (elapsed < cooldown) {
+            continue;
+          }
+        }
 
         // Use raw fetch (restSelect) instead of supabase-js. The js client
         // serialises every REST call behind its internal auth-refresh lock;

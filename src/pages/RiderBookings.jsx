@@ -106,10 +106,20 @@ export default function RiderBookings() {
       // Normalize homeServices to the same shape the card/modal already
       // render. Single mapping point keeps the JSX free of source-aware
       // branches and lets the existing therapist/address UI reuse as-is.
+      //
+      // Branch scoping is STRICT: rider must be linked to a branch AND
+      // the home service must carry the same branchId. Anything missing
+      // a stamp is hidden. Previously the filter fell through to "show
+      // everything" when either side was unset, which leaked customer
+      // PII and addresses across branches. Convenience here is not worth
+      // the privacy cost — if a record is missing branchId, the admin
+      // needs to fix it upstream, not have the rider page paper over it.
       const userBranchId = user?.branchId || null;
-      const homeServiceRows = (homeServices || [])
-        .filter(hs => !userBranchId || !hs.branchId || hs.branchId === userBranchId)
-        .map(hs => ({
+      const homeServiceRows = !userBranchId
+        ? []
+        : (homeServices || [])
+            .filter(hs => hs.branchId && hs.branchId === userBranchId)
+            .map(hs => ({
           id: hs._id || hs.id,
           source: 'homeService',
           bookingDateTime: hs.createdAt || hs.scheduledDate || new Date().toISOString(),
@@ -188,6 +198,11 @@ export default function RiderBookings() {
   if (loading) return <div className="page-loading"><div className="spinner" /><p>Loading…</p></div>;
 
   const accountMisconfigured = !user?.employeeId;
+  // Branch is required to filter walk-in home services correctly. Without
+  // it we deliberately show nothing (see load()) rather than leak across
+  // branches — surface the reason so a confused rider doesn't think the
+  // app is broken.
+  const branchMisconfigured = !!user?.employeeId && !user?.branchId;
 
   return (
     <div className="rider-bookings-page">
@@ -208,6 +223,16 @@ export default function RiderBookings() {
           <p style={{ margin: '4px 0 0' }}>
             You won't see any deliveries until an admin links your user account
             to your Rider employee profile in Employees.
+          </p>
+        </div>
+      )}
+
+      {branchMisconfigured && (
+        <div className="alert alert-warning" role="status">
+          <strong>Your rider profile isn't assigned to a branch yet.</strong>
+          <p style={{ margin: '4px 0 0' }}>
+            Walk-in home services are scoped per branch, so you won't see any
+            until an admin sets your branch in Employees.
           </p>
         </div>
       )}

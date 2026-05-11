@@ -195,6 +195,23 @@ export function startPosTriggers() {
           payload: { homeServiceId: hs._id },
           branchId: hs.branchId || null,
         });
+
+        // Front-of-house broadcast. The therapist + rider notifs above are
+        // narrowly targeted, so a manager/owner/receptionist running POS
+        // would otherwise get no acknowledgement that the home service
+        // was logged. One-shot chime, not the looping rider alarm — this
+        // is an FYI, not an action request.
+        await NotificationService.notify({
+          type: NotificationService.TYPES.POS_HOMESERVICE_CREATED,
+          targetRole: ['Manager', 'Owner', 'Branch Owner', 'Receptionist'],
+          title: 'Home service logged',
+          message: `${who} • ${services} • ${hs.address || 'address TBD'}`,
+          action: '/rooms',
+          actionLabel: 'View',
+          soundClass: 'oneshot',
+          payload: { homeServiceId: hs._id },
+          branchId: hs.branchId || null,
+        });
       } catch (e) { /* swallow */ }
     }
   });

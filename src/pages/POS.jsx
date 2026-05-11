@@ -1432,6 +1432,11 @@ const POS = () => {
               transactionId: receiptNumber,
               paxCount,
             });
+            // Immediate cashier feedback. The targeted therapist + rider
+            // notifs fire from posTriggers but only land on those users'
+            // own sessions — a manager doing the checkout would otherwise
+            // see no acknowledgement that the home service was created.
+            showToast('Home service created — card added to Rooms, therapist & rider notified', 'success');
           } catch (error) {
             console.error('Failed to update room/home service status:', error);
             showToast('Room status could not be updated', 'warning');
@@ -1647,6 +1652,7 @@ const POS = () => {
           serviceDuration: totalDuration,
           transactionId: receiptNumber,
         });
+        showToast('Home service created — card added to Rooms, therapist & rider notified', 'success');
       } catch (error) {
         console.error('Failed to create home service:', error);
       }

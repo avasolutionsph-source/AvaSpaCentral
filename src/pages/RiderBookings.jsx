@@ -98,6 +98,9 @@ export default function RiderBookings() {
   // belong to a different branch — leak risk) but exposing it lets the
   // rider claim genuinely stale rows after eyeballing the address.
   const [includeUntagged, setIncludeUntagged] = useState(false);
+  // Backfill state — flips while the bulk update is running so the button
+  // shows progress and is debounced against double-clicks.
+  const [backfilling, setBackfilling] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const focusId = searchParams.get('focus');
@@ -279,6 +282,56 @@ export default function RiderBookings() {
     }
   }, [focusId, bookings, setSearchParams]);
 
+  // One-click backfill — stamps the rider's branchId on every untagged
+  // home service so they pass the strict per-branch filter on every
+  // device going forward. Idempotent: rows that already carry a
+  // branchId are left alone. The 2-step confirm guards against
+  // accidentally claiming records that may belong to another branch
+  // (e.g. if multiple branches share one Supabase project and an admin
+  // is logged in as the wrong rider). After backfill we reload so the
+  // diagnostic counters reset and the cards appear.
+  const handleBackfillUntagged = async () => {
+    if (!user?.branchId) {
+      showToast('Cannot backfill — your account has no branch assigned.', 'error');
+      return;
+    }
+    if (backfilling) return;
+    const ok = window.confirm(
+      `Tag ${diag.untagged} untagged home service${diag.untagged === 1 ? '' : 's'} with your branch?\n\n` +
+      'This is permanent and will make them visible to every rider in this branch on every device. Only confirm if these records genuinely belong to your branch.'
+    );
+    if (!ok) return;
+    setBackfilling(true);
+    try {
+      const all = await mockApi.homeServices.getHomeServices();
+      const untagged = (all || []).filter(hs => !hs.branchId);
+      let okCount = 0;
+      let failCount = 0;
+      for (const hs of untagged) {
+        try {
+          await mockApi.homeServices.updateHomeService(hs._id || hs.id, {
+            branchId: user.branchId,
+          });
+          okCount += 1;
+        } catch (err) {
+          console.warn('[backfill] failed for', hs._id || hs.id, err);
+          failCount += 1;
+        }
+      }
+      if (failCount === 0) {
+        showToast(`Tagged ${okCount} home service${okCount === 1 ? '' : 's'} to your branch.`, 'success');
+      } else {
+        showToast(`Tagged ${okCount}; ${failCount} failed — check console.`, 'warning');
+      }
+      await load(false);
+    } catch (err) {
+      console.error('[backfill] unexpected error', err);
+      showToast('Backfill failed — check console.', 'error');
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const openCard = (id) => setSelectedBookingId(id);
   const cardKeyDown = (e, id) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -369,26 +422,38 @@ export default function RiderBookings() {
               <div style={{ marginTop: 6, fontSize: '0.82rem', color: '#854d0e' }}>
                 Your branch ID: <code>{user?.branchId || '(none)'}</code>
               </div>
-              {diag.untagged > 0 && !includeUntagged && (
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setIncludeUntagged(true)}
-                  style={{ marginTop: 10 }}
-                >
-                  Show {diag.untagged} untagged legacy record{diag.untagged === 1 ? '' : 's'}
-                </button>
-              )}
-              {includeUntagged && (
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setIncludeUntagged(false)}
-                  style={{ marginTop: 10 }}
-                >
-                  Hide untagged records
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                {diag.untagged > 0 && !includeUntagged && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setIncludeUntagged(true)}
+                  >
+                    Show {diag.untagged} untagged record{diag.untagged === 1 ? '' : 's'}
+                  </button>
+                )}
+                {includeUntagged && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setIncludeUntagged(false)}
+                  >
+                    Hide untagged
+                  </button>
+                )}
+                {diag.untagged > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleBackfillUntagged}
+                    disabled={backfilling || !user?.branchId}
+                  >
+                    {backfilling
+                      ? 'Tagging…'
+                      : `Claim all ${diag.untagged} for my branch`}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

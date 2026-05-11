@@ -2627,15 +2627,15 @@ export const homeServicesAdapter = {
 
   async createHomeService(data) {
     await delay();
-    // Surface unbranched creates loudly. Cross-device the rider page filters
-    // strictly by branchId, so an untagged row turns into "notif fires but
-    // no card" — the exact failure mode that was hard to diagnose in field
-    // testing. Don't refuse the create (would break legacy paths), but log
-    // so the dev tools console flags the offender immediately.
+    // Hard gate — every home service MUST carry a branchId. Without it the
+    // rider page's strict per-branch filter hides the row (legitimate
+    // anti-leak), the notification fans out wide (since the trigger falls
+    // back to null), and the rider hears a chime with nothing on screen.
+    // Throwing here forces the caller (POS today, anything else tomorrow)
+    // to resolve a real branch before the row lands in Dexie / Supabase.
     if (!data?.branchId) {
-      console.warn(
-        '[HomeServices] createHomeService called without branchId — rider page will not see this row until it is backfilled.',
-        { data }
+      throw new Error(
+        '[HomeServices] createHomeService requires branchId — refusing to create an untagged row that would be invisible to riders.'
       );
     }
     const homeService = await HomeServiceRepository.createService(data);

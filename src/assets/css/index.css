@@ -11796,5 +11796,230 @@ a:focus:not(:focus-visible),
 .rider-booking-status { display: inline-block; padding: 2px 10px; border-radius: var(--radius-full); background: var(--gray-100); font-size: 0.75rem; text-transform: uppercase; }
 .rider-booking-name { font-weight: 600; }
 .rider-booking-phone { display: inline-block; margin-top: 2px; color: var(--primary); }
-.rider-booking-address { background: var(--gray-50); padding: var(--spacing-sm); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: var(--spacing-xs); }
 .rider-booking-notes { font-size: 0.85rem; color: var(--gray-600); font-style: italic; }
+
+/* Therapist chip — stable color per name so the same person looks the
+   same across cards. Six palette slots; picked via a tiny hash in
+   colorIndexFor(). */
+.rider-therapist-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem 0.25rem 0.25rem;
+  border-radius: 999px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  font-size: 0.85rem;
+  color: var(--gray-800);
+  max-width: 100%;
+}
+.rider-therapist-chip.compact {
+  padding: 0.15rem 0.55rem 0.15rem 0.15rem;
+  font-size: 0.78rem;
+}
+.rider-therapist-avatar {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gray-300);
+  color: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.rider-therapist-chip.compact .rider-therapist-avatar {
+  width: 18px;
+  height: 18px;
+  font-size: 0.58rem;
+}
+.rider-therapist-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+/* Six-color palette. Visually distinct, all dark enough for white initials. */
+.chip-color-0 .rider-therapist-avatar { background: #1B5E37; }
+.chip-color-1 .rider-therapist-avatar { background: #7c3aed; }
+.chip-color-2 .rider-therapist-avatar { background: #b45309; }
+.chip-color-3 .rider-therapist-avatar { background: #0369a1; }
+.chip-color-4 .rider-therapist-avatar { background: #be123c; }
+.chip-color-5 .rider-therapist-avatar { background: #4338ca; }
+
+.rider-booking-therapist-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rider-booking-therapist-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+.rider-booking-therapist-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+/* Address block on the card. Clear "Pickup" label, prominent street line,
+   subdued city/landmark below, Maps button stretched along the bottom. */
+.rider-booking-address {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rider-booking-address-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.rider-booking-address-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+.rider-booking-address-street {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  line-height: 1.3;
+}
+.rider-booking-address-city {
+  font-size: 0.85rem;
+  color: var(--gray-700);
+}
+.rider-booking-address-landmark {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  font-style: italic;
+}
+.rider-booking-address-maps {
+  margin-top: 0.35rem;
+  align-self: flex-start;
+}
+
+/* Modal-only variants. Structured address block with Copy button. */
+.rider-modal-address-block {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+}
+.rider-modal-address-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+.rider-modal-copy-btn {
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--gray-300);
+  background: var(--white);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.rider-modal-copy-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.rider-modal-address-street {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  line-height: 1.35;
+}
+.rider-modal-address-city {
+  font-size: 0.9rem;
+  color: var(--gray-700);
+}
+.rider-modal-address-landmark,
+.rider-modal-address-instructions {
+  font-size: 0.85rem;
+  color: var(--gray-700);
+}
+.rider-modal-address-instructions {
+  font-style: italic;
+}
+
+/* Single-pax therapist row inside the modal Services section. */
+.rider-modal-therapist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+}
+
+/* Multi-pax guest table inside the modal Services section. Four columns:
+   Guest # | Service | Therapist chip | Price. Collapses to a labeled
+   two-column layout on narrow screens via inline aria roles. */
+.rider-guest-table {
+  display: grid;
+  gap: 0.4rem;
+}
+.rider-guest-table-head,
+.rider-guest-table-row {
+  display: grid;
+  grid-template-columns: 70px 1fr auto auto;
+  gap: 0.6rem;
+  align-items: center;
+  font-size: 0.88rem;
+}
+.rider-guest-table-head {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--gray-200);
+}
+.rider-guest-table-row {
+  padding: 0.4rem 0;
+  border-bottom: 1px dashed var(--gray-200);
+}
+.rider-guest-table-row:last-child {
+  border-bottom: none;
+}
+.rider-guest-table-num {
+  font-weight: 600;
+  color: var(--gray-700);
+}
+@media (max-width: 540px) {
+  .rider-guest-table-head { display: none; }
+  .rider-guest-table-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "num price"
+      "svc svc"
+      "ther ther";
+    gap: 0.25rem 0.6rem;
+  }
+  .rider-guest-table-row > :nth-child(1) { grid-area: num; }
+  .rider-guest-table-row > :nth-child(2) { grid-area: svc; color: var(--gray-700); }
+  .rider-guest-table-row > :nth-child(3) { grid-area: ther; }
+  .rider-guest-table-row > :nth-child(4) { grid-area: price; font-weight: 600; }
+}

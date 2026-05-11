@@ -21,6 +21,41 @@ function safeFormat(iso, fmt) {
 
 function stop(e) { e.stopPropagation(); }
 
+// Initial-letter avatar used for therapist chips. Stable color per name so
+// the same therapist always shows the same shade (helps riders spot at
+// a glance who's who on busy days).
+function initialsFor(name) {
+  if (!name) return '?';
+  const parts = String(name).trim().split(/\s+/);
+  const first = parts[0]?.[0] || '';
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  return (first + last).toUpperCase() || '?';
+}
+function colorIndexFor(name) {
+  let h = 0;
+  for (const c of String(name || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h % 6; // 6 palette slots in CSS
+}
+function TherapistChip({ name, compact = false }) {
+  const display = name && name.trim() ? name.trim() : 'Auto-assign';
+  return (
+    <span
+      className={`rider-therapist-chip${compact ? ' compact' : ''} chip-color-${colorIndexFor(display)}`}
+      title={`Therapist: ${display}`}
+    >
+      <span className="rider-therapist-avatar" aria-hidden="true">{initialsFor(display)}</span>
+      <span className="rider-therapist-name">{display}</span>
+    </span>
+  );
+}
+
+// Pull a comma-joined list of therapist names from a multi-pax guestSummary.
+// Falls back to "Auto-assign" if a guest has no employee yet.
+function therapistNamesFromSummary(summary) {
+  if (!Array.isArray(summary) || summary.length === 0) return [];
+  return summary.map(g => (g.employeeName && g.employeeName.trim()) || 'Auto-assign');
+}
+
 export default function RiderBookings() {
   const { user, showToast } = useApp();
   const [bookings, setBookings] = useState([]);
@@ -132,43 +167,70 @@ export default function RiderBookings() {
         </div>
       ) : (
         <div className="rider-bookings-grid">
-          {bookings.map(b => (
-            <div
-              key={b.id}
-              className={`rider-booking-card status-${b.status}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => openCard(b.id)}
-              onKeyDown={(e) => cardKeyDown(e, b.id)}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="rider-booking-time">{format(parseISO(b.bookingDateTime), 'MMM d, h:mm a')}</div>
-              <div className="rider-booking-service">{b.serviceName}</div>
-              <div className="rider-booking-status">{b.status.replaceAll('-', ' ')}</div>
-              <div className="rider-booking-client">
-                <div className="rider-booking-name">{b.clientName}</div>
-                {b.clientPhone && (
-                  <a className="rider-booking-phone" href={`tel:${b.clientPhone}`} onClick={stop}>{b.clientPhone}</a>
+          {bookings.map(b => {
+            // Multi-pax: each guest may have their own therapist. Single-pax:
+            // the booking-level employeeName is the sole assigned therapist.
+            const isMultiPax = (b.paxCount ?? 1) > 1 && Array.isArray(b.guestSummary) && b.guestSummary.length > 0;
+            const therapistNames = isMultiPax
+              ? therapistNamesFromSummary(b.guestSummary)
+              : [b.employeeName && b.employeeName.trim() ? b.employeeName.trim() : 'Auto-assign'];
+            return (
+              <div
+                key={b.id}
+                className={`rider-booking-card status-${b.status}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => openCard(b.id)}
+                onKeyDown={(e) => cardKeyDown(e, b.id)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="rider-booking-time">{format(parseISO(b.bookingDateTime), 'MMM d, h:mm a')}</div>
+                <div className="rider-booking-service">
+                  {isMultiPax ? `${b.paxCount} guests · ${b.serviceName}` : b.serviceName}
+                </div>
+                <div className="rider-booking-status">{b.status.replaceAll('-', ' ')}</div>
+                <div className="rider-booking-client">
+                  <div className="rider-booking-name">{b.clientName}</div>
+                  {b.clientPhone && (
+                    <a className="rider-booking-phone" href={`tel:${b.clientPhone}`} onClick={stop}>{b.clientPhone}</a>
+                  )}
+                </div>
+                <div className="rider-booking-therapist-row">
+                  <span className="rider-booking-therapist-label">Therapist</span>
+                  <div className="rider-booking-therapist-list">
+                    {therapistNames.map((name, i) => (
+                      <TherapistChip key={i} name={name} compact />
+                    ))}
+                  </div>
+                </div>
+                {b.clientAddress && (
+                  <div className="rider-booking-address">
+                    <div className="rider-booking-address-header">
+                      <span className="rider-booking-address-label">Pickup</span>
+                    </div>
+                    <div className="rider-booking-address-street">{b.clientAddress}</div>
+                    {b.clientCity && (
+                      <div className="rider-booking-address-city">{b.clientCity}</div>
+                    )}
+                    {b.clientLandmark && (
+                      <div className="rider-booking-address-landmark">Landmark: {b.clientLandmark}</div>
+                    )}
+                    <a
+                      className="btn btn-secondary btn-sm rider-booking-address-maps"
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.clientAddress)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      onClick={stop}
+                    >
+                      Open in Maps
+                    </a>
+                  </div>
+                )}
+                {b.specialRequests && (
+                  <div className="rider-booking-notes">Note: {b.specialRequests}</div>
                 )}
               </div>
-              {b.clientAddress && (
-                <div className="rider-booking-address">
-                  <div className="rider-booking-address-text">{b.clientAddress}</div>
-                  <a
-                    className="btn btn-secondary btn-sm"
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.clientAddress)}`}
-                    target="_blank" rel="noopener noreferrer"
-                    onClick={stop}
-                  >
-                    Open in Maps
-                  </a>
-                </div>
-              )}
-              {b.specialRequests && (
-                <div className="rider-booking-notes">Note: {b.specialRequests}</div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -189,6 +251,33 @@ function BookingDetailModal({ booking: b, onClose }) {
 
   const hasGuestBreakdown = (b.paxCount ?? 1) > 1 && Array.isArray(b.guestSummary) && b.guestSummary.length > 0;
   const services = !hasGuestBreakdown && Array.isArray(b.services) ? b.services : null;
+
+  // Compose the address shown to the rider AND copied to clipboard. Use
+  // every structured field that exists; fall back to clientAddress alone.
+  const composedAddress = [
+    b.clientAddress,
+    b.clientCity,
+    b.clientLandmark ? `Landmark: ${b.clientLandmark}` : null,
+  ].filter(Boolean).join('\n');
+
+  const [copyStatus, setCopyStatus] = useState('idle');
+  const copyAddress = async () => {
+    if (!composedAddress) return;
+    try {
+      await navigator.clipboard.writeText(composedAddress);
+      setCopyStatus('copied');
+      setTimeout(() => setCopyStatus('idle'), 1800);
+    } catch {
+      setCopyStatus('failed');
+      setTimeout(() => setCopyStatus('idle'), 2400);
+    }
+  };
+
+  // Single-pax assigned therapist (booking-level). For multi-pax we show
+  // per-guest therapists in the Services section instead.
+  const singlePaxTherapist = !hasGuestBreakdown
+    ? (b.employeeName && b.employeeName.trim() ? b.employeeName.trim() : 'Auto-assign')
+    : null;
 
   return (
     <div className="modal-overlay" role="presentation" onClick={onClose}>
@@ -225,14 +314,38 @@ function BookingDetailModal({ booking: b, onClose }) {
               <div style={{ fontSize: '0.9rem', color: '#475569' }}>{b.clientEmail}</div>
             )}
             {b.clientAddress && (
-              <div style={{ marginTop: '0.35rem', display: 'grid', gap: '0.35rem' }}>
-                <div>{b.clientAddress}</div>
+              <div className="rider-modal-address-block">
+                <div className="rider-modal-address-header">
+                  <span className="rider-booking-address-label">Pickup address</span>
+                  <button
+                    type="button"
+                    className="rider-modal-copy-btn"
+                    onClick={copyAddress}
+                    aria-label="Copy address to clipboard"
+                  >
+                    {copyStatus === 'copied' ? '✓ Copied' : copyStatus === 'failed' ? 'Copy failed' : 'Copy'}
+                  </button>
+                </div>
+                <div className="rider-modal-address-street">{b.clientAddress}</div>
+                {b.clientCity && (
+                  <div className="rider-modal-address-city">{b.clientCity}</div>
+                )}
+                {b.clientLandmark && (
+                  <div className="rider-modal-address-landmark">
+                    <strong>Landmark:</strong> {b.clientLandmark}
+                  </div>
+                )}
+                {b.clientInstructions && (
+                  <div className="rider-modal-address-instructions">
+                    <strong>Special instructions:</strong> {b.clientInstructions}
+                  </div>
+                )}
                 {mapsUrl && (
                   <a
                     className="btn btn-secondary btn-sm"
                     href={mapsUrl}
                     target="_blank" rel="noopener noreferrer"
-                    style={{ justifySelf: 'start' }}
+                    style={{ justifySelf: 'start', marginTop: '0.35rem' }}
                   >
                     Open in Google Maps
                   </a>
@@ -246,23 +359,42 @@ function BookingDetailModal({ booking: b, onClose }) {
           <section>
             <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem' }}>Services</h3>
             {hasGuestBreakdown ? (
-              <div style={{ display: 'grid', gap: '0.35rem' }}>
+              <div className="rider-guest-table" role="table">
+                <div className="rider-guest-table-head" role="row">
+                  <span role="columnheader">Guest</span>
+                  <span role="columnheader">Service</span>
+                  <span role="columnheader">Therapist</span>
+                  <span role="columnheader" style={{ textAlign: 'right' }}>Price</span>
+                </div>
                 {b.guestSummary.map((g, idx) => (
-                  <div key={`${g.guestNumber ?? idx}`} style={{ fontSize: '0.9rem' }}>
-                    Guest {g.guestNumber ?? idx + 1}: {g.serviceName || '—'} — {g.employeeName || 'Unassigned'} {formatPHP(g.price)}
-                  </div>
-                ))}
-              </div>
-            ) : services ? (
-              <div style={{ display: 'grid', gap: '0.35rem' }}>
-                {services.map((s, idx) => (
-                  <div key={idx} style={{ fontSize: '0.9rem' }}>
-                    {s.name || s.serviceName || '—'} {s.price != null && <>· {formatPHP(s.price)}</>}
+                  <div className="rider-guest-table-row" role="row" key={`${g.guestNumber ?? idx}`}>
+                    <span role="cell" className="rider-guest-table-num">Guest {g.guestNumber ?? idx + 1}</span>
+                    <span role="cell">{g.serviceName || '—'}</span>
+                    <span role="cell">
+                      <TherapistChip name={g.employeeName} compact />
+                    </span>
+                    <span role="cell" style={{ textAlign: 'right' }}>{formatPHP(g.price)}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div>{b.serviceName || '—'}</div>
+              <>
+                <div className="rider-modal-therapist-row">
+                  <span className="rider-booking-therapist-label">Assigned therapist</span>
+                  <TherapistChip name={singlePaxTherapist} />
+                </div>
+                {services ? (
+                  <div style={{ display: 'grid', gap: '0.35rem', marginTop: '0.5rem' }}>
+                    {services.map((s, idx) => (
+                      <div key={idx} style={{ fontSize: '0.9rem' }}>
+                        {s.name || s.serviceName || '—'} {s.price != null && <>· {formatPHP(s.price)}</>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '0.5rem' }}>{b.serviceName || '—'}</div>
+                )}
+              </>
             )}
             <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>
               Total: {formatPHP(b.totalAmount)}

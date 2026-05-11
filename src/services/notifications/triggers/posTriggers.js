@@ -16,6 +16,9 @@ const seenPickupRequests = new Set();
 // Rider acknowledgement events dedupe by home_services id; one ack per
 // request, single chime to the originating therapist.
 const seenPickupAcks = new Set();
+// Pahatid (transport_requests) — dedupe per row so we only chime once per
+// new request even if the row gets touched again later.
+const seenTransportRequests = new Set();
 
 let _employeeCachePromise = null;
 async function lookupEmployee(employeeId) {
@@ -293,6 +296,35 @@ export function startPosTriggers() {
         // (see "Home service created" toast) — they do NOT need the looping
         // Open/Confirm chime that's reserved for the therapist and rider
         // who must acknowledge the assignment. Confirmed by user 2026-05-11.
+      } catch (e) { /* swallow */ }
+    }
+
+    // Pahatid — anyone in a branch can request a drop-off via the universal
+    // header button. Fans out a looping chime to every Rider in the branch
+    // with the destination address + reason so they can decide who answers.
+    if (!isRemote && change.entityType === 'transportRequests' && change.operation === 'create' && change.entityId) {
+      if (seenTransportRequests.has(change.entityId)) return;
+      seenTransportRequests.add(change.entityId);
+      try {
+        const all = await mockApi.transportRequests.getTransportRequests();
+        const tr = (all || []).find((r) => (r._id || r.id) === change.entityId);
+        if (!tr) return;
+        // Branch gate — never broadcast across branches.
+        if (!tr.branchId) return;
+        const requester = tr.requestedByName || 'Someone';
+        const role = tr.requestedByRole ? ` (${tr.requestedByRole})` : '';
+        const reason = tr.reason ? ` • ${tr.reason}` : '';
+        await NotificationService.notify({
+          type: NotificationService.TYPES.POS_PICKUP_REQUEST,
+          targetRole: ['Rider'],
+          title: 'Pahatid — drop-off requested',
+          message: `${requester}${role} → ${tr.destinationAddress}${reason}`,
+          action: '/rider-bookings',
+          actionLabel: 'View',
+          soundClass: 'loop',
+          payload: { transportRequestId: tr._id || tr.id },
+          branchId: tr.branchId,
+        });
       } catch (e) { /* swallow */ }
     }
   });

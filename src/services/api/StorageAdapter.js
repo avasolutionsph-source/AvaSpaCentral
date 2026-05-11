@@ -22,6 +22,7 @@ import {
   ActivityLogRepository,
 } from '../storage/repositories';
 import NotificationRepo from '../storage/repositories/NotificationRepository';
+import TransportRequestRepository from '../storage/repositories/TransportRequestRepository';
 import { authService, supabase, isSupabaseConfigured, supabaseSyncManager } from '../supabase';
 import { db } from '../../db';
 import dataChangeEmitter from '../sync/DataChangeEmitter';
@@ -2678,6 +2679,47 @@ export const homeServicesAdapter = {
 };
 
 // =============================================================================
+// TRANSPORT REQUESTS API ADAPTER (Pahatid — drop-off requests, branch-broad)
+// =============================================================================
+export const transportRequestsAdapter = {
+  async getTransportRequests(filters = {}) {
+    await delay();
+    let rows = await TransportRequestRepository.getAll();
+    if (filters.branchId) rows = rows.filter(r => r.branchId === filters.branchId);
+    if (filters.status)   rows = rows.filter(r => r.status === filters.status);
+    return clone(rows);
+  },
+
+  async createTransportRequest(data) {
+    await delay();
+    if (!data?.branchId) {
+      throw new Error('[TransportRequests] createTransportRequest requires branchId — refusing to create an untagged row that would be invisible to riders.');
+    }
+    if (!data?.destinationAddress) {
+      throw new Error('[TransportRequests] createTransportRequest requires destinationAddress.');
+    }
+    const row = await TransportRequestRepository.create(data);
+    return clone(row);
+  },
+
+  async updateTransportRequest(id, fields) {
+    await delay();
+    const row = await TransportRequestRepository.update(id, fields);
+    return clone(row);
+  },
+
+  async acknowledge(id, opts)  { await delay(); return clone(await TransportRequestRepository.acknowledge(id, opts)); },
+  async complete(id, opts)     { await delay(); return clone(await TransportRequestRepository.complete(id, opts)); },
+  async cancel(id, opts)       { await delay(); return clone(await TransportRequestRepository.cancel(id, opts)); },
+
+  async deleteTransportRequest(id) {
+    await delay();
+    await TransportRequestRepository.delete(id);
+    return { success: true };
+  },
+};
+
+// =============================================================================
 // EXPORT ALL ADAPTERS
 // =============================================================================
 
@@ -2699,5 +2741,6 @@ export default {
   cashDrawer: cashDrawerAdapter,
   shiftSchedules: shiftSchedulesAdapter,
   users: usersAdapter,
-  homeServices: homeServicesAdapter
+  homeServices: homeServicesAdapter,
+  transportRequests: transportRequestsAdapter
 };

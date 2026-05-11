@@ -9,6 +9,7 @@ import NotificationToastContainer from './NotificationToastContainer';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
 import NotificationService from '../services/notifications/NotificationService';
 import NotificationSoundManager from '../services/notifications/NotificationSoundManager';
+import PahatidModal from './PahatidModal';
 import {
   getPreferredOrientation,
   setPreferredOrientation,
@@ -139,6 +140,7 @@ const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const { notifications, dismiss, dismissAll } = useNotifications(user);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showPahatid, setShowPahatid] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const notificationRef = React.useRef(null);
 
@@ -715,6 +717,19 @@ const MainLayout = () => {
               )}
             </div>
 
+            {/* Pahatid (request transport) — universally available to every
+                logged-in role. Compact icon next to the bell. */}
+            <button
+              type="button"
+              className="notification-bell"
+              onClick={() => setShowPahatid(true)}
+              aria-label="Request Pahatid (drop-off)"
+              title="Request Pahatid — notify a rider for a drop-off"
+              style={{ marginRight: 4 }}
+            >
+              <span aria-hidden="true" style={{ fontSize: '1.05rem' }}>🚖</span>
+            </button>
+
             {/* Notification Bell */}
             <div className="notification-container" ref={notificationRef}>
               <button
@@ -1111,6 +1126,7 @@ const MainLayout = () => {
       )}
 
       <NotificationToastContainer />
+      <PahatidModal open={showPahatid} onClose={() => setShowPahatid(false)} />
     </div>
   );
 };

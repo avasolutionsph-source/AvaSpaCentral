@@ -30,7 +30,8 @@ import {
   shiftSchedulesAdapter,
   usersAdapter,
   homeServicesAdapter,
-  notificationsAdapter
+  notificationsAdapter,
+  transportRequestsAdapter
 } from '../services/api';
 
 // Import APIs that we haven't migrated yet from the original mockApi
@@ -237,6 +238,17 @@ export const homeServicesApi = {
   deleteHomeService: homeServicesAdapter.deleteHomeService
 };
 
+// Transport Requests / Pahatid API
+export const transportRequestsApi = {
+  getTransportRequests: transportRequestsAdapter.getTransportRequests,
+  createTransportRequest: transportRequestsAdapter.createTransportRequest,
+  updateTransportRequest: transportRequestsAdapter.updateTransportRequest,
+  acknowledge: transportRequestsAdapter.acknowledge,
+  complete: transportRequestsAdapter.complete,
+  cancel: transportRequestsAdapter.cancel,
+  deleteTransportRequest: transportRequestsAdapter.deleteTransportRequest,
+};
+
 // Shift Schedules API (now using Dexie)
 export const shiftSchedulesApi = {
   getShiftConfig: shiftSchedulesAdapter.getShiftConfig,
@@ -295,5 +307,6 @@ export default {
   suppliers: suppliersApi,
   purchaseOrders: purchaseOrdersApi,
   users: usersApi,
-  homeServices: homeServicesApi
+  homeServices: homeServicesApi,
+  transportRequests: transportRequestsApi
 };

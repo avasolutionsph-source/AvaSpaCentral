@@ -134,9 +134,14 @@ export default function RiderBookings() {
         try { return (await mockApi.homeServices?.getHomeServices?.()) || []; }
         catch { return []; }
       };
-      const [advanceBookings, homeServices] = await Promise.all([
+      const safeListTransportRequests = async () => {
+        try { return (await mockApi.transportRequests?.getTransportRequests?.()) || []; }
+        catch { return []; }
+      };
+      const [advanceBookings, homeServices, transportRequests] = await Promise.all([
         mockApi.advanceBooking.listAdvanceBookings(),
         safeListHomeServices(),
+        safeListTransportRequests(),
       ]);
 
       const myAdvance = advanceBookings
@@ -256,13 +261,38 @@ export default function RiderBookings() {
           therapistLocationUpdatedAt: hs.therapistLocationUpdatedAt || null,
         }));
 
-      const merged = [...myAdvance, ...homeServiceRows];
+      // Pahatid (transport requests) — branch-scoped, same strict filter.
+      // Field names are normalized to the same shape as home-service pasundos
+      // so the existing Confirm/Done banner + handlers render without forking.
+      const transportRows = !userBranchId
+        ? []
+        : (transportRequests || [])
+            .filter(tr => tr.branchId === userBranchId)
+            .map(tr => ({
+              id: tr._id || tr.id,
+              source: 'transportRequest',
+              bookingDateTime: tr.requestedAt || tr.createdAt || new Date().toISOString(),
+              clientName: tr.requestedByName || 'Unknown',
+              clientAddress: tr.destinationAddress || null,
+              clientLandmark: tr.pickupAddress ? `Pickup at: ${tr.pickupAddress}` : null,
+              specialRequests: tr.reason || null,
+              status: tr.status === 'cancelled' ? 'cancelled' : 'scheduled',
+              branchId: tr.branchId,
+              serviceName: `Pahatid${tr.requestedByRole ? ` · from ${tr.requestedByRole}` : ''}`,
+              pickupRequestedAt: tr.requestedAt || null,
+              pickupRequestedBy: tr.requestedByName || null,
+              pickupAcknowledgedAt: tr.acknowledgedAt || null,
+              pickupAcknowledgedBy: tr.acknowledgedBy || null,
+              pickupCompletedAt: tr.completedAt || null,
+              pickupCompletedBy: tr.completedBy || null,
+              cancelledAt: tr.cancelledAt || null,
+              cancelledBy: tr.cancelledBy || null,
+              cancellationReason: tr.cancellationReason || null,
+            }));
+
+      const merged = [...myAdvance, ...homeServiceRows, ...transportRows];
       // Active list hides: terminal statuses (completed/cancelled/no_show) AND
-      // pasundos where the rider already tapped Done. Show completed reveals
-      // both classes for audit/history. Keeping pickup-completion separate from
-      // the home-service status preserves the home-service's own lifecycle —
-      // the therapist may still be at the customer's house after the rider
-      // has driven away.
+      // pasundos / transport requests where the rider already tapped Done.
       const filtered = showHistory
         ? merged
         : merged.filter(b => !HIDDEN_STATUSES.includes(b.status) && !b.pickupCompletedAt);
@@ -279,7 +309,7 @@ export default function RiderBookings() {
   useEffect(() => { load(true); }, [load]);
   useEffect(() => {
     const unsub = dataChangeEmitter.subscribe(c => {
-      if (c.entityType === 'advanceBookings' || c.entityType === 'homeServices') load(false);
+      if (['advanceBookings', 'homeServices', 'transportRequests'].includes(c.entityType)) load(false);
     });
     return () => unsub();
   }, [load]);
@@ -293,7 +323,7 @@ export default function RiderBookings() {
   useEffect(() => {
     let syncDebounce = null;
     const unsub = supabaseSyncManager.subscribe((status) => {
-      const watched = ['homeServices', 'advanceBookings'];
+      const watched = ['homeServices', 'advanceBookings', 'transportRequests'];
       if (
         (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
         status.type === 'pull_complete' || status.type === 'sync_complete'
@@ -467,10 +497,15 @@ export default function RiderBookings() {
       };
       if (booking.source === 'advanceBooking') {
         await mockApi.advanceBooking.updateAdvanceBooking(booking.id, fields);
+      } else if (booking.source === 'transportRequest') {
+        await mockApi.transportRequests.acknowledge(booking.id, {
+          byName: riderName,
+          byUserId: user?._id || user?.id || null,
+        });
       } else {
         await mockApi.homeServices.updateHomeService(booking.id, fields);
       }
-      showToast('Confirmed — therapist notified you are on the way', 'success');
+      showToast('Confirmed — heading there', 'success');
       await load(false);
     } catch (err) {
       console.error('[acknowledge] failed', err);
@@ -505,10 +540,15 @@ export default function RiderBookings() {
       };
       if (booking.source === 'advanceBooking') {
         await mockApi.advanceBooking.updateAdvanceBooking(booking.id, fields);
+      } else if (booking.source === 'transportRequest') {
+        await mockApi.transportRequests.complete(booking.id, {
+          byName: riderName,
+          byUserId: user?._id || user?.id || null,
+        });
       } else {
         await mockApi.homeServices.updateHomeService(booking.id, fields);
       }
-      showToast('Pickup marked done', 'success');
+      showToast('Marked done', 'success');
       await load(false);
     } catch (err) {
       console.error('[complete-pickup] failed', err);
@@ -888,7 +928,7 @@ export default function RiderBookings() {
                     confirm they're heading to the right spot, and the rider's
                     own pin (red) so the therapist can see them approach via
                     the same map on the Rooms page. */}
-                {b.pickupRequestedAt && !['completed', 'cancelled'].includes(b.status) && (
+                {b.source !== 'transportRequest' && b.pickupRequestedAt && !['completed', 'cancelled'].includes(b.status) && (
                   <PasundoLiveMap
                     viewerRole="rider"
                     rider={b.riderCurrentLat != null ? {

@@ -149,6 +149,27 @@ interface HomeService extends BaseEntity {
   transactionId?: string;
 }
 
+interface TransportRequest extends BaseEntity {
+  branchId?: string;
+  requestedByUserId?: string;
+  requestedByName?: string;
+  requestedByRole?: string;
+  pickupAddress?: string;
+  destinationAddress: string;
+  reason?: string;
+  status: 'pending' | 'acknowledged' | 'completed' | 'cancelled';
+  requestedAt: string;
+  acknowledgedAt?: string;
+  acknowledgedBy?: string;
+  acknowledgedByUserId?: string;
+  completedAt?: string;
+  completedBy?: string;
+  completedByUserId?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancellationReason?: string;
+}
+
 interface MigrationLog {
   id?: number;
   version: number;
@@ -275,6 +296,9 @@ class SpaDatabase extends Dexie {
 
   // Notifications (v15)
   notifications!: Table<Notification, string>;
+
+  // Transport requests / Pahatid (v16)
+  transportRequests!: Table<TransportRequest, string>;
 
   // Schema migration tracking
   migrationLog!: Table<MigrationLog, number>;
@@ -438,6 +462,21 @@ class SpaDatabase extends Dexie {
         description: 'Added notifications table; indexed riderId on advanceBookings',
       });
     });
+
+    // Version 16: Transport requests ("Pahatid"). Anyone in a branch can request a
+    // drop-off; riders pick them up via the same My Deliveries surface as home
+    // service pasundo. Indexed on branchId + status so the rider page can pull
+    // active requests in the branch in O(log n).
+    this.version(16).stores({
+      transportRequests: '_id, businessId, branchId, status, requestedByUserId, requestedAt',
+    }).upgrade(async (tx) => {
+      console.log('[Dexie] Upgrading to version 16: transportRequests table');
+      await tx.table('migrationLog').add({
+        version: 16,
+        timestamp: new Date().toISOString(),
+        description: 'Added transportRequests table for Pahatid feature',
+      });
+    });
   }
 }
 
@@ -498,6 +537,7 @@ export const {
   incidentReports,
   notifications,
   migrationLog,
+  transportRequests,
 } = db;
 
 export default db;

@@ -34,5 +34,6 @@ export {
   shiftSchedulesAdapter,
   usersAdapter,
   homeServicesAdapter,
-  notificationsAdapter
+  notificationsAdapter,
+  transportRequestsAdapter
 } from './StorageAdapter';

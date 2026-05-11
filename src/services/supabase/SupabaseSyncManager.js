@@ -118,6 +118,7 @@ const TABLE_NAME_MAP = {
   advanceBookings: 'advance_bookings',
   activeServices: 'active_services',
   homeServices: 'home_services',
+  transportRequests: 'transport_requests',
   // HR Requests
   otRequests: 'ot_requests',
   leaveRequests: 'leave_requests',
@@ -141,6 +142,7 @@ const PULL_COOLDOWN_MS = {
   advanceBookings: 0,
   activeServices: 0,
   homeServices: 0,
+  transportRequests: 0,
   cashDrawerSessions: 0,
   cashDrawerShifts: 0,
   activityLogs: 0,
@@ -415,6 +417,17 @@ const SUPABASE_TABLE_COLUMNS = {
   service_rotation: [
     'id', 'business_id', 'date', 'rotation_data', 'created_at', 'updated_at'
   ],
+  transport_requests: [
+    'id', 'business_id', 'branch_id',
+    'requested_by_user_id', 'requested_by_name', 'requested_by_role',
+    'pickup_address', 'destination_address', 'reason',
+    'status', 'requested_at',
+    'acknowledged_at', 'acknowledged_by', 'acknowledged_by_user_id',
+    'completed_at', 'completed_by', 'completed_by_user_id',
+    'cancelled_at', 'cancelled_by', 'cancellation_reason',
+    'sync_status', 'deleted', 'deleted_at',
+    'created_at', 'updated_at'
+  ],
 
   // === Logs & History ===
   activity_logs: [
@@ -592,6 +605,17 @@ const FIELD_NAME_MAP = {
   pickupCompletedAt: 'pickup_completed_at',
   pickupCompletedBy: 'pickup_completed_by',
   pickupCompletedByUserId: 'pickup_completed_by_user_id',
+  // Transport requests / Pahatid
+  requestedByUserId: 'requested_by_user_id',
+  requestedByName: 'requested_by_name',
+  requestedByRole: 'requested_by_role',
+  pickupAddress: 'pickup_address',
+  destinationAddress: 'destination_address',
+  requestedAt: 'requested_at',
+  acknowledgedAt: 'acknowledged_at',
+  acknowledgedBy: 'acknowledged_by',
+  acknowledgedByUserId: 'acknowledged_by_user_id',
+  completedByUserId: 'completed_by_user_id',
   riderCurrentLat: 'rider_current_lat',
   riderCurrentLng: 'rider_current_lng',
   riderLocationUpdatedAt: 'rider_location_updated_at',

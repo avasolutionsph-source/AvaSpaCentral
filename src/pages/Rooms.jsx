@@ -407,6 +407,19 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
         status.type === 'pull_complete' || status.type === 'sync_complete'
       ) {
+        // Same self-write guard as the dataChangeEmitter subscriber below:
+        // every 5s the therapist writes her own GPS to each active home
+        // service. The Supabase realtime echo comes back ~200ms later and
+        // (without this gate) would fire loadHomeServices() on every tick,
+        // re-rendering all cards — visible flicker.
+        if (
+          status.type === 'realtime_update' &&
+          status.entityType === 'homeServices' &&
+          status.record?.id
+        ) {
+          const writtenAt = selfLocationWritesRef.current.get(status.record.id);
+          if (writtenAt && Date.now() - writtenAt < 3000) return;
+        }
         clearTimeout(syncDebounce);
         syncDebounce = setTimeout(() => {
           try { loadRooms?.(); } catch {}

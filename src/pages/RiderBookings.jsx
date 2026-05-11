@@ -1003,14 +1003,23 @@ export default function RiderBookings() {
                     {formatPHP(priceToCollect)}
                   </div>
                 )}
-                <div className="rider-booking-therapist-row">
-                  <span className="rider-booking-therapist-label">Therapist</span>
-                  <div className="rider-booking-therapist-list">
-                    {therapistNames.map((name, i) => (
-                      <TherapistChip key={i} name={name} compact />
-                    ))}
+                {b.source === 'transportRequest' ? (
+                  <div className="rider-booking-therapist-row">
+                    <span className="rider-booking-therapist-label">Requested by</span>
+                    <div className="rider-booking-therapist-list">
+                      <TherapistChip name={b.pickupRequestedBy || b.clientName || 'Unknown'} compact />
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="rider-booking-therapist-row">
+                    <span className="rider-booking-therapist-label">Therapist</span>
+                    <div className="rider-booking-therapist-list">
+                      {therapistNames.map((name, i) => (
+                        <TherapistChip key={i} name={name} compact />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {b.clientAddress && (
                   <div className="rider-booking-address">
                     <div className="rider-booking-address-header">
@@ -1188,8 +1197,16 @@ function BookingDetailModal({ booking: b, onClose }) {
             ) : (
               <>
                 <div className="rider-modal-therapist-row">
-                  <span className="rider-booking-therapist-label">Assigned therapist</span>
-                  <TherapistChip name={singlePaxTherapist} />
+                  <span className="rider-booking-therapist-label">
+                    {b.source === 'transportRequest' ? 'Requested by' : 'Assigned therapist'}
+                  </span>
+                  <TherapistChip
+                    name={
+                      b.source === 'transportRequest'
+                        ? (b.pickupRequestedBy || b.clientName || 'Unknown')
+                        : singlePaxTherapist
+                    }
+                  />
                 </div>
                 {services ? (
                   <div style={{ display: 'grid', gap: '0.35rem', marginTop: '0.5rem' }}>

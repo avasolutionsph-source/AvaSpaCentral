@@ -243,6 +243,12 @@ export default function RiderBookings() {
           riderLocationUpdatedAt: hs.riderLocationUpdatedAt || null,
           therapistCurrentLat: hs.therapistCurrentLat ?? null,
           therapistCurrentLng: hs.therapistCurrentLng ?? null,
+          // Cancellation audit — surfaced inline on cancelled cards (visible
+          // when the rider toggles "Show completed") so they can see WHY
+          // and WHO stopped a delivery without leaving the page.
+          cancelledAt: hs.cancelledAt || null,
+          cancelledBy: hs.cancelledBy || null,
+          cancellationReason: hs.cancellationReason || null,
           therapistLocationUpdatedAt: hs.therapistLocationUpdatedAt || null,
         }));
 
@@ -699,6 +705,40 @@ export default function RiderBookings() {
                   {isMultiPax ? `${b.paxCount} guests · ${b.serviceName}` : b.serviceName}
                 </div>
                 <div className="rider-booking-status">{b.status.replaceAll('-', ' ').replaceAll('_', ' ')}</div>
+
+                {/* Stop / cancel audit — inline so the rider can see WHY and
+                    WHO stopped a delivery without opening Service History.
+                    Only renders on cancelled rows (which themselves only show
+                    when the "Show completed" toggle is on). */}
+                {b.status === 'cancelled' && (b.cancellationReason || b.cancelledBy) && (
+                  <div
+                    role="status"
+                    style={{
+                      marginTop: 8,
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      background: '#fef3c7',
+                      border: '1.5px solid #f59e0b',
+                      color: '#78350f',
+                      fontSize: '0.88rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: '1.05rem' }}>⛔</span>
+                      <strong>Stopped{b.cancellationReason ? `: ${b.cancellationReason}` : ''}</strong>
+                    </div>
+                    {(b.cancelledBy || b.cancelledAt) && (
+                      <div style={{ fontSize: '0.78rem', color: '#92400e', paddingLeft: 24 }}>
+                        {b.cancelledBy ? `by ${b.cancelledBy}` : ''}
+                        {b.cancelledBy && b.cancelledAt ? ' · ' : ''}
+                        {b.cancelledAt ? safeFormat(b.cancelledAt, 'MMM d, h:mm a') : ''}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {b.pickupRequestedAt && !b.pickupAcknowledgedAt && (
                   <div

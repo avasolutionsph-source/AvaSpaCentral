@@ -196,23 +196,11 @@ export function startPosTriggers() {
           branchId: hs.branchId || null,
         });
 
-        // Front-of-house broadcast. The therapist + rider notifs above are
-        // narrowly targeted, so a manager/owner/receptionist running POS
-        // would otherwise get no acknowledgement that the home service
-        // was logged. Loop chime + Open/Confirm dual buttons match the
-        // rider/therapist UX so the cashier doesn't perceive it as a
-        // weaker notification — the Confirm tap is what silences the
-        // chime, Open jumps to the Rooms page.
-        await NotificationService.notify({
-          type: NotificationService.TYPES.POS_HOMESERVICE_CREATED,
-          targetRole: ['Manager', 'Owner', 'Branch Owner', 'Receptionist'],
-          title: 'Home service logged',
-          message: `${who} • ${services} • ${hs.address || 'address TBD'}`,
-          action: '/rooms',
-          soundClass: 'loop',
-          payload: { homeServiceId: hs._id },
-          branchId: hs.branchId || null,
-        });
+        // No front-of-house broadcast here. Management/owner/receptionist
+        // running POS get inline cashier feedback via showToast in POS.jsx
+        // (see "Home service created" toast) — they do NOT need the looping
+        // Open/Confirm chime that's reserved for the therapist and rider
+        // who must acknowledge the assignment. Confirmed by user 2026-05-11.
       } catch (e) { /* swallow */ }
     }
   });

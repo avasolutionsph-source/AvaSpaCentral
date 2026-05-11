@@ -42,8 +42,21 @@ const POS = () => {
   // as it was. paxCount>1 swaps the flat cart for a per-guest <PaxBuilder>.
   // Each guest has its own services + (optional) requested therapist.
   const [paxCount, setPaxCount] = useState(1);
+  // Each guest carries assignment metadata only — services come from the
+  // shared cart and are distributed by index. genderPref filters the
+  // therapist dropdown to matching gender (and gets persisted on the line
+  // item for auto-rotation to honor). customer captures per-guest Walk-in
+  // / Existing selection — primary payer (Guest 1) populates
+  // transaction.customer; other guests' customer info rides on
+  // guest_summary so reports/profiles still attribute correctly.
   const [guests, setGuests] = useState([
-    { guestNumber: 1, services: [], employeeId: null, isRequestedTherapist: false },
+    {
+      guestNumber: 1,
+      employeeId: null,
+      isRequestedTherapist: false,
+      genderPref: 'all',
+      customer: { type: 'walk-in', customerId: null, name: '', phone: '', email: '', address: '' },
+    },
   ]);
   const [showManageOrder, setShowManageOrder] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
@@ -560,6 +573,13 @@ const POS = () => {
       const qty = Math.max(1, item.quantity || 1);
       for (let q = 0; q < qty; q++) {
         const guest = guestsList[serviceIdx % n] || guestsList[0];
+        // Per-guest metadata rides on the line item so downstream (auto-
+        // rotation, receipts, reports) can attribute by guest without
+        // needing to re-join against guest_summary.
+        const guestCustomer = guest?.customer || null;
+        const pref = guest?.genderPref && guest.genderPref !== 'all'
+          ? guest.genderPref
+          : null;
         items.push({
           id: item.id,
           productId: item.productId || item.id,
@@ -571,6 +591,14 @@ const POS = () => {
           duration: item.duration,
           guestNumber: guest?.guestNumber || (serviceIdx % n) + 1,
           employeeId: guest?.employeeId || null,
+          // Gender preference for auto-rotation when employeeId is null.
+          // 'all' is omitted to keep the payload clean.
+          genderPref: pref,
+          // Per-guest customer attribution. customerId set when picked from
+          // existing customers; name/phone always populated when available.
+          customerId: guestCustomer?.customerId || null,
+          customerName: guestCustomer?.name || null,
+          customerPhone: guestCustomer?.phone || null,
         });
         serviceIdx++;
       }
@@ -611,7 +639,13 @@ const POS = () => {
         out.push(
           prev[i]
             ? { ...prev[i], guestNumber: i + 1 }
-            : { guestNumber: i + 1, services: [], employeeId: null, isRequestedTherapist: false }
+            : {
+                guestNumber: i + 1,
+                employeeId: null,
+                isRequestedTherapist: false,
+                genderPref: 'all',
+                customer: { type: 'walk-in', customerId: null, name: '', phone: '', email: '', address: '' },
+              }
         );
       }
       return out;
@@ -936,9 +970,58 @@ const POS = () => {
         return;
       }
 
-      // If walk-in customer with provided info, save customer first
+      // If walk-in customer with provided info, save customer first.
+      // For multi-pax, iterate every guest's customer slot: each Walk-in
+      // with name+phone becomes its own Customer row; Existing guests
+      // reuse their picked customerId. After this loop, every guest entry
+      // in `guests` has a resolved customerId (either freshly created or
+      // pre-existing) so downstream items + guest_summary can attribute
+      // services to the right person.
       let customerData = null;
-      if (customerType === 'walk-in' && walkInCustomerData.name && walkInCustomerData.phone) {
+      if (paxCount > 1) {
+        const savedGuests = await Promise.all(
+          guests.map(async (g) => {
+            const c = g.customer || { type: 'walk-in' };
+            if (c.type === 'walk-in' && c.name && c.phone) {
+              try {
+                const newCustomer = await mockApi.customers.createCustomer({
+                  name: c.name.trim(),
+                  phone: c.phone.trim(),
+                  email: (c.email || '').trim() || null,
+                  address: (c.address || '').trim() || null,
+                  status: 'active',
+                  branchId: checkoutBranchId,
+                });
+                return { ...g, customer: { ...c, customerId: newCustomer._id, name: newCustomer.name, phone: newCustomer.phone } };
+              } catch (error) {
+                console.error(`Failed to save customer for Guest ${g.guestNumber}:`, error);
+                return g;
+              }
+            }
+            return g;
+          })
+        );
+        setGuests(savedGuests);
+        // Reassign for the rest of this function so flattenGuestsToItems
+        // sees the resolved customerIds without waiting for React re-render.
+        // eslint-disable-next-line no-param-reassign
+        guests.splice(0, guests.length, ...savedGuests);
+        // Primary payer = Guest 1's customer record (if any).
+        const primary = savedGuests[0]?.customer;
+        if (primary?.customerId) {
+          customerData = {
+            _id: primary.customerId,
+            name: primary.name,
+            phone: primary.phone,
+            email: primary.email || null,
+            address: primary.address || null,
+          };
+        }
+        const savedCount = savedGuests.filter(g => g.customer?.customerId).length;
+        if (savedCount > 0) {
+          showToast(`${savedCount} customer${savedCount === 1 ? '' : 's'} saved to database`, 'success');
+        }
+      } else if (customerType === 'walk-in' && walkInCustomerData.name && walkInCustomerData.phone) {
         try {
           const newCustomer = await mockApi.customers.createCustomer({
             name: walkInCustomerData.name.trim(),
@@ -1219,23 +1302,44 @@ const POS = () => {
                 position: null,
                 commission: commissionAmount,
               },
-          customer: customerType === 'walk-in'
-            ? (customerData
-                ? {
-                    id: customerData._id,
-                    name: customerData.name,
-                    phone: customerData.phone,
-                    email: customerData.email
-                  }
-                : { name: 'Walk-in' })
-            : selectedCustomer
-              ? {
-                  id: selectedCustomer._id,
-                  name: selectedCustomer.name,
-                  phone: selectedCustomer.phone,
-                  email: selectedCustomer.email
+          // Primary customer attribution:
+          //   - paxCount > 1 → Guest 1's resolved customer (may have an
+          //     existing customerId or a freshly-created one from the
+          //     walk-in save block above). Per-guest customers also ride
+          //     on items[]/guestSummary so reports keep full attribution.
+          //   - paxCount === 1 → unchanged single-guest path.
+          customer: paxCount > 1
+            ? (() => {
+                const primary = guests[0]?.customer;
+                if (primary?.customerId) {
+                  return {
+                    id: primary.customerId,
+                    name: primary.name,
+                    phone: primary.phone,
+                    email: primary.email || null,
+                  };
                 }
-              : { name: 'Walk-in' },
+                return primary?.name
+                  ? { name: primary.name, phone: primary.phone || null }
+                  : { name: 'Walk-in' };
+              })()
+            : customerType === 'walk-in'
+              ? (customerData
+                  ? {
+                      id: customerData._id,
+                      name: customerData.name,
+                      phone: customerData.phone,
+                      email: customerData.email
+                    }
+                  : { name: 'Walk-in' })
+              : selectedCustomer
+                ? {
+                    id: selectedCustomer._id,
+                    name: selectedCustomer.name,
+                    phone: selectedCustomer.phone,
+                    email: selectedCustomer.email
+                  }
+                : { name: 'Walk-in' },
           bookingSource: bookingSource,
           // QRPh sales sit at 'pending' until the NextPay webhook flips them.
           status: paymentMethod === 'QRPh' ? 'pending' : 'completed',
@@ -1987,6 +2091,10 @@ const POS = () => {
           {paxCount > 1 && cart.length > 0 && (() => {
             const guestServices = cartByGuest(guests, cart);
             const therapistOpts = getTherapists(employees);
+            const anyTherapistHasGender = therapistOpts.some((t) => {
+              const g = (t.gender || '').toLowerCase();
+              return g === 'male' || g === 'female';
+            });
             return (
               <div className="pax-therapists-inline" style={{ padding: '0.75rem', borderTop: '1px solid var(--gray-200)', display: 'grid', gap: '0.6rem' }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--gray-700)', letterSpacing: '0.02em' }}>
@@ -1994,18 +2102,40 @@ const POS = () => {
                 </div>
                 {guests.map((g, i) => {
                   const assigned = guestServices.get(g.guestNumber) || [];
-                  const onTherapistChange = (val) => {
-                    setGuests((prev) => prev.map((gg, idx) => (
-                      idx === i
-                        ? { ...gg, employeeId: val || null, isRequestedTherapist: !!val }
-                        : gg
-                    )));
+                  const genderPref = g.genderPref || 'all';
+                  const customer = g.customer || { type: 'walk-in', customerId: null, name: '', phone: '', email: '', address: '' };
+
+                  // Patch helpers — every mutation goes through `patchGuest`
+                  // so we never lose other guest fields by accident.
+                  const patchGuest = (patch) => {
+                    setGuests((prev) => prev.map((gg, idx) => (idx === i ? { ...gg, ...patch } : gg)));
                   };
+                  const onTherapistChange = (val) => {
+                    patchGuest({ employeeId: val || null, isRequestedTherapist: !!val });
+                  };
+                  const onGenderChange = (val) => {
+                    // Clear stale therapist selection when the gender filter
+                    // no longer matches — same UX pattern as the public
+                    // BookingPage so the cashier never silently books a
+                    // therapist whose gender contradicts what was just picked.
+                    const stillOk = !g.employeeId
+                      || val === 'all'
+                      || (therapistOpts.find((t) => String(t._id) === String(g.employeeId))?.gender || '').toLowerCase() === val;
+                    patchGuest({
+                      genderPref: val,
+                      employeeId: stillOk ? g.employeeId : null,
+                      isRequestedTherapist: stillOk && !!g.employeeId,
+                    });
+                  };
+                  const patchCustomer = (patch) => {
+                    patchGuest({ customer: { ...customer, ...patch } });
+                  };
+
                   return (
                     <div
                       key={g.guestNumber}
                       data-testid={`pos-guest-row-${g.guestNumber}`}
-                      style={{ border: '1px solid var(--gray-200)', borderRadius: 6, padding: '0.5rem 0.6rem', background: '#fff', display: 'grid', gap: '0.3rem' }}
+                      style={{ border: '1px solid var(--gray-200)', borderRadius: 6, padding: '0.6rem 0.7rem', background: '#fff', display: 'grid', gap: '0.4rem' }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <strong style={{ fontSize: '0.9rem' }}>Guest {g.guestNumber}</strong>
@@ -2018,43 +2148,179 @@ const POS = () => {
                           ? <em style={{ color: 'var(--gray-400)' }}>No service assigned (add more to the cart)</em>
                           : assigned.map((s) => s.name).join(', ')}
                       </div>
+
+                      {/* Gender preference pills — filters the therapist
+                          dropdown AND propagates to the line item as
+                          genderPref so auto-rotation can honor it when no
+                          specific employee is chosen. Hidden when no
+                          employee in the roster has a gender stamped so we
+                          don't surface a filter that can't match anyone. */}
+                      {anyTherapistHasGender && (
+                        <div role="radiogroup" aria-label={`Preferred gender for Guest ${g.guestNumber}`} style={{ display: 'flex', gap: '0.3rem' }}>
+                          {[
+                            { value: 'all', label: 'Any' },
+                            { value: 'female', label: 'Female' },
+                            { value: 'male', label: 'Male' },
+                          ].map((opt) => {
+                            const isActive = genderPref === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={isActive}
+                                onClick={() => onGenderChange(opt.value)}
+                                style={{
+                                  padding: '0.25rem 0.7rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: isActive ? 600 : 500,
+                                  borderRadius: 999,
+                                  border: '1px solid ' + (isActive ? 'var(--color-primary, #800020)' : 'var(--gray-300)'),
+                                  background: isActive ? 'var(--color-primary, #800020)' : '#fff',
+                                  color: isActive ? '#fff' : 'var(--gray-700)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
                       <select
                         aria-label={`Therapist for Guest ${g.guestNumber}`}
                         value={g.employeeId || ''}
                         onChange={(e) => onTherapistChange(e.target.value)}
                         style={{ padding: '0.35rem 0.5rem', border: '1px solid var(--gray-300)', borderRadius: 6, fontSize: '0.85rem' }}
                       >
-                        <option value="">Auto (rotation)</option>
-                        {/* Match the rich label used by the global REQUESTED
-                            THERAPIST dropdown (lines 2437-2488): full name +
-                            position + clock-in / busy status. Disabled options
-                            stay visible but greyed-out so the cashier can see
-                            who's on shift today vs not. */}
-                        {therapistOpts.map((t) => {
-                          const inQueue = rotationQueue.find((q) => String(q.employeeId) === String(t._id));
-                          const isClockedIn = !!inQueue;
-                          const isBusy = busyEmployeeIds.includes(String(t._id));
-                          const canSelect = isClockedIn && !isBusy;
-                          const statusSuffix = isBusy
-                            ? ' (🔴 Doing service)'
-                            : isClockedIn
-                              ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)`
-                              : ' (Not clocked in)';
-                          return (
-                            <option
-                              key={t._id}
-                              value={t._id}
-                              disabled={!canSelect}
-                              style={!canSelect ? { color: '#999999' } : {}}
-                            >
-                              {t.firstName} {t.lastName} - {t.position}{statusSuffix}
-                            </option>
-                          );
-                        })}
+                        <option value="">
+                          {genderPref === 'all'
+                            ? 'Auto (rotation)'
+                            : `Auto (rotation) — ${genderPref === 'male' ? 'Male' : 'Female'} only`}
+                        </option>
+                        {/* Same rich rendering as the global REQUESTED THERAPIST
+                            dropdown, plus a gender filter so cashiers don't
+                            need to scan the whole roster when the guest asked
+                            for a specific gender. */}
+                        {therapistOpts
+                          .filter((t) => {
+                            if (genderPref === 'all') return true;
+                            return (t.gender || '').toLowerCase() === genderPref;
+                          })
+                          .map((t) => {
+                            const inQueue = rotationQueue.find((q) => String(q.employeeId) === String(t._id));
+                            const isClockedIn = !!inQueue;
+                            const isBusy = busyEmployeeIds.includes(String(t._id));
+                            const canSelect = isClockedIn && !isBusy;
+                            const statusSuffix = isBusy
+                              ? ' (🔴 Doing service)'
+                              : isClockedIn
+                                ? ` (🟢 Clocked in - ${inQueue.servicesCompleted} services)`
+                                : ' (Not clocked in)';
+                            return (
+                              <option
+                                key={t._id}
+                                value={t._id}
+                                disabled={!canSelect}
+                                style={!canSelect ? { color: '#999999' } : {}}
+                              >
+                                {t.firstName} {t.lastName} - {t.position}{statusSuffix}
+                              </option>
+                            );
+                          })}
                       </select>
+
+                      {/* Per-guest customer (Walk-in / Existing). The
+                          primary payer (Guest 1's customer) becomes
+                          transaction.customer at checkout; every guest's
+                          customer name + customerId rides on the
+                          flattened item so reports/profiles attribute the
+                          service to the right person. */}
+                      <div style={{ marginTop: '0.2rem', borderTop: '1px dashed var(--gray-200)', paddingTop: '0.4rem', display: 'grid', gap: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--gray-600)', letterSpacing: '0.02em' }}>CUSTOMER</span>
+                          {[
+                            { value: 'walk-in', label: 'Walk-in' },
+                            { value: 'existing', label: 'Existing' },
+                          ].map((opt) => {
+                            const isActive = customer.type === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => patchCustomer({
+                                  type: opt.value,
+                                  // Reset cross-mode fields so a stale
+                                  // existing-customer pick doesn't survive
+                                  // a switch back to walk-in (and vice versa).
+                                  customerId: opt.value === 'existing' ? customer.customerId : null,
+                                  name: opt.value === 'existing' && customer.customerId ? customer.name : (opt.value === 'walk-in' ? customer.name : ''),
+                                })}
+                                style={{
+                                  padding: '0.2rem 0.55rem',
+                                  fontSize: '0.72rem',
+                                  fontWeight: isActive ? 600 : 500,
+                                  borderRadius: 999,
+                                  border: '1px solid ' + (isActive ? 'var(--color-primary, #800020)' : 'var(--gray-300)'),
+                                  background: isActive ? 'var(--color-primary, #800020)' : '#fff',
+                                  color: isActive ? '#fff' : 'var(--gray-700)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {customer.type === 'walk-in' ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem' }}>
+                            <input
+                              type="text"
+                              placeholder="Customer name"
+                              value={customer.name}
+                              onChange={(e) => patchCustomer({ name: e.target.value })}
+                              style={{ padding: '0.3rem 0.45rem', border: '1px solid var(--gray-300)', borderRadius: 6, fontSize: '0.8rem' }}
+                            />
+                            <input
+                              type="text"
+                              inputMode="tel"
+                              placeholder="09XXXXXXXXX"
+                              value={customer.phone}
+                              onChange={(e) => patchCustomer({ phone: sanitizePhoneInput(e.target.value) })}
+                              style={{ padding: '0.3rem 0.45rem', border: '1px solid var(--gray-300)', borderRadius: 6, fontSize: '0.8rem' }}
+                            />
+                          </div>
+                        ) : (
+                          <select
+                            value={customer.customerId || ''}
+                            onChange={(e) => {
+                              const cid = e.target.value;
+                              const picked = customers.find((c) => c._id === cid);
+                              patchCustomer({
+                                customerId: cid || null,
+                                name: picked?.name || '',
+                                phone: picked?.phone || '',
+                                email: picked?.email || '',
+                                address: picked?.address || '',
+                              });
+                            }}
+                            style={{ padding: '0.3rem 0.45rem', border: '1px solid var(--gray-300)', borderRadius: 6, fontSize: '0.8rem' }}
+                          >
+                            <option value="">Select existing customer…</option>
+                            {customers.map((c) => (
+                              <option key={c._id} value={c._id}>{c.name}{c.phone ? ` — ${c.phone}` : ''}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
+                <p style={{ fontSize: '0.72rem', color: 'var(--gray-500)', margin: 0 }}>
+                  Guest 1's customer is the primary payer on the receipt. Each guest's name + phone is saved to the customer database on checkout.
+                </p>
               </div>
             );
           })()}
@@ -2528,8 +2794,21 @@ const POS = () => {
               </div>
               )}
 
-              {/* Customer Selection - Hidden when advance booking is enabled */}
-              {!isAdvanceBooking && (
+              {/* Customer Selection — hidden when advance booking is enabled
+                  OR when multi-pax is active. Multi-pax captures customer
+                  info per guest inline in the cart panel (see
+                  pax-therapists-inline block above), and a duplicate global
+                  picker here would let the cashier accidentally override
+                  the primary-payer guest. A short banner replaces it. */}
+              {!isAdvanceBooking && paxCount > 1 && (
+                <div className="checkout-section">
+                  <h4>Customer (per guest)</h4>
+                  <div style={{ background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: 6, padding: '0.6rem 0.75rem', fontSize: '0.85rem', color: 'var(--gray-700)' }}>
+                    Captured inline per guest in the cart panel. Guest 1's customer is the primary payer on the receipt.
+                  </div>
+                </div>
+              )}
+              {!isAdvanceBooking && paxCount === 1 && (
                 <div className="checkout-section">
                   <h4>Customer</h4>
                   <div className="customer-type-selector">

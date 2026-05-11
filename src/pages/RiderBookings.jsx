@@ -87,7 +87,7 @@ export default function RiderBookings() {
   // "no deliveries" means "literally nothing in storage" or "data exists
   // but doesn't carry your branch tag" — the second case is fixable by
   // admin, but only if surfaced.
-  const [diag, setDiag] = useState({ totalHs: 0, branchedOut: 0, untagged: 0 });
+  const [diag, setDiag] = useState({ totalHs: 0, branchedOut: 0, untagged: 0, otherBranches: [] });
   // Separate flag for non-initial reloads (realtime refreshes) so the page
   // doesn't flicker back to the spinner every time advanceBookings changes.
   const [refreshing, setRefreshing] = useState(false);
@@ -159,7 +159,22 @@ export default function RiderBookings() {
       const totalHs = (homeServices || []).length;
       const untagged = (homeServices || []).filter(hs => !hs.branchId).length;
       const branchedOut = (homeServices || []).filter(hs => hs.branchId && hs.branchId !== userBranchId).length;
-      setDiag({ totalHs, branchedOut, untagged });
+      // Group the mismatched records by their actual branchId so the
+      // diagnostic can show each foreign UUID + count. Common cause:
+      // two user accounts both labeled "Test Branch" in the UI but
+      // pointing at different rows in the branches table (different
+      // UUIDs) — POS stamps one, rider filters with the other, every
+      // new record looks like a "different branch" leak.
+      const otherBranchMap = new Map();
+      for (const hs of (homeServices || [])) {
+        if (hs.branchId && hs.branchId !== userBranchId) {
+          otherBranchMap.set(hs.branchId, (otherBranchMap.get(hs.branchId) || 0) + 1);
+        }
+      }
+      const otherBranches = Array.from(otherBranchMap.entries())
+        .map(([id, count]) => ({ id, count }))
+        .sort((a, b) => b.count - a.count);
+      setDiag({ totalHs, branchedOut, untagged, otherBranches });
 
       const homeServiceRows = !userBranchId
         ? []
@@ -290,6 +305,62 @@ export default function RiderBookings() {
       setSearchParams({}, { replace: true });
     }
   }, [focusId, bookings, setSearchParams]);
+
+  // Re-tag every home service currently stamped with `fromBranchId`
+  // (untagged when fromBranchId == null) to the rider's own branch.
+  // Use case: the user has two branch rows in Supabase that share
+  // the same display name but different UUIDs, so the POS stamps one
+  // and the rider filters with the other. After claiming, every new
+  // record from that source flows correctly because the home_services
+  // row carries the rider's branchId end-to-end.
+  const claimRecordsByBranch = async (fromBranchId, label) => {
+    if (!user?.branchId) {
+      showToast('Cannot claim — your account has no branch assigned.', 'error');
+      return;
+    }
+    if (backfilling) return;
+    const all = await mockApi.homeServices.getHomeServices();
+    const targets = (all || []).filter(hs =>
+      fromBranchId == null ? !hs.branchId : hs.branchId === fromBranchId
+    );
+    if (targets.length === 0) {
+      showToast('Nothing to claim.', 'info');
+      return;
+    }
+    const ok = window.confirm(
+      `Re-tag ${targets.length} home service${targets.length === 1 ? '' : 's'} from ${label} to YOUR branch?\n\n` +
+      'This is permanent. Only confirm if these records genuinely belong to your branch — claiming records from another live branch will cross-link real customer data.'
+    );
+    if (!ok) return;
+    setBackfilling(true);
+    try {
+      let okCount = 0;
+      let failCount = 0;
+      for (const hs of targets) {
+        try {
+          await mockApi.homeServices.updateHomeService(hs._id || hs.id, {
+            branchId: user.branchId,
+          });
+          okCount += 1;
+        } catch (err) {
+          console.warn('[claim] failed for', hs._id || hs.id, err);
+          failCount += 1;
+        }
+      }
+      showToast(
+        failCount === 0
+          ? `Claimed ${okCount} record${okCount === 1 ? '' : 's'} to your branch.`
+          : `Claimed ${okCount}; ${failCount} failed — check console.`,
+        failCount === 0 ? 'success' : 'warning'
+      );
+      await load(false);
+    } catch (err) {
+      console.error('[claim] unexpected error', err);
+      showToast('Claim failed — check console.', 'error');
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   // One-click backfill — stamps the rider's branchId on every untagged
   // home service so they pass the strict per-branch filter on every
@@ -425,8 +496,27 @@ export default function RiderBookings() {
               )}
               {diag.branchedOut > 0 && (
                 <div style={{ marginTop: 4 }}>
-                  • <strong>{diag.branchedOut}</strong> belong to a different branch.
+                  • <strong>{diag.branchedOut}</strong> belong to {diag.otherBranches.length === 1 ? 'a different branch' : `${diag.otherBranches.length} different branches`}:
                 </div>
+              )}
+              {diag.otherBranches.length > 0 && (
+                <ul style={{ margin: '4px 0 0 18px', padding: 0, fontSize: '0.85rem' }}>
+                  {diag.otherBranches.map(({ id, count }) => (
+                    <li key={id} style={{ marginBottom: 4 }}>
+                      <code style={{ fontSize: '0.78rem' }}>{id}</code> — {count} record{count === 1 ? '' : 's'}
+                      {' '}
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ marginLeft: 6, padding: '2px 8px', fontSize: '0.78rem' }}
+                        onClick={() => claimRecordsByBranch(id, `branch ${id.slice(0, 8)}…`)}
+                        disabled={backfilling || !user?.branchId}
+                      >
+                        Claim
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
               <div style={{ marginTop: 6, fontSize: '0.82rem', color: '#854d0e' }}>
                 Your branch ID: <code>{user?.branchId || '(none)'}</code>

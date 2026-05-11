@@ -162,6 +162,10 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
         voidedAt: t.voidedAt,
         voidedBy: t.voidedBy,
         voidReason: t.voidReason,
+        cancelledAt: t.cancelledAt,
+        cancelledBy: t.cancelledBy,
+        cancelledByRole: t.cancelledByRole,
+        cancelReason: t.cancelReason,
         upgradeHistory: Array.isArray(t.upgradeHistory) ? t.upgradeHistory : []
         };
       });
@@ -299,12 +303,16 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
     showToast('Service history exported successfully!', 'success');
   };
 
-  // Voided transactions stay visible in the list (with the VOIDED badge and
-  // strikethrough) so cashiers can audit them, but they must NOT contribute
-  // to revenue / transaction count / average / unique customer count or to
-  // employee performance — otherwise voiding the receipt has no financial
-  // effect on the dashboard, defeating the purpose of voiding it.
-  const billable = filteredTransactions.filter((t) => t.status !== 'voided');
+  // Voided AND cancelled transactions stay visible in the list (each with
+  // their own badge + strikethrough) so cashiers can audit them, but they
+  // must NOT contribute to revenue / transaction count / average / unique
+  // customer count or to employee performance — otherwise the receipt
+  // still drives the dashboard, defeating the purpose of voiding/cancelling.
+  // Voided: manually voided via the Void button. Cancelled: the service
+  // didn't happen (cancelled in Rooms by therapist/manager/receptionist).
+  const billable = filteredTransactions.filter(
+    (t) => t.status !== 'voided' && t.status !== 'cancelled'
+  );
 
   // Calculate summary
   const summary = {
@@ -563,12 +571,19 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
               <tbody>
                 {currentTransactions.map(transaction => (
                   <tr key={transaction.id} onClick={() => handleViewDetail(transaction)}
-                    style={transaction.status === 'voided' ? { opacity: 0.5, textDecoration: 'line-through' } : {}}>
+                    style={(transaction.status === 'voided' || transaction.status === 'cancelled') ? { opacity: 0.5, textDecoration: 'line-through' } : {}}>
                     <td>
                       <span className="transaction-receipt">
                         {transaction.receiptNumber}
                         {transaction.status === 'voided' && (
                           <span style={{ marginLeft: '6px', background: '#dc2626', color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', textDecoration: 'none', display: 'inline-block' }}>VOIDED</span>
+                        )}
+                        {transaction.status === 'cancelled' && (
+                          <span
+                            title={`Cancelled${transaction.cancelledBy ? ` by ${transaction.cancelledBy}` : ''}${transaction.cancelReason ? ` — ${transaction.cancelReason}` : ''}`}
+                            style={{ marginLeft: '6px', background: '#d97706', color: '#fff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', textDecoration: 'none', display: 'inline-block' }}>
+                            CANCELLED
+                          </span>
                         )}
                         {transaction.upgradeHistory.length > 0 && (
                           <span
@@ -637,7 +652,11 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                     <td>{transaction.cashier}</td>
                     {hasManagementAccess() && (
                       <td>
-                        {transaction.status !== 'voided' ? (
+                        {transaction.status === 'voided' ? (
+                          <span style={{ fontSize: '0.7rem', color: '#999', textDecoration: 'none', display: 'inline-block' }}>Voided</span>
+                        ) : transaction.status === 'cancelled' ? (
+                          <span style={{ fontSize: '0.7rem', color: '#999', textDecoration: 'none', display: 'inline-block' }}>Cancelled</span>
+                        ) : (
                           <button
                             className="btn btn-sm"
                             style={{ color: '#dc2626', fontSize: '0.75rem', padding: '4px 8px' }}
@@ -645,8 +664,6 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                           >
                             Void
                           </button>
-                        ) : (
-                          <span style={{ fontSize: '0.7rem', color: '#999', textDecoration: 'none', display: 'inline-block' }}>Voided</span>
                         )}
                       </td>
                     )}
@@ -723,6 +740,18 @@ const ServiceHistory = ({ embedded = false, onDataChange }) => {
                 <div className="info-value" style={{ fontSize: '0.85rem' }}>
                   {selectedTransaction.voidReason}<br/>
                   <span style={{ color: '#999', fontSize: '0.75rem' }}>by {selectedTransaction.voidedBy} {selectedTransaction.voidedAt && `on ${format(parseISO(selectedTransaction.voidedAt), 'MMM dd, yyyy h:mm a')}`}</span>
+                </div>
+              </div>
+              )}
+              {selectedTransaction.status === 'cancelled' && (
+              <div className="info-group" style={{ background: '#fffbeb', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                <div className="info-label" style={{ color: '#d97706', fontWeight: 700 }}>CANCELLED</div>
+                <div className="info-value" style={{ fontSize: '0.85rem' }}>
+                  {selectedTransaction.cancelReason}<br/>
+                  <span style={{ color: '#999', fontSize: '0.75rem' }}>
+                    by {selectedTransaction.cancelledBy || 'Unknown'}
+                    {selectedTransaction.cancelledAt && ` on ${format(parseISO(selectedTransaction.cancelledAt), 'MMM dd, yyyy h:mm a')}`}
+                  </span>
                 </div>
               </div>
               )}

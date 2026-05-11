@@ -791,6 +791,27 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
     setStopReason('');
   };
 
+  // Cascade-cancel the POS transaction tied to a room or home service.
+  // Rooms / home services store a receiptNumber in `transactionId`; we
+  // resolve that back to the transaction's internal id, then call
+  // cancelTransaction which sets status='cancelled', restores stock, and
+  // stamps the actor name + role for Service History attribution. Silent
+  // no-op when there's no linked transaction (pay-after that hasn't
+  // produced one yet) so the cancel UX never fails on the void path.
+  const cancelLinkedTransaction = async (receiptNumber, reason, actorDisplay, actorRole) => {
+    if (!receiptNumber) return;
+    try {
+      const txn = await mockApi.transactions.getTransactionByReceiptNumber(receiptNumber);
+      if (!txn || !txn._id) return;
+      if (txn.status === 'cancelled' || txn.status === 'voided') return;
+      await mockApi.transactions.cancelTransaction(txn._id, reason, actorDisplay, actorRole);
+    } catch (err) {
+      // Silent — Service History will still show the original transaction;
+      // worst case the operator can void it manually from there.
+      console.warn('[Rooms] cancelLinkedTransaction failed:', err);
+    }
+  };
+
   // Handle stopping service with reason
   const handleStopService = async () => {
     if (!stopReason) {
@@ -803,6 +824,17 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
     if (!room) return;
 
     setIsStoppingService(true);
+    // Resolve the actor (who's cancelling) once up front so we can stamp it
+    // on the booking, home service, AND the underlying transaction. The
+    // role suffix (e.g. "Maria Santos (Therapist)") is what lets Service
+    // History distinguish a therapist cancellation from a manager override
+    // when auditing.
+    const actorName = (user?.name
+      || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+      || 'User').trim();
+    const actorRole = user?.role || 'User';
+    const actorDisplay = `${actorName} (${actorRole})`;
+
     try {
       // Calculate actual duration
       const now = new Date();
@@ -835,13 +867,18 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             await mockApi.advanceBooking.updateAdvanceBooking(room._id, {
               status: 'cancelled',
               cancelReason: stopReason,
-              cancelledAt: now.toISOString()
+              cancelledAt: now.toISOString(),
+              cancelledBy: actorName,
+              cancelledByRole: actorRole,
             });
+            await cancelLinkedTransaction(room.transactionId, stopReason, actorDisplay, actorRole);
             showToast(`Home service stopped: ${stopReason}`, 'info');
           }
         } else {
-          // Delete regular home service card
+          // Delete regular home service card and cancel the linked POS
+          // transaction so Service History stops counting it.
           await homeServicesApi.deleteHomeService(room._id);
+          await cancelLinkedTransaction(room.transactionId, stopReason, actorDisplay, actorRole);
           showToast(`Home service stopped: ${stopReason}`, 'info');
         }
         loadHomeServices();
@@ -864,11 +901,21 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
             await mockApi.advanceBooking.updateAdvanceBooking(room.advanceBookingId, {
               status: 'cancelled',
               cancelReason: stopReason,
-              cancelledAt: now.toISOString()
+              cancelledAt: now.toISOString(),
+              cancelledBy: actorName,
+              cancelledByRole: actorRole,
             });
           } catch (bookingError) {
             // Silent fail for booking cancellation
           }
+        }
+
+        // Cascade-cancel the linked POS transaction for any cancellation
+        // path (pre-paid walk-in, pay-now advance, etc.). cancelLinkedTransaction
+        // looks up by receipt number and no-ops when no transaction exists
+        // (e.g. pay-after that never produced one).
+        if (status === 'cancelled') {
+          await cancelLinkedTransaction(room.transactionId, stopReason, actorDisplay, actorRole);
         }
 
         // If cancelled (not ended early), undo the service rotation count

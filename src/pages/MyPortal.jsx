@@ -196,7 +196,7 @@ const MyPortal = () => {
       const myCompleted = transactions.filter(t => {
         if (!t.date) return false;
         const txDate = t.date.split('T')[0];
-        return txDate === today && t.employeeId === user.employeeId && t.status !== 'voided';
+        return txDate === today && t.employeeId === user.employeeId && t.status !== 'voided' && t.status !== 'cancelled';
       });
       myCompleted.forEach(t => {
         // Don't duplicate if already in bookings

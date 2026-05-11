@@ -959,6 +959,69 @@ export const transactionsAdapter = {
     });
   },
 
+  // Mirror of voidTransaction for the "service was cancelled in Rooms" flow.
+  // Same stock-restore behavior and revenue-exclusion outcome, but stamped
+  // with cancellation fields so Service History can render a distinct
+  // CANCELLED badge with the actor's role — and so audits can tell apart
+  // a cashier voiding a mistake from a therapist/manager cancelling a
+  // service that didn't happen.
+  async cancelTransaction(id, reason, cancelledBy, cancelledByRole) {
+    await delay();
+    return await db.transaction('rw', [db.transactions, db.products, db.syncQueue], async () => {
+      const existing = await storageService.transactions.getById(id);
+      if (!existing) throw new Error('Transaction not found');
+      if (existing.status === 'cancelled') throw new Error('Transaction already cancelled');
+      if (existing.status === 'voided') throw new Error('Transaction already voided');
+
+      // Restore product stock for cancelled items (identical to void path).
+      if (existing.items) {
+        const productIdsToFetch = new Set();
+        for (const item of existing.items) {
+          if (item.type === 'product') {
+            productIdsToFetch.add(item.id);
+          }
+        }
+        if (productIdsToFetch.size > 0) {
+          const allProducts = await db.products.where('_id').anyOf([...productIdsToFetch]).toArray();
+          const updates = new Map();
+          for (const item of existing.items) {
+            if (item.type === 'product') {
+              const product = allProducts.find(p => p._id === item.id);
+              if (product && product.stock !== undefined) {
+                const existing = updates.get(item.id) || { ...product };
+                existing.stock = (existing.stock ?? product.stock) + item.quantity;
+                updates.set(item.id, existing);
+              }
+            }
+          }
+          if (updates.size > 0) {
+            await db.products.bulkPut([...updates.values()]);
+            for (const [productId, updatedProduct] of updates) {
+              await db.syncQueue.add({
+                entityType: 'products',
+                entityId: productId,
+                operation: 'update',
+                data: updatedProduct,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                retryCount: 0,
+              });
+            }
+          }
+        }
+      }
+
+      const updated = await storageService.transactions.update(id, {
+        status: 'cancelled',
+        cancelledAt: new Date().toISOString(),
+        cancelledBy: cancelledBy || null,
+        cancelledByRole: cancelledByRole || null,
+        cancelReason: reason || null,
+      });
+      return clone(updated);
+    });
+  },
+
   async getRevenueSummary(period) {
     await delay();
 
@@ -984,7 +1047,7 @@ export const transactionsAdapter = {
 
     const allTransactions = await storageService.transactions.getAll();
     const transactions = allTransactions.filter(t =>
-      new Date(t.date) >= startDate && t.status !== 'voided'
+      new Date(t.date) >= startDate && t.status !== 'voided' && t.status !== 'cancelled'
     );
 
     const totalRevenue = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);

@@ -33,14 +33,15 @@
 -- ============================================================================
 SELECT
   business_id,
-  name,
+  LOWER(TRIM(name))                          AS normalized_name,
   COUNT(*)                                   AS copies,
+  ARRAY_AGG(name ORDER BY created_at)        AS names_as_stored,
   ARRAY_AGG(id ORDER BY created_at)          AS branch_ids,
   ARRAY_AGG(created_at ORDER BY created_at)  AS created_at_list
 FROM branches
 GROUP BY business_id, LOWER(TRIM(name))
 HAVING COUNT(*) > 1
-ORDER BY copies DESC, name;
+ORDER BY copies DESC, LOWER(TRIM(name));
 
 
 -- ============================================================================

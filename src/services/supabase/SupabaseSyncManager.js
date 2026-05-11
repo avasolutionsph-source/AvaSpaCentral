@@ -378,6 +378,18 @@ const SUPABASE_TABLE_COLUMNS = {
     'customer_id', 'customer_name', 'customer_phone', 'customer_email',
     'status', 'scheduled_time', 'address', 'notes', 'services',
     'service_names', 'service_duration', 'branch_id',
+    // Pricing — surfaced on the rider card so they know "magkano need
+    // bayaran" at the destination without re-pulling the transaction.
+    'service_price', 'total_amount', 'pax_count',
+    // Lifecycle stamps. start_time mirrors active_services/rooms so the
+    // rider can show the same countdown as the therapist's Rooms page.
+    'start_time', 'started_at', 'started_by',
+    'completed_at', 'completed_by', 'completion_notes',
+    'cancelled_at', 'cancelled_by', 'cancellation_reason',
+    // Pasundo — therapist's pickup request. Notification fans out to
+    // riders in the branch when pickup_requested_at flips from null.
+    'pickup_requested_at', 'pickup_requested_by', 'pickup_requested_by_role',
+    'pickup_requested_by_user_id',
     'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
   ],
   service_rotation: [
@@ -544,6 +556,16 @@ const FIELD_NAME_MAP = {
   cancelledAt: 'cancelled_at',
   cancelledBy: 'cancelled_by',
   cancelledByRole: 'cancelled_by_role',
+  cancellationReason: 'cancellation_reason',
+  startedAt: 'started_at',
+  startedBy: 'started_by',
+  completedAt: 'completed_at',
+  completedBy: 'completed_by',
+  completionNotes: 'completion_notes',
+  pickupRequestedAt: 'pickup_requested_at',
+  pickupRequestedBy: 'pickup_requested_by',
+  pickupRequestedByRole: 'pickup_requested_by_role',
+  pickupRequestedByUserId: 'pickup_requested_by_user_id',
   voidReason: 'void_reason',
   voidedAt: 'voided_at',
   voidedBy: 'voided_by',

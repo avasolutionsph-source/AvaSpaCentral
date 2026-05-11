@@ -10,6 +10,9 @@ const seenOnline = new Set();
 const seenRoomAssignments = new Set();
 // Home-service notifications dedupe by the home_services row id.
 const seenHomeServices = new Set();
+// Pasundo (pickup-request) events dedupe by home_services id; a therapist
+// may flip the flag once and we only want one looping chime per request.
+const seenPickupRequests = new Set();
 
 let _employeeCachePromise = null;
 async function lookupEmployee(employeeId) {
@@ -101,6 +104,38 @@ export function startPosTriggers() {
     if (change.entityType === 'homeServices' && change.operation === 'delete' && change.entityId) {
       try {
         await NotificationService.stopLoopsForHomeService(change.entityId);
+      } catch (e) { /* swallow */ }
+    }
+
+    // Pasundo — therapist requested a rider pickup. The Rooms page stamps
+    // pickupRequestedAt/By/Role on the home_services row; this trigger
+    // fans that out as a looping chime to every Rider in the branch so
+    // whoever's free can pick the therapist up. Dedupe per home_services
+    // id — a single request is one event, even if the row is touched
+    // again later for other reasons (status flip, upgrade, etc.).
+    if (!isRemote && change.entityType === 'homeServices' && change.operation === 'update' && change.entityId) {
+      try {
+        const all = await mockApi.homeServices.getHomeServices();
+        const hs = all.find((h) => (h._id || h.id) === change.entityId);
+        if (hs && hs.pickupRequestedAt && !seenPickupRequests.has(hs._id || hs.id)) {
+          seenPickupRequests.add(hs._id || hs.id);
+          const therapist = hs.pickupRequestedBy || hs.employeeName || 'Therapist';
+          const where = hs.address || 'home service address';
+          const services = Array.isArray(hs.serviceNames)
+            ? hs.serviceNames.join(' + ')
+            : (hs.serviceNames || 'home service');
+          await NotificationService.notify({
+            type: NotificationService.TYPES.POS_PICKUP_REQUEST,
+            targetRole: ['Rider'],
+            title: 'Pasundo — pickup requested',
+            message: `${therapist} needs a pickup • ${where} • ${services}`,
+            action: '/rider-bookings',
+            actionLabel: 'View',
+            soundClass: 'loop',
+            payload: { homeServiceId: hs._id || hs.id },
+            branchId: hs.branchId || null,
+          });
+        }
       } catch (e) { /* swallow */ }
     }
 

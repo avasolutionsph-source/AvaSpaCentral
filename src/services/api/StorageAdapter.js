@@ -2652,6 +2652,17 @@ export const homeServicesAdapter = {
     await delay();
     await HomeServiceRepository.delete(id);
     return { success: true };
+  },
+
+  // Free-form field updater. Mirrors roomsAdapter.updateRoom semantics so
+  // callers can patch arbitrary columns (service upgrade, pickup request,
+  // start-time stamping). Status transitions still flow through
+  // updateHomeServiceStatus to preserve the side-effect helpers in the
+  // repository (startService / cancelService / completeService).
+  async updateHomeService(id, fields) {
+    await delay();
+    const updated = await HomeServiceRepository.update(id, fields);
+    return clone(updated);
   }
 };
 

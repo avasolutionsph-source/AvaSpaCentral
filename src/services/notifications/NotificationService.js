@@ -13,6 +13,7 @@ const TYPES = Object.freeze({
   POS_ONLINE_BOOKING:         'pos.online.booking',
   POS_QRPH_PAID:              'pos.qrph.paid',
   POS_QRPH_FAILED:            'pos.qrph.failed',
+  POS_PICKUP_REQUEST:         'pos.pickup.request',
   HR_REQUEST_STATUS:          'hr.request.status',
   HR_REQUEST_NEW:             'hr.request.new',
   ATTENDANCE_LATE:            'attendance.late',

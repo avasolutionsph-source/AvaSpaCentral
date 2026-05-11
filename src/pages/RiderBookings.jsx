@@ -56,10 +56,29 @@ function therapistNamesFromSummary(summary) {
   return summary.map(g => (g.employeeName && g.employeeName.trim()) || 'Auto-assign');
 }
 
+// Compute remaining service time identically to the therapist's Rooms page
+// so rider + therapist see the same countdown to the second. Returns null
+// for non-running bookings; caller hides the badge in that case.
+function getRemainingTime(booking, now) {
+  if (!booking?.startTime || !booking?.serviceDuration) return null;
+  const start = new Date(booking.startTime).getTime();
+  const end = start + Number(booking.serviceDuration) * 60000;
+  const remaining = Math.max(0, end - now);
+  return {
+    minutes: Math.floor(remaining / 60000),
+    seconds: Math.floor((remaining % 60000) / 1000),
+    isExpired: remaining <= 0,
+    isCritical: remaining > 0 && remaining <= 5 * 60000,
+  };
+}
+
 export default function RiderBookings() {
   const { user, showToast } = useApp();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Re-render once per second so the inline countdown ticks without
+  // refetching from Dexie. Same pattern Rooms.jsx uses for room timers.
+  const [nowTick, setNowTick] = useState(() => Date.now());
   // Separate flag for non-initial reloads (realtime refreshes) so the page
   // doesn't flicker back to the spinner every time advanceBookings changes.
   const [refreshing, setRefreshing] = useState(false);
@@ -140,6 +159,15 @@ export default function RiderBookings() {
           servicePrice: hs.servicePrice || null,
           totalAmount: hs.totalAmount || hs.servicePrice || null,
           specialRequests: hs.specialRequests || null,
+          // Live-timer fields. The Rooms page maps startedAt → startTime
+          // when a therapist taps Start; expose the same shape here so
+          // the rider sees the same countdown without a parallel path.
+          startTime: hs.startTime || hs.startedAt || null,
+          serviceDuration: hs.serviceDuration || null,
+          // Pasundo — when set, the card shows a high-visibility callout
+          // so the rider on standby knows which therapist to fetch.
+          pickupRequestedAt: hs.pickupRequestedAt || null,
+          pickupRequestedBy: hs.pickupRequestedBy || hs.employeeName || null,
         }));
 
       const merged = [...myAdvance, ...homeServiceRows];
@@ -163,6 +191,13 @@ export default function RiderBookings() {
     });
     return () => unsub();
   }, [load]);
+
+  // 1-second tick for the inline countdown. Cheap (one setState/sec) and
+  // only runs while this page is mounted; the load() flow is unaffected.
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -251,6 +286,18 @@ export default function RiderBookings() {
             const therapistNames = isMultiPax
               ? therapistNamesFromSummary(b.guestSummary)
               : [b.employeeName && b.employeeName.trim() ? b.employeeName.trim() : 'Auto-assign'];
+            // Therapist's live countdown — only relevant once the service
+            // is running ('occupied' for home services normalized in Rooms;
+            // 'in-progress' for advance bookings still mid-service).
+            const timer = (b.status === 'in_progress' || b.status === 'occupied' || b.status === 'in-progress')
+              ? getRemainingTime(b, nowTick)
+              : null;
+            const priceToCollect = Number(b.totalAmount || b.servicePrice || 0);
+            // Pay-after = customer pays the rider on arrival. Pay-now /
+            // paid = already settled at POS — rider doesn't collect. We
+            // still surface the amount as context so the rider can
+            // anticipate the receipt total at the door.
+            const collectAtDoor = !b.paymentStatus || b.paymentStatus === 'pending' || b.paymentTiming === 'pay-after';
             return (
               <div
                 key={b.id}
@@ -265,13 +312,69 @@ export default function RiderBookings() {
                 <div className="rider-booking-service">
                   {isMultiPax ? `${b.paxCount} guests · ${b.serviceName}` : b.serviceName}
                 </div>
-                <div className="rider-booking-status">{b.status.replaceAll('-', ' ')}</div>
+                <div className="rider-booking-status">{b.status.replaceAll('-', ' ').replaceAll('_', ' ')}</div>
+
+                {b.pickupRequestedAt && (
+                  <div
+                    className="rider-pickup-callout"
+                    role="status"
+                    style={{
+                      marginTop: 6,
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      background: '#fef3c7',
+                      border: '1px solid #f59e0b',
+                      color: '#7c2d12',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    🚖 <strong>Pasundo:</strong> {b.pickupRequestedBy || b.employeeName || 'Therapist'} needs a pickup
+                  </div>
+                )}
+
+                {timer && (
+                  <div
+                    className={`rider-booking-timer${timer.isCritical ? ' critical' : ''}`}
+                    style={{
+                      marginTop: 6,
+                      padding: '6px 10px',
+                      borderRadius: 8,
+                      background: timer.isExpired ? '#fee2e2' : timer.isCritical ? '#fef3c7' : '#ecfdf5',
+                      color: timer.isExpired ? '#991b1b' : timer.isCritical ? '#92400e' : '#065f46',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    ⏱ {timer.isExpired
+                      ? "Therapist's service ended"
+                      : `${timer.minutes}:${String(timer.seconds).padStart(2, '0')} on therapist's clock`}
+                  </div>
+                )}
+
                 <div className="rider-booking-client">
                   <div className="rider-booking-name">{b.clientName}</div>
                   {b.clientPhone && (
                     <a className="rider-booking-phone" href={`tel:${b.clientPhone}`} onClick={stop}>{b.clientPhone}</a>
                   )}
                 </div>
+
+                {priceToCollect > 0 && (
+                  <div
+                    className="rider-booking-amount"
+                    style={{
+                      marginTop: 4,
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      background: collectAtDoor ? '#fef9c3' : '#f1f5f9',
+                      color: collectAtDoor ? '#854d0e' : '#334155',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    {collectAtDoor ? '💵 Collect: ' : '💵 Paid: '}
+                    {formatPHP(priceToCollect)}
+                  </div>
+                )}
                 <div className="rider-booking-therapist-row">
                   <span className="rider-booking-therapist-label">Therapist</span>
                   <div className="rider-booking-therapist-list">

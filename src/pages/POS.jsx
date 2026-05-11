@@ -1722,10 +1722,19 @@ const POS = () => {
               customerEmail = walkInCustomerData.email || null;
             }
 
+            // Service-only subtotal so the rider sees only what the customer
+            // owes for the service itself (the cart may include retail
+            // products that ship separately or are settled at the spa).
+            const homeServicePrice = checkoutItems
+              .filter(it => it.type === 'service')
+              .reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
+
             // Create home service record. Stamp branchId so the rider page
             // (which strict-filters by branch to prevent cross-branch PII
             // leaks) actually surfaces this record to the right branch's
             // riders. Same guarantee transactions already get at line 882.
+            // servicePrice + totalAmount are persisted so the rider card can
+            // show "magkano need bayaran" without re-fetching the txn.
             await mockApi.homeServices.createHomeService({
               branchId: checkoutBranchId,
               employeeId: homeEmpId,
@@ -1738,6 +1747,8 @@ const POS = () => {
               serviceDuration: totalDuration,
               transactionId: receiptNumber,
               paxCount,
+              servicePrice: homeServicePrice,
+              totalAmount,
             });
             // Immediate cashier feedback. The targeted therapist + rider
             // notifs fire from posTriggers but only land on those users'
@@ -1944,6 +1955,9 @@ const POS = () => {
         const serviceNames = cartSnapshot
           .filter(item => item.type === 'service')
           .map(item => item.name);
+        const qrphServicePrice = cartSnapshot
+          .filter(it => it.type === 'service')
+          .reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
         await mockApi.homeServices.createHomeService({
           // Inherit branchId from the saved transaction. Without this
           // stamp the rider page (strict branch filter) won't surface
@@ -1958,6 +1972,9 @@ const POS = () => {
           serviceNames,
           serviceDuration: totalDuration,
           transactionId: receiptNumber,
+          paxCount: ctxPaxCount,
+          servicePrice: qrphServicePrice,
+          totalAmount: transaction.totalAmount || 0,
         });
         showToast('Home service created — card added to Rooms, therapist & rider notified', 'success');
       } catch (error) {

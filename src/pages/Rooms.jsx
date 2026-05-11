@@ -35,14 +35,23 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   const [stopReason, setStopReason] = useState('');
   const [isStoppingService, setIsStoppingService] = useState(false);
 
-  // Service upgrade modal state
-  const [upgradeModal, setUpgradeModal] = useState({ isOpen: false, room: null });
+  // Service upgrade modal state. isHomeService discriminates whether we
+  // patch a room row + linked transaction (false) or a homeServices row +
+  // linked transaction (true). The dialog body itself is the same — only
+  // the persistence target differs.
+  const [upgradeModal, setUpgradeModal] = useState({ isOpen: false, room: null, isHomeService: false });
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedUpgradeServices, setSelectedUpgradeServices] = useState([]);
   const [upgradeDuration, setUpgradeDuration] = useState(0);
 
   // Home services state
   const [homeServices, setHomeServices] = useState([]);
+
+  // Per-card "pickup requested" feedback so the Pasundo button can show a
+  // local pending state immediately, before the realtime echo lands. Keyed
+  // by homeService._id. The persisted pickupRequestedAt on the row is the
+  // source of truth; this is just a UI sugar.
+  const [pickupRequesting, setPickupRequesting] = useState({});
 
   // Manage order modal state
   const [showManageOrder, setShowManageOrder] = useState(false);
@@ -253,11 +262,20 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         .filter(s => s.status === 'scheduled' || s.status === 'pending' || s.status === 'in_progress')
         .map(s => ({
           ...s,
-          // Normalize 'scheduled' (repository default for new POS rows) to
-          // 'pending' so the card badge and CSS class — which both branch
-          // on 'pending' vs 'in_progress' — render the right state without
-          // a separate code path for the two near-synonymous statuses.
-          status: s.status === 'scheduled' ? 'pending' : s.status,
+          // Normalize statuses so the home-service card renders the same
+          // UI/CSS as a room. 'scheduled' (repo default for POS rows) and
+          // 'pending' both mean "not started yet"; 'in_progress' is the
+          // home-service equivalent of a room's 'occupied' state and
+          // unlocks the timer + Stop + Upgrade buttons.
+          status:
+            s.status === 'scheduled' ? 'pending'
+              : s.status === 'in_progress' ? 'occupied'
+              : s.status,
+          // The repository writes startedAt when the therapist taps Start;
+          // the timer logic and the room card both key off startTime. Map
+          // startedAt → startTime so the same countdown component works for
+          // both surfaces without forking the repository contract.
+          startTime: s.startTime || s.startedAt || null,
         }));
 
       // Also load home service advance bookings (scheduled/confirmed/in-progress with isHomeService flag)
@@ -528,15 +546,16 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       // confirm.
       setSelectedUpgradeServices([]);
       setUpgradeDuration(room.serviceDuration || 60);
-      setUpgradeModal({ isOpen: true, room });
+      setUpgradeModal({ isOpen: true, room, isHomeService: false });
     } catch (error) {
       showToast('Failed to load services', 'error');
     }
   };
 
-  // Handle service upgrade - update room service details without stopping timer
+  // Handle service upgrade - update room (or home service) details without stopping timer
   const handleUpgradeService = async () => {
     const room = upgradeModal.room;
+    const isHomeServiceUpgrade = upgradeModal.isHomeService;
     if (!room || selectedUpgradeServices.length === 0) return;
 
     try {
@@ -544,12 +563,23 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       const newDuration = selectedUpgradeServices.reduce((sum, s) => sum + (s.duration || 60), 0);
       const newPrice = selectedUpgradeServices.reduce((sum, s) => sum + (s.price || 0), 0);
 
-      // Update room with new service info, keep timer running (don't change startTime)
-      await mockApi.rooms.updateRoom(room._id, {
-        serviceNames: newServiceNames,
-        serviceDuration: upgradeDuration || newDuration,
-        servicePrice: newPrice
-      });
+      // Update room OR home service with new service info, keep timer running.
+      // Both surfaces store the same shape (serviceNames/serviceDuration/
+      // servicePrice) so the only difference is which adapter we hit.
+      if (isHomeServiceUpgrade) {
+        await homeServicesApi.updateHomeService(room._id, {
+          serviceNames: newServiceNames,
+          serviceDuration: upgradeDuration || newDuration,
+          servicePrice: newPrice,
+          totalAmount: newPrice,
+        });
+      } else {
+        await mockApi.rooms.updateRoom(room._id, {
+          serviceNames: newServiceNames,
+          serviceDuration: upgradeDuration || newDuration,
+          servicePrice: newPrice
+        });
+      }
 
       // Update the linked transaction so Service History and Sales
       // reflect the upgraded service. room.transactionId stores the
@@ -628,18 +658,22 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         }
       }
 
-      setUpgradeModal({ isOpen: false, room: null });
+      setUpgradeModal({ isOpen: false, room: null, isHomeService: false });
       if (historyUpdateFailed) {
         // Service-history sync didn't propagate. Tell the user explicitly so
         // they don't think the new total reached reports/sales when it didn't.
         showToast(
-          `Room upgraded, but service history not updated (${historyFailReason}).`,
+          `${isHomeServiceUpgrade ? 'Home service' : 'Room'} upgraded, but service history not updated (${historyFailReason}).`,
           'warning',
         );
       } else {
         showToast(`Service upgraded to: ${newServiceNames.join(', ')}`, 'success');
       }
-      loadRooms();
+      if (isHomeServiceUpgrade) {
+        loadHomeServices();
+      } else {
+        loadRooms();
+      }
     } catch (error) {
       showToast('Failed to upgrade service', 'error');
     }
@@ -655,9 +689,16 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         // Use advance booking API to start service
         await mockApi.advanceBooking.startServiceFromBooking(service._id);
       } else {
-        // Regular home service
+        // Regular home service. The repository's startService writes
+        // status='in_progress' + startedAt; the rider page + this card
+        // both read startTime, so stamp it explicitly via updateHomeService.
+        // Two calls is cheap and keeps the audit field (startedAt/startedBy)
+        // intact for HR-style auditing.
         await homeServicesApi.updateHomeServiceStatus(service._id, 'occupied', {
-          startTime: startTime
+          startedBy: user?.name || user?.username || user?.email || 'therapist',
+        });
+        await homeServicesApi.updateHomeService(service._id, {
+          startTime,
         });
       }
 
@@ -666,6 +707,79 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
       loadHomeServices();
     } catch (error) {
       showToast('Failed to start home service', 'error');
+    }
+  };
+
+  // Pasundo — therapist requests a rider pickup at the home-service address.
+  // Stamps the home service row with who asked and when, which posTriggers
+  // turns into a broadcast notification to every Rider in the branch. The
+  // button is single-shot per session (button shows "Pickup requested" once
+  // the field is set) so therapists can't accidentally spam the riders.
+  const handleRequestPickup = async (service) => {
+    if (!service?._id) return;
+    if (service.pickupRequestedAt) {
+      showToast('Pickup already requested', 'info');
+      return;
+    }
+    setPickupRequesting((prev) => ({ ...prev, [service._id]: true }));
+    try {
+      const requesterName = (user?.name
+        || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+        || user?.username
+        || user?.email
+        || 'Therapist').trim();
+      // Advance-booking home services live on advanceBookings table, not
+      // homeServices — only stamp the rows that actually carry the field
+      // and rely on the existing advance-booking flow for the rest.
+      if (service.isAdvanceBooking) {
+        await mockApi.advanceBooking.updateAdvanceBooking(service._id, {
+          pickupRequestedAt: new Date().toISOString(),
+          pickupRequestedBy: requesterName,
+          pickupRequestedByRole: user?.role || 'Therapist',
+          pickupRequestedByUserId: user?._id || user?.id || null,
+        });
+      } else {
+        await homeServicesApi.updateHomeService(service._id, {
+          pickupRequestedAt: new Date().toISOString(),
+          pickupRequestedBy: requesterName,
+          pickupRequestedByRole: user?.role || 'Therapist',
+          pickupRequestedByUserId: user?._id || user?.id || null,
+        });
+      }
+      showToast('Rider notified — pasundo on the way', 'success');
+      loadHomeServices();
+    } catch (error) {
+      console.error('Failed to request pickup:', error);
+      showToast('Failed to request pickup', 'error');
+    } finally {
+      setPickupRequesting((prev) => {
+        const next = { ...prev };
+        delete next[service._id];
+        return next;
+      });
+    }
+  };
+
+  // Open the same upgrade modal a room uses, but flag it as targeting a
+  // home service so the persist handler patches homeServices instead of
+  // rooms. The body of the dialog is identical — pick services, adjust
+  // duration, see total — so we just reuse it with a discriminator.
+  const openHomeServiceUpgradeModal = async (service) => {
+    try {
+      const products = await mockApi.products.getProducts();
+      const branchId = service.branchId;
+      const services = products.filter(
+        (p) =>
+          p.type === 'service' &&
+          p.active !== false &&
+          (!branchId || !p.branchId || p.branchId === branchId),
+      );
+      setAvailableServices(services);
+      setSelectedUpgradeServices([]);
+      setUpgradeDuration(service.serviceDuration || 60);
+      setUpgradeModal({ isOpen: true, room: service, isHomeService: true });
+    } catch (error) {
+      showToast('Failed to load services', 'error');
     }
   };
 
@@ -1275,6 +1389,29 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                         </span>
                       </div>
                     )}
+                    {(service.totalAmount > 0 || service.servicePrice > 0) && (
+                      <div className="info-row">
+                        <span>💵</span>
+                        <span>
+                          <strong>Total:</strong> ₱{Number(service.totalAmount || service.servicePrice || 0).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {service.paxCount > 1 && (
+                      <div className="info-row">
+                        <span>👥</span>
+                        <span><strong>Pax:</strong> {service.paxCount} guests</span>
+                      </div>
+                    )}
+                    {service.pickupRequestedAt && (
+                      <div className="info-row" style={{ color: '#92400e' }}>
+                        <span>🚖</span>
+                        <span>
+                          <strong>Pickup requested</strong>
+                          {service.pickupRequestedBy ? ` by ${service.pickupRequestedBy}` : ''}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Start Service button for pending home services */}
@@ -1295,15 +1432,48 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                     </div>
                   )}
 
-                  {/* Stop Service button for occupied home services */}
-                  {service.status === 'occupied' && (isMyService || !isTherapist()) && (
+                  {/* Pasundo button — therapist requests pickup from rider.
+                      Visible to the assigned therapist (or non-therapist
+                      operators viewing the card) on both pending AND
+                      occupied home services, since the therapist may need
+                      a ride before the service starts (just arrived at the
+                      house for setup) or after (heading back to the spa). */}
+                  {(isMyService || !isTherapist()) && !service.isAdvanceBooking && (
                     <button
-                      className="btn btn-error stop-service-btn"
-                      onClick={() => openStopServiceModal(service, true)}
-                      style={{ marginTop: 'var(--spacing-sm)' }}
+                      className="btn btn-secondary"
+                      onClick={() => handleRequestPickup(service)}
+                      disabled={!!service.pickupRequestedAt || !!pickupRequesting[service._id]}
+                      style={{ width: '100%', marginTop: 'var(--spacing-sm)', fontSize: '0.85rem' }}
                     >
-                      ⏹️ Stop Service
+                      {service.pickupRequestedAt
+                        ? '✅ Pickup requested'
+                        : pickupRequesting[service._id]
+                          ? 'Requesting…'
+                          : '🚖 Pasundo (Request Pickup)'}
                     </button>
+                  )}
+
+                  {/* Action buttons for occupied home services — mirror
+                      the room card layout (Upgrade + Stop) so a therapist
+                      mid-service can swap to a longer service or end
+                      early without leaving the page. */}
+                  {service.status === 'occupied' && (isMyService || !isTherapist()) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'var(--spacing-sm)' }}>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => openHomeServiceUpgradeModal(service)}
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '6px 10px' }}
+                      >
+                        ⬆️ Upgrade
+                      </button>
+                      <button
+                        className="btn btn-error"
+                        onClick={() => openStopServiceModal(service, true)}
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '6px 10px' }}
+                      >
+                        ⏹️ Stop
+                      </button>
+                    </div>
                   )}
 
                   {/* Countdown timer for occupied home services */}
@@ -1534,11 +1704,15 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
 
       {/* Upgrade Service Modal */}
       {upgradeModal.isOpen && (
-        <div className="modal-overlay" onClick={() => setUpgradeModal({ isOpen: false, room: null })}>
+        <div className="modal-overlay" onClick={() => setUpgradeModal({ isOpen: false, room: null, isHomeService: false })}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <div className="modal-header">
-              <h3>Upgrade Service - {upgradeModal.room?.name}</h3>
-              <button className="modal-close" onClick={() => setUpgradeModal({ isOpen: false, room: null })}>&times;</button>
+              <h3>
+                Upgrade Service - {upgradeModal.isHomeService
+                  ? (upgradeModal.room?.customerName || 'Home Service')
+                  : upgradeModal.room?.name}
+              </h3>
+              <button className="modal-close" onClick={() => setUpgradeModal({ isOpen: false, room: null, isHomeService: false })}>&times;</button>
             </div>
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               <p style={{ marginBottom: '12px', color: '#666', fontSize: '0.9rem' }}>
@@ -1629,7 +1803,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
               </div>
             </div>
             <div className="modal-footer" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={() => setUpgradeModal({ isOpen: false, room: null })}>Cancel</button>
+              <button className="btn" onClick={() => setUpgradeModal({ isOpen: false, room: null, isHomeService: false })}>Cancel</button>
               <button
                 className="btn btn-primary"
                 onClick={handleUpgradeService}

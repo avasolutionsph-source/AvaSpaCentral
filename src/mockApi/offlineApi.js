@@ -233,6 +233,7 @@ export const homeServicesApi = {
   getActiveHomeServices: homeServicesAdapter.getActiveHomeServices,
   createHomeService: homeServicesAdapter.createHomeService,
   updateHomeServiceStatus: homeServicesAdapter.updateHomeServiceStatus,
+  updateHomeService: homeServicesAdapter.updateHomeService,
   deleteHomeService: homeServicesAdapter.deleteHomeService
 };
 

@@ -21,6 +21,136 @@ import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
 import storageService from '../services/storage';
 import '../assets/css/pos.css';
 
+// Inline autocomplete for picking an existing customer per guest. Mirrors
+// the global Customer search (POS.jsx ~line 2700) so cashiers don't have
+// to scroll through every saved customer in a flat <select>. Each guest
+// row mounts its own instance, so search state stays per-guest without
+// extra plumbing on the parent's guests array.
+function GuestExistingCustomerPicker({ customers, value, onPick, onClear }) {
+  const [query, setQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const hasPick = !!value?.customerId;
+
+  // When a customer is already picked, render a small selected-state pill
+  // with a clear button. Typing again is gated behind clearing first —
+  // mirrors the global picker's behavior so it's intuitive.
+  if (hasPick) {
+    return (
+      <div style={{ position: 'relative' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.35rem 0.55rem',
+            border: '2px solid var(--success, #16a34a)',
+            borderRadius: 6,
+            background: 'rgba(27, 94, 55, 0.05)',
+            fontSize: '0.8rem',
+          }}
+        >
+          <span><strong>{value.name}</strong>{value.phone ? ` — ${value.phone}` : ''}</span>
+          <button
+            type="button"
+            onClick={() => { onClear?.(); setQuery(''); }}
+            aria-label="Clear customer"
+            style={{ background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: 'var(--gray-500)', padding: '0 0.2rem' }}
+          >×</button>
+        </div>
+      </div>
+    );
+  }
+
+  const matches = query.trim()
+    ? customers.filter((c) => {
+        const q = query.trim().toLowerCase();
+        return (c.name || '').toLowerCase().includes(q)
+          || (c.phone || '').toLowerCase().includes(q);
+      }).slice(0, 8)
+    : [];
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={query}
+        placeholder="Type customer name or phone…"
+        onChange={(e) => { setQuery(e.target.value); setShowSuggestions(true); }}
+        onFocus={() => setShowSuggestions(true)}
+        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+        style={{ width: '100%', padding: '0.35rem 0.5rem', border: '1px solid var(--gray-300)', borderRadius: 6, fontSize: '0.8rem' }}
+      />
+      {showSuggestions && query.trim() && matches.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            background: 'var(--white, #fff)',
+            border: '1px solid var(--gray-300)',
+            borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            maxHeight: '180px',
+            overflowY: 'auto',
+            zIndex: 1000,
+            marginTop: '4px',
+          }}
+        >
+          {matches.map((c) => (
+            <button
+              key={c._id}
+              type="button"
+              // onMouseDown fires before the input's onBlur, so the click
+              // resolves before the suggestion list unmounts.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onPick?.(c);
+                setQuery('');
+                setShowSuggestions(false);
+              }}
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'left',
+                padding: '0.4rem 0.55rem',
+                border: 'none',
+                borderBottom: '1px solid var(--gray-100)',
+                background: 'transparent',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+              }}
+            >
+              <strong>{c.name}</strong>
+              {c.phone && <span style={{ color: 'var(--gray-600)' }}> — {c.phone}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {showSuggestions && query.trim() && matches.length === 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            background: 'var(--white, #fff)',
+            border: '1px solid var(--gray-300)',
+            borderRadius: 6,
+            padding: '0.5rem',
+            marginTop: '4px',
+            fontSize: '0.75rem',
+            color: 'var(--gray-500)',
+            zIndex: 1000,
+          }}
+        >
+          No matching customer.
+        </div>
+      )}
+    </div>
+  );
+}
+
 const POS = () => {
   const navigate = useNavigate();
   const { showToast, user, getEffectiveBranchId, bookingLimits } = useApp();
@@ -2293,26 +2423,24 @@ const POS = () => {
                             />
                           </div>
                         ) : (
-                          <select
-                            value={customer.customerId || ''}
-                            onChange={(e) => {
-                              const cid = e.target.value;
-                              const picked = customers.find((c) => c._id === cid);
-                              patchCustomer({
-                                customerId: cid || null,
-                                name: picked?.name || '',
-                                phone: picked?.phone || '',
-                                email: picked?.email || '',
-                                address: picked?.address || '',
-                              });
-                            }}
-                            style={{ padding: '0.3rem 0.45rem', border: '1px solid var(--gray-300)', borderRadius: 6, fontSize: '0.8rem' }}
-                          >
-                            <option value="">Select existing customer…</option>
-                            {customers.map((c) => (
-                              <option key={c._id} value={c._id}>{c.name}{c.phone ? ` — ${c.phone}` : ''}</option>
-                            ))}
-                          </select>
+                          <GuestExistingCustomerPicker
+                            customers={customers}
+                            value={customer}
+                            onPick={(picked) => patchCustomer({
+                              customerId: picked._id,
+                              name: picked.name || '',
+                              phone: picked.phone || '',
+                              email: picked.email || '',
+                              address: picked.address || '',
+                            })}
+                            onClear={() => patchCustomer({
+                              customerId: null,
+                              name: '',
+                              phone: '',
+                              email: '',
+                              address: '',
+                            })}
+                          />
                         )}
                       </div>
                     </div>

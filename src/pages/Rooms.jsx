@@ -7,6 +7,7 @@ import { supabaseSyncManager } from '../services/supabase';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import useLocationTracker from '../hooks/useLocationTracker';
 import PasundoLiveMap from '../components/PasundoLiveMap';
+import PahatidModal from '../components/PahatidModal';
 
 // Import new shared components and hooks
 import { useCrudOperations } from '../hooks';
@@ -54,6 +55,7 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   // by homeService._id. The persisted pickupRequestedAt on the row is the
   // source of truth; this is just a UI sugar.
   const [pickupRequesting, setPickupRequesting] = useState({});
+  const [showPahatid, setShowPahatid] = useState(false);
 
   // Live location tracking for the therapist side. Active for every non-advance
   // home service on this device in 'pending' or 'occupied' state — independent
@@ -1379,6 +1381,35 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
         </div>
       )}
 
+      {/* Pahatid — prominent action button always visible on Rooms. The
+          header has the same affordance as a compact icon for cross-page
+          access, but therapists / receptionists working in Rooms get a
+          high-visibility large button so they don't have to fish for the
+          icon during a busy shift. */}
+      <div style={{ marginBottom: 'var(--spacing-md)' }}>
+        <button
+          type="button"
+          onClick={() => setShowPahatid(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '12px 20px',
+            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+            color: '#451a03',
+            border: '2px solid #b45309',
+            borderRadius: 10,
+            fontSize: '1rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)',
+          }}
+        >
+          <span style={{ fontSize: '1.4rem' }}>🚖</span>
+          <span>Request Pahatid (drop-off)</span>
+        </button>
+      </div>
+
       {/* Home Services Section */}
       {homeServices.length > 0 && (
         <div className="home-services-section">
@@ -1923,6 +1954,8 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
           </div>
         </div>
       )}
+
+      <PahatidModal open={showPahatid} onClose={() => setShowPahatid(false)} />
     </div>
   );
 };

@@ -167,6 +167,13 @@ export default function RiderBookings() {
             .filter(hs => {
               // Strict match — same branch.
               if (hs.branchId && hs.branchId === userBranchId) return true;
+              // Active pasundo always wins. If the therapist tapped
+              // "Pasundo" and the notification reached THIS rider, the
+              // record passed the branch-scoped notify filter already
+              // (or fell back to a wide broadcast on null branchId);
+              // hiding the card afterwards is the worst possible UX —
+              // rider hears the chime, sees no record to act on.
+              if (hs.pickupRequestedAt) return true;
               // Opt-in: untagged legacy rows (branchId === null/undefined).
               // We never show rows with a DIFFERENT valid branchId — that
               // would be the cross-branch leak the strict filter is here
@@ -481,7 +488,7 @@ export default function RiderBookings() {
             return (
               <div
                 key={b.id}
-                className={`rider-booking-card status-${b.status}`}
+                className={`rider-booking-card status-${b.status}${b.pickupRequestedAt ? ' has-pickup-request' : ''}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => openCard(b.id)}
@@ -499,16 +506,27 @@ export default function RiderBookings() {
                     className="rider-pickup-callout"
                     role="status"
                     style={{
-                      marginTop: 6,
-                      padding: '8px 10px',
-                      borderRadius: 8,
-                      background: '#fef3c7',
-                      border: '1px solid #f59e0b',
-                      color: '#7c2d12',
-                      fontSize: '0.9rem',
+                      marginTop: 8,
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      background: 'linear-gradient(135deg, #fde047 0%, #f59e0b 100%)',
+                      border: '2px solid #b45309',
+                      color: '#451a03',
+                      fontSize: '0.92rem',
+                      fontWeight: 600,
+                      boxShadow: '0 2px 8px rgba(245, 158, 11, 0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      animation: 'pulse-pickup 1.6s ease-in-out infinite',
                     }}
                   >
-                    🚖 <strong>Pasundo:</strong> {b.pickupRequestedBy || b.employeeName || 'Therapist'} needs a pickup
+                    <span style={{ fontSize: '1.4rem' }}>🚖</span>
+                    <span>
+                      <strong style={{ fontWeight: 800 }}>PASUNDO</strong>
+                      {' — '}
+                      {b.pickupRequestedBy || b.employeeName || 'Therapist'} needs a pickup
+                    </span>
                   </div>
                 )}
 

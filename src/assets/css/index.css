@@ -11791,6 +11791,17 @@ a:focus:not(:focus-visible),
 }
 .rider-booking-card.status-confirmed { border-left: 4px solid var(--primary); }
 .rider-booking-card.status-in-progress { border-left: 4px solid var(--success); }
+
+/* Pasundo pulse — pickup-requested callout gently breathes to catch the
+   rider's eye without being epileptic. 1.6s cycle, scale-only, GPU-cheap. */
+@keyframes pulse-pickup {
+  0%, 100% { transform: scale(1); box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35); }
+  50%      { transform: scale(1.02); box-shadow: 0 4px 14px rgba(245, 158, 11, 0.55); }
+}
+.rider-booking-card.has-pickup-request {
+  border-left: 4px solid #f59e0b;
+  box-shadow: 0 0 0 1px #fcd34d, var(--shadow-sm);
+}
 .rider-booking-time { font-size: 0.85rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
 .rider-booking-service { font-size: 1.15rem; font-weight: 700; color: var(--gray-900); }
 .rider-booking-status { display: inline-block; padding: 2px 10px; border-radius: var(--radius-full); background: var(--gray-100); font-size: 0.75rem; text-transform: uppercase; }

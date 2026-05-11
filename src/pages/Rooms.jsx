@@ -1477,12 +1477,21 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                         </span>
                       </div>
                     )}
-                    {service.pickupAcknowledgedAt && (
+                    {service.pickupAcknowledgedAt && !service.pickupCompletedAt && (
                       <div className="info-row" style={{ color: '#064e3b' }}>
                         <span>✅</span>
                         <span>
                           <strong>Rider on the way</strong>
                           {service.pickupAcknowledgedBy ? ` — ${service.pickupAcknowledgedBy}` : ''}
+                        </span>
+                      </div>
+                    )}
+                    {service.pickupCompletedAt && (
+                      <div className="info-row" style={{ color: '#1e3a8a' }}>
+                        <span>🏁</span>
+                        <span>
+                          <strong>Rider arrived</strong>
+                          {service.pickupCompletedBy ? ` — ${service.pickupCompletedBy}` : ''}
                         </span>
                       </div>
                     )}
@@ -1540,13 +1549,15 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                       disabled={!!service.pickupRequestedAt || !!pickupRequesting[service._id]}
                       style={{ width: '100%', marginTop: 'var(--spacing-sm)', fontSize: '0.85rem' }}
                     >
-                      {service.pickupAcknowledgedAt
-                        ? `✅ Rider OTW${service.pickupAcknowledgedBy ? ` — ${service.pickupAcknowledgedBy}` : ''}`
-                        : service.pickupRequestedAt
-                          ? '✅ Pickup requested'
-                          : pickupRequesting[service._id]
-                            ? 'Requesting…'
-                            : '🚖 Pasundo (Request Pickup)'}
+                      {service.pickupCompletedAt
+                        ? `🏁 Rider arrived${service.pickupCompletedBy ? ` — ${service.pickupCompletedBy}` : ''}`
+                        : service.pickupAcknowledgedAt
+                          ? `✅ Rider OTW${service.pickupAcknowledgedBy ? ` — ${service.pickupAcknowledgedBy}` : ''}`
+                          : service.pickupRequestedAt
+                            ? '✅ Pickup requested'
+                            : pickupRequesting[service._id]
+                              ? 'Requesting…'
+                              : '🚖 Pasundo (Request Pickup)'}
                     </button>
                   )}
 

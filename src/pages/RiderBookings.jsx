@@ -237,6 +237,10 @@ export default function RiderBookings() {
           // "Rider OTW" once present.
           pickupAcknowledgedAt: hs.pickupAcknowledgedAt || null,
           pickupAcknowledgedBy: hs.pickupAcknowledgedBy || null,
+          // Rider completion — set when rider taps "Done" after the pickup.
+          // Hides card from active deliveries (unless Show completed).
+          pickupCompletedAt: hs.pickupCompletedAt || null,
+          pickupCompletedBy: hs.pickupCompletedBy || null,
           // Live location fields — published every ~15s while pasundo active.
           riderCurrentLat: hs.riderCurrentLat ?? null,
           riderCurrentLng: hs.riderCurrentLng ?? null,
@@ -253,9 +257,15 @@ export default function RiderBookings() {
         }));
 
       const merged = [...myAdvance, ...homeServiceRows];
+      // Active list hides: terminal statuses (completed/cancelled/no_show) AND
+      // pasundos where the rider already tapped Done. Show completed reveals
+      // both classes for audit/history. Keeping pickup-completion separate from
+      // the home-service status preserves the home-service's own lifecycle —
+      // the therapist may still be at the customer's house after the rider
+      // has driven away.
       const filtered = showHistory
         ? merged
-        : merged.filter(b => !HIDDEN_STATUSES.includes(b.status));
+        : merged.filter(b => !HIDDEN_STATUSES.includes(b.status) && !b.pickupCompletedAt);
       filtered.sort((a, b) => new Date(a.bookingDateTime) - new Date(b.bookingDateTime));
       setBookings(filtered);
     } catch (err) {
@@ -467,6 +477,44 @@ export default function RiderBookings() {
       showToast('Failed to confirm. Try again.', 'error');
     } finally {
       setAcknowledging(prev => {
+        const next = { ...prev };
+        delete next[booking.id];
+        return next;
+      });
+    }
+  };
+
+  // Rider's "Done" — marks pickup completed after they've actually fetched
+  // the therapist. Hides the card from active deliveries (still in Show
+  // completed for audit) and updates the therapist's Rooms badge to
+  // "Rider arrived". Same write pattern as handleAcknowledgePickup.
+  const [completingPickup, setCompletingPickup] = useState({});
+  const handleCompletePickup = async (booking) => {
+    if (!booking?.id || booking.pickupCompletedAt) return;
+    setCompletingPickup(prev => ({ ...prev, [booking.id]: true }));
+    try {
+      const riderName = (user?.name
+        || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+        || user?.username
+        || user?.email
+        || 'Rider').trim();
+      const fields = {
+        pickupCompletedAt: new Date().toISOString(),
+        pickupCompletedBy: riderName,
+        pickupCompletedByUserId: user?._id || user?.id || null,
+      };
+      if (booking.source === 'advanceBooking') {
+        await mockApi.advanceBooking.updateAdvanceBooking(booking.id, fields);
+      } else {
+        await mockApi.homeServices.updateHomeService(booking.id, fields);
+      }
+      showToast('Pickup marked done', 'success');
+      await load(false);
+    } catch (err) {
+      console.error('[complete-pickup] failed', err);
+      showToast('Failed to mark done. Try again.', 'error');
+    } finally {
+      setCompletingPickup(prev => {
         const next = { ...prev };
         delete next[booking.id];
         return next;
@@ -801,16 +849,38 @@ export default function RiderBookings() {
                       fontSize: '0.92rem',
                       fontWeight: 600,
                       display: 'flex',
-                      alignItems: 'center',
+                      flexDirection: 'column',
                       gap: 8,
                     }}
                   >
-                    <span style={{ fontSize: '1.3rem' }}>✅</span>
-                    <span>
-                      <strong style={{ fontWeight: 800 }}>Confirmed</strong>
-                      {' — heading to '}
-                      {b.pickupRequestedBy || b.employeeName || 'therapist'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '1.3rem' }}>✅</span>
+                      <span>
+                        <strong style={{ fontWeight: 800 }}>Confirmed</strong>
+                        {' — heading to '}
+                        {b.pickupRequestedBy || b.employeeName || 'therapist'}
+                      </span>
+                    </div>
+                    {/* Done — closes the pasundo loop. Hides this card from
+                        active list (still in Show completed). The therapist's
+                        Rooms card flips to "Rider arrived". */}
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={(e) => { stop(e); handleCompletePickup(b); }}
+                      disabled={!!completingPickup[b.id]}
+                      style={{
+                        width: '100%',
+                        background: '#1e3a8a',
+                        borderColor: '#1e40af',
+                        color: '#eff6ff',
+                        fontWeight: 700,
+                        padding: '8px 12px',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      {completingPickup[b.id] ? 'Marking…' : '✓ Done — pickup complete'}
+                    </button>
                   </div>
                 )}
                 {/* Live map — only on active pasundo deliveries. Shows the

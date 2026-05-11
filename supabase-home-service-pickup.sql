@@ -51,6 +51,14 @@ ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_acknowledged_at       
 ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_acknowledged_by          TEXT;
 ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_acknowledged_by_user_id  TEXT;
 
+-- Rider completion — rider taps "Done" on the pasundo card after actually
+-- picking the therapist up. Hides the card from the rider's active deliveries
+-- (still visible under "Show completed") and flips the therapist's Rooms badge
+-- to "Rider arrived".
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_completed_at          TIMESTAMPTZ;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_completed_by          TEXT;
+ALTER TABLE home_services ADD COLUMN IF NOT EXISTS pickup_completed_by_user_id  TEXT;
+
 -- Advance bookings also get the pickup fields — therapist may run the
 -- service via an advance booking record (scheduled home service), not the
 -- walk-in home_services row. The rider notification handler reads the

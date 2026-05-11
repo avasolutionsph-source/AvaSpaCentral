@@ -403,6 +403,9 @@ const SUPABASE_TABLE_COLUMNS = {
     // Flips the therapist's Rooms card from yellow to green and fires a
     // one-shot ping to the originating therapist.
     'pickup_acknowledged_at', 'pickup_acknowledged_by', 'pickup_acknowledged_by_user_id',
+    // Rider completion — rider taps "Done" after the pickup. Hides the
+    // card from the rider's active list and flips the therapist's badge.
+    'pickup_completed_at', 'pickup_completed_by', 'pickup_completed_by_user_id',
     // Live location tracking — each side publishes its own GPS fix every
     // ~15s while a pasundo is active so the other side can render a map.
     'rider_current_lat', 'rider_current_lng', 'rider_location_updated_at',
@@ -586,6 +589,9 @@ const FIELD_NAME_MAP = {
   pickupAcknowledgedAt: 'pickup_acknowledged_at',
   pickupAcknowledgedBy: 'pickup_acknowledged_by',
   pickupAcknowledgedByUserId: 'pickup_acknowledged_by_user_id',
+  pickupCompletedAt: 'pickup_completed_at',
+  pickupCompletedBy: 'pickup_completed_by',
+  pickupCompletedByUserId: 'pickup_completed_by_user_id',
   riderCurrentLat: 'rider_current_lat',
   riderCurrentLng: 'rider_current_lng',
   riderLocationUpdatedAt: 'rider_location_updated_at',

@@ -182,6 +182,10 @@ const SUPABASE_TABLE_COLUMNS = {
     'cost', 'duration', 'active', 'stock_quantity', 'reorder_level', 'sku',
     'services_since_last_adjustment', 'image_url', 'hide_from_pos', 'items_used',
     'metadata', 'sync_status', 'branch_id', 'display_order',
+    // Unit of measurement (pcs, L, kg, etc.). Without this in the allowlist
+    // the sync strips it on push and the inventory/stock UI falls back to
+    // the 'pcs' default on every other device.
+    'unit',
     'created_at', 'updated_at', 'deleted', 'deleted_at'
   ],
   rooms: [

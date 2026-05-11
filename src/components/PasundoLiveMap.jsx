@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -34,16 +34,26 @@ const makeIcon = (color) =>
 const RIDER_ICON     = makeIcon('#dc2626'); // red — fetcher
 const THERAPIST_ICON = makeIcon('#0ea5e9'); // cyan — waiting party
 
+// Fit the map viewport to whichever pins are present. Refits only when the
+// SET of roles changes (e.g. rider pin appears after a fresh fix) — small
+// GPS drift within an existing pin doesn't re-fit. Re-fitting on every 5s
+// location tick triggered a Leaflet repaint that bubbled up as a document
+// scroll-to-top on the Rooms page; this stable-signature approach keeps
+// the initial framing without snapping the viewport on every tick.
 function FitBounds({ points }) {
   const map = useMap();
-  useMemo(() => {
+  const lastSignatureRef = useRef(null);
+  useEffect(() => {
     if (!points || points.length === 0) return;
+    const signature = points.map(p => p.role || '').sort().join('|');
+    if (signature === lastSignatureRef.current) return;
+    lastSignatureRef.current = signature;
     if (points.length === 1) {
-      map.setView([points[0].lat, points[0].lng], 16);
+      map.setView([points[0].lat, points[0].lng], 16, { animate: false });
       return;
     }
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
-    map.fitBounds(bounds, { padding: [32, 32], maxZoom: 16 });
+    map.fitBounds(bounds, { padding: [32, 32], maxZoom: 16, animate: false });
   }, [points, map]);
   return null;
 }

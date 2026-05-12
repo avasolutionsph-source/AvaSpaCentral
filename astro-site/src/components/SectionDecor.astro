@@ -1,0 +1,16 @@
+---
+interface Props {
+  orbs?: ('gold-tl' | 'gold-tr' | 'gold-br' | 'em-tl' | 'em-br' | 'em-bl')[];
+  image?: string;
+  imagePos?: 'bl' | 'br' | 'tl' | 'tr';
+}
+const { orbs = [], image, imagePos = 'bl' } = Astro.props;
+---
+
+{orbs.map(orb => <div class={`sec-orb sec-orb-${orb}`}></div>)}
+
+{image && (
+  <div class={`sec-decor-corner ${imagePos}`}>
+    <img src={image} alt="" />
+  </div>
+)}

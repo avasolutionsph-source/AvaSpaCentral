@@ -1,0 +1,256 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SectionDecor from '../components/SectionDecor.astro';
+import FaqItem from '../components/FaqItem.astro';
+
+const tiers = [
+  {
+    name: 'Starter',
+    desc: 'Perfect for single-branch spas.',
+    regular: '₱3,400',
+    promo: '₱1,700',
+    feats: [
+      '1 Branch Only',
+      '1 Login Account (Owner Only)',
+      'Shared Tablet Time In/Out for Staff',
+      'Generic Booking URL (clientspa.avaspacentral.com)',
+      '100MB Storage',
+    ],
+    notIncluded: ['Own Domain Use', 'Priority Support'],
+    cta: 'secondary',
+  },
+  {
+    name: 'Advance',
+    desc: 'Perfect for growing spa businesses.',
+    regular: '₱17,000',
+    promo: '₱8,500',
+    feats: [
+      '2 – 3 Branches',
+      'Multi-user Accounts',
+      'Generic Booking URL (clientspa.avaspacentral.com)',
+      '250MB Storage',
+    ],
+    notIncluded: ['Own Domain Use'],
+    cta: 'primary',
+    popular: true,
+  },
+  {
+    name: 'Enterprise',
+    desc: 'Perfect for large spa operations.',
+    regular: '₱33,000',
+    promo: '₱16,500',
+    feats: [
+      '4 or More Branches',
+      'Multi-user Accounts',
+      'Own Domain Support (you provide the domain)',
+      '500MB Storage',
+      'Priority Support',
+    ],
+    requirement: 'Client provides own domain',
+    cta: 'secondary',
+  },
+];
+
+const allFeatures = [
+  'Online Booking & Website', 'POS System', 'Inventory Management',
+  'Smart Scheduling', 'Live Room Management', 'Home Service Dispatch',
+  'Rider Management', 'Real-time Therapist Tracking', 'Payroll & Commission',
+  'Employee Management', 'Customer Management', 'AVA AI Business Assistant',
+  'Reports & Analytics', 'Payment Gateway Integration', 'All System Features Connected',
+];
+
+const valueProps = [
+  { title: 'Secure & Reliable', desc: 'Enterprise-grade security and daily backups to keep your data safe.', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
+  { title: 'Scalable Solution', desc: 'Easily upgrade as your business grows. More branches, more power.', icon: 'M3 12h4l3-9 4 18 3-9h4' },
+  { title: "We're Here to Help", desc: 'Responsive support when you need assistance every step of the way.', icon: 'M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z' },
+  { title: 'Built for Spas', desc: 'Designed specifically for spa business operations and workflows.', icon: 'M12 2 L15 8.5 L22 9.3 L17 14 L18.2 21 L12 17.8 L5.8 21 L7 14 L2 9.3 L9 8.5 Z' },
+];
+---
+
+<Layout title="Pricing — AVA Spa Central" description="AVA Spa Central pricing — choose from Starter, Advance, Enterprise tiers or the Lifetime Ownership Package. Transparent monthly and annual plans." active="pricing">
+
+  <!-- HERO -->
+  <section class="py-[110px] pb-[90px] text-center relative overflow-hidden bg-ivory" style="background: radial-gradient(circle at 12% 30%, rgba(0,92,69,.05) 0%, transparent 38%), radial-gradient(circle at 88% 70%, rgba(201,154,58,.06) 0%, transparent 42%), var(--color-ivory);">
+    <span class="absolute top-0 left-1/2 -translate-x-1/2 w-px h-14" style="background:linear-gradient(180deg, transparent 0%, var(--color-gold-brand) 100%); opacity:.6;"></span>
+    <div class="container-spa relative z-[2]">
+      <div class="max-w-[760px] mx-auto">
+        <span class="eyebrow inline-block mb-[18px]">Pricing Packages</span>
+        <h1 class="mb-5 tracking-tight">Same powerful system. <span class="block italic text-emerald-brand font-medium">Different scale.</span></h1>
+        <p class="text-[1.1rem] max-w-[560px] mx-auto leading-relaxed">Every plan includes the complete AVA Spa Central experience. Pick the tier that fits your operation today — grow into the next one anytime.</p>
+        <div class="inline-flex items-center gap-2 mt-7 bg-gold-soft/30 border border-gold-brand/30 rounded-full px-4 py-2">
+          <span class="text-[0.7rem] tracking-wider font-bold text-emerald-deep">★ 50% OFF LAUNCH PROMO — LIMITED TIME</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TIERS (image) -->
+  <section class="py-[70px] pb-[110px] relative overflow-hidden" style="background-image:url('/2.png'); background-size:cover; background-position:center; background-repeat:no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background:linear-gradient(180deg, rgba(250,247,241,.93) 0%, rgba(250,247,241,.85) 50%, rgba(250,247,241,.93) 100%);"></div>
+    <SectionDecor orbs={["gold-tl","em-br"]} />
+    <div class="container-spa relative z-[2]">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-[1180px] mx-auto reveal">
+        {tiers.map((t) => (
+          <div class={`bg-white border ${t.popular ? 'border-emerald-brand shadow-[0_0_0_1px_var(--color-emerald-brand),var(--shadow-md-spa)]' : 'border-border-soft'} rounded-[22px] p-[38px_32px] flex flex-col relative transition-all hover:-translate-y-1 hover:shadow-lg-spa`}>
+            {t.popular && <div class="absolute top-[-12px] left-1/2 -translate-x-1/2 bg-gold-brand text-emerald-deep text-[0.66rem] font-bold tracking-wider uppercase px-4 py-1.5 rounded-full">★ Most Popular</div>}
+            <div class="font-serif text-[1.6rem] text-emerald-deep font-semibold mb-1.5">{t.name}</div>
+            <p class="text-[0.88rem] text-muted mb-5 min-h-[42px] leading-relaxed">{t.desc}</p>
+
+            <div class="mb-2">
+              <div class="text-[0.7rem] tracking-wider font-bold text-muted uppercase">Regular Price</div>
+              <div class="flex items-baseline gap-1.5"><span class="font-serif text-[1.4rem] text-muted/70 line-through">{t.regular}</span><span class="text-[0.78rem] text-muted/70">/month</span></div>
+            </div>
+
+            <div class="inline-flex self-start items-center bg-gold-brand/15 text-emerald-deep border border-gold-brand/30 rounded-full px-3 py-1 text-[0.66rem] font-bold tracking-wider mb-3">50% OFF LAUNCH PROMO</div>
+
+            <div class="flex items-baseline gap-1.5 mb-1 flex-wrap">
+              <span class="font-serif text-[2.6rem] text-emerald-deep font-semibold leading-none">{t.promo}</span>
+              <span class="text-[0.85rem] text-muted">/ month</span>
+            </div>
+            <p class="text-[0.78rem] text-gold-brand font-semibold italic mb-6">Early Adopter Rate — Limited Time Only!</p>
+
+            <ul class="list-none flex flex-col gap-3 mb-5 flex-1">
+              {t.feats.map((f) => (
+                <li class="flex items-start gap-2.5 text-[0.9rem] text-ink leading-relaxed">
+                  <span class="w-[18px] h-[18px] rounded-full bg-success-spa/15 text-success-spa flex items-center justify-center text-[0.66rem] font-bold flex-shrink-0 mt-0.5">✓</span>{f}
+                </li>
+              ))}
+            </ul>
+
+            {t.notIncluded && (
+              <div class="bg-ivory border border-border-soft rounded-xl p-3.5 mb-6">
+                <div class="text-[0.66rem] tracking-wider font-bold text-muted uppercase mb-2">Not Included</div>
+                <ul class="list-none flex flex-col gap-1.5 m-0 p-0">
+                  {t.notIncluded.map((n) => (
+                    <li class="flex items-start gap-2 text-[0.84rem] text-muted leading-relaxed">
+                      <span class="w-[16px] h-[16px] rounded-full bg-muted/15 text-muted flex items-center justify-center text-[0.7rem] flex-shrink-0 mt-0.5">✕</span>{n}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {t.requirement && (
+              <div class="bg-emerald-brand/5 border border-emerald-brand/20 rounded-xl p-3.5 mb-6">
+                <div class="text-[0.66rem] tracking-wider font-bold text-emerald-brand uppercase mb-2">Requirement</div>
+                <div class="flex items-start gap-2 text-[0.84rem] text-ink leading-relaxed">
+                  <span class="w-[16px] h-[16px] rounded-full bg-emerald-brand/15 text-emerald-brand flex items-center justify-center text-[0.7rem] flex-shrink-0 mt-0.5">!</span>{t.requirement}
+                </div>
+              </div>
+            )}
+
+            <a href="/contact" class={`btn ${t.cta === 'primary' ? 'btn-primary' : 'btn-secondary'} w-full`}>Get Started</a>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- LIFETIME -->
+  <section class="pt-[60px] pb-[110px] bg-ivory relative overflow-hidden">
+    <SectionDecor orbs={["em-tl","gold-br"]} image="/6-nobg.png" imagePos="tr" />
+    <div class="container-spa relative z-[2]">
+      <div class="max-w-[1180px] mx-auto rounded-3xl p-[60px] text-white relative overflow-hidden reveal" style="background:linear-gradient(135deg, var(--color-emerald-deep) 0%, var(--color-emerald-brand) 100%);">
+        <div class="absolute top-[-120px] right-[-120px] w-[440px] h-[440px] pointer-events-none" style="background:radial-gradient(circle, rgba(201,154,58,.2) 0%, transparent 60%);"></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-15 items-center relative z-[1]">
+          <div>
+            <span class="eyebrow !text-gold-soft mb-3.5 block">Lifetime Ownership Package</span>
+            <h2 class="!text-white text-[clamp(1.8rem,2.8vw,2.4rem)] font-medium leading-tight mb-4 tracking-tight">One System. Complete Control. <span class="italic !text-gold-soft font-normal">Lasting Value.</span></h2>
+            <div class="flex items-baseline gap-2.5 mb-2 flex-wrap">
+              <span class="font-serif text-[2.8rem] text-white font-semibold leading-none">₱898,000</span>
+              <span class="text-[0.7rem] uppercase tracking-wider text-white/65 font-semibold">One-Time Payment</span>
+            </div>
+            <p class="!text-white/75 text-base leading-relaxed my-4 mb-7 max-w-[440px]">A complete, owned spa management system — branded for you, deployed by us, yours forever. White-label opportunity included.</p>
+            <a href="#" class="btn btn-gold">Inquire About Lifetime →</a>
+          </div>
+          <div>
+            <h4 class="font-sans text-[0.74rem] text-gold-soft uppercase tracking-wider font-bold mb-4">What's Included</h4>
+            <ul class="list-none grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 m-0 p-0">
+              {['Lifetime Software License','Unlimited Usage','White Label Opportunity','Custom Branding','Initial Deployment','Technical Setup','Real-Time Monitoring','Sales & Transaction Reports','Branch Monitoring','Employee Monitoring','Centralized Management','Cloud-Based Access','Business Analytics','Secure Data Management','Scalable System','System Updates'].map(item => (
+                <li class="text-[0.86rem] text-white/85 flex items-start gap-2 leading-snug"><span class="text-gold-brand text-[0.7rem] mt-1">✦</span>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALL FEATURES INCLUDED -->
+  <section class="py-[100px] bg-cream relative overflow-hidden">
+    <SectionDecor orbs={["gold-tr","em-bl"]} />
+    <div class="container-spa relative z-[2]">
+      <div class="text-center max-w-[640px] mx-auto mb-14 reveal">
+        <span class="eyebrow inline-block mb-4">Complete System</span>
+        <h2 class="text-emerald-deep mb-3">All features <span class="italic text-emerald-brand font-medium">included.</span></h2>
+        <p class="text-base">One complete system. All features connected. Every plan includes the complete AVA Spa Central experience — only the scale changes.</p>
+      </div>
+      <div class="max-w-[1080px] mx-auto bg-white border border-border-soft rounded-3xl p-[40px_48px] shadow-sm-spa reveal">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+          {allFeatures.map((f) => (
+            <div class="flex items-center gap-3 text-[0.92rem] text-ink">
+              <span class="w-[20px] h-[20px] rounded-full bg-emerald-brand/10 text-emerald-brand flex items-center justify-center text-[0.72rem] font-bold flex-shrink-0">✓</span>{f}
+            </div>
+          ))}
+        </div>
+        <div class="mt-8 pt-6 border-t border-border-soft text-center text-[0.88rem] text-muted italic">
+          One System. One Login. Everything Connected.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VALUE PROPS -->
+  <section class="py-[100px] bg-ivory relative overflow-hidden">
+    <SectionDecor orbs={["em-tl","gold-br"]} />
+    <div class="container-spa relative z-[2]">
+      <div class="text-center max-w-[680px] mx-auto mb-14 reveal">
+        <span class="eyebrow inline-block mb-4">Built for Spas</span>
+        <h2 class="text-emerald-deep mb-3">Designed to <span class="italic text-emerald-brand font-medium">grow with you.</span></h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-[1180px] mx-auto reveal">
+        {valueProps.map((v) => (
+          <div class="bg-white border border-border-soft rounded-2xl p-[28px_24px] text-center transition-all hover:-translate-y-1 hover:shadow-md-spa">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-brand/10 to-gold-brand/10 text-emerald-brand flex items-center justify-center mx-auto mb-4 border border-emerald-brand/15">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-[22px] h-[22px]"><path d={v.icon} /></svg>
+            </div>
+            <h3 class="font-serif text-[1.05rem] text-emerald-deep font-semibold mb-2">{v.title}</h3>
+            <p class="text-[0.86rem] leading-relaxed">{v.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="py-[110px] bg-ivory relative overflow-hidden">
+    <SectionDecor orbs={["em-tl","gold-br"]} image="/8-nobg.png" imagePos="bl" />
+    <div class="container-spa relative z-[2]">
+      <div class="text-center max-w-[620px] mx-auto mb-14 reveal">
+        <span class="eyebrow inline-block mb-4">Frequently Asked</span>
+        <h2 class="text-emerald-deep mb-3">Pricing &amp; plan questions</h2>
+        <p class="text-base">Can't find what you're looking for? Reach out at hello@avaspacentral.com.</p>
+      </div>
+      <div class="max-w-[820px] mx-auto flex flex-col gap-3 reveal">
+        <FaqItem q="Can I switch plans later?">Yes — you can upgrade or downgrade anytime. Changes take effect at the start of your next billing cycle, and we'll pro-rate any difference.</FaqItem>
+        <FaqItem q="Is there a free trial?">We offer a guided demo before purchase, so you can see exactly how AVA fits your spa's workflow. Contact us at hello@avaspacentral.com to schedule one.</FaqItem>
+        <FaqItem q="What payment methods do you accept?">We accept bank transfer, GCash, Maya, and major credit cards. Lifetime ownership inquiries are handled directly with our team for tailored payment terms.</FaqItem>
+        <FaqItem q="Do you offer multi-branch discounts?">The Advance and Enterprise plans are already built for multi-branch operations. For chains beyond 6 branches, we offer custom pricing — get in touch with us.</FaqItem>
+        <FaqItem q="How does the Lifetime Ownership Package work?">You pay once and the system is yours — branded for your spa, deployed by our team. Includes white-label rights, custom branding, and full setup. No recurring fees.</FaqItem>
+        <FaqItem q="Is my data secure?">Yes. AVA uses encrypted cloud storage, role-based access control, and regular backups. Enterprise plans add advanced security features including audit logs and SSO.</FaqItem>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section id="demo" class="relative overflow-hidden min-h-[520px] flex items-center justify-center text-center" style="background-image:url('/7.png'); background-size:140% auto; background-position:center 30%; background-repeat:no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background: linear-gradient(180deg, rgba(0,61,46,.1) 0%, rgba(0,61,46,.4) 55%, rgba(0,61,46,.8) 100%);"></div>
+    <div class="relative z-[2] py-[90px] px-7 max-w-[680px] mx-auto">
+      <span class="eyebrow block mb-[18px] !text-gold-soft">Get Started</span>
+      <h2 class="!text-white mb-[18px] text-[clamp(1.8rem,3.6vw,2.6rem)] font-medium tracking-tight">Ready to choose your <span class="italic !text-gold-soft font-normal">perfect plan?</span></h2>
+      <p class="text-[1.02rem] max-w-[520px] mx-auto mb-7 !text-white/85 leading-relaxed">Watch a demo first to see how AVA works for your spa — then pick the plan that fits.</p>
+      <a href="#" class="btn bg-white !text-emerald-deep shadow-[0_10px_30px_rgba(0,0,0,.18)] px-8 py-4 font-semibold hover:bg-gold-soft">Watch Demo →</a>
+    </div>
+  </section>
+
+</Layout>

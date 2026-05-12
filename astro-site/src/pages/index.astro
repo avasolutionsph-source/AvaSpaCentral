@@ -1,0 +1,192 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SectionDecor from '../components/SectionDecor.astro';
+
+const features = [
+  { title: 'Smart Booking', desc: 'Online & walk-in reservations with auto-confirmation, calendar sync, and SMS reminders that cut no-shows by up to 40%.', icon: 'M3 4h18v18H3z M16 2v6M8 2v6M3 10h18' },
+  { title: 'POS & Sales', desc: 'Integrated point-of-sale handles services, products, packages, gift cards, and split payments — all in one tap.', icon: 'M2 6h20v12H2z M2 10h20 M7 14h.01' },
+  { title: 'Employee Monitoring', desc: 'Track attendance, performance, commissions, and service hours in real time across every branch and every shift.', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0' },
+  { title: 'Room Management', desc: 'Live room availability, treatment timers, and conflict-free scheduling that keeps every room productive and prepared.', icon: 'M3 9 L12 3 L21 9 L21 20 L3 20 Z M9 14 L15 14' },
+  { title: 'Inventory Tracking', desc: "Auto-deducting stock with low-balance alerts, reorder thresholds, and supplier records you'll actually use.", icon: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z' },
+  { title: 'Analytics & Reports', desc: 'Daily, weekly, monthly insights on revenue, top services, peak hours, and customer patterns — no spreadsheets needed.', icon: 'M18 20V10 M12 20V4 M6 20v-6' },
+  { title: 'Commission Automation', desc: 'Configure flat or tiered rates per therapist and service; the system computes payouts every cycle without manual math.', icon: 'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M12 7v5l3 3' },
+  { title: 'Customer Database', desc: 'Full client history, preferences, allergies, and visit notes — every staff member sees what matters at check-in.', icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0' },
+  { title: 'Mobile Access', desc: 'Native iOS & Android apps for owners and staff — monitor performance, approve schedules, view sales on the go.', icon: 'M5 2h14v20H5z M12 18h.01' },
+];
+
+const pillars = [
+  { title: 'Made for Wellness', desc: 'Every screen, every workflow shaped by what spa owners actually do — not generic retail software in disguise.' },
+  { title: 'Calm & Reliable', desc: 'Cloud-backed, encrypted, and quietly dependable. Your data is safe, your team can focus on guests, not on tech.' },
+  { title: 'Grows With You', desc: 'Start with a single branch; scale to a chain. Same login, same dashboard, multi-location ready from day one.' },
+];
+---
+
+<Layout title="AVA Spa Central — All-in-One Spa Management Software" active="home">
+
+  <!-- HERO -->
+  <section id="home" class="relative overflow-hidden py-[70px] pb-[60px] min-h-[calc(100vh-74px)] flex items-center" style="background-image: url('/6.png'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background: linear-gradient(115deg, rgba(250,247,241,.78) 0%, rgba(250,247,241,.55) 38%, rgba(250,247,241,.25) 70%, rgba(250,247,241,.08) 100%);"></div>
+    <div class="sec-orb sec-orb-gold-tl"></div>
+    <div class="sec-orb sec-orb-em-br"></div>
+
+    <div class="container-spa relative z-[2] w-full">
+      <div class="grid grid-cols-1 md:grid-cols-[1fr_1.15fr] gap-15 items-center">
+        <div class="md:pl-5">
+          <span class="eyebrow inline-block mb-[18px]">Centralized Spa Software</span>
+          <h1 class="mb-[22px] text-emerald-deep">Run your spa. <span class="block italic text-emerald-brand font-medium">Anywhere you go.</span></h1>
+          <p class="text-base max-w-[480px] leading-relaxed mb-8">Booking, POS, employee monitoring, inventory, commissions, reports and more — all in one beautifully calm system built for spas.</p>
+          <div class="flex gap-3.5 flex-wrap">
+            <a href="#demo" class="btn btn-primary">Watch Demo →</a>
+            <a href="/features" class="btn btn-secondary"><span>▶</span> Explore Features</a>
+          </div>
+        </div>
+
+        <!-- Dashboard mockup -->
+        <div class="relative">
+          <div class="bg-white rounded-2xl shadow-xl-spa overflow-hidden border border-border-soft grid grid-cols-[150px_1fr] min-h-[430px]">
+            <aside class="bg-gradient-to-b from-emerald-deep to-[#002B22] p-[22px_14px] text-white">
+              <div class="flex items-center gap-2 px-1.5 pb-[18px] border-b border-white/10 mb-3.5">
+                <svg viewBox="0 0 32 32" fill="currentColor" class="w-5 h-5 text-gold-soft"><path d="M16 4 C 18 8, 22 11, 16 16 C 10 11, 14 8, 16 4 Z M16 16 C 20 18, 24 22, 18 26 C 14 24, 14 20, 16 16 Z M16 16 C 12 18, 8 22, 14 26 C 18 24, 18 20, 16 16 Z"/></svg>
+                <span class="font-serif text-[0.9rem] text-white font-semibold leading-none">AVA Spa</span>
+              </div>
+              <ul class="list-none flex flex-col gap-0.5 m-0 p-0">
+                <li class="px-2.5 py-2 rounded-md text-[0.74rem] bg-gold-brand/15 text-gold-soft flex items-center gap-2 font-medium">▦ Dashboard</li>
+                <li class="px-2.5 py-2 rounded-md text-[0.74rem] text-white/65 flex items-center gap-2 font-medium">▦ Appointments</li>
+                <li class="px-2.5 py-2 rounded-md text-[0.74rem] text-white/65 flex items-center gap-2 font-medium">○ Clients</li>
+                <li class="px-2.5 py-2 rounded-md text-[0.74rem] text-white/65 flex items-center gap-2 font-medium">○ Staff</li>
+                <li class="px-2.5 py-2 rounded-md text-[0.74rem] text-white/65 flex items-center gap-2 font-medium">✦ Services</li>
+                <li class="px-2.5 py-2 rounded-md text-[0.74rem] text-white/65 flex items-center gap-2 font-medium">▣ Inventory</li>
+                <li class="px-2.5 py-2 rounded-md text-[0.74rem] text-white/65 flex items-center gap-2 font-medium">▦ Reports</li>
+                <li class="px-2.5 py-2 rounded-md text-[0.74rem] text-white/65 flex items-center gap-2 font-medium">⚙ Settings</li>
+              </ul>
+            </aside>
+            <div class="p-[20px_22px] bg-white flex flex-col gap-3.5">
+              <div class="flex justify-between items-center gap-3">
+                <div class="font-serif text-[1.2rem] text-ink font-semibold leading-none">Dashboard</div>
+                <div class="flex items-center gap-2 bg-ivory rounded-full pl-1.5 pr-3 py-1 border border-border-soft">
+                  <div class="w-6 h-6 rounded-full bg-gradient-to-br from-gold-brand to-gold-soft text-emerald-deep flex items-center justify-center font-serif text-[0.7rem] font-bold">E</div>
+                  <span class="text-[0.7rem] text-ink font-medium">Welcome, <strong>Emma</strong></span>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="bg-white border border-border-soft rounded-[10px] px-3 py-2.5">
+                  <div class="text-[0.6rem] text-muted font-medium leading-tight min-h-[22px]">Today's<br/>Appointments</div>
+                  <div class="font-serif text-[1.2rem] text-ink mt-0.5 leading-tight font-semibold">24</div>
+                  <div class="text-[0.62rem] text-success-spa mt-0.5 font-semibold">▲ +8.3%</div>
+                </div>
+                <div class="bg-white border border-border-soft rounded-[10px] px-3 py-2.5">
+                  <div class="text-[0.6rem] text-muted font-medium leading-tight min-h-[22px]">New<br/>Clients</div>
+                  <div class="font-serif text-[1.2rem] text-ink mt-0.5 leading-tight font-semibold">15</div>
+                  <div class="text-[0.62rem] text-success-spa mt-0.5 font-semibold">▲ +5.1%</div>
+                </div>
+                <div class="bg-white border border-border-soft rounded-[10px] px-3 py-2.5">
+                  <div class="text-[0.6rem] text-muted font-medium leading-tight min-h-[22px]">Today's<br/>Sales</div>
+                  <div class="font-serif text-[1.2rem] text-ink mt-0.5 leading-tight font-semibold">₱45,870</div>
+                  <div class="text-[0.62rem] text-success-spa mt-0.5 font-semibold">▲ +13.2%</div>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2.5 flex-1">
+                <div class="bg-white border border-border-soft rounded-[10px] px-3 py-3 flex flex-col">
+                  <h4 class="font-sans text-[0.7rem] text-ink font-semibold mb-2.5">Upcoming Appointments</h4>
+                  <div class="flex flex-col gap-2 flex-1">
+                    <div class="flex justify-between gap-2 text-[0.66rem]"><div class="text-emerald-brand font-semibold font-serif text-[0.74rem] whitespace-nowrap">2:30 PM</div><div class="text-ink font-medium leading-tight">Anna Cruz<small class="block text-muted text-[0.6rem] font-normal mt-px">Aromatherapy</small></div></div>
+                    <div class="flex justify-between gap-2 text-[0.66rem]"><div class="text-emerald-brand font-semibold font-serif text-[0.74rem] whitespace-nowrap">3:00 PM</div><div class="text-ink font-medium leading-tight">Mike Tan<small class="block text-muted text-[0.6rem] font-normal mt-px">Foot Reflexology</small></div></div>
+                    <div class="flex justify-between gap-2 text-[0.66rem]"><div class="text-emerald-brand font-semibold font-serif text-[0.74rem] whitespace-nowrap">4:15 PM</div><div class="text-ink font-medium leading-tight">Lily Garcia<small class="block text-muted text-[0.6rem] font-normal mt-px">Body Scrub</small></div></div>
+                  </div>
+                  <a class="mt-auto pt-2.5 text-[0.66rem] text-emerald-brand font-semibold">View Calendar →</a>
+                </div>
+                <div class="bg-white border border-border-soft rounded-[10px] px-3 py-3 flex flex-col">
+                  <h4 class="font-sans text-[0.7rem] text-ink font-semibold mb-2.5">Top Services</h4>
+                  <div class="flex flex-col gap-2 flex-1">
+                    <div class="flex items-center gap-2 text-[0.66rem] text-ink font-medium"><span class="text-gold-brand font-serif font-bold text-[0.72rem] w-3.5">1.</span>Aromatherapy Massage</div>
+                    <div class="flex items-center gap-2 text-[0.66rem] text-ink font-medium"><span class="text-gold-brand font-serif font-bold text-[0.72rem] w-3.5">2.</span>Foot Reflexology</div>
+                    <div class="flex items-center gap-2 text-[0.66rem] text-ink font-medium"><span class="text-gold-brand font-serif font-bold text-[0.72rem] w-3.5">3.</span>Body Scrub</div>
+                    <div class="flex items-center gap-2 text-[0.66rem] text-ink font-medium"><span class="text-gold-brand font-serif font-bold text-[0.72rem] w-3.5">4.</span>Hot Stone Massage</div>
+                  </div>
+                  <a class="mt-auto pt-2.5 text-[0.66rem] text-emerald-brand font-semibold">View Reports →</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SHOWCASE (plain) -->
+  <section id="features" class="bg-cream py-[110px] relative overflow-hidden">
+    <SectionDecor orbs={["gold-tl","em-br"]} />
+    <div class="container-spa relative z-[2]">
+      <div class="grid grid-cols-1 md:grid-cols-[1.15fr_1fr] gap-20 items-center">
+        <div class="reveal">
+          <img src="/3-nobg.png" alt="AVA Spa Central feature overview" class="w-full h-auto block" style="filter: drop-shadow(0 14px 30px rgba(16,46,37,0.08));" />
+        </div>
+        <div class="reveal">
+          <span class="eyebrow block mb-[18px]">Designed for Spa Professionals</span>
+          <h2 class="text-emerald-deep mb-[18px]">Powerful features. <span class="block italic text-emerald-brand font-medium">Effortless experience.</span></h2>
+          <p class="text-base leading-relaxed mb-7 max-w-[440px]">From bookings to billing, inventory to insights — AVA Spa Central brings everything together in a platform you'll love to use. Built from the ground up for spa owners, by people who understand the daily rhythm of running a wellness business.</p>
+          <a href="/features" class="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-border-soft bg-white text-emerald-deep font-medium text-[0.92rem] no-underline transition-all hover:border-emerald-brand hover:text-emerald-brand hover:-translate-y-px">Explore Features →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PILLARS (image) -->
+  <section class="py-[120px] text-center relative overflow-hidden" style="background-image:url('/8.png'); background-size:cover; background-position:center; background-repeat:no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background:linear-gradient(180deg, rgba(250,247,241,.86) 0%, rgba(250,247,241,.72) 50%, rgba(250,247,241,.86) 100%);"></div>
+    <SectionDecor orbs={["em-tl","gold-br"]} />
+    <div class="container-spa relative z-[2]">
+      <span class="eyebrow inline-block mb-4">Why Spa Owners Choose AVA</span>
+      <h2 class="font-serif text-[clamp(1.7rem,3vw,2.4rem)] text-emerald-deep font-medium mb-15 max-w-[680px] mx-auto">Built for spas. <span class="italic text-emerald-brand font-normal">Designed by a multi-branch spa owner.</span></h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-[1080px] mx-auto">
+        {pillars.map((p, i) => (
+          <div class="text-center px-3 reveal">
+            <div class="w-[58px] h-[58px] rounded-full bg-gradient-to-br from-gold-brand/20 to-gold-soft/10 text-gold-brand flex items-center justify-center mx-auto mb-[22px] border border-gold-brand/20">
+              {i === 0 && <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2 L15 8.5 L22 9.3 L17 14 L18.2 21 L12 17.8 L5.8 21 L7 14 L2 9.3 L9 8.5 Z"/></svg>}
+              {i === 1 && <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8 12 L11 15 L16 9"/></svg>}
+              {i === 2 && <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M23 6 L13.5 15.5 L8.5 10.5 L1 18"/><polyline points="17 6 23 6 23 12"/></svg>}
+            </div>
+            <h3 class="text-[1.15rem] text-emerald-deep mb-2.5 font-semibold">{p.title}</h3>
+            <p class="text-[0.9rem] leading-relaxed max-w-[280px] mx-auto">{p.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- MOBILE SECTION (plain) -->
+  <section class="bg-ivory py-[120px] relative overflow-hidden">
+    <SectionDecor orbs={["gold-tr","em-bl"]} />
+    <div class="container-spa relative z-[2]">
+      <div class="grid grid-cols-1 md:grid-cols-[1fr_1.15fr] gap-20 items-center">
+        <div class="relative reveal">
+          <img src="/1-nobg.png" alt="AVA Spa Central mobile app" class="max-w-[340px] w-full h-auto block mx-auto" style="filter: drop-shadow(0 20px 40px rgba(16,46,37,0.12));" />
+        </div>
+        <div class="reveal">
+          <span class="eyebrow block mb-[18px]">Mobile Access</span>
+          <h2 class="text-emerald-deep mb-[18px]">Your spa, <span class="block italic text-emerald-brand font-medium">in your pocket.</span></h2>
+          <p class="text-base leading-relaxed mb-7 max-w-[440px]">Monitor sales, bookings, and staff activity in real time — wherever you are. Built for spa owners on the move.</p>
+          <ul class="list-none flex flex-col gap-3.5 mt-3.5">
+            <li class="flex items-start gap-3 text-[0.95rem] text-ink"><span class="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-brand/10 text-emerald-brand flex items-center justify-center text-[0.7rem] font-bold mt-0.5">✓</span>Live sales and bookings at a glance</li>
+            <li class="flex items-start gap-3 text-[0.95rem] text-ink"><span class="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-brand/10 text-emerald-brand flex items-center justify-center text-[0.7rem] font-bold mt-0.5">✓</span>Real-time activity from every branch</li>
+            <li class="flex items-start gap-3 text-[0.95rem] text-ink"><span class="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-brand/10 text-emerald-brand flex items-center justify-center text-[0.7rem] font-bold mt-0.5">✓</span>Weekly performance summaries</li>
+            <li class="flex items-start gap-3 text-[0.95rem] text-ink"><span class="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-brand/10 text-emerald-brand flex items-center justify-center text-[0.7rem] font-bold mt-0.5">✓</span>Instant low-stock and booking alerts</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section id="demo" class="relative overflow-hidden min-h-[560px] flex items-center justify-center text-center" style="background-image:url('/5.png'); background-size:140% auto; background-position:center 35%; background-repeat:no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background: linear-gradient(180deg, rgba(0,61,46,.05) 0%, rgba(0,61,46,.35) 60%, rgba(0,61,46,.75) 100%);"></div>
+    <div class="absolute inset-0 z-[1]" style="background: radial-gradient(ellipse at center bottom, rgba(0,61,46,.45) 0%, transparent 70%);"></div>
+    <div class="relative z-[2] py-[100px] px-7 max-w-[680px] mx-auto">
+      <span class="eyebrow block mb-[18px] !text-gold-soft">Get Started</span>
+      <h2 class="text-white mb-[18px] text-[clamp(2rem,4vw,3rem)] font-medium tracking-tight">Ready to transform your <span class="italic text-gold-soft font-normal">spa business?</span></h2>
+      <p class="text-[1.05rem] max-w-[540px] mx-auto mb-9 text-white/85 leading-relaxed">Watch the full demo to see how AVA can help you save time, increase profits and grow with confidence.</p>
+      <a href="#" class="btn bg-white !text-emerald-deep shadow-[0_10px_30px_rgba(0,0,0,.18)] px-8 py-4 font-semibold hover:bg-gold-soft hover:-translate-y-0.5">Watch Demo →</a>
+    </div>
+  </section>
+
+</Layout>

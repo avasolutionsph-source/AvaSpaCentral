@@ -1,0 +1,120 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SectionDecor from '../components/SectionDecor.astro';
+
+const features = [
+  { title: 'Smart Booking', desc: 'Online & walk-in reservations with auto-confirmation, calendar sync, and SMS reminders that cut no-shows by up to 40%.', icon: 'M3 4h18v18H3z M16 2v6M8 2v6M3 10h18' },
+  { title: 'POS & Sales', desc: 'Integrated point-of-sale handles services, products, packages, gift cards, and split payments — all in one tap.', icon: 'M2 6h20v12H2z M2 10h20 M7 14h.01' },
+  { title: 'Employee Monitoring', desc: 'Track attendance, performance, commissions, and service hours in real time across every branch and every shift.', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0' },
+  { title: 'Room Management', desc: 'Live room availability, treatment timers, and conflict-free scheduling that keeps every room productive and prepared.', icon: 'M3 9 L12 3 L21 9 L21 20 L3 20 Z M9 14 L15 14' },
+  { title: 'Inventory Tracking', desc: "Auto-deducting stock with low-balance alerts, reorder thresholds, and supplier records you'll actually use.", icon: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z' },
+  { title: 'Analytics & Reports', desc: 'Daily, weekly, monthly insights on revenue, top services, peak hours, and customer patterns — no spreadsheets needed.', icon: 'M18 20V10 M12 20V4 M6 20v-6' },
+  { title: 'Commission Automation', desc: 'Configure flat or tiered rates per therapist and service; the system computes payouts every cycle without manual math.', icon: 'M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M12 7v5l3 3' },
+  { title: 'Customer Database', desc: 'Full client history, preferences, allergies, and visit notes — every staff member sees what matters at check-in.', icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0' },
+  { title: 'Mobile Access', desc: 'Native iOS & Android apps for owners and staff — monitor performance, approve schedules, view sales on the go.', icon: 'M5 2h14v20H5z M12 18h.01' },
+];
+
+const deepDive = [
+  {
+    title: 'Booking & Calendar',
+    blurb: 'Centralized scheduling that handles online bookings, walk-ins, package redemptions, and recurring clients without conflicts.',
+    bullets: ['Real-time calendar across branches', 'SMS + email auto-reminders', 'Online booking widget for your website', 'Block-out times for staff breaks', 'Package & gift-card redemption flow'],
+  },
+  {
+    title: 'POS & Payments',
+    blurb: 'Tap-to-bill point of sale designed for spa service combinations, retail, and split payment scenarios.',
+    bullets: ['Service + retail combo billing', 'Split payments across multiple methods', 'GCash, Maya, card, cash, gift card', 'Auto-receipts via email or SMS', 'Daily Z-reports for cashiering'],
+  },
+  {
+    title: 'Staff & Commission',
+    blurb: 'Track every therapist hour, every service performed, and let the system compute payouts on autopilot.',
+    bullets: ['Attendance with time-in / time-out', 'Per-service commission rules', 'Flat or tiered commission tables', 'Auto-generated payout slips', 'Performance leaderboards'],
+  },
+  {
+    title: 'Insights & Reports',
+    blurb: 'Decision-ready dashboards — see revenue, retention, and operational health at a glance, not on a spreadsheet.',
+    bullets: ['Daily / weekly / monthly revenue', 'Top services and slow performers', 'Branch comparison view', 'Customer retention metrics', 'Exportable to Excel or PDF'],
+  },
+];
+---
+
+<Layout title="Features — AVA Spa Central" description="Explore every feature of AVA Spa Central — booking, POS, staff monitoring, inventory, analytics, and more. Built for spa professionals." active="features">
+
+  <!-- HERO -->
+  <section class="py-[110px] pb-[80px] text-center relative overflow-hidden" style="background-image: url('/3.png'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background: linear-gradient(180deg, rgba(250,247,241,.92) 0%, rgba(250,247,241,.78) 50%, rgba(250,247,241,.92) 100%);"></div>
+    <span class="absolute top-0 left-1/2 -translate-x-1/2 w-px h-14 z-[2]" style="background:linear-gradient(180deg, transparent 0%, var(--color-gold-brand) 100%); opacity:.6;"></span>
+    <div class="container-spa relative z-[2]">
+      <div class="max-w-[760px] mx-auto">
+        <span class="eyebrow inline-block mb-[18px]">Designed for Spa Professionals</span>
+        <h1 class="mb-5 tracking-tight">Powerful features. <span class="block italic text-emerald-brand font-medium">Effortless experience.</span></h1>
+        <p class="text-[1.1rem] max-w-[560px] mx-auto leading-relaxed">From bookings to billing, inventory to insights — every tool a modern spa needs, built into one calm, focused platform.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES GRID -->
+  <section class="py-[110px] relative overflow-hidden" style="background-image:url('/2.png'); background-size:cover; background-position:center; background-repeat:no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background:linear-gradient(180deg, rgba(250,247,241,.94) 0%, rgba(250,247,241,.88) 50%, rgba(250,247,241,.94) 100%);"></div>
+    <SectionDecor orbs={["gold-tl","em-br"]} />
+    <div class="container-spa relative z-[2]">
+      <div class="text-center max-w-[640px] mx-auto mb-16 reveal">
+        <span class="eyebrow inline-block mb-[14px]">Everything You Need</span>
+        <h2 class="text-emerald-deep mb-[14px]">One platform. <span class="block italic text-emerald-brand font-medium">Every spa essential.</span></h2>
+        <p class="text-base leading-relaxed max-w-[520px] mx-auto">Nine integrated modules working seamlessly together — no plugins, no patchwork, no compromises.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-[1180px] mx-auto reveal">
+        {features.map((f) => (
+          <div class="bg-white border border-border-soft rounded-2xl p-[30px_26px] transition-all hover:-translate-y-1 hover:shadow-lg-spa hover:border-emerald-brand/20">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-brand/10 to-gold-brand/10 text-emerald-brand flex items-center justify-center mb-[18px] border border-emerald-brand/15">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-[22px] h-[22px]">
+                <path d={f.icon} />
+              </svg>
+            </div>
+            <h3 class="font-serif text-[1.2rem] text-emerald-deep font-semibold mb-2.5">{f.title}</h3>
+            <p class="text-[0.9rem] leading-relaxed">{f.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- DEEP DIVE -->
+  <section class="py-[120px] relative overflow-hidden" style="background-image:url('/8.png'); background-size:cover; background-position:center; background-repeat:no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background:linear-gradient(180deg, rgba(243,235,221,.94) 0%, rgba(243,235,221,.86) 50%, rgba(243,235,221,.94) 100%);"></div>
+    <div class="container-spa relative z-[2]">
+      <div class="text-center max-w-[640px] mx-auto mb-16 reveal">
+        <span class="eyebrow inline-block mb-[14px]">In Detail</span>
+        <h2 class="text-emerald-deep mb-[14px]">Four pillars, <span class="block italic text-emerald-brand font-medium">one workflow.</span></h2>
+        <p class="text-base leading-relaxed max-w-[520px] mx-auto">A closer look at how each major module fits the daily rhythm of running a spa.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-7 max-w-[1180px] mx-auto reveal">
+        {deepDive.map((d) => (
+          <div class="bg-white border border-border-soft rounded-3xl p-[36px_32px] shadow-sm-spa transition-all hover:-translate-y-1 hover:shadow-md-spa">
+            <h3 class="font-serif text-[1.5rem] text-emerald-deep font-semibold mb-3">{d.title}</h3>
+            <p class="text-[0.95rem] leading-relaxed mb-5">{d.blurb}</p>
+            <ul class="list-none flex flex-col gap-2.5 m-0 p-0">
+              {d.bullets.map((b) => (
+                <li class="flex items-start gap-2.5 text-[0.9rem] text-ink leading-relaxed">
+                  <span class="w-[18px] h-[18px] rounded-full bg-success-spa/15 text-success-spa flex items-center justify-center text-[0.66rem] font-bold flex-shrink-0 mt-0.5">✓</span>{b}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="relative overflow-hidden min-h-[460px] flex items-center justify-center text-center" style="background-image:url('/5.png'); background-size:cover; background-position:center; background-repeat:no-repeat;">
+    <div class="absolute inset-0 z-[1]" style="background: linear-gradient(180deg, rgba(0,61,46,.1) 0%, rgba(0,61,46,.4) 55%, rgba(0,61,46,.8) 100%);"></div>
+    <div class="relative z-[2] py-[90px] px-7 max-w-[680px] mx-auto">
+      <span class="eyebrow block mb-[18px] !text-gold-soft">See It Live</span>
+      <h2 class="!text-white mb-[18px] text-[clamp(1.8rem,3.6vw,2.6rem)] font-medium tracking-tight">Want to see every feature <span class="italic !text-gold-soft font-normal">in action?</span></h2>
+      <p class="text-[1.02rem] max-w-[520px] mx-auto mb-7 !text-white/85 leading-relaxed">Book a 30-minute live demo with our team — we'll walk you through bookings, POS, and reports using your real workflow.</p>
+      <a href="/contact" class="btn bg-white !text-emerald-deep shadow-[0_10px_30px_rgba(0,0,0,.18)] px-8 py-4 font-semibold hover:bg-gold-soft">Schedule a Demo →</a>
+    </div>
+  </section>
+
+</Layout>

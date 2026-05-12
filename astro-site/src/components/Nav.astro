@@ -1,0 +1,32 @@
+---
+interface Props {
+  active?: 'home' | 'features' | 'pricing' | 'contact';
+}
+const { active } = Astro.props;
+---
+
+<nav class="sticky top-0 z-50 bg-ivory/80 backdrop-blur-xl backdrop-saturate-150 border-b border-border-soft/50">
+  <div class="container-spa flex items-center justify-between h-[74px] gap-7">
+    <a href="/" class="flex items-center gap-2.5 no-underline font-serif text-emerald-deep">
+      <svg viewBox="0 0 32 32" fill="currentColor" class="w-[34px] h-[34px] text-gold-brand">
+        <path d="M16 4 C 18 8, 22 11, 16 16 C 10 11, 14 8, 16 4 Z M16 16 C 20 18, 24 22, 18 26 C 14 24, 14 20, 16 16 Z M16 16 C 12 18, 8 22, 14 26 C 18 24, 18 20, 16 16 Z M6 14 C 8 12, 12 13, 14 16 C 10 17, 7 16, 6 14 Z M26 14 C 24 12, 20 13, 18 16 C 22 17, 25 16, 26 14 Z"/>
+      </svg>
+      <span class="flex flex-col leading-none">
+        <strong class="text-[1.25rem] font-semibold tracking-tight">AVA Spa Central</strong>
+        <small class="text-[0.6rem] tracking-[0.32em] text-muted font-sans font-semibold mt-[3px]">SOFTWARE</small>
+      </span>
+    </a>
+
+    <ul class="hidden md:flex gap-8 items-center list-none flex-1 justify-center m-0 p-0">
+      <li><a href="/" class={`text-ink no-underline text-[0.92rem] font-medium hover:text-emerald-brand transition-colors ${active === 'home' ? 'text-emerald-brand' : ''}`}>Home</a></li>
+      <li><a href="/features" class={`text-ink no-underline text-[0.92rem] font-medium hover:text-emerald-brand transition-colors ${active === 'features' ? 'text-emerald-brand' : ''}`}>Features</a></li>
+      <li><a href="/pricing" class={`text-ink no-underline text-[0.92rem] font-medium hover:text-emerald-brand transition-colors ${active === 'pricing' ? 'text-emerald-brand' : ''}`}>Pricing</a></li>
+      <li><a href="/contact" class={`text-ink no-underline text-[0.92rem] font-medium hover:text-emerald-brand transition-colors ${active === 'contact' ? 'text-emerald-brand' : ''}`}>Contact</a></li>
+    </ul>
+
+    <div class="flex items-center gap-5">
+      <a href="#" class="hidden sm:inline text-ink no-underline text-[0.92rem] font-medium hover:text-emerald-brand">Log in</a>
+      <a href="/#demo" class="bg-emerald-brand text-white px-[22px] py-[11px] rounded-full text-[0.88rem] font-medium no-underline transition-all hover:bg-emerald-hover hover:-translate-y-px">Watch Demo</a>
+    </div>
+  </div>
+</nav>

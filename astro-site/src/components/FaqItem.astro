@@ -1,0 +1,39 @@
+---
+interface Props {
+  q: string;
+}
+const { q } = Astro.props;
+---
+
+<div class="faq-item bg-white border border-border-soft rounded-2xl p-6 cursor-pointer transition-colors hover:border-emerald-brand">
+  <div class="flex justify-between items-center gap-4 font-serif text-[1.1rem] text-emerald-deep font-semibold">
+    <span>{q}</span>
+    <span class="faq-ico w-7 h-7 rounded-full bg-ivory border border-border-soft flex items-center justify-center text-emerald-brand text-[0.95rem] font-semibold flex-shrink-0 transition-transform">+</span>
+  </div>
+  <div class="faq-a max-h-0 overflow-hidden transition-[max-height,margin] duration-300 text-muted text-[0.95rem] leading-relaxed">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .faq-item.open .faq-ico {
+    transform: rotate(45deg);
+    background: var(--color-emerald-brand);
+    color: #fff;
+    border-color: var(--color-emerald-brand);
+  }
+  .faq-item.open .faq-a {
+    max-height: 240px;
+    margin-top: 14px;
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.faq-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const wasOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach((x) => x.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    });
+  });
+</script>

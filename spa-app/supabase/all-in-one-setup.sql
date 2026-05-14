@@ -4,21 +4,13 @@
 -- I-paste mo lahat ng laman ng file na ito sa Supabase SQL Editor (single
 -- page lang, no need i-split) tapos pindutin Run.
 --
--- Order:
---   1. Base schema + RLS                  (supabase-schema.sql)
---   2. Column add-ons / RLS fixes         (top-level supabase-*.sql)
---   3. Date-stamped migrations            (supabase/migrations/*.sql)
+-- Kung may "policy ... already exists" error — run mo muna
+-- `00-reset-public-schema.sql` para malinis ang previous partial run,
+-- tapos paste mo ulit ito.
 --
--- Generally idempotent — most statements use IF NOT EXISTS, IF EXISTS, or
--- ADD COLUMN IF NOT EXISTS. Safe to re-run kung may na-skip o nag-error.
---
--- POST-RUN STEPS (sa Supabase Dashboard):
---   * Database -> Replication: enable Realtime for products, employees,
---     customers, appointments, transactions, rooms (kung gusto mo ng live
---     updates across devices)
---   * Authentication -> Users: gumawa ng unang Owner user
---   * SQL Editor: i-insert ang first `businesses` row + `users` row na
---     naglilink sa auth_id (see end of file for template)
+-- Idempotent: pwedeng patak-patakan i-run nang paulit-ulit. Every CREATE
+-- POLICY / CREATE TRIGGER is preceded by DROP ... IF EXISTS, and every
+-- ALTER PUBLICATION ADD TABLE is wrapped in an existence check.
 -- ============================================================================
 
 
@@ -741,11 +733,9 @@ ALTER TABLE sync_metadata ENABLE ROW LEVEL SECURITY;
 
 -- Businesses table
 DROP POLICY IF EXISTS "Users can view their business" ON businesses;
-DROP POLICY IF EXISTS "Users can view their business" ON businesses;
 CREATE POLICY "Users can view their business" ON businesses
     FOR SELECT USING (id = get_user_business_id());
 
-DROP POLICY IF EXISTS "Owners can update their business" ON businesses;
 DROP POLICY IF EXISTS "Owners can update their business" ON businesses;
 CREATE POLICY "Owners can update their business" ON businesses
     FOR UPDATE USING (
@@ -755,11 +745,9 @@ CREATE POLICY "Owners can update their business" ON businesses
 
 -- Users table
 DROP POLICY IF EXISTS "Users can view own business users" ON users;
-DROP POLICY IF EXISTS "Users can view own business users" ON users;
 CREATE POLICY "Users can view own business users" ON users
     FOR SELECT USING (business_id = get_user_business_id());
 
-DROP POLICY IF EXISTS "Owners can manage users" ON users;
 DROP POLICY IF EXISTS "Owners can manage users" ON users;
 CREATE POLICY "Owners can manage users" ON users
     FOR ALL USING (
@@ -769,93 +757,63 @@ CREATE POLICY "Owners can manage users" ON users
 
 -- Generic policy for all other tables
 DROP POLICY IF EXISTS "Business isolation" ON products;
-DROP POLICY IF EXISTS "Business isolation" ON products;
 CREATE POLICY "Business isolation" ON products FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON employees;
 DROP POLICY IF EXISTS "Business isolation" ON employees;
 CREATE POLICY "Business isolation" ON employees FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON customers;
-DROP POLICY IF EXISTS "Business isolation" ON customers;
 CREATE POLICY "Business isolation" ON customers FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON suppliers;
 DROP POLICY IF EXISTS "Business isolation" ON suppliers;
 CREATE POLICY "Business isolation" ON suppliers FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON rooms;
-DROP POLICY IF EXISTS "Business isolation" ON rooms;
 CREATE POLICY "Business isolation" ON rooms FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON transactions;
 DROP POLICY IF EXISTS "Business isolation" ON transactions;
 CREATE POLICY "Business isolation" ON transactions FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON appointments;
-DROP POLICY IF EXISTS "Business isolation" ON appointments;
 CREATE POLICY "Business isolation" ON appointments FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON purchase_orders;
 DROP POLICY IF EXISTS "Business isolation" ON purchase_orders;
 CREATE POLICY "Business isolation" ON purchase_orders FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON inventory_movements;
-DROP POLICY IF EXISTS "Business isolation" ON inventory_movements;
 CREATE POLICY "Business isolation" ON inventory_movements FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON stock_history;
 DROP POLICY IF EXISTS "Business isolation" ON stock_history;
 CREATE POLICY "Business isolation" ON stock_history FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON product_consumption;
-DROP POLICY IF EXISTS "Business isolation" ON product_consumption;
 CREATE POLICY "Business isolation" ON product_consumption FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON expenses;
 DROP POLICY IF EXISTS "Business isolation" ON expenses;
 CREATE POLICY "Business isolation" ON expenses FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON cash_drawer_sessions;
-DROP POLICY IF EXISTS "Business isolation" ON cash_drawer_sessions;
 CREATE POLICY "Business isolation" ON cash_drawer_sessions FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON gift_certificates;
 DROP POLICY IF EXISTS "Business isolation" ON gift_certificates;
 CREATE POLICY "Business isolation" ON gift_certificates FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON attendance;
-DROP POLICY IF EXISTS "Business isolation" ON attendance;
 CREATE POLICY "Business isolation" ON attendance FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON shift_schedules;
 DROP POLICY IF EXISTS "Business isolation" ON shift_schedules;
 CREATE POLICY "Business isolation" ON shift_schedules FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON payroll_requests;
-DROP POLICY IF EXISTS "Business isolation" ON payroll_requests;
 CREATE POLICY "Business isolation" ON payroll_requests FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON time_off_requests;
 DROP POLICY IF EXISTS "Business isolation" ON time_off_requests;
 CREATE POLICY "Business isolation" ON time_off_requests FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON activity_logs;
-DROP POLICY IF EXISTS "Business isolation" ON activity_logs;
 CREATE POLICY "Business isolation" ON activity_logs FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON settings;
 DROP POLICY IF EXISTS "Business isolation" ON settings;
 CREATE POLICY "Business isolation" ON settings FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON payroll_config;
-DROP POLICY IF EXISTS "Business isolation" ON payroll_config;
 CREATE POLICY "Business isolation" ON payroll_config FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON payroll_config_logs;
 DROP POLICY IF EXISTS "Business isolation" ON payroll_config_logs;
 CREATE POLICY "Business isolation" ON payroll_config_logs FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON business_config;
-DROP POLICY IF EXISTS "Business isolation" ON business_config;
 CREATE POLICY "Business isolation" ON business_config FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON service_rotation;
 DROP POLICY IF EXISTS "Business isolation" ON service_rotation;
 CREATE POLICY "Business isolation" ON service_rotation FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON loyalty_history;
-DROP POLICY IF EXISTS "Business isolation" ON loyalty_history;
 CREATE POLICY "Business isolation" ON loyalty_history FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON advance_bookings;
 DROP POLICY IF EXISTS "Business isolation" ON advance_bookings;
 CREATE POLICY "Business isolation" ON advance_bookings FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON active_services;
-DROP POLICY IF EXISTS "Business isolation" ON active_services;
 CREATE POLICY "Business isolation" ON active_services FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON home_services;
 DROP POLICY IF EXISTS "Business isolation" ON home_services;
 CREATE POLICY "Business isolation" ON home_services FOR ALL USING (business_id = get_user_business_id());
 DROP POLICY IF EXISTS "Business isolation" ON sync_queue;
-DROP POLICY IF EXISTS "Business isolation" ON sync_queue;
 CREATE POLICY "Business isolation" ON sync_queue FOR ALL USING (business_id = get_user_business_id());
-DROP POLICY IF EXISTS "Business isolation" ON sync_metadata;
 DROP POLICY IF EXISTS "Business isolation" ON sync_metadata;
 CREATE POLICY "Business isolation" ON sync_metadata FOR ALL USING (business_id = get_user_business_id());
 
@@ -962,7 +920,6 @@ DROP POLICY IF EXISTS "owners_can_view_business_users" ON users;
 DROP POLICY IF EXISTS "owners_can_update_branch_owner_profiles" ON users;
 
 DROP POLICY IF EXISTS "owners_can_update_branch_owner_profiles" ON users;
-DROP POLICY IF EXISTS "owners_can_update_branch_owner_profiles" ON users;
 CREATE POLICY "owners_can_update_branch_owner_profiles" ON users
   FOR UPDATE
   USING (
@@ -981,6 +938,147 @@ CREATE POLICY "owners_can_update_branch_owner_profiles" ON users
 -- =============================================================================
 -- DONE! Login should work again immediately after running this.
 -- =============================================================================
+
+
+-- ============================================================================
+-- BLOCK: supabase-online-bookings.sql
+-- ============================================================================
+-- ============================================================================
+-- ONLINE BOOKINGS TABLE
+-- Run this script in your Supabase SQL Editor
+-- ============================================================================
+
+-- Create the online_bookings table
+CREATE TABLE IF NOT EXISTS online_bookings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+
+    -- Booking reference
+    reference_number VARCHAR(50) NOT NULL UNIQUE,
+
+    -- Customer details (not linked to customers table - public booking)
+    customer_name VARCHAR(255) NOT NULL,
+    customer_phone VARCHAR(50) NOT NULL,
+    customer_email VARCHAR(255),
+    notes TEXT,
+
+    -- Scheduling
+    preferred_date DATE NOT NULL,
+    preferred_time VARCHAR(20) NOT NULL,
+    preferred_therapist_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+
+    -- Services (stored as JSON array)
+    services JSONB NOT NULL DEFAULT '[]',
+
+    -- Pricing
+    total_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+    deposit_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+
+    -- Status tracking
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled', 'no_show')),
+    payment_status VARCHAR(50) DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'deposit_paid', 'fully_paid', 'refunded')),
+
+    -- Source tracking
+    source VARCHAR(50) DEFAULT 'online_booking',
+
+    -- Staff who confirmed/handled the booking
+    confirmed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    confirmed_at TIMESTAMPTZ,
+
+    -- If converted to an actual appointment
+    appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Soft delete
+    deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ
+);
+
+-- Create indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_online_bookings_business_id ON online_bookings(business_id);
+CREATE INDEX IF NOT EXISTS idx_online_bookings_status ON online_bookings(status);
+CREATE INDEX IF NOT EXISTS idx_online_bookings_preferred_date ON online_bookings(preferred_date);
+CREATE INDEX IF NOT EXISTS idx_online_bookings_reference ON online_bookings(reference_number);
+CREATE INDEX IF NOT EXISTS idx_online_bookings_created_at ON online_bookings(created_at DESC);
+
+-- Enable Row Level Security
+ALTER TABLE online_bookings ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only see bookings for their business
+DROP POLICY IF EXISTS "Users can view own business bookings" ON online_bookings;
+CREATE POLICY "Users can view own business bookings" ON online_bookings
+    FOR SELECT
+    USING (
+        business_id IN (
+            SELECT business_id FROM users WHERE auth_id = auth.uid()
+        )
+    );
+
+-- Policy: Anyone can INSERT (public booking page)
+DROP POLICY IF EXISTS "Anyone can create bookings" ON online_bookings;
+CREATE POLICY "Anyone can create bookings" ON online_bookings
+    FOR INSERT
+    WITH CHECK (true);
+
+-- Policy: Users can update bookings for their business
+DROP POLICY IF EXISTS "Users can update own business bookings" ON online_bookings;
+CREATE POLICY "Users can update own business bookings" ON online_bookings
+    FOR UPDATE
+    USING (
+        business_id IN (
+            SELECT business_id FROM users WHERE auth_id = auth.uid()
+        )
+    );
+
+-- Add trigger to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_online_bookings_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_online_bookings_updated_at ON online_bookings;
+CREATE TRIGGER trigger_online_bookings_updated_at
+    BEFORE UPDATE ON online_bookings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_online_bookings_updated_at();
+
+-- ============================================================================
+-- DONE! You can now receive online bookings.
+-- ============================================================================
+
+
+-- ============================================================================
+-- BLOCK: supabase-booking-slug.sql
+-- ============================================================================
+                -- ============================================================================
+                -- BOOKING SLUG FEATURE
+                -- Run this script in your Supabase SQL Editor
+                -- Allows businesses to have custom booking URLs like /book/daet-spa
+                -- ============================================================================
+
+                -- Add booking_slug column to businesses table
+                ALTER TABLE businesses
+                ADD COLUMN IF NOT EXISTS booking_slug VARCHAR(50) UNIQUE;
+
+                -- Create index for fast lookups by slug
+                CREATE INDEX IF NOT EXISTS idx_businesses_booking_slug
+                ON businesses(booking_slug) WHERE booking_slug IS NOT NULL;
+
+                -- Add RLS policy to allow public read of booking_slug
+                -- (This is already covered by "Public can view businesses" policy if you have it)
+
+                -- ============================================================================
+                -- DONE! You can now set custom booking slugs for businesses.
+                --
+                -- Example: UPDATE businesses SET booking_slug = 'daet-spa' WHERE id = 'your-uuid';
+                -- Then access: /book/daet-spa
+                -- ============================================================================
 
 
 -- ============================================================================
@@ -1128,14 +1226,12 @@ DROP POLICY IF EXISTS "Public view active branches" ON branches;
 
 -- Staff can view branches for their business (uses helper function for performance)
 DROP POLICY IF EXISTS "Staff view business branches" ON branches;
-DROP POLICY IF EXISTS "Staff view business branches" ON branches;
 CREATE POLICY "Staff view business branches" ON branches
   FOR SELECT USING (
     business_id = get_current_user_business_id()
   );
 
 -- Only Owner can create/update/delete branches (uses helper function for performance)
-DROP POLICY IF EXISTS "Owner manage branches" ON branches;
 DROP POLICY IF EXISTS "Owner manage branches" ON branches;
 CREATE POLICY "Owner manage branches" ON branches
   FOR ALL USING (
@@ -1174,7 +1270,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS branches_updated_at ON branches;
 DROP TRIGGER IF EXISTS branches_updated_at ON branches;
 DROP TRIGGER IF EXISTS branches_updated_at ON branches;
 CREATE TRIGGER branches_updated_at
@@ -1222,7 +1317,6 @@ DROP POLICY IF EXISTS "Branch owner update products" ON products;
 DROP POLICY IF EXISTS "Branch owner delete products" ON products;
 
 DROP POLICY IF EXISTS "Branch owner view products" ON products;
-DROP POLICY IF EXISTS "Branch owner view products" ON products;
 CREATE POLICY "Branch owner view products" ON products
   FOR SELECT USING (
     business_id = get_current_user_business_id()
@@ -1234,7 +1328,6 @@ CREATE POLICY "Branch owner view products" ON products
   );
 
 DROP POLICY IF EXISTS "Branch owner insert products" ON products;
-DROP POLICY IF EXISTS "Branch owner insert products" ON products;
 CREATE POLICY "Branch owner insert products" ON products
   FOR INSERT WITH CHECK (
     business_id = get_current_user_business_id()
@@ -1245,7 +1338,6 @@ CREATE POLICY "Branch owner insert products" ON products
   );
 
 DROP POLICY IF EXISTS "Branch owner update products" ON products;
-DROP POLICY IF EXISTS "Branch owner update products" ON products;
 CREATE POLICY "Branch owner update products" ON products
   FOR UPDATE USING (
     business_id = get_current_user_business_id()
@@ -1255,7 +1347,6 @@ CREATE POLICY "Branch owner update products" ON products
     )
   );
 
-DROP POLICY IF EXISTS "Branch owner delete products" ON products;
 DROP POLICY IF EXISTS "Branch owner delete products" ON products;
 CREATE POLICY "Branch owner delete products" ON products
   FOR DELETE USING (
@@ -1275,7 +1366,6 @@ DROP POLICY IF EXISTS "Branch owner update appointments" ON appointments;
 DROP POLICY IF EXISTS "Branch owner delete appointments" ON appointments;
 
 DROP POLICY IF EXISTS "Branch owner view appointments" ON appointments;
-DROP POLICY IF EXISTS "Branch owner view appointments" ON appointments;
 CREATE POLICY "Branch owner view appointments" ON appointments
   FOR SELECT USING (
     business_id = get_current_user_business_id()
@@ -1287,7 +1377,6 @@ CREATE POLICY "Branch owner view appointments" ON appointments
   );
 
 DROP POLICY IF EXISTS "Branch owner insert appointments" ON appointments;
-DROP POLICY IF EXISTS "Branch owner insert appointments" ON appointments;
 CREATE POLICY "Branch owner insert appointments" ON appointments
   FOR INSERT WITH CHECK (
     business_id = get_current_user_business_id()
@@ -1298,7 +1387,6 @@ CREATE POLICY "Branch owner insert appointments" ON appointments
   );
 
 DROP POLICY IF EXISTS "Branch owner update appointments" ON appointments;
-DROP POLICY IF EXISTS "Branch owner update appointments" ON appointments;
 CREATE POLICY "Branch owner update appointments" ON appointments
   FOR UPDATE USING (
     business_id = get_current_user_business_id()
@@ -1308,7 +1396,6 @@ CREATE POLICY "Branch owner update appointments" ON appointments
     )
   );
 
-DROP POLICY IF EXISTS "Branch owner delete appointments" ON appointments;
 DROP POLICY IF EXISTS "Branch owner delete appointments" ON appointments;
 CREATE POLICY "Branch owner delete appointments" ON appointments
   FOR DELETE USING (
@@ -1328,7 +1415,6 @@ DROP POLICY IF EXISTS "Branch owner update transactions" ON transactions;
 DROP POLICY IF EXISTS "Branch owner delete transactions" ON transactions;
 
 DROP POLICY IF EXISTS "Branch owner view transactions" ON transactions;
-DROP POLICY IF EXISTS "Branch owner view transactions" ON transactions;
 CREATE POLICY "Branch owner view transactions" ON transactions
   FOR SELECT USING (
     business_id = get_current_user_business_id()
@@ -1340,7 +1426,6 @@ CREATE POLICY "Branch owner view transactions" ON transactions
   );
 
 DROP POLICY IF EXISTS "Branch owner insert transactions" ON transactions;
-DROP POLICY IF EXISTS "Branch owner insert transactions" ON transactions;
 CREATE POLICY "Branch owner insert transactions" ON transactions
   FOR INSERT WITH CHECK (
     business_id = get_current_user_business_id()
@@ -1351,7 +1436,6 @@ CREATE POLICY "Branch owner insert transactions" ON transactions
   );
 
 DROP POLICY IF EXISTS "Branch owner update transactions" ON transactions;
-DROP POLICY IF EXISTS "Branch owner update transactions" ON transactions;
 CREATE POLICY "Branch owner update transactions" ON transactions
   FOR UPDATE USING (
     business_id = get_current_user_business_id()
@@ -1361,7 +1445,6 @@ CREATE POLICY "Branch owner update transactions" ON transactions
     )
   );
 
-DROP POLICY IF EXISTS "Branch owner delete transactions" ON transactions;
 DROP POLICY IF EXISTS "Branch owner delete transactions" ON transactions;
 CREATE POLICY "Branch owner delete transactions" ON transactions
   FOR DELETE USING (
@@ -1385,7 +1468,6 @@ DROP POLICY IF EXISTS "Branch owner update employees" ON employees;
 DROP POLICY IF EXISTS "Branch owner delete employees" ON employees;
 
 DROP POLICY IF EXISTS "Branch owner view employees" ON employees;
-DROP POLICY IF EXISTS "Branch owner view employees" ON employees;
 CREATE POLICY "Branch owner view employees" ON employees
   FOR SELECT USING (
     business_id = get_current_user_business_id()
@@ -1397,7 +1479,6 @@ CREATE POLICY "Branch owner view employees" ON employees
   );
 
 DROP POLICY IF EXISTS "Branch owner insert employees" ON employees;
-DROP POLICY IF EXISTS "Branch owner insert employees" ON employees;
 CREATE POLICY "Branch owner insert employees" ON employees
   FOR INSERT WITH CHECK (
     business_id = get_current_user_business_id()
@@ -1408,7 +1489,6 @@ CREATE POLICY "Branch owner insert employees" ON employees
   );
 
 DROP POLICY IF EXISTS "Branch owner update employees" ON employees;
-DROP POLICY IF EXISTS "Branch owner update employees" ON employees;
 CREATE POLICY "Branch owner update employees" ON employees
   FOR UPDATE USING (
     business_id = get_current_user_business_id()
@@ -1418,7 +1498,6 @@ CREATE POLICY "Branch owner update employees" ON employees
     )
   );
 
-DROP POLICY IF EXISTS "Branch owner delete employees" ON employees;
 DROP POLICY IF EXISTS "Branch owner delete employees" ON employees;
 CREATE POLICY "Branch owner delete employees" ON employees
   FOR DELETE USING (
@@ -1438,7 +1517,6 @@ DROP POLICY IF EXISTS "Branch owner update rooms" ON rooms;
 DROP POLICY IF EXISTS "Branch owner delete rooms" ON rooms;
 
 DROP POLICY IF EXISTS "Branch owner view rooms" ON rooms;
-DROP POLICY IF EXISTS "Branch owner view rooms" ON rooms;
 CREATE POLICY "Branch owner view rooms" ON rooms
   FOR SELECT USING (
     business_id = get_current_user_business_id()
@@ -1450,7 +1528,6 @@ CREATE POLICY "Branch owner view rooms" ON rooms
   );
 
 DROP POLICY IF EXISTS "Branch owner insert rooms" ON rooms;
-DROP POLICY IF EXISTS "Branch owner insert rooms" ON rooms;
 CREATE POLICY "Branch owner insert rooms" ON rooms
   FOR INSERT WITH CHECK (
     business_id = get_current_user_business_id()
@@ -1461,7 +1538,6 @@ CREATE POLICY "Branch owner insert rooms" ON rooms
   );
 
 DROP POLICY IF EXISTS "Branch owner update rooms" ON rooms;
-DROP POLICY IF EXISTS "Branch owner update rooms" ON rooms;
 CREATE POLICY "Branch owner update rooms" ON rooms
   FOR UPDATE USING (
     business_id = get_current_user_business_id()
@@ -1471,7 +1547,6 @@ CREATE POLICY "Branch owner update rooms" ON rooms
     )
   );
 
-DROP POLICY IF EXISTS "Branch owner delete rooms" ON rooms;
 DROP POLICY IF EXISTS "Branch owner delete rooms" ON rooms;
 CREATE POLICY "Branch owner delete rooms" ON rooms
   FOR DELETE USING (
@@ -1491,7 +1566,6 @@ DROP POLICY IF EXISTS "Branch owner update online_bookings" ON online_bookings;
 DROP POLICY IF EXISTS "Branch owner delete online_bookings" ON online_bookings;
 
 DROP POLICY IF EXISTS "Branch owner view online_bookings" ON online_bookings;
-DROP POLICY IF EXISTS "Branch owner view online_bookings" ON online_bookings;
 CREATE POLICY "Branch owner view online_bookings" ON online_bookings
   FOR SELECT USING (
     business_id = get_current_user_business_id()
@@ -1503,7 +1577,6 @@ CREATE POLICY "Branch owner view online_bookings" ON online_bookings
   );
 
 DROP POLICY IF EXISTS "Branch owner insert online_bookings" ON online_bookings;
-DROP POLICY IF EXISTS "Branch owner insert online_bookings" ON online_bookings;
 CREATE POLICY "Branch owner insert online_bookings" ON online_bookings
   FOR INSERT WITH CHECK (
     business_id = get_current_user_business_id()
@@ -1514,7 +1587,6 @@ CREATE POLICY "Branch owner insert online_bookings" ON online_bookings
   );
 
 DROP POLICY IF EXISTS "Branch owner update online_bookings" ON online_bookings;
-DROP POLICY IF EXISTS "Branch owner update online_bookings" ON online_bookings;
 CREATE POLICY "Branch owner update online_bookings" ON online_bookings
   FOR UPDATE USING (
     business_id = get_current_user_business_id()
@@ -1524,7 +1596,6 @@ CREATE POLICY "Branch owner update online_bookings" ON online_bookings
     )
   );
 
-DROP POLICY IF EXISTS "Branch owner delete online_bookings" ON online_bookings;
 DROP POLICY IF EXISTS "Branch owner delete online_bookings" ON online_bookings;
 CREATE POLICY "Branch owner delete online_bookings" ON online_bookings
   FOR DELETE USING (
@@ -1541,7 +1612,6 @@ CREATE POLICY "Branch owner delete online_bookings" ON online_bookings
 DROP POLICY IF EXISTS "Branch owner view users" ON users;
 
 -- Branch Owner can only see users in their branch (cannot create/modify users)
-DROP POLICY IF EXISTS "Branch owner view users" ON users;
 DROP POLICY IF EXISTS "Branch owner view users" ON users;
 CREATE POLICY "Branch owner view users" ON users
   FOR SELECT USING (
@@ -1584,7 +1654,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS validate_branch_owner_trigger ON users;
 DROP TRIGGER IF EXISTS validate_branch_owner_trigger ON users;
 DROP TRIGGER IF EXISTS validate_branch_owner_trigger ON users;
 CREATE TRIGGER validate_branch_owner_trigger
@@ -1640,151 +1709,6 @@ $$ LANGUAGE SQL SECURITY DEFINER;
 
 
 -- ============================================================================
--- BLOCK: supabase-booking-slug.sql
--- ============================================================================
-                -- ============================================================================
-                -- BOOKING SLUG FEATURE
-                -- Run this script in your Supabase SQL Editor
-                -- Allows businesses to have custom booking URLs like /book/daet-spa
-                -- ============================================================================
-
-                -- Add booking_slug column to businesses table
-                ALTER TABLE businesses
-                ADD COLUMN IF NOT EXISTS booking_slug VARCHAR(50) UNIQUE;
-
-                -- Create index for fast lookups by slug
-                CREATE INDEX IF NOT EXISTS idx_businesses_booking_slug
-                ON businesses(booking_slug) WHERE booking_slug IS NOT NULL;
-
-                -- Add RLS policy to allow public read of booking_slug
-                -- (This is already covered by "Public can view businesses" policy if you have it)
-
-                -- ============================================================================
-                -- DONE! You can now set custom booking slugs for businesses.
-                --
-                -- Example: UPDATE businesses SET booking_slug = 'daet-spa' WHERE id = 'your-uuid';
-                -- Then access: /book/daet-spa
-                -- ============================================================================
-
-
--- ============================================================================
--- BLOCK: supabase-online-bookings.sql
--- ============================================================================
--- ============================================================================
--- ONLINE BOOKINGS TABLE
--- Run this script in your Supabase SQL Editor
--- ============================================================================
-
--- Create the online_bookings table
-CREATE TABLE IF NOT EXISTS online_bookings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-
-    -- Booking reference
-    reference_number VARCHAR(50) NOT NULL UNIQUE,
-
-    -- Customer details (not linked to customers table - public booking)
-    customer_name VARCHAR(255) NOT NULL,
-    customer_phone VARCHAR(50) NOT NULL,
-    customer_email VARCHAR(255),
-    notes TEXT,
-
-    -- Scheduling
-    preferred_date DATE NOT NULL,
-    preferred_time VARCHAR(20) NOT NULL,
-    preferred_therapist_id UUID REFERENCES employees(id) ON DELETE SET NULL,
-
-    -- Services (stored as JSON array)
-    services JSONB NOT NULL DEFAULT '[]',
-
-    -- Pricing
-    total_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
-    deposit_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
-
-    -- Status tracking
-    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled', 'no_show')),
-    payment_status VARCHAR(50) DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'deposit_paid', 'fully_paid', 'refunded')),
-
-    -- Source tracking
-    source VARCHAR(50) DEFAULT 'online_booking',
-
-    -- Staff who confirmed/handled the booking
-    confirmed_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    confirmed_at TIMESTAMPTZ,
-
-    -- If converted to an actual appointment
-    appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
-
-    -- Timestamps
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-
-    -- Soft delete
-    deleted BOOLEAN DEFAULT FALSE,
-    deleted_at TIMESTAMPTZ
-);
-
--- Create indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_online_bookings_business_id ON online_bookings(business_id);
-CREATE INDEX IF NOT EXISTS idx_online_bookings_status ON online_bookings(status);
-CREATE INDEX IF NOT EXISTS idx_online_bookings_preferred_date ON online_bookings(preferred_date);
-CREATE INDEX IF NOT EXISTS idx_online_bookings_reference ON online_bookings(reference_number);
-CREATE INDEX IF NOT EXISTS idx_online_bookings_created_at ON online_bookings(created_at DESC);
-
--- Enable Row Level Security
-ALTER TABLE online_bookings ENABLE ROW LEVEL SECURITY;
-
--- Policy: Users can only see bookings for their business
-DROP POLICY IF EXISTS "Users can view own business bookings" ON online_bookings;
-DROP POLICY IF EXISTS "Users can view own business bookings" ON online_bookings;
-CREATE POLICY "Users can view own business bookings" ON online_bookings
-    FOR SELECT
-    USING (
-        business_id IN (
-            SELECT business_id FROM users WHERE auth_id = auth.uid()
-        )
-    );
-
--- Policy: Anyone can INSERT (public booking page)
-DROP POLICY IF EXISTS "Anyone can create bookings" ON online_bookings;
-DROP POLICY IF EXISTS "Anyone can create bookings" ON online_bookings;
-CREATE POLICY "Anyone can create bookings" ON online_bookings
-    FOR INSERT
-    WITH CHECK (true);
-
--- Policy: Users can update bookings for their business
-DROP POLICY IF EXISTS "Users can update own business bookings" ON online_bookings;
-DROP POLICY IF EXISTS "Users can update own business bookings" ON online_bookings;
-CREATE POLICY "Users can update own business bookings" ON online_bookings
-    FOR UPDATE
-    USING (
-        business_id IN (
-            SELECT business_id FROM users WHERE auth_id = auth.uid()
-        )
-    );
-
--- Add trigger to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_online_bookings_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trigger_online_bookings_updated_at ON online_bookings;
-DROP TRIGGER IF EXISTS trigger_online_bookings_updated_at ON online_bookings;
-CREATE TRIGGER trigger_online_bookings_updated_at
-    BEFORE UPDATE ON online_bookings
-    FOR EACH ROW
-    EXECUTE FUNCTION update_online_bookings_updated_at();
-
--- ============================================================================
--- DONE! You can now receive online bookings.
--- ============================================================================
-
-
--- ============================================================================
 -- BLOCK: supabase-booking-rls.sql
 -- ============================================================================
 -- ============================================================================
@@ -1794,13 +1718,11 @@ CREATE TRIGGER trigger_online_bookings_updated_at
 
 -- Allow anyone to read business info (needed for booking page header)
 DROP POLICY IF EXISTS "Public can view businesses" ON businesses;
-DROP POLICY IF EXISTS "Public can view businesses" ON businesses;
 CREATE POLICY "Public can view businesses" ON businesses
     FOR SELECT
     USING (true);
 
 -- Allow anyone to read active products/services (needed for booking page)
-DROP POLICY IF EXISTS "Public can view active products" ON products;
 DROP POLICY IF EXISTS "Public can view active products" ON products;
 CREATE POLICY "Public can view active products" ON products
     FOR SELECT
@@ -1808,13 +1730,11 @@ CREATE POLICY "Public can view active products" ON products
 
 -- Allow anyone to read active employees (needed for therapist selection)
 DROP POLICY IF EXISTS "Public can view active employees" ON employees;
-DROP POLICY IF EXISTS "Public can view active employees" ON employees;
 CREATE POLICY "Public can view active employees" ON employees
     FOR SELECT
     USING (status = 'active' AND deleted = false);
 
 -- Allow anyone to read hero/branding settings (needed for booking page hero)
-DROP POLICY IF EXISTS "Public can view hero settings" ON settings;
 DROP POLICY IF EXISTS "Public can view hero settings" ON settings;
 CREATE POLICY "Public can view hero settings" ON settings
     FOR SELECT
@@ -1846,7 +1766,6 @@ CREATE POLICY "Public can view hero settings" ON settings
 
 DROP POLICY IF EXISTS "Public can view hero settings" ON settings;
 
-DROP POLICY IF EXISTS "Public can view hero settings" ON settings;
 DROP POLICY IF EXISTS "Public can view hero settings" ON settings;
 CREATE POLICY "Public can view hero settings" ON settings
     FOR SELECT
@@ -1930,12 +1849,10 @@ ALTER TABLE customer_accounts ENABLE ROW LEVEL SECURITY;
 
 -- Customers can view their own account
 DROP POLICY IF EXISTS "Customers view own account" ON customer_accounts;
-DROP POLICY IF EXISTS "Customers view own account" ON customer_accounts;
 CREATE POLICY "Customers view own account" ON customer_accounts
   FOR SELECT USING (auth.uid() = auth_id);
 
 -- Customers can update their own account (limited fields)
-DROP POLICY IF EXISTS "Customers update own account" ON customer_accounts;
 DROP POLICY IF EXISTS "Customers update own account" ON customer_accounts;
 CREATE POLICY "Customers update own account" ON customer_accounts
   FOR UPDATE USING (auth.uid() = auth_id)
@@ -1943,12 +1860,10 @@ CREATE POLICY "Customers update own account" ON customer_accounts
 
 -- Public can create accounts (registration)
 DROP POLICY IF EXISTS "Public can register" ON customer_accounts;
-DROP POLICY IF EXISTS "Public can register" ON customer_accounts;
 CREATE POLICY "Public can register" ON customer_accounts
   FOR INSERT WITH CHECK (true);
 
 -- Staff can view customer accounts for their business
-DROP POLICY IF EXISTS "Staff view business customers" ON customer_accounts;
 DROP POLICY IF EXISTS "Staff view business customers" ON customer_accounts;
 CREATE POLICY "Staff view business customers" ON customer_accounts
   FOR SELECT USING (
@@ -1958,7 +1873,6 @@ CREATE POLICY "Staff view business customers" ON customer_accounts
   );
 
 -- Staff can update customer accounts for their business (e.g., add loyalty points)
-DROP POLICY IF EXISTS "Staff update business customers" ON customer_accounts;
 DROP POLICY IF EXISTS "Staff update business customers" ON customer_accounts;
 CREATE POLICY "Staff update business customers" ON customer_accounts
   FOR UPDATE USING (
@@ -1974,7 +1888,6 @@ CREATE POLICY "Staff update business customers" ON customer_accounts
 -- Allow customers to view their own bookings
 DROP POLICY IF EXISTS "Customers view own bookings" ON online_bookings;
 DROP POLICY IF EXISTS "Customers view own bookings" ON online_bookings;
-DROP POLICY IF EXISTS "Customers view own bookings" ON online_bookings;
 CREATE POLICY "Customers view own bookings" ON online_bookings
   FOR SELECT USING (
     customer_account_id IN (
@@ -1983,7 +1896,6 @@ CREATE POLICY "Customers view own bookings" ON online_bookings
   );
 
 -- Allow customers to update their own bookings (e.g., cancel)
-DROP POLICY IF EXISTS "Customers update own bookings" ON online_bookings;
 DROP POLICY IF EXISTS "Customers update own bookings" ON online_bookings;
 DROP POLICY IF EXISTS "Customers update own bookings" ON online_bookings;
 CREATE POLICY "Customers update own bookings" ON online_bookings
@@ -2057,7 +1969,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS customer_accounts_updated_at ON customer_accounts;
 DROP TRIGGER IF EXISTS customer_accounts_updated_at ON customer_accounts;
 DROP TRIGGER IF EXISTS customer_accounts_updated_at ON customer_accounts;
 CREATE TRIGGER customer_accounts_updated_at
@@ -2271,7 +2182,6 @@ ALTER TABLE public.transport_requests ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Business isolation" ON public.transport_requests;
 DROP POLICY IF EXISTS "Business isolation" ON public.transport_requests;
-DROP POLICY IF EXISTS "Business isolation" ON public.transport_requests;
 CREATE POLICY "Business isolation" ON public.transport_requests
   FOR ALL USING (business_id = (SELECT business_id FROM public.users WHERE auth_id = (SELECT auth.uid())));
 
@@ -2393,7 +2303,6 @@ BEGIN
 END $$;
 
 -- Create policy: Owner and Manager roles can update user profiles in their business
-DROP POLICY IF EXISTS "owners_can_update_branch_owner_profiles" ON users;
 DROP POLICY IF EXISTS "owners_can_update_branch_owner_profiles" ON users;
 CREATE POLICY "owners_can_update_branch_owner_profiles" ON users
   FOR UPDATE
@@ -2950,7 +2859,6 @@ ALTER TABLE payment_intents ENABLE ROW LEVEL SECURITY;
 -- The codebase stores a single branch_id directly on the `users` table and links
 -- to Supabase Auth via the auth_id column (see authService.ts:_loadUserProfile).
 DROP POLICY IF EXISTS "read own branch intents" ON payment_intents;
-DROP POLICY IF EXISTS "read own branch intents" ON payment_intents;
 CREATE POLICY "read own branch intents" ON payment_intents
   FOR SELECT TO authenticated
   USING (
@@ -2973,7 +2881,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS payment_intents_updated_at ON payment_intents;
 DROP TRIGGER IF EXISTS payment_intents_updated_at ON payment_intents;
 CREATE TRIGGER payment_intents_updated_at
   BEFORE UPDATE ON payment_intents
@@ -3113,7 +3020,6 @@ ALTER TABLE disbursements ENABLE ROW LEVEL SECURITY;
 -- org-wide) are visible to everyone in the business so accountants can
 -- reconcile across branches.
 DROP POLICY IF EXISTS "read disbursements scoped" ON disbursements;
-DROP POLICY IF EXISTS "read disbursements scoped" ON disbursements;
 CREATE POLICY "read disbursements scoped" ON disbursements
   FOR SELECT TO authenticated
   USING (
@@ -3138,7 +3044,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS disbursements_updated_at ON disbursements;
 DROP TRIGGER IF EXISTS disbursements_updated_at ON disbursements;
 CREATE TRIGGER disbursements_updated_at
   BEFORE UPDATE ON disbursements
@@ -3319,7 +3224,6 @@ CREATE INDEX idx_saved_reports_branch
 ALTER TABLE saved_reports ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "read saved_reports same business" ON saved_reports;
-DROP POLICY IF EXISTS "read saved_reports same business" ON saved_reports;
 CREATE POLICY "read saved_reports same business" ON saved_reports
   FOR SELECT TO authenticated
   USING (
@@ -3331,7 +3235,6 @@ CREATE POLICY "read saved_reports same business" ON saved_reports
   );
 
 DROP POLICY IF EXISTS "insert saved_reports same business" ON saved_reports;
-DROP POLICY IF EXISTS "insert saved_reports same business" ON saved_reports;
 CREATE POLICY "insert saved_reports same business" ON saved_reports
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -3342,7 +3245,6 @@ CREATE POLICY "insert saved_reports same business" ON saved_reports
     )
   );
 
-DROP POLICY IF EXISTS "delete saved_reports creator or owner" ON saved_reports;
 DROP POLICY IF EXISTS "delete saved_reports creator or owner" ON saved_reports;
 CREATE POLICY "delete saved_reports creator or owner" ON saved_reports
   FOR DELETE TO authenticated
@@ -3391,7 +3293,6 @@ CREATE INDEX idx_saved_payrolls_period
 ALTER TABLE saved_payrolls ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "read saved_payrolls same business" ON saved_payrolls;
-DROP POLICY IF EXISTS "read saved_payrolls same business" ON saved_payrolls;
 CREATE POLICY "read saved_payrolls same business" ON saved_payrolls
   FOR SELECT TO authenticated
   USING (
@@ -3403,7 +3304,6 @@ CREATE POLICY "read saved_payrolls same business" ON saved_payrolls
   );
 
 DROP POLICY IF EXISTS "insert saved_payrolls same business" ON saved_payrolls;
-DROP POLICY IF EXISTS "insert saved_payrolls same business" ON saved_payrolls;
 CREATE POLICY "insert saved_payrolls same business" ON saved_payrolls
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -3414,7 +3314,6 @@ CREATE POLICY "insert saved_payrolls same business" ON saved_payrolls
     )
   );
 
-DROP POLICY IF EXISTS "delete saved_payrolls creator or owner" ON saved_payrolls;
 DROP POLICY IF EXISTS "delete saved_payrolls creator or owner" ON saved_payrolls;
 CREATE POLICY "delete saved_payrolls creator or owner" ON saved_payrolls
   FOR DELETE TO authenticated
@@ -3746,7 +3645,6 @@ DROP POLICY IF EXISTS "auth_update_branches" ON public.branches;
 -- 1. public.users / "Insert users" (INSERT, authenticated)
 DROP POLICY IF EXISTS "Insert users" ON public.users;
 DROP POLICY IF EXISTS "Insert users" ON public.users;
-DROP POLICY IF EXISTS "Insert users" ON public.users;
 CREATE POLICY "Insert users" ON public.users
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -3758,7 +3656,6 @@ CREATE POLICY "Insert users" ON public.users
   );
 
 -- 2. public.payment_intents / "read own branch intents" (SELECT, authenticated)
-DROP POLICY IF EXISTS "read own branch intents" ON public.payment_intents;
 DROP POLICY IF EXISTS "read own branch intents" ON public.payment_intents;
 DROP POLICY IF EXISTS "read own branch intents" ON public.payment_intents;
 CREATE POLICY "read own branch intents" ON public.payment_intents
@@ -3774,7 +3671,6 @@ CREATE POLICY "read own branch intents" ON public.payment_intents
   );
 
 -- 3. public.users / "owners_can_update_branch_owner_profiles" (UPDATE, public)
-DROP POLICY IF EXISTS "owners_can_update_branch_owner_profiles" ON public.users;
 DROP POLICY IF EXISTS "owners_can_update_branch_owner_profiles" ON public.users;
 DROP POLICY IF EXISTS "owners_can_update_branch_owner_profiles" ON public.users;
 CREATE POLICY "owners_can_update_branch_owner_profiles" ON public.users
@@ -3801,7 +3697,6 @@ CREATE POLICY "owners_can_update_branch_owner_profiles" ON public.users
 -- 4. public.disbursements / "read disbursements scoped" (SELECT, authenticated)
 DROP POLICY IF EXISTS "read disbursements scoped" ON public.disbursements;
 DROP POLICY IF EXISTS "read disbursements scoped" ON public.disbursements;
-DROP POLICY IF EXISTS "read disbursements scoped" ON public.disbursements;
 CREATE POLICY "read disbursements scoped" ON public.disbursements
   FOR SELECT TO authenticated
   USING (
@@ -3821,7 +3716,6 @@ CREATE POLICY "read disbursements scoped" ON public.disbursements
 -- 5. public.saved_reports / "read saved_reports same business" (SELECT, authenticated)
 DROP POLICY IF EXISTS "read saved_reports same business" ON public.saved_reports;
 DROP POLICY IF EXISTS "read saved_reports same business" ON public.saved_reports;
-DROP POLICY IF EXISTS "read saved_reports same business" ON public.saved_reports;
 CREATE POLICY "read saved_reports same business" ON public.saved_reports
   FOR SELECT TO authenticated
   USING (
@@ -3836,7 +3730,6 @@ CREATE POLICY "read saved_reports same business" ON public.saved_reports
 -- 6. public.saved_reports / "insert saved_reports same business" (INSERT, authenticated)
 DROP POLICY IF EXISTS "insert saved_reports same business" ON public.saved_reports;
 DROP POLICY IF EXISTS "insert saved_reports same business" ON public.saved_reports;
-DROP POLICY IF EXISTS "insert saved_reports same business" ON public.saved_reports;
 CREATE POLICY "insert saved_reports same business" ON public.saved_reports
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -3849,7 +3742,6 @@ CREATE POLICY "insert saved_reports same business" ON public.saved_reports
   );
 
 -- 7. public.saved_reports / "delete saved_reports creator or owner" (DELETE, authenticated)
-DROP POLICY IF EXISTS "delete saved_reports creator or owner" ON public.saved_reports;
 DROP POLICY IF EXISTS "delete saved_reports creator or owner" ON public.saved_reports;
 DROP POLICY IF EXISTS "delete saved_reports creator or owner" ON public.saved_reports;
 CREATE POLICY "delete saved_reports creator or owner" ON public.saved_reports
@@ -3867,7 +3759,6 @@ CREATE POLICY "delete saved_reports creator or owner" ON public.saved_reports
 -- 8. public.saved_payrolls / "read saved_payrolls same business" (SELECT, authenticated)
 DROP POLICY IF EXISTS "read saved_payrolls same business" ON public.saved_payrolls;
 DROP POLICY IF EXISTS "read saved_payrolls same business" ON public.saved_payrolls;
-DROP POLICY IF EXISTS "read saved_payrolls same business" ON public.saved_payrolls;
 CREATE POLICY "read saved_payrolls same business" ON public.saved_payrolls
   FOR SELECT TO authenticated
   USING (
@@ -3882,7 +3773,6 @@ CREATE POLICY "read saved_payrolls same business" ON public.saved_payrolls
 -- 9. public.saved_payrolls / "insert saved_payrolls same business" (INSERT, authenticated)
 DROP POLICY IF EXISTS "insert saved_payrolls same business" ON public.saved_payrolls;
 DROP POLICY IF EXISTS "insert saved_payrolls same business" ON public.saved_payrolls;
-DROP POLICY IF EXISTS "insert saved_payrolls same business" ON public.saved_payrolls;
 CREATE POLICY "insert saved_payrolls same business" ON public.saved_payrolls
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -3895,7 +3785,6 @@ CREATE POLICY "insert saved_payrolls same business" ON public.saved_payrolls
   );
 
 -- 10. public.saved_payrolls / "delete saved_payrolls creator or owner" (DELETE, authenticated)
-DROP POLICY IF EXISTS "delete saved_payrolls creator or owner" ON public.saved_payrolls;
 DROP POLICY IF EXISTS "delete saved_payrolls creator or owner" ON public.saved_payrolls;
 DROP POLICY IF EXISTS "delete saved_payrolls creator or owner" ON public.saved_payrolls;
 CREATE POLICY "delete saved_payrolls creator or owner" ON public.saved_payrolls
@@ -3950,7 +3839,10 @@ CREATE INDEX IF NOT EXISTS idx_transactions_payment_intent_id
 -- REPLICA IDENTITY FULL is set so UPDATE/DELETE payloads include every column
 -- (Supabase realtime needs this to deliver the full `old` record).
 
--- Per-table conditional add so re-runs don't error on already-published tables.
+-- Per-table conditional add + REPLICA IDENTITY. Re-runs don't error on
+-- already-published tables. Tables that aren't created by this setup file
+-- (ot_requests, leave_requests, cash_advance_requests, incident_reports —
+-- legacy ad-hoc tables from the original project) are silently skipped.
 DO $pubadd$
 DECLARE
   t TEXT;
@@ -3964,35 +3856,14 @@ DECLARE
   ];
 BEGIN
   FOREACH t IN ARRAY tables LOOP
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t)
-       AND NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = t) THEN
-      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', t);
-    END IF;
-  END LOOP;
-END $pubadd$;
-
--- Conditionally set REPLICA IDENTITY FULL on every table that exists.
--- Some of these (ot_requests, leave_requests, cash_advance_requests,
--- incident_reports) aren't created by this setup file — they were added
--- ad-hoc on the legacy project. Skip silently if absent.
-DO $replicaid$
-DECLARE
-  t TEXT;
-  tables TEXT[] := ARRAY[
-    'business_config','cash_drawer_sessions','cash_drawer_shifts',
-    'gift_certificates','purchase_orders','attendance','shift_schedules',
-    'payroll_requests','payroll_config','time_off_requests','ot_requests',
-    'leave_requests','cash_advance_requests','incident_reports',
-    'advance_bookings','active_services','suppliers','service_rotation',
-    'home_services','loyalty_history'
-  ];
-BEGIN
-  FOREACH t IN ARRAY tables LOOP
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = t) THEN
+      IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = t) THEN
+        EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', t);
+      END IF;
       EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL', t);
     END IF;
   END LOOP;
-END $replicaid$;
+END $pubadd$;
 
 
 -- ============================================================================

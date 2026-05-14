@@ -22,6 +22,28 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="AVA Spa Central" />
     <title>AVA Spa Central</title>
+    <script>
+      // Buffer the PWA install prompt before React mounts. Chrome fires
+      // `beforeinstallprompt` very early — often before the JS bundle has
+      // hydrated the Install page — and the event is one-shot. Without this
+      // pre-bundle catcher the React listener attaches too late, the event
+      // is gone, deferredPrompt stays null, and the Install button is
+      // permanently disabled. We stash the event on `window` and re-emit a
+      // custom event so the React component can pick it up regardless of
+      // mount timing.
+      (function () {
+        window.__avaInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', function (e) {
+          e.preventDefault();
+          window.__avaInstallPrompt = e;
+          window.dispatchEvent(new Event('avaInstallPromptReady'));
+        });
+        window.addEventListener('appinstalled', function () {
+          window.__avaInstallPrompt = null;
+          window.dispatchEvent(new Event('avaInstallPromptInstalled'));
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

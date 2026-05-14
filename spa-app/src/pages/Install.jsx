@@ -21,19 +21,33 @@ const Install = () => {
     }
     setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream);
 
+    // Pick up an already-fired prompt buffered by the pre-React handler in
+    // index.html. Without this branch the prompt is missed when Chrome fires
+    // `beforeinstallprompt` before the JS bundle finishes mounting.
+    if (window.__avaInstallPrompt) {
+      setDeferredPrompt(window.__avaInstallPrompt);
+    }
+
     const handleBeforeInstall = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
+    };
+    const handleReady = () => {
+      if (window.__avaInstallPrompt) setDeferredPrompt(window.__avaInstallPrompt);
     };
     const handleInstalled = () => {
       setInstalled(true);
       setDeferredPrompt(null);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('avaInstallPromptReady', handleReady);
     window.addEventListener('appinstalled', handleInstalled);
+    window.addEventListener('avaInstallPromptInstalled', handleInstalled);
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('avaInstallPromptReady', handleReady);
       window.removeEventListener('appinstalled', handleInstalled);
+      window.removeEventListener('avaInstallPromptInstalled', handleInstalled);
     };
   }, []);
 

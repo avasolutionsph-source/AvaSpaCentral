@@ -13,8 +13,8 @@ import Layout from '../../layouts/Layout.astro';
         </div>
 
         <span class="eyebrow inline-block mb-3">Payment Confirmed</span>
-        <h1 class="mb-4 text-[clamp(2rem,4vw,2.8rem)]">Welcome to <span class="italic text-emerald-brand font-medium">AVA Spa Central.</span></h1>
-        <p class="text-base max-w-[480px] mx-auto leading-relaxed mb-2">Salamat sa pagtitiwala! Aktibo na ang subscription mo, at nasa inbox mo na ang login credentials.</p>
+        <h1 class="mb-4 text-[clamp(2rem,4vw,2.8rem)]">Last step: <span class="italic text-emerald-brand font-medium">install your app.</span></h1>
+        <p class="text-base max-w-[480px] mx-auto leading-relaxed mb-2">Salamat! Aktibo na ang subscription mo. I-install ang AVA app sa phone o computer mo para mabilis ang access — parang native app pero web technology pa rin sa likod.</p>
         <p class="text-[0.88rem] text-muted">Reference: <code id="orderRef" class="font-mono text-emerald-deep">—</code></p>
       </div>
 
@@ -52,26 +52,26 @@ import Layout from '../../layouts/Layout.astro';
 
         <hr class="border-border-soft mb-6"/>
 
-        <h4 class="text-[0.88rem] font-semibold text-ink mb-4">What happens next</h4>
+        <h4 class="text-[0.88rem] font-semibold text-ink mb-4">Install the AVA app on your device</h4>
         <ul class="list-none flex flex-col gap-3 m-0 p-0">
           <li class="flex items-start gap-3">
             <span class="flex-shrink-0 w-6 h-6 bg-emerald-brand/10 text-emerald-brand rounded-full flex items-center justify-center text-[0.78rem] font-bold">1</span>
-            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Check your email.</strong> Pinadala namin ang login link at temporary password sa <span id="emailInline" class="text-emerald-brand">—</span>.</p>
+            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Tap "Install AVA App" below.</strong> Magbubukas ang install page sa device mo.</p>
           </li>
           <li class="flex items-start gap-3">
             <span class="flex-shrink-0 w-6 h-6 bg-emerald-brand/10 text-emerald-brand rounded-full flex items-center justify-center text-[0.78rem] font-bold">2</span>
-            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Log in to your dashboard.</strong> Mag-set up ka ng spa profile, services, and branches.</p>
+            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Tap "Install".</strong> Sa Android/Desktop: click "Install" button. Sa iPhone: tap Share → Add to Home Screen.</p>
           </li>
           <li class="flex items-start gap-3">
             <span class="flex-shrink-0 w-6 h-6 bg-emerald-brand/10 text-emerald-brand rounded-full flex items-center justify-center text-[0.78rem] font-bold">3</span>
-            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Onboarding call.</strong> Tatawagan ka ng team within 1 business day para tulungan ka mag-onboard.</p>
+            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Open from home screen.</strong> Mag-log in gamit ang email mo: <span id="emailInline" class="text-emerald-brand">—</span></p>
           </li>
         </ul>
       </div>
 
       <!-- ACTIONS -->
       <div class="max-w-[680px] mx-auto flex flex-col sm:flex-row gap-3 justify-center">
-        <a id="dashboardLink" href="#" class="btn btn-primary px-8">Go to Dashboard →</a>
+        <a id="dashboardLink" href="#" class="btn btn-primary px-8">Install AVA App →</a>
         <a href="/" class="btn btn-secondary px-8">Back to Home</a>
       </div>
 
@@ -108,14 +108,15 @@ import Layout from '../../layouts/Layout.astro';
     document.getElementById('paymentMethod').textContent = (method || 'gcash').replace('otc', 'Over-the-Counter');
     document.getElementById('nextBilling').textContent = nextStr;
 
-    // Dashboard URL — points to the local spa software (Vite dev server).
-    // Replace 'http://localhost:3000' with your hosted app URL when deployed.
+    // Install URL — points to the spa PWA's /install page which handles the
+    // install prompt (and iOS Add-to-Home-Screen fallback). Replace
+    // 'http://localhost:3000' with the hosted spa app URL once deployed.
     const params = new URLSearchParams();
     if (data.customer.email) params.set('email', data.customer.email);
     if (data.customer.businessName) params.set('business', data.customer.businessName);
     const qs = params.toString();
     const dashboardLink = document.getElementById('dashboardLink');
-    dashboardLink.href = 'http://localhost:3000' + (qs ? '?' + qs : '');
+    dashboardLink.href = 'http://localhost:3000/install' + (qs ? '?' + qs : '');
     dashboardLink.target = '_blank';
     dashboardLink.rel = 'noopener noreferrer';
 

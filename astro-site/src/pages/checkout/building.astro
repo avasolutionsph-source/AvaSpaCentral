@@ -83,7 +83,7 @@ import Layout from '../../layouts/Layout.astro';
                 <svg class="step-check hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                 <span class="step-spin hidden w-3.5 h-3.5 border-2 border-emerald-brand border-t-transparent rounded-full animate-spin"></span>
               </span>
-              <span class="step-label text-[0.92rem] text-muted font-medium flex-1">Launching your spa software</span>
+              <span class="step-label text-[0.92rem] text-muted font-medium flex-1">Preparing your installable app</span>
             </li>
           </ul>
         </div>
@@ -94,8 +94,8 @@ import Layout from '../../layouts/Layout.astro';
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="w-7 h-7 text-emerald-deep"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
           <h3 class="!text-white text-[1.4rem] font-serif font-semibold mb-2">Ready ka na!</h3>
-          <p class="!text-white/75 text-[0.92rem] mb-6 leading-relaxed">Bumukas dapat ang spa software sa bagong tab. Kung hindi, click mo ang button sa baba.</p>
-          <button id="openDashboardBtn" type="button" class="btn btn-gold px-8">Open Dashboard →</button>
+          <p class="!text-white/75 text-[0.92rem] mb-6 leading-relaxed">Bumukas dapat ang install page sa bagong tab. Tap "Install" doon para i-add ang AVA app sa home screen mo.</p>
+          <button id="openDashboardBtn" type="button" class="btn btn-gold px-8">Install AVA App →</button>
           <p class="text-[0.78rem] !text-white/55 mt-5">Hindi bumubukas? Make sure tumatakbo ang spa app sa <code class="font-mono !text-gold-soft">localhost:3000</code></p>
         </div>
 
@@ -106,8 +106,10 @@ import Layout from '../../layouts/Layout.astro';
 </Layout>
 
 <script is:inline>
-  // Build URL for the spa software. Replace this with your real app URL kapag
-  // hosted na. Currently points to local Vite dev server (default port 3000).
+  // Build URL for the spa PWA's install page. Replace 'http://localhost:3000'
+  // with the hosted spa app URL once deployed. The /install route handles
+  // the PWA install prompt (with iOS Add-to-Home-Screen fallback) so the
+  // customer ends up with the app installed on their device.
   function buildSpaUrl() {
     const raw = sessionStorage.getItem('ava_checkout');
     const data = raw ? JSON.parse(raw) : null;
@@ -115,7 +117,7 @@ import Layout from '../../layouts/Layout.astro';
     if (data?.customer?.email) params.set('email', data.customer.email);
     if (data?.customer?.businessName) params.set('business', data.customer.businessName);
     const qs = params.toString();
-    return 'http://localhost:3000' + (qs ? '?' + qs : '');
+    return 'http://localhost:3000/install' + (qs ? '?' + qs : '');
   }
 
   const steps = [

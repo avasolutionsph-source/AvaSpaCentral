@@ -108,8 +108,16 @@ import Layout from '../../layouts/Layout.astro';
     document.getElementById('paymentMethod').textContent = (method || 'gcash').replace('otc', 'Over-the-Counter');
     document.getElementById('nextBilling').textContent = nextStr;
 
-    // Dashboard URL — placeholder; replace with your real app URL.
-    document.getElementById('dashboardLink').href = 'https://app.avaspacentral.com/login?email=' + encodeURIComponent(data.customer.email || '');
+    // Dashboard URL — points to the local spa software (Vite dev server).
+    // Replace 'http://localhost:3000' with your hosted app URL when deployed.
+    const params = new URLSearchParams();
+    if (data.customer.email) params.set('email', data.customer.email);
+    if (data.customer.businessName) params.set('business', data.customer.businessName);
+    const qs = params.toString();
+    const dashboardLink = document.getElementById('dashboardLink');
+    dashboardLink.href = 'http://localhost:3000' + (qs ? '?' + qs : '');
+    dashboardLink.target = '_blank';
+    dashboardLink.rel = 'noopener noreferrer';
 
     // Clear the checkout session data — the order is complete.
     sessionStorage.removeItem('ava_checkout');

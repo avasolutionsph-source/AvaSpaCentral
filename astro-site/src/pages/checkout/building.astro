@@ -1,0 +1,220 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Building Your Spa — AVA Spa Central" description="We're setting up your AVA Spa Central account. This will only take a moment.">
+
+  <section class="min-h-[90vh] flex items-center justify-center py-[60px]" style="background: radial-gradient(circle at 15% 30%, rgba(0,92,69,.07) 0%, transparent 42%), radial-gradient(circle at 85% 70%, rgba(201,154,58,.09) 0%, transparent 45%), var(--color-ivory);">
+    <div class="container-spa">
+      <div class="max-w-[640px] mx-auto">
+
+        <!-- Top status -->
+        <div class="text-center mb-10">
+          <div class="relative inline-flex items-center justify-center w-24 h-24 mb-7">
+            <!-- Pulsing rings -->
+            <span class="absolute inset-0 rounded-full bg-emerald-brand/15 animate-ping"></span>
+            <span class="absolute inset-2 rounded-full bg-emerald-brand/25 animate-pulse"></span>
+            <span class="relative w-16 h-16 rounded-full bg-emerald-brand shadow-lg-spa flex items-center justify-center">
+              <svg viewBox="0 0 32 32" fill="currentColor" class="w-9 h-9 text-gold-soft">
+                <path d="M16 4 C 18 8, 22 11, 16 16 C 10 11, 14 8, 16 4 Z M16 16 C 20 18, 24 22, 18 26 C 14 24, 14 20, 16 16 Z M16 16 C 12 18, 8 22, 14 26 C 18 24, 18 20, 16 16 Z M6 14 C 8 12, 12 13, 14 16 C 10 17, 7 16, 6 14 Z M26 14 C 24 12, 20 13, 18 16 C 22 17, 25 16, 26 14 Z"/>
+              </svg>
+            </span>
+          </div>
+          <span class="eyebrow inline-block mb-3">Setting Up Your Account</span>
+          <h1 class="mb-3 text-[clamp(1.8rem,3.5vw,2.4rem)]">Building your <span class="italic text-emerald-brand font-medium">spa software…</span></h1>
+          <p id="statusText" class="text-base text-muted leading-relaxed">Sandali lang — naghahanda kami ng dashboard mo.</p>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="bg-white border border-border-soft rounded-2xl p-8 shadow-md-spa mb-6">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-[0.78rem] uppercase tracking-wider text-muted font-semibold">Progress</span>
+            <span id="progressLabel" class="text-[0.86rem] text-emerald-deep font-semibold tabular-nums">0%</span>
+          </div>
+          <div class="h-2 bg-border-soft rounded-full overflow-hidden mb-7">
+            <div id="progressBar" class="h-full bg-gradient-to-r from-emerald-brand to-emerald-hover rounded-full transition-all duration-500 ease-out" style="width: 0%;"></div>
+          </div>
+
+          <!-- Steps -->
+          <ul id="stepList" class="list-none flex flex-col gap-3 m-0 p-0">
+            <li data-step="0" class="flex items-center gap-3.5 step-item">
+              <span class="step-icon flex-shrink-0 w-7 h-7 rounded-full border border-border-soft bg-ivory flex items-center justify-center">
+                <span class="step-num text-[0.74rem] text-muted font-bold">1</span>
+                <svg class="step-check hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="step-spin hidden w-3.5 h-3.5 border-2 border-emerald-brand border-t-transparent rounded-full animate-spin"></span>
+              </span>
+              <span class="step-label text-[0.92rem] text-muted font-medium flex-1">Payment confirmed</span>
+            </li>
+            <li data-step="1" class="flex items-center gap-3.5 step-item">
+              <span class="step-icon flex-shrink-0 w-7 h-7 rounded-full border border-border-soft bg-ivory flex items-center justify-center">
+                <span class="step-num text-[0.74rem] text-muted font-bold">2</span>
+                <svg class="step-check hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="step-spin hidden w-3.5 h-3.5 border-2 border-emerald-brand border-t-transparent rounded-full animate-spin"></span>
+              </span>
+              <span class="step-label text-[0.92rem] text-muted font-medium flex-1">Creating your AVA account</span>
+            </li>
+            <li data-step="2" class="flex items-center gap-3.5 step-item">
+              <span class="step-icon flex-shrink-0 w-7 h-7 rounded-full border border-border-soft bg-ivory flex items-center justify-center">
+                <span class="step-num text-[0.74rem] text-muted font-bold">3</span>
+                <svg class="step-check hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="step-spin hidden w-3.5 h-3.5 border-2 border-emerald-brand border-t-transparent rounded-full animate-spin"></span>
+              </span>
+              <span class="step-label text-[0.92rem] text-muted font-medium flex-1">Setting up your spa business profile</span>
+            </li>
+            <li data-step="3" class="flex items-center gap-3.5 step-item">
+              <span class="step-icon flex-shrink-0 w-7 h-7 rounded-full border border-border-soft bg-ivory flex items-center justify-center">
+                <span class="step-num text-[0.74rem] text-muted font-bold">4</span>
+                <svg class="step-check hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="step-spin hidden w-3.5 h-3.5 border-2 border-emerald-brand border-t-transparent rounded-full animate-spin"></span>
+              </span>
+              <span class="step-label text-[0.92rem] text-muted font-medium flex-1">Configuring branches and team access</span>
+            </li>
+            <li data-step="4" class="flex items-center gap-3.5 step-item">
+              <span class="step-icon flex-shrink-0 w-7 h-7 rounded-full border border-border-soft bg-ivory flex items-center justify-center">
+                <span class="step-num text-[0.74rem] text-muted font-bold">5</span>
+                <svg class="step-check hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="step-spin hidden w-3.5 h-3.5 border-2 border-emerald-brand border-t-transparent rounded-full animate-spin"></span>
+              </span>
+              <span class="step-label text-[0.92rem] text-muted font-medium flex-1">Building your dashboard</span>
+            </li>
+            <li data-step="5" class="flex items-center gap-3.5 step-item">
+              <span class="step-icon flex-shrink-0 w-7 h-7 rounded-full border border-border-soft bg-ivory flex items-center justify-center">
+                <span class="step-num text-[0.74rem] text-muted font-bold">6</span>
+                <svg class="step-check hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span class="step-spin hidden w-3.5 h-3.5 border-2 border-emerald-brand border-t-transparent rounded-full animate-spin"></span>
+              </span>
+              <span class="step-label text-[0.92rem] text-muted font-medium flex-1">Launching your spa software</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Fallback / ready state -->
+        <div id="readyPanel" class="hidden bg-emerald-deep text-white rounded-2xl p-7 shadow-lg-spa text-center">
+          <div class="inline-flex items-center justify-center w-14 h-14 bg-gold-brand rounded-full mb-4">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="w-7 h-7 text-emerald-deep"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h3 class="!text-white text-[1.4rem] font-serif font-semibold mb-2">Ready ka na!</h3>
+          <p class="!text-white/75 text-[0.92rem] mb-6 leading-relaxed">Bumukas dapat ang spa software sa bagong tab. Kung hindi, click mo ang button sa baba.</p>
+          <button id="openDashboardBtn" type="button" class="btn btn-gold px-8">Open Dashboard →</button>
+          <p class="text-[0.78rem] !text-white/55 mt-5">Hindi bumubukas? Make sure tumatakbo ang spa app sa <code class="font-mono !text-gold-soft">localhost:3000</code></p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<script is:inline>
+  // Build URL for the spa software. Replace this with your real app URL kapag
+  // hosted na. Currently points to local Vite dev server (default port 3000).
+  function buildSpaUrl() {
+    const raw = sessionStorage.getItem('ava_checkout');
+    const data = raw ? JSON.parse(raw) : null;
+    const params = new URLSearchParams();
+    if (data?.customer?.email) params.set('email', data.customer.email);
+    if (data?.customer?.businessName) params.set('business', data.customer.businessName);
+    const qs = params.toString();
+    return 'http://localhost:3000' + (qs ? '?' + qs : '');
+  }
+
+  const steps = [
+    { delay: 600,  status: 'Confirming your payment with NextPay…' },
+    { delay: 1400, status: 'Creating your AVA account…' },
+    { delay: 1600, status: 'Setting up your spa business profile…' },
+    { delay: 1300, status: 'Configuring branches and team access…' },
+    { delay: 1500, status: 'Building your dashboard…' },
+    { delay: 1100, status: 'Launching your spa software…' },
+  ];
+
+  const statusText = document.getElementById('statusText');
+  const progressBar = document.getElementById('progressBar');
+  const progressLabel = document.getElementById('progressLabel');
+  const stepItems = document.querySelectorAll('.step-item');
+  const readyPanel = document.getElementById('readyPanel');
+  const openDashboardBtn = document.getElementById('openDashboardBtn');
+
+  function setStepState(idx, state) {
+    const item = stepItems[idx];
+    if (!item) return;
+    const icon = item.querySelector('.step-icon');
+    const num = item.querySelector('.step-num');
+    const check = item.querySelector('.step-check');
+    const spin = item.querySelector('.step-spin');
+    const label = item.querySelector('.step-label');
+
+    icon.classList.remove('bg-emerald-brand', 'border-emerald-brand', 'bg-ivory', 'border-border-soft');
+
+    if (state === 'active') {
+      icon.classList.add('border-emerald-brand', 'bg-ivory');
+      num.classList.add('hidden');
+      check.classList.add('hidden');
+      spin.classList.remove('hidden');
+      label.classList.remove('text-muted');
+      label.classList.add('text-ink');
+    } else if (state === 'done') {
+      icon.classList.add('bg-emerald-brand', 'border-emerald-brand');
+      num.classList.add('hidden');
+      spin.classList.add('hidden');
+      check.classList.remove('hidden');
+      label.classList.remove('text-muted');
+      label.classList.add('text-emerald-deep');
+    }
+  }
+
+  async function runProvisioning() {
+    // No checkout data? Send back to start.
+    if (!sessionStorage.getItem('ava_checkout')) {
+      window.location.href = '/checkout';
+      return;
+    }
+
+    // === Phase 2 integration point ===
+    // Replace the simulated awaits below with real Supabase calls:
+    //   1. await supabase.auth.signUp({ email, password })
+    //   2. await supabase.from('businesses').insert({ name, address, ... })
+    //   3. await supabase.from('users').insert({ auth_id, business_id, role: 'Owner', ... })
+    //   4. await supabase.from('branches').insert({ business_id, ... })  // for each branch
+    // Each await fulfills one "step" — drive the UI from real promise resolution
+    // instead of the static delays here.
+    // ===================================
+
+    let totalDelay = steps.reduce((s, x) => s + x.delay, 0);
+    let elapsed = 0;
+
+    for (let i = 0; i < steps.length; i++) {
+      setStepState(i, 'active');
+      statusText.textContent = steps[i].status;
+
+      await new Promise((r) => setTimeout(r, steps[i].delay));
+
+      setStepState(i, 'done');
+      elapsed += steps[i].delay;
+      const pct = Math.round((elapsed / totalDelay) * 100);
+      progressBar.style.width = pct + '%';
+      progressLabel.textContent = pct + '%';
+    }
+
+    // All done — open spa software + show ready panel.
+    statusText.textContent = 'Tapos na! Opening your spa software…';
+    const spaUrl = buildSpaUrl();
+
+    // Try auto-open in new tab. Most browsers allow this since user submitted
+    // a form ~10s ago and the tab is from a top-level page.
+    const opened = window.open(spaUrl, '_blank', 'noopener,noreferrer');
+
+    // Show ready panel as fallback if popup blocked.
+    readyPanel.classList.remove('hidden');
+    openDashboardBtn.addEventListener('click', () => {
+      window.open(spaUrl, '_blank', 'noopener,noreferrer');
+    });
+
+    // Navigate to the success page in this tab so the user has a confirmation
+    // record. Wait a beat so they see the "100%" finish.
+    setTimeout(() => {
+      window.location.href = '/checkout/success';
+    }, opened ? 1500 : 4000);
+  }
+
+  runProvisioning();
+</script>

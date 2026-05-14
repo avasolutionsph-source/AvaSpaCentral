@@ -1,0 +1,845 @@
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { authService, supabaseSyncManager, isSupabaseConfigured } from '../services/supabase';
+import { setUserContext, clearUserContext } from '../utils/sentry';
+import { setBusinessContext, clearBusinessContext } from '../services/storage/BaseRepository';
+import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
+import { db } from '../db';
+import { setAnalyticsBranchFilter } from '../mockApi/mockApi';
+import { PayrollConfigRepository } from '../services/storage/repositories';
+import NotificationService from '../services/notifications/NotificationService';
+import NotificationSoundManager from '../services/notifications/NotificationSoundManager';
+import PushSubscriptionService from '../services/notifications/PushSubscriptionService';
+
+// Defaults for booking pax stepper limits. Public-facing booking page caps
+// group size lower than the staff-facing POS / Appointments / AdvanceBooking
+// flows. Owner can override either via Settings → Bookings.
+const DEFAULT_BOOKING_LIMITS = Object.freeze({ maxPaxPublic: 12, maxPaxStaff: 30 });
+
+// Sentinel representing "view data from all branches" for Owner/Manager users.
+// Stored in the same selectedBranch slot (so localStorage persistence Just Works).
+// Callers should treat `selectedBranch?._allBranches === true` as "no branch filter".
+export const ALL_BRANCHES = Object.freeze({ id: null, name: 'All Branches', _allBranches: true });
+
+// Roles locked to a single assigned branch. Owner is the only role that can
+// roam across branches via the dropdown — every other role is staff that the
+// Edit Account UI promises will "only see data from their assigned branch."
+// Single source of truth so App.jsx and AppContext stay in sync.
+export const BRANCH_LOCKED_ROLES = Object.freeze([
+  'Manager',
+  'Branch Owner',
+  'Therapist',
+  'Receptionist',
+  'Rider',
+  'Utility',
+]);
+export const isBranchLockedRole = (role) => BRANCH_LOCKED_ROLES.includes(role);
+
+/**
+ * Migrate all local data to current business context
+ * This handles:
+ * 1. Legacy data created without a businessId
+ * 2. Data created with a different businessId (e.g., auto-generated UUIDs)
+ *
+ * Since this is a single-tenant local app (one business per browser),
+ * all local data should belong to the logged-in user's business.
+ */
+const migrateOrphanedData = async (businessId) => {
+  if (!businessId) return;
+
+  try {
+    // Tables that support multi-tenant and may have orphaned data
+    const multiTenantTables = [
+      'employees', 'customers', 'products', 'rooms', 'suppliers',
+      'transactions', 'appointments', 'expenses', 'giftCertificates',
+      'purchaseOrders', 'attendance', 'users'
+    ];
+
+    let totalMigrated = 0;
+
+    for (const tableName of multiTenantTables) {
+      const table = db[tableName];
+      if (!table) continue;
+
+      // Find records that don't have the current businessId
+      // This includes: no businessId, or different businessId
+      const recordsToMigrate = await table
+        .filter(item => item.businessId !== businessId)
+        .toArray();
+
+      if (recordsToMigrate.length > 0) {
+        // Update each record with the current businessId
+        for (const record of recordsToMigrate) {
+          await table.update(record._id, { businessId });
+        }
+        totalMigrated += recordsToMigrate.length;
+        console.log(`[AppContext] Migrated ${recordsToMigrate.length} ${tableName} records to business ${businessId}`);
+      }
+    }
+
+    if (totalMigrated > 0) {
+      console.log(`[AppContext] Total data migration complete: ${totalMigrated} records updated`);
+    }
+  } catch (error) {
+    console.error('[AppContext] Data migration error:', error);
+    // Don't throw - migration failure shouldn't block app usage
+  }
+};
+
+const AppContext = createContext();
+
+// Role permissions mapping
+// 'app-update' is granted to every role on purpose: pulling the latest PWA
+// build is a self-service utility, not a privileged action, and roles
+// without Settings access (Receptionist / Therapist / Rider / Utility)
+// would otherwise have no in-app way to refresh their installed build.
+const rolePermissions = {
+  'Owner': ['dashboard', 'pos', 'products', 'employees', 'customers', 'appointments', 'attendance', 'rooms',
+            'gift-certificates', 'expenses', 'payroll', 'my-schedule', 'shift-schedules', 'payroll-requests', 'cash-drawer-history',
+            'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings', 'app-update'],
+  'Manager': ['dashboard', 'pos', 'products', 'inventory', 'employees', 'customers', 'appointments', 'attendance',
+              'payroll', 'rooms', 'service-history', 'gift-certificates', 'expenses', 'ai-chatbot', 'daet-insights', 'analytics', 'settings',
+              'my-schedule', 'shift-schedules', 'payroll-requests', 'calendar', 'cash-drawer-history', 'app-update'],
+  'Branch Owner': ['dashboard', 'pos', 'products', 'employees', 'customers', 'appointments', 'attendance', 'rooms',
+                   'gift-certificates', 'expenses', 'payroll', 'my-schedule', 'shift-schedules', 'payroll-requests', 'cash-drawer-history',
+                   'activity-logs', 'service-history', 'inventory', 'reports', 'calendar', 'ai-chatbot', 'daet-insights', 'analytics', 'settings', 'app-update'],
+  'Receptionist': ['pos', 'products', 'inventory', 'customers', 'appointments', 'attendance', 'payroll', 'rooms',
+                   'service-history', 'expenses', 'my-schedule', 'payroll-requests', 'calendar', 'app-update'],
+  'Therapist': ['appointments', 'attendance', 'rooms', 'service-history', 'my-schedule', 'payroll-requests', 'app-update'],
+  'Rider': ['rider-bookings', 'appointments', 'attendance', 'my-schedule', 'payroll-requests', 'app-update'],
+  'Utility': ['attendance', 'my-schedule', 'payroll-requests', 'app-update']
+};
+
+// Action-level permissions (finer-grained than page access).
+// Use hasAction(key) in the UI to show/hide buttons. Repository methods can
+// double-check on the server side via activity logs.
+const actionPermissions = {
+  'drawer.open':              ['Owner', 'Branch Owner', 'Manager', 'Receptionist'],
+  'drawer.shift.start':       ['Owner', 'Branch Owner', 'Manager', 'Receptionist'],
+  'drawer.shift.end.own':     ['Owner', 'Branch Owner', 'Manager', 'Receptionist'],
+  'drawer.shift.end.any':     ['Owner', 'Branch Owner', 'Manager'],
+  'drawer.close':             ['Owner', 'Branch Owner', 'Manager', 'Receptionist'],
+  'drawer.variance.approve':  ['Owner', 'Branch Owner', 'Manager'],
+  'drawer.eod.signoff':       ['Owner', 'Branch Owner', 'Manager'],
+  'drawer.history.all':       ['Owner', 'Branch Owner', 'Manager'],
+};
+
+// First page redirect after login
+const getFirstPageForRole = (role) => {
+  switch(role) {
+    case 'Owner':
+    case 'Manager':
+    case 'Branch Owner':
+      return '/dashboard';
+    case 'Receptionist':
+      return '/pos';
+    case 'Therapist':
+      return '/appointments';
+    case 'Rider':
+      return '/rider-bookings';
+    case 'Utility':
+      return '/attendance';
+    default:
+      return '/dashboard';
+  }
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within AppProvider');
+  }
+  return context;
+};
+
+export const AppProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+  const [syncStatus, setSyncStatus] = useState({ isOnline: false, isSyncing: false });
+  const [selectedBranch, setSelectedBranch] = useState(null); // { id, name, slug, ... } or null
+  const [initialSyncing, setInitialSyncing] = useState(false);
+
+  // Booking pax stepper limits. Loaded once from PayrollConfigRepository on
+  // mount (and again when the user logs in / business context changes). Reading
+  // here once and exposing via context keeps the per-page consumers (BookingPage,
+  // POS, Appointments, AdvanceBookingCheckout) synchronous — the alternative
+  // would be each page running its own async read on render.
+  const [bookingLimits, setBookingLimits] = useState(DEFAULT_BOOKING_LIMITS);
+
+  // Holds the teardown returned by startAllNotificationTriggers() so a
+  // logout-then-login cycle doesn't accumulate duplicate listeners.
+  const triggersUnsubRef = useRef(null);
+
+  // Load booking limits from PayrollConfigRepository (key-value store). Missing
+  // keys fall back to DEFAULT_BOOKING_LIMITS. Exposed as a callback so the
+  // Settings page can refresh the in-memory value immediately after a save
+  // (no full reload required).
+  const refreshBookingLimits = useCallback(async () => {
+    try {
+      const [pubVal, staffVal] = await Promise.all([
+        PayrollConfigRepository.get('booking.maxPaxPublic'),
+        PayrollConfigRepository.get('booking.maxPaxStaff'),
+      ]);
+      const next = {
+        maxPaxPublic: Number.isFinite(Number(pubVal)) && Number(pubVal) > 0
+          ? Number(pubVal) : DEFAULT_BOOKING_LIMITS.maxPaxPublic,
+        maxPaxStaff: Number.isFinite(Number(staffVal)) && Number(staffVal) > 0
+          ? Number(staffVal) : DEFAULT_BOOKING_LIMITS.maxPaxStaff,
+      };
+      setBookingLimits(next);
+    } catch (e) {
+      // Silent fall-back to defaults — limits aren't safety-critical.
+      setBookingLimits(DEFAULT_BOOKING_LIMITS);
+    }
+  }, []);
+
+  // Refresh limits whenever the active business changes (login / branch swap
+  // doesn't change businessId, but a user-switch does). Safe to call before
+  // the user is loaded — the repo will just return undefined for both keys.
+  useEffect(() => {
+    refreshBookingLimits();
+  }, [user?.businessId, refreshBookingLimits]);
+
+  // Initialize app - check for existing session
+  // Load and apply branding (color theme) from Supabase
+  const loadBranding = async (businessId) => {
+    if (!businessId) return;
+    try {
+      const data = await getBrandingSettings(businessId);
+      if (data?.primaryColor) {
+        applyColorTheme(data.primaryColor);
+      }
+    } catch (e) {
+      // Best-effort — default theme stays
+    }
+  };
+
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        // Initialize Supabase auth service
+        await authService.initialize();
+
+        // Check for existing user from authService
+        if (authService.currentUser) {
+          setUser(authService.currentUser);
+          // Set business context for multi-tenant data isolation
+          if (authService.currentUser.businessId) {
+            setBusinessContext(authService.currentUser.businessId);
+            loadBranding(authService.currentUser.businessId);
+            migrateOrphanedData(authService.currentUser.businessId);
+          }
+        } else {
+          // Fallback: Check localStorage for offline session
+          const sessionUser = localStorage.getItem('user');
+          if (sessionUser) {
+            let userData = JSON.parse(sessionUser);
+
+            // Refresh employeeId from Dexie if missing (for existing sessions)
+            if (!userData.employeeId) {
+              const db = (await import('../db')).default;
+              const dexieUser = await db.users.get(userData._id);
+
+              if (dexieUser?.employeeId) {
+                userData.employeeId = dexieUser.employeeId;
+                console.log('[AppContext] Refreshed employeeId from Dexie:', userData.employeeId);
+                localStorage.setItem('user', JSON.stringify(userData));
+              }
+            }
+
+            setUser(userData);
+            // Set business context for multi-tenant data isolation
+            if (userData.businessId) {
+              setBusinessContext(userData.businessId);
+              loadBranding(userData.businessId);
+              migrateOrphanedData(userData.businessId);
+            }
+          }
+        }
+
+        // Restore selected branch from localStorage, but only if it still
+        // belongs to the current user. Without this check, logging in as a
+        // different user (especially a branch-locked role) can inherit the
+        // previous user's branch — leaking cross-branch data in the UI.
+        const savedBranch = localStorage.getItem('selectedBranch');
+        if (savedBranch) {
+          try {
+            const parsed = JSON.parse(savedBranch);
+            const currentUser = authService.currentUser || JSON.parse(localStorage.getItem('user') || 'null');
+            const businessMatch = !currentUser?.businessId || !parsed?.business_id || parsed.business_id === currentUser.businessId;
+            const lockedMismatch = currentUser && isBranchLockedRole(currentUser.role) && currentUser.branchId && parsed?.id !== currentUser.branchId;
+            if (!businessMatch || lockedMismatch) {
+              localStorage.removeItem('selectedBranch');
+            } else {
+              setSelectedBranch(parsed);
+            }
+          } catch (e) {
+            localStorage.removeItem('selectedBranch');
+          }
+        }
+
+        // Subscribe to auth state changes
+        authService.subscribe((event, session, userProfile) => {
+          console.log('[AppContext] Auth state changed:', event);
+          if (event === 'SIGNED_IN' && userProfile) {
+            setUser(userProfile);
+            // Clear any stale selectedBranch that doesn't belong to the
+            // newly signed-in user. BranchSelect will auto-assign the right
+            // branch for any locked role (everyone except Owner).
+            setSelectedBranch(prev => {
+              if (!prev) return prev;
+              const businessMismatch = userProfile.businessId && prev.business_id && prev.business_id !== userProfile.businessId;
+              const lockedMismatch = isBranchLockedRole(userProfile.role) && userProfile.branchId && prev.id !== userProfile.branchId;
+              if (businessMismatch || lockedMismatch) {
+                localStorage.removeItem('selectedBranch');
+                return null;
+              }
+              return prev;
+            });
+            // Set business context for multi-tenant data isolation
+            if (userProfile.businessId) {
+              setBusinessContext(userProfile.businessId);
+              loadBranding(userProfile.businessId);
+              migrateOrphanedData(userProfile.businessId);
+            }
+            // Initialize sync manager when user signs in
+            if (isSupabaseConfigured()) {
+              supabaseSyncManager.initialize();
+            }
+          } else if (event === 'SIGNED_OUT') {
+            setUser(null);
+            clearBusinessContext(); // Clear business context on sign out
+            supabaseSyncManager.cleanup();
+          }
+        });
+
+        // Initialize sync manager when a session is restored. The helper
+        // handles both paths:
+        //   - Dexie has data → fire-and-forget (loading screen flips off
+        //     immediately).
+        //   - Dexie empty → show the full-screen loader and await the pull.
+        if (authService.currentUser && isSupabaseConfigured()) {
+          // Subscribe to sync status updates (debounced to avoid re-renders while user is typing)
+          let syncDebounce = null;
+          supabaseSyncManager.subscribe((status) => {
+            clearTimeout(syncDebounce);
+            syncDebounce = setTimeout(() => {
+              setSyncStatus(prev => {
+                const newIsSyncing = status.type === 'sync_start';
+                const newLastSync = status.type === 'sync_complete' ? new Date().toISOString() : prev.lastSync;
+                // Skip update if nothing changed (prevents unnecessary re-renders)
+                if (prev.isSyncing === newIsSyncing && prev.lastSync === newLastSync) return prev;
+                return { ...prev, isSyncing: newIsSyncing, lastSync: newLastSync };
+              });
+            }, 500);
+          });
+
+          // initializeSyncAfterLogin is declared later in the component body;
+          // safe to call here because useEffect callbacks run post-render.
+          await initializeSyncAfterLogin();
+        }
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initApp();
+
+    // Cleanup on unmount
+    return () => {
+      supabaseSyncManager.cleanup();
+    };
+  }, []);
+
+  // Toast notification system. `options.action` adds a clickable button to
+  // the toast — { label, onClick } — and extends the auto-dismiss so the user
+  // has time to act on it.
+  const showToast = (message, type = 'info', options = {}) => {
+    const id = Date.now();
+    const action = options.action && options.action.label && options.action.onClick
+      ? options.action
+      : null;
+    setToast({ id, message, type, action });
+
+    setTimeout(() => {
+      setToast((current) => (current && current.id === id ? null : current));
+    }, action ? 8000 : 4000);
+  };
+
+  // Initialize the Supabase sync manager after a user is signed in.
+  // Two paths:
+  //   1. Dexie already has data (returning user) → fire-and-forget initialize.
+  //      Login navigation proceeds immediately.
+  //   2. Dexie is empty (first login on a fresh browser / incognito / device /
+  //      account) → await initialize behind a full-screen loader, with a 15s
+  //      timeout so a supabase-js hang (see project_supabase_hang memory)
+  //      can't strand the user.
+  // A second call to supabaseSyncManager.initialize() also fires via the
+  // authService.subscribe(SIGNED_IN) handler inside initApp. Concurrent
+  // callers are de-duplicated by SyncManager.initialize()'s in-flight
+  // promise cache, so both awaits see the same pull.
+  // Keep that invariant in mind if you ever touch either call site.
+  const initializeSyncAfterLogin = async () => {
+    if (!isSupabaseConfigured()) return;
+
+    let isEmpty = false;
+    try {
+      isEmpty = await supabaseSyncManager.isLocalDataEmpty();
+    } catch (e) {
+      console.warn('[AppContext] isLocalDataEmpty check failed:', e);
+      // Fall through to fire-and-forget path on the cautious assumption the
+      // DB has data (we'd rather skip the loader than hang on a false empty).
+      isEmpty = false;
+    }
+
+    if (!isEmpty) {
+      // Returning user: background init, no UI block.
+      supabaseSyncManager.initialize().catch(err => {
+        console.warn('[AppContext] Sync manager init error:', err);
+      });
+      return;
+    }
+
+    // First login: block on initial pull behind the loader.
+    setInitialSyncing(true);
+    let timeoutHandle;
+    try {
+      const timeoutMs = 15000;
+      await Promise.race([
+        supabaseSyncManager.initialize(),
+        new Promise((_, reject) => {
+          timeoutHandle = setTimeout(
+            () => reject(new Error('initial-sync-timeout')),
+            timeoutMs
+          );
+        }),
+      ]);
+    } catch (err) {
+      if (err?.message === 'initial-sync-timeout') {
+        showToast(
+          'Some data may still be loading — pull to refresh if needed.',
+          'warning'
+        );
+      } else {
+        console.warn('[AppContext] Initial sync error:', err);
+      }
+    } finally {
+      clearTimeout(timeoutHandle);
+      setInitialSyncing(false);
+    }
+  };
+
+  const login = async (username, password, rememberMe) => {
+    try {
+      // Use Supabase auth service with username-based login
+      const response = await authService.signInWithUsername(username, password);
+      setUser(response.user);
+      setUserContext(response.user); // Track user in Sentry
+
+      // Set business context for multi-tenant data isolation
+      if (response.user?.businessId) {
+        setBusinessContext(response.user.businessId);
+        // Migrate orphaned data to this business (runs in background)
+        migrateOrphanedData(response.user.businessId);
+      }
+
+      showToast('Login successful!', 'success');
+
+      // Initialize sync after login. This is awaited so first-login (empty
+      // Dexie) blocks behind the loader before login() returns; returning
+      // users resolve near-instantly because the helper uses fire-and-forget
+      // on that path.
+      await initializeSyncAfterLogin();
+
+      return response;
+    } catch (error) {
+      showToast(error.message, 'error');
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    // Helper to add timeout to promises - prevents logout from hanging
+    const withTimeout = (promise, ms, operation) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`${operation} timed out`)), ms)
+        )
+      ]);
+    };
+
+    // IMPORTANT: Sync pending data to Supabase BEFORE clearing local data
+    // Use 3 second timeout to prevent hanging
+    if (isSupabaseConfigured()) {
+      try {
+        console.log('[AppContext] Syncing pending data before logout...');
+        await withTimeout(supabaseSyncManager.sync(), 3000, 'Sync');
+      } catch (error) {
+        console.warn('[AppContext] Pre-logout sync failed or timed out:', error);
+        // Continue with logout even if sync fails
+      }
+    }
+
+    // Use Supabase auth service - 2 second timeout
+    try {
+      await withTimeout(authService.signOut(), 2000, 'SignOut');
+    } catch (error) {
+      console.warn('[AppContext] Auth signOut failed or timed out:', error);
+    }
+
+    // Full cleanup on logout - 2 second timeout
+    try {
+      await withTimeout(supabaseSyncManager.cleanupOnLogout(), 2000, 'Cleanup');
+    } catch (error) {
+      console.warn('[AppContext] Cleanup failed or timed out:', error);
+    }
+
+    // Always clear user state regardless of above errors
+    setUser(null);
+    setSelectedBranch(null);
+    clearUserContext(); // Clear user from Sentry
+    clearBusinessContext(); // Clear business context for multi-tenant isolation
+
+    // Also clear localStorage directly as backup
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('selectedBranch');
+
+    // Clear Supabase internal auth tokens to prevent auto-login on next visit
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    showToast('Logged out successfully', 'info');
+  };
+
+  // Check if user has permission to access a page
+  const hasPermission = (page) => {
+    if (!user) return false;
+    const permissions = rolePermissions[user.role] || [];
+    return permissions.includes(page);
+  };
+
+  // Check if user can perform a fine-grained action (see actionPermissions map).
+  const hasAction = (actionKey) => {
+    if (!user) return false;
+    const allowed = actionPermissions[actionKey];
+    if (!allowed) return false;
+    return allowed.includes(user.role);
+  };
+
+  // Get allowed pages for current user
+  const getAllowedPages = () => {
+    if (!user) return [];
+    return rolePermissions[user.role] || [];
+  };
+
+  // Get first page for user's role
+  const getFirstPage = () => {
+    if (!selectedBranch) return '/select-branch';
+    if (!user) return '/login';
+    return getFirstPageForRole(user.role);
+  };
+
+  // Check if user is Owner
+  const isOwner = () => {
+    return user?.role === 'Owner';
+  };
+
+  // Check if user is Manager
+  const isManager = () => {
+    return user?.role === 'Manager';
+  };
+
+  // Check if user is Receptionist
+  const isReceptionist = () => {
+    return user?.role === 'Receptionist';
+  };
+
+  // Check if user is Therapist
+  const isTherapist = () => {
+    return user?.role === 'Therapist';
+  };
+
+  // Check if user is Rider
+  const isRider = () => user?.role === 'Rider';
+
+  // Check if user can edit (Owner, Manager, and Branch Owner for their branch)
+  const canEdit = () => {
+    return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
+  };
+
+  // Check if user can edit products/services (Owner, Manager, and Branch Owner)
+  const canEditProducts = () => {
+    return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
+  };
+
+  // Check if user can manage employees (Owner, Manager, and Branch Owner)
+  const canManageEmployees = () => {
+    return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
+  };
+
+  // Check if user can view all data (Owner, Manager, Receptionist for most features)
+  const canViewAll = () => {
+    return ['Owner', 'Manager', 'Receptionist'].includes(user?.role);
+  };
+
+  // Check if user is Owner or Manager (for branding/appearance access)
+  const isOwnerOrManager = () => {
+    return user?.role === 'Owner' || user?.role === 'Manager';
+  };
+
+  // Check if user has management access (Owner, Manager, or Branch Owner)
+  const hasManagementAccess = () => {
+    return ['Owner', 'Manager', 'Branch Owner'].includes(user?.role);
+  };
+
+  // Check if user is Branch Owner
+  const isBranchOwner = () => {
+    return user?.role === 'Branch Owner';
+  };
+
+  // Get user's branch ID (for branch-locked roles)
+  const getUserBranchId = () => {
+    if (isBranchLockedRole(user?.role)) {
+      return user.branchId || null;
+    }
+    return null; // Owner sees all branches
+  };
+
+  // Check if user can see all branches (not restricted to one)
+  const canSeeAllBranches = () => {
+    return user?.role === 'Owner';
+  };
+
+  // Returns the branch id that feature pages should filter by, reflecting the
+  // dropdown selection for Owner and the user's fixed branch for locked roles.
+  // Returns null when no branch filter should apply (All Branches sentinel, or
+  // a locked-role user with no branchId yet).
+  const getEffectiveBranchId = () => {
+    if (isBranchLockedRole(user?.role)) {
+      return user.branchId || null;
+    }
+    if (selectedBranch?._allBranches) return null;
+    return selectedBranch?.id || null;
+  };
+
+  // Push the effective branch into the mockApi analytics layer whenever it
+  // changes, so pre-computed metrics (Business Insights, Analytics pages)
+  // see a branch-scoped dataset without each page having to wire it up.
+  useEffect(() => {
+    setAnalyticsBranchFilter(getEffectiveBranchId());
+  }, [user?.role, user?.branchId, selectedBranch?.id, selectedBranch?._allBranches]);
+
+  // Wire the notification service to the current user. setUserContext lets
+  // the producer attribute branch/business. start() begins the realtime
+  // subscription + prune loop. stop() halts the prune loop on logout.
+  useEffect(() => {
+    if (user) {
+      NotificationService.setUserContext(user);
+      NotificationService.start();
+
+      // Notifications are mandatory for every role and have *two* separate
+      // browser-level locks that both need a real user gesture:
+      //
+      //   1. Notification.requestPermission() — needs transient activation
+      //      on Firefox/Safari (and is increasingly restricted on Chrome),
+      //      so calling it from this effect would silently no-op.
+      //   2. Audio.play() autoplay policy — even with permission granted,
+      //      .play() throws NotAllowedError until *some* audio has been
+      //      successfully played from a user gesture in this session.
+      //      Background triggers (push, realtime) hit this hard: the SW
+      //      forwards a push to the focused tab, NotificationSoundManager
+      //      tries to play, browser blocks it, no chime ever fires.
+      //
+      // Both unlock paths share the same fix: install a one-shot capture-
+      // phase listener for the *next* click/keydown on the document, then
+      // do BOTH operations from inside that handler (which carries the
+      // gesture activation).
+      let gestureListenerCleanup = null;
+      const subscribePush = () => {
+        PushSubscriptionService.subscribe({
+          userId: user.id || user._id,
+          branchId: user.branchId ?? null,
+        }).then((res) => {
+          if (!res.ok) {
+            console.warn('[push] resubscribe skipped:', res.reason);
+          }
+        });
+      };
+      if (typeof Notification !== 'undefined' && typeof document !== 'undefined') {
+        // Always subscribe push when permission is already granted; this is
+        // independent of the gesture flow below.
+        if (Notification.permission === 'granted') {
+          subscribePush();
+        }
+        // Skip the gesture handler entirely if both audio is already
+        // unlocked (somehow) AND permission is non-default.
+        const needsAudioUnlock = !NotificationSoundManager.isUnlocked();
+        const needsPermission = Notification.permission === 'default';
+        if (needsAudioUnlock || needsPermission) {
+          const onFirstGesture = () => {
+            document.removeEventListener('click', onFirstGesture, true);
+            document.removeEventListener('keydown', onFirstGesture, true);
+            // Audio unlock is the more important of the two — without it,
+            // even a granted permission produces a silent OS notification
+            // because our in-app loop chime is autoplay-blocked.
+            NotificationSoundManager.unlock();
+            if (Notification.permission === 'default') {
+              try {
+                Promise.resolve(Notification.requestPermission())
+                  .then((perm) => {
+                    if (perm === 'granted') subscribePush();
+                  })
+                  .catch((err) => {
+                    console.warn('[notifications] requestPermission rejected:', err);
+                  });
+              } catch (err) {
+                console.warn('[notifications] requestPermission threw:', err);
+              }
+            }
+          };
+          // Capture phase so React handlers that call stopPropagation() on
+          // their click events don't eat our chance to unlock.
+          document.addEventListener('click', onFirstGesture, true);
+          document.addEventListener('keydown', onFirstGesture, true);
+          gestureListenerCleanup = () => {
+            document.removeEventListener('click', onFirstGesture, true);
+            document.removeEventListener('keydown', onFirstGesture, true);
+          };
+        }
+      }
+
+      let cancelled = false;
+      // Lazy-import triggers so a logged-out tab doesn't subscribe.
+      import('../services/notifications/triggers').then(m => {
+        if (cancelled) return;
+        // Tear down any prior subscription before starting a fresh set so
+        // logout-then-login doesn't accumulate listeners.
+        if (triggersUnsubRef.current) {
+          try { triggersUnsubRef.current(); } catch {}
+        }
+        triggersUnsubRef.current = m.startAllNotificationTriggers();
+      });
+      return () => {
+        cancelled = true;
+        // Detach the gesture listener if the user logs out before granting
+        // — otherwise it would leak across user sessions.
+        if (gestureListenerCleanup) gestureListenerCleanup();
+      };
+    } else {
+      if (triggersUnsubRef.current) {
+        try { triggersUnsubRef.current(); } catch {}
+        triggersUnsubRef.current = null;
+      }
+      NotificationService.stop();
+      // On logout, drop the push subscription so the next user on the
+      // same device gets a fresh endpoint that's correctly attributed.
+      PushSubscriptionService.unsubscribe().catch((err) => {
+        console.warn('[push] unsubscribe on logout failed:', err);
+      });
+    }
+  }, [user]);
+
+  // Select a branch (called from BranchSelect page or the inline switcher)
+  const selectBranch = (branch) => {
+    // Detect a real switch — i.e. user already had a branch and is moving to
+    // a different one. Initial selection (null → branch) goes through the
+    // BranchSelect flow and must not reload, so it can navigate normally.
+    const prevId = selectedBranch?._allBranches ? '__all__' : selectedBranch?.id || null;
+    const nextId = branch?._allBranches ? '__all__' : branch?.id || null;
+    const isRealSwitch = prevId && nextId && prevId !== nextId;
+
+    setSelectedBranch(branch);
+    if (branch) {
+      localStorage.setItem('selectedBranch', JSON.stringify(branch));
+    } else {
+      localStorage.removeItem('selectedBranch');
+    }
+
+    // Hard reload so every page re-fetches against the new branch scope.
+    // Cheaper and more reliable than threading branch deps into every
+    // useEffect across ~20 feature pages. Branch switches are infrequent.
+    if (isRealSwitch && typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  };
+
+  // Clear branch selection (e.g., to go back to branch select screen)
+  const clearBranch = () => {
+    setSelectedBranch(null);
+    localStorage.removeItem('selectedBranch');
+  };
+
+  // Trigger manual sync
+  const triggerSync = async () => {
+    if (!isSupabaseConfigured()) {
+      showToast('Cloud sync not configured', 'warning');
+      return;
+    }
+    const result = await supabaseSyncManager.sync();
+    if (result.success) {
+      showToast(`Synced: ${result.pushed} pushed, ${result.pulled} pulled`, 'success');
+    } else {
+      showToast(`Sync failed: ${result.error || result.message}`, 'error');
+    }
+    return result;
+  };
+
+  // Check if cloud sync is available
+  const isCloudSyncEnabled = () => {
+    return isSupabaseConfigured();
+  };
+
+  const value = {
+    user,
+    setUser,
+    loading,
+    initialSyncing,
+    toast,
+    showToast,
+    login,
+    logout,
+    hasPermission,
+    hasAction,
+    getAllowedPages,
+    getFirstPage,
+    isOwner,
+    isManager,
+    isReceptionist,
+    isTherapist,
+    isRider,
+    isBranchOwner,
+    canEdit,
+    canEditProducts,
+    canManageEmployees,
+    canViewAll,
+    hasManagementAccess,
+    isOwnerOrManager,
+    // Branch-related exports
+    selectedBranch,
+    selectBranch,
+    clearBranch,
+    getUserBranchId,
+    getEffectiveBranchId,
+    canSeeAllBranches,
+    // Sync-related exports
+    syncStatus,
+    triggerSync,
+    isCloudSyncEnabled,
+    // Booking limits (max pax for public + staff flows, configurable in
+    // Settings → Bookings). refreshBookingLimits lets Settings.jsx pull the
+    // new values into context immediately after a save.
+    bookingLimits,
+    refreshBookingLimits,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+};
+
+export default AppContext;

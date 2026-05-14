@@ -1,0 +1,1405 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
+import mockApi from '../mockApi';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, parseISO } from 'date-fns';
+import AdvanceBookingsTab from '../components/AdvanceBookingsTab';
+import { getEmployeesForService, getTherapists } from '../utils/employeeFilters';
+import { ConfirmDialog } from '../components/shared';
+import { supabaseSyncManager } from '../services/supabase';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
+import storageService from '../services/storage';
+import { formatTime12Hour } from '../utils/dateUtils';
+import PaxBuilder from '../components/booking/PaxBuilder';
+import PaxBadge from '../components/booking/PaxBadge';
+import { summarisePax } from '../utils/booking/multiPax';
+
+// Build a fresh blank guest row for the PaxBuilder.
+const blankGuest = (n) => ({ guestNumber: n, services: [], employeeId: null, isRequestedTherapist: false });
+
+// Longest service stack across all guests (parallel sessions, single time slot).
+const maxGuestDuration = (guests) => {
+  if (!guests || guests.length === 0) return 0;
+  return Math.max(
+    ...guests.map(g => (g.services || []).reduce((s, svc) => s + (svc.duration || 0), 0))
+  );
+};
+
+const Appointments = ({ embedded = false, defaultInnerTab, onCreateRef }) => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { showToast, user, canViewAll, isTherapist, getEffectiveBranchId, bookingLimits } = useApp();
+  // Pax stepper cap for the staff-side appointment flow. Default 30 matches
+  // the historical hardcoded cap if Settings hasn't been touched.
+  const maxPaxStaff = bookingLimits?.maxPaxStaff || 30;
+
+  const [loading, setLoading] = useState(true);
+  const [appointments, setAppointments] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [services, setServices] = useState([]);
+  const [rooms, setRooms] = useState([]);
+
+  // Embedded inside Schedule hub: the parent owns the Regular/Advance tab
+  // selection via defaultInnerTab. Standalone: honor ?tab=advance from URL.
+  const initialTab = embedded
+    ? (defaultInnerTab || 'appointments')
+    : (searchParams.get('tab') === 'advance' ? 'advance-bookings' : 'appointments');
+  const [activeTab, setActiveTab] = useState(initialTab); // 'appointments' or 'advance-bookings'
+
+  // When embedded, follow the parent's tab selection on subsequent renders.
+  useEffect(() => {
+    if (embedded && defaultInnerTab && defaultInnerTab !== activeTab) {
+      setActiveTab(defaultInnerTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, defaultInnerTab]);
+
+  // Expose openCreateModal to the parent hub so the embedded view can be
+  // triggered from the hub's "+ New Appointment" button. Must live above any
+  // early return — moving it below `if (loading)` triggered React #310.
+  useEffect(() => {
+    if (onCreateRef) onCreateRef.current = () => openCreateModal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onCreateRef]);
+
+  // Keep the URL in sync when the inner tab changes — only on the standalone
+  // route, never when embedded (parent owns the URL).
+  const switchTab = (tab) => {
+    setActiveTab(tab);
+    if (embedded) return;
+    if (tab === 'advance-bookings') {
+      setSearchParams({ tab: 'advance' });
+    } else {
+      setSearchParams({});
+    }
+  };
+  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'list'
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [filterStatus, setFilterStatus] = useState('all');
+
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState('create');
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  // Conflict detection state
+  const [conflicts, setConflicts] = useState({ therapist: null, room: null });
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+
+  // Confirmation dialog states
+  const [cancelConfirm, setCancelConfirm] = useState({ isOpen: false, appointment: null, fee: null });
+  const [noShowConfirm, setNoShowConfirm] = useState({ isOpen: false, appointment: null });
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, appointment: null });
+
+  const [formData, setFormData] = useState({
+    customerId: '',
+    customerName: '',
+    serviceId: '',
+    employeeId: '',
+    roomId: '',
+    date: '',
+    time: '',
+    duration: 60,
+    bookingSource: 'walk-in',
+    notes: '',
+    paxCount: 1,
+    guests: [blankGuest(1)],
+  });
+
+  const timeSlots = [
+    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'
+  ];
+
+  const bookingSources = ['walk-in', 'phone', 'social-media', 'website'];
+
+  // Service rotation queue state — mirrors POS so walk-in appointments can
+  // also Auto Select / Auto Select (Male/Female) the next-in-rotation
+  // therapist instead of scrolling a dropdown.
+  const [rotationQueue, setRotationQueue] = useState([]);
+  const [nextEmployee, setNextEmployee] = useState(null);
+  const [serviceCountFilter, setServiceCountFilter] = useState('today');
+  const [historicalServiceCounts, setHistoricalServiceCounts] = useState({});
+
+  // Load (and reload) the rotation queue. Same shape as POS: read from the
+  // serviceRotation API, then strict-filter to clocked-in therapists in the
+  // current branch (no receptionists, no other branches).
+  const loadRotationQueue = useCallback(async () => {
+    try {
+      const result = await mockApi.serviceRotation.getRotationQueue();
+      let queue = result.queue || [];
+      const allEmployees = await mockApi.employees.getEmployees({ status: 'active' });
+      const therapistIds = new Set(getTherapists(allEmployees).map(e => String(e._id || e.id)));
+      queue = queue.filter(q => therapistIds.has(String(q.employeeId)));
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        const branchEmpIds = new Set(
+          allEmployees.filter(e => e.branchId === effectiveBranchId).map(e => String(e._id || e.id))
+        );
+        queue = queue.filter(q => branchEmpIds.has(String(q.employeeId)));
+      }
+      queue.forEach((q, i) => { q.queuePosition = i + 1; q.isNext = i === 0; });
+      setRotationQueue(queue);
+      setNextEmployee(queue[0] || null);
+    } catch (err) {
+      console.error('[Appointments] Failed to load rotation queue:', err);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Initial queue load + refresh when attendance / serviceRotation events fire
+  // (so a new clock-in elsewhere immediately surfaces in the queue).
+  useEffect(() => {
+    loadRotationQueue();
+    let debounce = null;
+    const unsubscribe = dataChangeEmitter.subscribe((change) => {
+      if (change.entityType === 'attendance' || change.entityType === 'serviceRotation') {
+        clearTimeout(debounce);
+        debounce = setTimeout(loadRotationQueue, 300);
+      }
+    });
+    return () => {
+      unsubscribe();
+      clearTimeout(debounce);
+    };
+  }, [loadRotationQueue]);
+
+  // Historical service counts for the selected filter (Today/Week/Month/All).
+  // Same logic as POS — counts completed transactions per employee.
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        let txns;
+        if (serviceCountFilter === 'today') {
+          txns = await storageService.transactions.getByDate(today);
+        } else if (serviceCountFilter === 'week') {
+          const weekAgo = new Date(now);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          const wk = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+          txns = await storageService.transactions.getByDateRange(wk, today);
+        } else if (serviceCountFilter === 'month') {
+          const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+          txns = await storageService.transactions.getByDateRange(m, today);
+        } else {
+          txns = await storageService.transactions.getAll();
+        }
+        const completed = (txns || []).filter(t => t.status === 'completed');
+        const counts = {};
+        completed.forEach(t => {
+          const empId = t.employeeId || t.employee?.id;
+          if (empId) counts[empId] = (counts[empId] || 0) + 1;
+        });
+        setHistoricalServiceCounts(counts);
+      } catch (err) {
+        console.warn('[Appointments] Failed to load service counts:', err);
+      }
+    };
+    loadCounts();
+  }, [serviceCountFilter]);
+
+  // Therapists currently busy (assigned to an occupied/pending room) should
+  // not show up as auto-pickable — they're already serving someone.
+  const busyEmployeeIds = useMemo(() => {
+    return rooms
+      .filter(r => (r.status === 'occupied' || r.status === 'pending') && r.assignedEmployeeId)
+      .map(r => String(r.assignedEmployeeId));
+  }, [rooms]);
+
+  const availableRotationQueue = useMemo(() => {
+    return rotationQueue.filter(emp => !busyEmployeeIds.includes(String(emp.employeeId)));
+  }, [rotationQueue, busyEmployeeIds]);
+
+  const selectFromRotation = useCallback((employeeId) => {
+    setFormData(prev => ({ ...prev, employeeId }));
+    showToast('Therapist selected from rotation queue', 'info');
+  }, [showToast]);
+
+  const pickAutoTherapist = useCallback((gender = null) => {
+    if (availableRotationQueue.length === 0) {
+      showToast('No clocked-in therapist available in rotation', 'error');
+      return;
+    }
+    // The queue is already branch-filtered in loadRotationQueue, so the
+    // unfiltered employees list is enough to look up gender by ID.
+    const empById = new Map(employees.map(e => [String(e._id), e]));
+    const match = availableRotationQueue.find(q => {
+      if (!gender) return true;
+      const emp = empById.get(String(q.employeeId));
+      return emp && (emp.gender || '').toLowerCase() === gender;
+    });
+    if (!match) {
+      showToast(`No available ${gender} therapist in rotation`, 'error');
+      return;
+    }
+    setFormData(prev => ({ ...prev, employeeId: match.employeeId }));
+    const suffix = gender ? ` (${gender})` : '';
+    showToast(`Auto-selected${suffix}: ${match.employeeName}`, 'success');
+  }, [availableRotationQueue, employees, showToast]);
+
+  const skipInRotation = useCallback(async (employeeId) => {
+    try {
+      await mockApi.serviceRotation.skipEmployee(employeeId);
+      await loadRotationQueue();
+      showToast('Therapist skipped in rotation', 'info');
+    } catch {
+      showToast('Failed to skip therapist', 'error');
+    }
+  }, [loadRotationQueue, showToast]);
+
+  // Show queue UI only when the appointment is for today (or unscheduled);
+  // for future-dated appointments, who's clocked in NOW is irrelevant —
+  // the rotation queue reflects today's attendance.
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const showRotationQueue = !formData.date || formData.date === todayStr;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        if (!isMounted) return;
+        setLoading(true);
+        const [appts, emps, custs, prods, rms] = await Promise.all([
+          mockApi.appointments.getAppointments(),
+          mockApi.employees.getEmployees(),
+          mockApi.customers.getCustomers(),
+          mockApi.products.getProducts(),
+          mockApi.rooms.getRooms()
+        ]);
+
+        if (!isMounted) return;
+
+        setAppointments(appts);
+        setEmployees(emps.filter(e => e.status === 'active'));
+        setCustomers(custs);
+        setServices(prods.filter(p => p.type === 'service' && p.active));
+        setRooms(rms);
+        setLoading(false);
+      } catch (error) {
+        if (!isMounted) return;
+        showToast('Failed to load appointments', 'error');
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const loadData = async ({ quiet = false } = {}) => {
+    try {
+      if (!quiet) setLoading(true);
+      const [appts, emps, custs, prods, rms] = await Promise.all([
+        mockApi.appointments.getAppointments(),
+        mockApi.employees.getEmployees(),
+        mockApi.customers.getCustomers(),
+        mockApi.products.getProducts(),
+        mockApi.rooms.getRooms()
+      ]);
+      setAppointments(appts);
+      setEmployees(emps.filter(e => e.status === 'active'));
+      setCustomers(custs);
+      setServices(prods.filter(p => p.type === 'service' && p.active));
+      setRooms(rms);
+      if (!quiet) setLoading(false);
+    } catch (error) {
+      if (!quiet) {
+        showToast('Failed to load appointments', 'error');
+        setLoading(false);
+      }
+    }
+  };
+
+  // Cross-device live updates + tab-resume refresh: when bookings/customers/
+  // employees/services/rooms change on another device or when this tab regains
+  // focus, refresh the data quietly (no spinner flicker on background updates).
+  useEffect(() => {
+    const watched = ['appointments', 'advanceBookings', 'employees', 'customers', 'products', 'services', 'rooms'];
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        status.type === 'pull_complete' || status.type === 'sync_complete'
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadData({ quiet: true }), 500);
+      }
+    });
+
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (watched.includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadData({ quiet: true }), 300);
+      }
+    });
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadData({ quiet: true });
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeData();
+      clearTimeout(syncDebounce);
+      clearTimeout(dataDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Check availability when relevant form fields change.
+  //
+  // Two paths:
+  //   - paxCount === 1 → existing single-resource adapter call (returns the
+  //     prettified { therapist, room } shape the UI already renders).
+  //   - paxCount  > 1 → call the repository's options-object signature directly
+  //     so we can validate every guest's therapist + the (single) room in one
+  //     shot. Map the raw conflicts back to the same { therapist, room } shape
+  //     so the existing warning banners still render unchanged.
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (!formData.date || !formData.time) {
+        setConflicts({ therapist: null, room: null });
+        return;
+      }
+
+      const isMulti = formData.paxCount > 1;
+      const scheduledDateTime = `${formData.date}T${formData.time}:00`;
+
+      if (isMulti) {
+        const employeeIds = (formData.guests || [])
+          .map(g => g.employeeId)
+          .filter(Boolean);
+        const roomIds = formData.roomId ? [formData.roomId] : [];
+        const duration = maxGuestDuration(formData.guests);
+
+        if (employeeIds.length === 0 && roomIds.length === 0) {
+          setConflicts({ therapist: null, room: null });
+          return;
+        }
+        if (!duration) {
+          setConflicts({ therapist: null, room: null });
+          return;
+        }
+
+        setCheckingAvailability(true);
+        try {
+          const raw = await storageService.appointments.checkConflicts({
+            employeeIds,
+            roomIds,
+            scheduledDateTime,
+            duration,
+            excludeId: modalMode === 'edit' ? selectedAppointment?._id : null,
+          });
+          let therapist = null;
+          let room = null;
+          for (const c of raw) {
+            const reason = c.reason || '';
+            if (reason.startsWith('therapist:') && !therapist) {
+              const start = new Date(c.scheduledDateTime);
+              therapist = {
+                time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+                therapistName: c.employee?.firstName ? `${c.employee.firstName} ${c.employee.lastName}` : 'Therapist',
+                serviceName: c.service?.name || 'Service',
+                customerName: c.customer?.name || 'Customer',
+                duration: c.duration || 60,
+              };
+            } else if (reason.startsWith('room:') && !room) {
+              const start = new Date(c.scheduledDateTime);
+              room = {
+                time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+                roomName: c.room?.name || 'Room',
+                serviceName: c.service?.name || 'Service',
+                duration: c.duration || 60,
+              };
+            }
+          }
+          setConflicts({ therapist, room });
+        } catch (error) {
+          // Silent fail for availability check
+        } finally {
+          setCheckingAvailability(false);
+        }
+        return;
+      }
+
+      // Single-pax path — unchanged.
+      if (!formData.duration) {
+        setConflicts({ therapist: null, room: null });
+        return;
+      }
+      if (!formData.employeeId && !formData.roomId) {
+        setConflicts({ therapist: null, room: null });
+        return;
+      }
+
+      setCheckingAvailability(true);
+      try {
+        const result = await mockApi.appointments.checkAvailability({
+          therapistId: formData.employeeId || null,
+          roomId: formData.roomId || null,
+          date: formData.date,
+          time: formData.time,
+          duration: parseInt(formData.duration),
+          excludeAppointmentId: modalMode === 'edit' ? selectedAppointment?._id : null
+        });
+        setConflicts(result);
+      } catch (error) {
+        // Silent fail for availability check
+      } finally {
+        setCheckingAvailability(false);
+      }
+    };
+
+    // Debounce the availability check
+    const timeoutId = setTimeout(checkAvailability, 300);
+    return () => clearTimeout(timeoutId);
+  }, [formData.employeeId, formData.roomId, formData.date, formData.time, formData.duration, formData.paxCount, formData.guests, modalMode, selectedAppointment]);
+
+  // Scope every dropdown source to the active branch so a brand-new branch
+  // does not surface customers / employees / rooms that belong to a sibling
+  // branch (cross-branch leak in the New Appointment modal).
+  const branchScoped = (items) => {
+    const effectiveBranchId = getEffectiveBranchId();
+    if (!effectiveBranchId) return items;
+    return items.filter(item => !item.branchId || item.branchId === effectiveBranchId);
+  };
+  const branchCustomers = useMemo(() => branchScoped(customers), [customers, getEffectiveBranchId()]);
+  const branchEmployees = useMemo(() => branchScoped(employees), [employees, getEffectiveBranchId()]);
+  const branchServices  = useMemo(() => branchScoped(services),  [services,  getEffectiveBranchId()]);
+  const branchRooms     = useMemo(() => branchScoped(rooms),     [rooms,     getEffectiveBranchId()]);
+
+  const getFilteredAppointments = () => {
+    let filtered = appointments;
+
+    // Filter by branch
+    const effectiveBranchId = getEffectiveBranchId();
+    if (effectiveBranchId) {
+      filtered = filtered.filter(item => item.branchId === effectiveBranchId);
+    }
+
+    // Filter by therapist if user is therapist
+    if (isTherapist() && user?.employeeId) {
+      filtered = filtered.filter(a => a.employee?._id === user.employeeId);
+    }
+
+    // Filter by status
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(a => a.status === filterStatus);
+    }
+
+    return filtered;
+  };
+
+  const getAppointmentsForDate = (date) => {
+    return appointments.filter(a => {
+      if (!a.scheduledDateTime) return false;
+      const apptDate = parseISO(a.scheduledDateTime);
+      return isSameDay(apptDate, date);
+    });
+  };
+
+  const openCreateModal = (date = null) => {
+    setModalMode('create');
+    const selectedDateStr = date ? format(date, 'yyyy-MM-dd') : '';
+    setSelectedDate(date);
+    setConflicts({ therapist: null, room: null });
+    setFormData({
+      customerId: '', customerName: '', serviceId: '', employeeId: '', roomId: '',
+      date: selectedDateStr, time: '', duration: 60, bookingSource: 'walk-in', notes: '',
+      paxCount: 1, guests: [blankGuest(1)]
+    });
+    setShowModal(true);
+  };
+
+  const openEditModal = (appointment) => {
+    setModalMode('edit');
+    setSelectedAppointment(appointment);
+    setConflicts({ therapist: null, room: null });
+    const apptDate = appointment.scheduledDateTime ? parseISO(appointment.scheduledDateTime) : new Date();
+    setFormData({
+      customerId: appointment.customerId || appointment.customer?._id || '',
+      customerName: appointment.customerName || appointment.customer?.name || '',
+      serviceId: appointment.serviceId || appointment.service?._id || '',
+      employeeId: appointment.employeeId || appointment.employee?._id || '',
+      roomId: appointment.roomId || appointment.room?._id || '',
+      date: format(apptDate, 'yyyy-MM-dd'),
+      time: format(apptDate, 'h:mm a'),
+      duration: appointment.duration || 60,
+      bookingSource: appointment.bookingSource || 'walk-in',
+      notes: appointment.notes || '',
+      // Edit mode falls back to single-pax — multi-pax editing is a later task.
+      // Legacy serviceId/employeeId on the row still drive the existing inputs.
+      paxCount: 1,
+      guests: [blankGuest(1)]
+    });
+    setShowModal(true);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'serviceId') {
+      const service = services.find(s => s._id === value);
+      if (service && service.duration) {
+        setFormData(prev => ({ ...prev, duration: service.duration }));
+      }
+      // Keep employeeId only if the therapist is still available for the new service
+      setFormData(prev => {
+        if (!prev.employeeId) return prev;
+        const selectedService = services.find(s => s._id === value);
+        const availableTherapists = value
+          ? getEmployeesForService(employees, selectedService)
+          : getTherapists(employees);
+        const stillAvailable = availableTherapists.some(e => e._id === prev.employeeId);
+        return stillAvailable ? prev : { ...prev, employeeId: '' };
+      });
+    }
+  };
+
+  const validateForm = () => {
+    if (!formData.customerId && !formData.customerName.trim()) {
+      showToast('Customer is required', 'error');
+      return false;
+    }
+
+    const isMulti = formData.paxCount > 1;
+    if (isMulti) {
+      const guests = formData.guests || [];
+      // Every guest must have at least one service. Therapist may be empty
+      // (Auto rotation) — same flexibility as POS.
+      for (let i = 0; i < guests.length; i++) {
+        if (!guests[i].services || guests[i].services.length === 0) {
+          showToast(`Guest ${i + 1} needs at least one service`, 'error');
+          return false;
+        }
+      }
+    } else {
+      if (!formData.serviceId) { showToast('Service is required', 'error'); return false; }
+      if (!formData.employeeId) { showToast('Employee is required', 'error'); return false; }
+    }
+    if (!formData.date) { showToast('Date is required', 'error'); return false; }
+    if (!formData.time) { showToast('Time is required', 'error'); return false; }
+
+    // Block submission if there are conflicts
+    if (conflicts.therapist) {
+      showToast(`Therapist is already booked at ${conflicts.therapist.time}. Please choose a different time or therapist.`, 'error');
+      return false;
+    }
+    if (conflicts.room) {
+      showToast(`Room is already booked at ${conflicts.room.time}. Please choose a different time or room.`, 'error');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    try {
+      const branchId = getEffectiveBranchId();
+      const isMulti = formData.paxCount > 1;
+
+      let appointmentData;
+      if (isMulti) {
+        // Build a flat items array in the shape summarisePax expects.
+        // Therapist names are looked up off the (already-loaded) employees list
+        // so guestSummary stays useful even when the appointment row is read
+        // by code that doesn't re-hydrate employee references.
+        const empById = new Map(employees.map(e => [String(e._id), e]));
+        const items = [];
+        for (const g of formData.guests) {
+          const emp = g.employeeId ? empById.get(String(g.employeeId)) : null;
+          const employeeName = emp ? `${emp.firstName} ${emp.lastName}`.trim() : undefined;
+          for (const svc of (g.services || [])) {
+            items.push({
+              guestNumber: g.guestNumber,
+              name: svc.name,
+              employeeId: g.employeeId || undefined,
+              employee: employeeName ? { name: employeeName } : undefined,
+              employeeName,
+              price: svc.price,
+              quantity: 1,
+            });
+          }
+        }
+        const guestSummary = summarisePax(items);
+        const firstGuest = formData.guests[0];
+        const firstService = firstGuest?.services?.[0];
+
+        appointmentData = {
+          customerId: formData.customerId || undefined,
+          customerName: !formData.customerId ? formData.customerName.trim() : undefined,
+          // Legacy single-resource fields mirror the first guest so existing
+          // calendar / list code that reads appointment.serviceId / employeeId
+          // keeps rendering something meaningful.
+          serviceId: firstService?.productId,
+          employeeId: firstGuest?.employeeId || undefined,
+          roomId: formData.roomId || undefined,
+          scheduledDateTime: `${formData.date}T${formData.time}:00`,
+          duration: maxGuestDuration(formData.guests),
+          bookingSource: formData.bookingSource,
+          notes: formData.notes.trim() || undefined,
+          // New multi-pax fields.
+          paxCount: formData.paxCount,
+          guestSummary,
+          ...(branchId && { branchId })
+        };
+      } else {
+        appointmentData = {
+          customerId: formData.customerId || undefined,
+          customerName: !formData.customerId ? formData.customerName.trim() : undefined,
+          serviceId: formData.serviceId,
+          employeeId: formData.employeeId,
+          roomId: formData.roomId || undefined,
+          scheduledDateTime: `${formData.date}T${formData.time}:00`,
+          duration: parseInt(formData.duration),
+          bookingSource: formData.bookingSource,
+          notes: formData.notes.trim() || undefined,
+          paxCount: 1,
+          ...(branchId && { branchId })
+        };
+      }
+
+      if (modalMode === 'create') {
+        await mockApi.appointments.createAppointment(appointmentData);
+        showToast('Appointment created!', 'success');
+      } else {
+        await mockApi.appointments.updateAppointment(selectedAppointment._id, appointmentData);
+        showToast('Appointment updated!', 'success');
+      }
+      setShowModal(false);
+      loadData();
+    } catch (error) {
+      showToast('Failed to save appointment', 'error');
+    }
+  };
+
+  // Cancellation Policy Configuration
+  const getCancellationFee = (appointment) => {
+    if (!appointment.scheduledDateTime) return { fee: 0, percentage: 0, policy: 'Unknown' };
+
+    const appointmentTime = parseISO(appointment.scheduledDateTime);
+    const now = new Date();
+    const hoursUntilAppointment = (appointmentTime - now) / (1000 * 60 * 60);
+    const servicePrice = appointment.service?.price || 0;
+
+    // Past appointments: treat as same-day cancellation (full fee)
+    if (hoursUntilAppointment < 0) {
+      return { fee: servicePrice, percentage: 100, policy: 'Full charge (past appointment time)' };
+    }
+
+    if (hoursUntilAppointment > 24) {
+      return { fee: 0, percentage: 0, policy: 'Free cancellation (>24 hours before)' };
+    } else if (hoursUntilAppointment >= 12) {
+      const fee = servicePrice * 0.5;
+      return { fee, percentage: 50, policy: '50% cancellation fee (12-24 hours before)' };
+    } else {
+      return { fee: servicePrice, percentage: 100, policy: 'Full charge (<12 hours before)' };
+    }
+  };
+
+  const handleStatusChange = async (appointment, newStatus) => {
+    try {
+      // Handle cancellation with policy
+      if (newStatus === 'cancelled') {
+        const cancellationInfo = getCancellationFee(appointment);
+        setCancelConfirm({ isOpen: true, appointment, fee: cancellationInfo });
+        return;
+      }
+
+      // Handle no-show with customer tracking
+      if (newStatus === 'no-show') {
+        setNoShowConfirm({ isOpen: true, appointment });
+        return;
+      }
+
+      // Default status change
+      await mockApi.appointments.updateAppointment(appointment._id, { status: newStatus });
+      showToast(`Appointment ${newStatus}!`, 'success');
+      loadData();
+    } catch (error) {
+      showToast('Failed to update status', 'error');
+    }
+  };
+
+  const confirmCancellation = async () => {
+    const { appointment, fee } = cancelConfirm;
+    if (!appointment) return;
+
+    try {
+      await mockApi.appointments.updateAppointment(appointment._id, {
+        status: 'cancelled',
+        cancellationFee: fee.fee,
+        cancelledAt: new Date().toISOString()
+      });
+      showToast(`Appointment cancelled. Fee: ₱${fee.fee.toLocaleString()}`, 'info');
+      setCancelConfirm({ isOpen: false, appointment: null, fee: null });
+      loadData();
+    } catch (error) {
+      showToast('Failed to cancel appointment', 'error');
+    }
+  };
+
+  const confirmNoShow = async () => {
+    const { appointment } = noShowConfirm;
+    if (!appointment) return;
+
+    try {
+      // Update appointment status
+      await mockApi.appointments.updateAppointment(appointment._id, {
+        status: 'no-show',
+        noShowAt: new Date().toISOString()
+      });
+
+      // Update customer's no-show count
+      if (appointment.customer?._id) {
+        try {
+          const customer = await mockApi.customers.getCustomer(appointment.customer._id);
+          await mockApi.customers.updateCustomer(appointment.customer._id, {
+            noShowCount: (customer.noShowCount || 0) + 1,
+            lastNoShow: new Date().toISOString()
+          });
+        } catch (err) {
+          // Silent fail for no-show count update
+        }
+      }
+
+      showToast('Appointment marked as No-Show', 'warning');
+      setNoShowConfirm({ isOpen: false, appointment: null });
+      loadData();
+    } catch (error) {
+      showToast('Failed to update status', 'error');
+    }
+  };
+
+  const handleDelete = (appointment) => {
+    setDeleteConfirm({ isOpen: true, appointment });
+  };
+
+  const confirmDelete = async () => {
+    const { appointment } = deleteConfirm;
+    if (!appointment) return;
+
+    try {
+      await mockApi.appointments.deleteAppointment(appointment._id);
+      showToast('Appointment deleted', 'success');
+      setDeleteConfirm({ isOpen: false, appointment: null });
+      loadData();
+    } catch (error) {
+      showToast('Failed to delete', 'error');
+    }
+  };
+
+  const renderCalendar = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+    // Add padding days
+    const startDay = monthStart.getDay();
+    const paddingDays = [];
+    for (let i = 0; i < startDay; i++) {
+      paddingDays.push(null);
+    }
+
+    return (
+      <div className="calendar-view">
+        <div className="calendar-header">
+          <button
+            className="calendar-nav-btn"
+            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            aria-label="Previous month"
+          >
+            ‹
+          </button>
+          <h2 className="calendar-title">{format(currentMonth, 'MMMM yyyy')}</h2>
+          <button
+            className="calendar-nav-btn"
+            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            aria-label="Next month"
+          >
+            ›
+          </button>
+        </div>
+        <div className="calendar-grid">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="calendar-day-header">{day}</div>
+          ))}
+          {paddingDays.map((_, idx) => (
+            <div key={`pad-${idx}`} className="calendar-day other-month"></div>
+          ))}
+          {days.map(day => {
+            const dayAppts = getAppointmentsForDate(day);
+            return (
+              <div
+                key={day.toString()}
+                className={`calendar-day ${!isSameMonth(day, currentMonth) ? 'other-month' : ''} ${isToday(day) ? 'today' : ''}`}
+                onClick={() => canViewAll() && openCreateModal(day)}
+                style={{ cursor: canViewAll() ? 'pointer' : 'default' }}
+              >
+                <div className="calendar-day-number">{format(day, 'd')}</div>
+                <div className="calendar-appointments">
+                  {dayAppts.slice(0, 3).map(appt => (
+                    <div key={appt._id} className={`calendar-appointment-dot ${appt.status}`}>
+                      {format(parseISO(appt.scheduledDateTime), 'h:mm a')} {appt.customer?.name || 'Walk-in'}
+                    </div>
+                  ))}
+                  {dayAppts.length > 3 && (
+                    <div className="calendar-appointment-dot">+{dayAppts.length - 3} more</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderList = () => {
+    const filtered = getFilteredAppointments();
+
+    if (filtered.length === 0) {
+      return (
+        <div className="empty-appointments">
+          <div className="empty-appointments-icon">📅</div>
+          <p>No appointments found</p>
+          <button className="btn btn-primary" onClick={() => openCreateModal()}>Create Appointment</button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="appointments-list">
+        {filtered.map(appointment => {
+          if (!appointment.scheduledDateTime) return null;
+          const apptDate = parseISO(appointment.scheduledDateTime);
+          return (
+            <div key={appointment._id} className="appointment-card">
+              <div className={`appointment-time-block ${appointment.status}`}>
+                <div className="appointment-time">{format(apptDate, 'h:mm a')}</div>
+                <div className="appointment-date">{format(apptDate, 'MMM dd, yyyy')}</div>
+              </div>
+              <div className="appointment-details">
+                <div className="appointment-header">
+                  <div>
+                    <h3 className="appointment-customer">{appointment.customer?.name || 'Walk-in Customer'}</h3>
+                    <p className="appointment-service">
+                      {appointment.service?.name}
+                      <PaxBadge paxCount={appointment.paxCount} guestSummary={appointment.guestSummary} />
+                    </p>
+                  </div>
+                  <span className={`appointment-status-badge ${appointment.status}`}>
+                    {appointment.status}
+                  </span>
+                </div>
+                <div className="appointment-info">
+                  <div className="appointment-info-item">
+                    <span className="appointment-info-icon">👤</span>
+                    <span>{appointment.employee?.firstName} {appointment.employee?.lastName}</span>
+                  </div>
+                  <div className="appointment-info-item">
+                    <span className="appointment-info-icon">⏱</span>
+                    <span>{appointment.duration} minutes</span>
+                  </div>
+                  {appointment.room && (
+                    <div className="appointment-info-item">
+                      <span className="appointment-info-icon">🚪</span>
+                      <span>{appointment.room.name}</span>
+                    </div>
+                  )}
+                  <div className="appointment-info-item">
+                    <span className="appointment-info-icon">📍</span>
+                    <span>{appointment.bookingSource || 'walk-in'}</span>
+                  </div>
+                </div>
+                {appointment.notes && (
+                  <p className="text-sm text-gray-600 mt-sm">
+                    💬 {appointment.notes}
+                  </p>
+                )}
+                <div className="appointment-actions">
+                  {canViewAll() && (
+                    <button className="btn btn-sm btn-secondary" onClick={() => openEditModal(appointment)}>Edit</button>
+                  )}
+                  {canViewAll() && appointment.status === 'pending' && (
+                    <button className="btn btn-sm btn-success" onClick={() => handleStatusChange(appointment, 'confirmed')}>Confirm</button>
+                  )}
+                  {appointment.status === 'confirmed' && (
+                    <>
+                      <button className="btn btn-sm btn-primary" onClick={() => handleStatusChange(appointment, 'completed')}>Complete</button>
+                      <button className="btn btn-sm btn-error" onClick={() => handleStatusChange(appointment, 'no-show')} title="Mark as No-Show">No-Show</button>
+                    </>
+                  )}
+                  {canViewAll() && (appointment.status === 'pending' || appointment.status === 'confirmed') && (
+                    <button className="btn btn-sm btn-warning" onClick={() => handleStatusChange(appointment, 'cancelled')}>Cancel</button>
+                  )}
+                  {canViewAll() && (
+                    <button className="btn btn-sm btn-error" onClick={() => handleDelete(appointment)}>Delete</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return <div className="page-loading"><div className="spinner"></div><p>Loading appointments...</p></div>;
+  }
+
+  return (
+    <div className={`appointments-page ${embedded ? 'embedded' : ''}`}>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1>Appointments</h1>
+            <p>{isTherapist() ? 'View your appointments' : 'Manage bookings and schedules'}</p>
+          </div>
+          {canViewAll() && activeTab === 'appointments' && (
+            <button className="btn btn-primary" onClick={() => openCreateModal()}>+ New Appointment</button>
+          )}
+        </div>
+      )}
+
+      {/* Inner Regular/Advance tabs — hidden when embedded because the parent
+          Schedule hub already surfaces these as top-level tabs. */}
+      {!embedded && (
+        <div className="tabs-container mb-lg">
+          <button
+            className={`tab ${activeTab === 'appointments' ? 'active' : ''}`}
+            onClick={() => switchTab('appointments')}
+          >
+            Regular Appointments
+          </button>
+          <button
+            className={`tab ${activeTab === 'advance-bookings' ? 'active' : ''}`}
+            onClick={() => switchTab('advance-bookings')}
+          >
+            Advance Bookings
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'appointments' ? (
+        <>
+          <div className="filters-section">
+            <div className="filters-row">
+              <div className="view-mode-toggle">
+                <button
+                  className={`btn btn-sm ${viewMode === 'calendar' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setViewMode('calendar')}
+                >
+                  📅 Calendar
+                </button>
+                <button
+                  className={`btn btn-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setViewMode('list')}
+                >
+                  📋 List
+                </button>
+              </div>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
+                <option value="all">Status: All</option>
+                <option value="pending">Status: Pending</option>
+                <option value="confirmed">Status: Confirmed</option>
+                <option value="completed">Status: Completed</option>
+                <option value="cancelled">Status: Cancelled</option>
+                <option value="no-show">Status: No-Show</option>
+              </select>
+              <div className="results-count">
+                Found {getFilteredAppointments().length} appointment{getFilteredAppointments().length === 1 ? '' : 's'} for {format(currentMonth, 'MMMM')}
+              </div>
+            </div>
+          </div>
+
+          {viewMode === 'calendar' ? renderCalendar() : renderList()}
+        </>
+      ) : (
+        <AdvanceBookingsTab />
+      )}
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal appointment-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{modalMode === 'create' ? 'New Appointment' : 'Edit Appointment'}</h2>
+              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Customer *</label>
+                  <select name="customerId" value={formData.customerId} onChange={(e) => {
+                    const val = e.target.value;
+                    const customer = branchCustomers.find(c => c._id === val);
+                    setFormData(prev => ({
+                      ...prev,
+                      customerId: val,
+                      customerName: customer ? customer.name : prev.customerName
+                    }));
+                  }} className="form-control">
+                    <option value="">Walk-in (or select existing)</option>
+                    {branchCustomers.map(c => (
+                      <option key={c._id} value={c._id}>
+                        {c.name} {(c.noShowCount || 0) >= 2 ? '⚠️' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {/* No-Show Warning for selected customer */}
+                  {formData.customerId && (() => {
+                    const selectedCustomer = branchCustomers.find(c => c._id === formData.customerId);
+                    const noShowCount = selectedCustomer?.noShowCount || 0;
+                    if (noShowCount >= 2) {
+                      return (
+                        <div style={{
+                          marginTop: 'var(--spacing-sm)',
+                          padding: 'var(--spacing-sm) var(--spacing-md)',
+                          background: 'var(--warning-light)',
+                          border: '1px solid var(--warning)',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.85rem',
+                          color: 'var(--warning-dark)'
+                        }}>
+                          ⚠️ <strong>Warning:</strong> This customer has {noShowCount} no-show(s) on record.
+                          {noShowCount >= 3 && ' Consider requiring a deposit.'}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+                {!formData.customerId && (
+                  <div className="form-group">
+                    <label>Walk-in Customer Name</label>
+                    <input type="text" name="customerName" value={formData.customerName} onChange={handleInputChange}
+                      placeholder="Enter customer name" className="form-control" />
+                  </div>
+                )}
+                {/* Number of guests — staff form supports up to maxPaxStaff
+                    (default 30, configurable in Settings → Bookings). When > 1
+                    the single-pax service / rotation / therapist controls are
+                    swapped for the PaxBuilder so each guest picks their own. */}
+                {modalMode === 'create' && (
+                  <div className="form-group">
+                    <label>Number of guests</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={maxPaxStaff}
+                      value={formData.paxCount}
+                      onChange={(e) => {
+                        const raw = parseInt(e.target.value, 10);
+                        const next = Number.isFinite(raw) ? Math.min(maxPaxStaff, Math.max(1, raw)) : 1;
+                        setFormData(prev => {
+                          const current = prev.guests || [];
+                          let guests;
+                          if (next > current.length) {
+                            guests = [
+                              ...current,
+                              ...Array.from({ length: next - current.length }, (_, i) => blankGuest(current.length + i + 1)),
+                            ];
+                          } else {
+                            guests = current.slice(0, next).map((g, i) => ({ ...g, guestNumber: i + 1 }));
+                          }
+                          return { ...prev, paxCount: next, guests };
+                        });
+                      }}
+                      onWheel={(e) => e.target.blur()}
+                      className="form-control"
+                      style={{ maxWidth: 120 }}
+                    />
+                  </div>
+                )}
+                {modalMode === 'create' && formData.paxCount > 1 ? (
+                  <div className="form-group">
+                    <label>Guests</label>
+                    <PaxBuilder
+                      paxCount={formData.paxCount}
+                      guests={formData.guests}
+                      onChange={(g) => setFormData(prev => ({ ...prev, guests: g }))}
+                      services={branchServices}
+                      therapists={branchEmployees
+                        .filter(e => {
+                          // Only therapists can serve — receptionists etc. aren't selectable.
+                          const role = (e.role || '').toLowerCase();
+                          return role === 'therapist' || role === 'massage therapist' || role.includes('therapist');
+                        })
+                        .map(e => ({ _id: e._id, name: `${e.firstName || ''} ${e.lastName || ''}`.trim() }))}
+                      mode="staff"
+                    />
+                  </div>
+                ) : (
+                <div className="form-group">
+                  <label>Service *</label>
+                  <select name="serviceId" value={formData.serviceId} onChange={handleInputChange} className="form-control" required>
+                    <option value="">Select service...</option>
+                    {branchServices.map(s => <option key={s._id} value={s._id}>{s.name} - ₱{s.price}</option>)}
+                  </select>
+                </div>
+                )}
+                {/* Service Rotation Queue — only for today's appointments
+                    (rotation reflects who's clocked in NOW). Hidden in
+                    multi-pax mode: each guest picks their own therapist
+                    (Auto/specific) inside the PaxBuilder. */}
+                {modalMode === 'create' && formData.paxCount === 1 && showRotationQueue && rotationQueue.length > 0 && (
+                  <div className="rotation-queue-panel">
+                    <div className="rotation-queue-header">
+                      <span className="rotation-queue-title">🔄 Service Rotation Queue</span>
+                      <span className="rotation-queue-count">{availableRotationQueue.length} available</span>
+                    </div>
+                    <div className="rotation-auto-select">
+                      <button type="button" className="rotation-auto-btn"
+                        onClick={() => pickAutoTherapist()}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next therapist in rotation">
+                        Auto Select
+                      </button>
+                      <button type="button" className="rotation-auto-btn male"
+                        onClick={() => pickAutoTherapist('male')}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next male therapist in rotation">
+                        Auto Select (Male)
+                      </button>
+                      <button type="button" className="rotation-auto-btn female"
+                        onClick={() => pickAutoTherapist('female')}
+                        disabled={availableRotationQueue.length === 0}
+                        title="Pick the next female therapist in rotation">
+                        Auto Select (Female)
+                      </button>
+                    </div>
+                    <div className="rotation-service-filter">
+                      {[
+                        { key: 'today', label: 'Today' },
+                        { key: 'week', label: 'Week' },
+                        { key: 'month', label: 'Month' },
+                        { key: 'all', label: 'All Time' }
+                      ].map(f => (
+                        <button key={f.key} type="button"
+                          className={`rotation-filter-btn ${serviceCountFilter === f.key ? 'active' : ''}`}
+                          onClick={() => setServiceCountFilter(f.key)}>
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="rotation-queue-list">
+                      {availableRotationQueue.map((emp, index) => (
+                        <div key={emp.employeeId}
+                          className={`rotation-queue-item ${emp.isNext ? 'next-in-line' : ''} ${formData.employeeId === emp.employeeId ? 'selected' : ''}`}
+                          onClick={() => selectFromRotation(emp.employeeId)}>
+                          <div className="rotation-queue-position">
+                            {emp.isNext ? '➡️' : `#${index + 1}`}
+                          </div>
+                          <div className="rotation-queue-info">
+                            <div className="rotation-queue-name">{emp.employeeName}</div>
+                            <div className="rotation-queue-details">
+                              <span className="rotation-clock-in">⏰ {formatTime12Hour(emp.clockInTime)}</span>
+                              <span className="rotation-services">🎯 {historicalServiceCounts[emp.employeeId] || 0} services</span>
+                            </div>
+                          </div>
+                          {emp.isNext && (
+                            <button type="button" className="rotation-skip-btn"
+                              onClick={(e) => { e.stopPropagation(); skipInRotation(emp.employeeId); }}
+                              title="Skip to next person">
+                              ⏭️
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {nextEmployee && !busyEmployeeIds.includes(String(nextEmployee.employeeId)) && (
+                      <div className="rotation-next-indicator">
+                        <strong>Next to serve:</strong> {nextEmployee.employeeName}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {modalMode === 'create' && formData.paxCount === 1 && showRotationQueue && rotationQueue.length === 0 && (
+                  <div className="rotation-no-queue">
+                    <span>⚠️</span>
+                    <p>No therapists clocked in today. Select manually below.</p>
+                  </div>
+                )}
+
+                <div className="form-row">
+                  {formData.paxCount === 1 && (
+                    <div className="form-group">
+                      <label>Therapist *</label>
+                      <select name="employeeId" value={formData.employeeId} onChange={handleInputChange} className="form-control" required>
+                        <option value="">Select therapist...</option>
+                        {(() => {
+                          const selectedService = branchServices.find(s => s._id === formData.serviceId);
+                          const availableTherapists = formData.serviceId
+                            ? getEmployeesForService(branchEmployees, selectedService)
+                            : getTherapists(branchEmployees);
+                          return availableTherapists.map(e => (
+                            <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>
+                          ));
+                        })()}
+                      </select>
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label>Room</label>
+                    <select name="roomId" value={formData.roomId} onChange={handleInputChange} className="form-control">
+                      <option value="">No room</option>
+                      {branchRooms.filter(r => r.status !== 'maintenance').map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Date *</label>
+                    <input type="date" name="date" value={formData.date} onChange={handleInputChange} className="form-control" required min={format(new Date(), 'yyyy-MM-dd')} />
+                  </div>
+                  {formData.paxCount === 1 ? (
+                    <div className="form-group">
+                      <label>Duration (min)</label>
+                      <input type="number" name="duration" value={formData.duration} onChange={handleInputChange}
+                        onWheel={(e) => e.target.blur()} className="form-control" min="15" step="15" />
+                    </div>
+                  ) : (
+                    <div className="form-group">
+                      <label>Duration (min)</label>
+                      <input
+                        type="number"
+                        value={maxGuestDuration(formData.guests)}
+                        readOnly
+                        className="form-control"
+                        title="Auto-computed from each guest's longest service stack"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label>Time *</label>
+                  <div className="time-slot-grid">
+                    {timeSlots.map(slot => (
+                      <button
+                        key={slot}
+                        type="button"
+                        className={`time-slot-btn ${formData.time === slot ? 'selected' : ''}`}
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          time: prev.time === slot ? '' : slot
+                        }))}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Booking Source</label>
+                  <div className="booking-source-grid">
+                    {bookingSources.map(source => (
+                      <button
+                        key={source}
+                        type="button"
+                        className={`booking-source-btn ${formData.bookingSource === source ? 'selected' : ''}`}
+                        onClick={() => setFormData(prev => ({ ...prev, bookingSource: source }))}
+                      >
+                        {source.replace('-', ' ').toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Conflict Warnings */}
+                {(conflicts.therapist || conflicts.room) && (
+                  <div className="conflict-warnings">
+                    {conflicts.therapist && (
+                      <div className="conflict-warning therapist-conflict">
+                        <span className="conflict-icon">⚠️</span>
+                        <div className="conflict-details">
+                          <strong>Therapist Conflict!</strong>
+                          <p>{conflicts.therapist.therapistName} is already booked at {conflicts.therapist.time} for {conflicts.therapist.serviceName} ({conflicts.therapist.duration} min) with {conflicts.therapist.customerName}.</p>
+                        </div>
+                      </div>
+                    )}
+                    {conflicts.room && (
+                      <div className="conflict-warning room-conflict">
+                        <span className="conflict-icon">⚠️</span>
+                        <div className="conflict-details">
+                          <strong>Room Conflict!</strong>
+                          <p>{conflicts.room.roomName} is already booked at {conflicts.room.time} for {conflicts.room.serviceName} ({conflicts.room.duration} min).</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {checkingAvailability && (
+                  <div className="checking-availability">
+                    <span className="spinner-sm"></span> Checking availability...
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label>Notes</label>
+                  <textarea name="notes" value={formData.notes} onChange={handleInputChange}
+                    placeholder="Special requests or notes" className="form-control" rows="3"></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">{modalMode === 'create' ? 'Create' : 'Update'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cancellation Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={cancelConfirm.isOpen}
+        onClose={() => setCancelConfirm({ isOpen: false, appointment: null, fee: null })}
+        onConfirm={confirmCancellation}
+        title="Cancel Appointment"
+        message={cancelConfirm.fee ? `${cancelConfirm.fee.policy}\n\nCancellation fee: ₱${cancelConfirm.fee.fee.toLocaleString()} (${cancelConfirm.fee.percentage}%)\n\nProceed with cancellation?` : 'Cancel this appointment?'}
+        confirmText="Cancel Appointment"
+        confirmVariant="warning"
+      />
+
+      {/* No-Show Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={noShowConfirm.isOpen}
+        onClose={() => setNoShowConfirm({ isOpen: false, appointment: null })}
+        onConfirm={confirmNoShow}
+        title="Mark as No-Show"
+        message="This will be recorded on the customer's profile. Customers with multiple no-shows may be flagged for future bookings."
+        confirmText="Mark No-Show"
+        confirmVariant="warning"
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, appointment: null })}
+        onConfirm={confirmDelete}
+        title="Delete Appointment"
+        message="Are you sure you want to delete this appointment? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
+    </div>
+  );
+};
+
+export default Appointments;

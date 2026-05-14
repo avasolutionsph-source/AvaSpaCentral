@@ -1,0 +1,927 @@
+/* ============================================================================
+   ROOMS PAGE SPECIFIC STYLES
+   Clean, minimal design with strict color palette
+   ============================================================================ */
+.rooms-page {
+  padding: var(--spacing-lg);
+}
+
+.rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
+}
+
+/* Room Card - Clean and Simple */
+.room-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: var(--spacing-lg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.room-card.available {
+  border-color: var(--primary);
+}
+
+.room-card.occupied {
+  border-color: var(--error);
+}
+
+.room-card.pending {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.03);
+}
+
+.room-card.maintenance {
+  border-color: var(--gray-600);
+}
+
+.room-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Room Header */
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.room-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+/* Status Badge - Simple dots/pills */
+.room-status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.room-status-badge.available {
+  background: var(--gray-100);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.room-status-badge.occupied {
+  background: var(--gray-100);
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+
+.room-status-badge.maintenance {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-600);
+}
+
+.room-status-badge.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid #f59e0b;
+  animation: pulse-pending 2s ease-in-out infinite;
+}
+
+@keyframes pulse-pending {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Room Info */
+.room-name {
+  font-size: 1.1rem;
+  margin: 0 0 4px 0;
+  color: var(--gray-900);
+  font-weight: 600;
+}
+
+.room-type {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Assigned Employee - Shows who is doing the service */
+.room-assigned-employee {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  margin-bottom: var(--spacing-md);
+}
+
+.room-assigned-employee .employee-icon {
+  font-size: 1rem;
+}
+
+.room-assigned-employee .employee-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--error);
+}
+
+/* Room Details - Cleaner */
+.room-details {
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--gray-100);
+  border-radius: 6px;
+}
+
+.room-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 0.8rem;
+}
+
+.room-detail-label {
+  color: var(--gray-600);
+}
+
+.room-detail-value {
+  color: var(--gray-900);
+  font-weight: 500;
+}
+
+/* Amenities - Compact tags */
+.room-amenities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--spacing-md) 0;
+}
+
+.amenity-tag {
+  padding: 4px 10px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* Status Change Buttons - Simplified */
+.status-change-group {
+  display: flex;
+  gap: 8px;
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--gray-200);
+}
+
+.status-change-group .btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.status-change-group .btn-success {
+  background: var(--white);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.status-change-group .btn-success:hover {
+  background: var(--primary);
+  color: var(--white);
+}
+
+.status-change-group .btn-error {
+  background: var(--white);
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+
+.status-change-group .btn-error:hover {
+  background: var(--error);
+  color: var(--white);
+}
+
+.status-change-group .btn-warning {
+  background: var(--white);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-600);
+}
+
+.status-change-group .btn-warning:hover {
+  background: var(--gray-600);
+  color: var(--white);
+}
+
+/* Room Actions - Clean buttons */
+.room-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: var(--spacing-sm);
+}
+
+.room-actions .btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.room-actions .btn-secondary {
+  background: var(--white);
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
+}
+
+.room-actions .btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.room-actions .btn-error {
+  background: var(--white);
+  color: var(--error);
+  border: 1px solid var(--gray-200);
+}
+
+.room-actions .btn-error:hover {
+  border-color: var(--error);
+}
+
+/* Room Modal */
+.room-modal {
+  max-width: 500px;
+}
+
+.amenities-selector {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: var(--spacing-md);
+  background: var(--gray-100);
+  border-radius: 6px;
+  border: 1px solid var(--gray-200);
+}
+
+.amenity-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.amenity-checkbox:hover {
+  background: var(--white);
+}
+
+.amenity-checkbox input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.amenity-checkbox span {
+  font-size: 0.8rem;
+  color: var(--gray-900);
+  user-select: none;
+}
+
+/* Empty State */
+.empty-rooms {
+  text-align: center;
+  padding: var(--spacing-xxl) var(--spacing-lg);
+  color: var(--gray-600);
+}
+
+.empty-rooms-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.5;
+}
+
+.empty-rooms p {
+  margin-bottom: var(--spacing-lg);
+  font-size: 0.9rem;
+}
+
+/* Filters Section */
+.filters-section {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+.filters-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--gray-900);
+  background: var(--white);
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.results-count {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  margin-left: auto;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .rooms-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+
+  .amenities-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .rooms-page {
+    padding: var(--spacing-md);
+    /* Reserve space below the last room card so the Start Service /
+       Cancel buttons aren't clipped by the fixed bottom-nav (60px tall
+       plus the device's safe-area inset). The page-content parent
+       already adds bottom padding for the nav, but on shorter viewports
+       the room card's own action buttons can still hug the nav. */
+    padding-bottom: calc(var(--spacing-xl) + 96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .rooms-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .room-card {
+    /* Ensure card content can fully render and the action buttons
+       always have breathing room above the fixed bottom nav. */
+    padding-bottom: var(--spacing-md);
+  }
+
+  .service-action-buttons {
+    /* On mobile, stack the buttons so labels don't truncate and the
+       hit-targets stay easily tappable. */
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .service-action-buttons .start-service-btn,
+  .service-action-buttons .stop-service-btn {
+    width: 100%;
+    flex: none;
+  }
+
+  .room-actions {
+    flex-direction: column;
+  }
+
+  .status-change-group {
+    flex-wrap: wrap;
+  }
+
+  .status-change-group .btn {
+    min-width: calc(50% - 4px);
+  }
+
+  .filters-row {
+    flex-wrap: wrap;
+  }
+
+  .filter-select {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .results-count {
+    width: 100%;
+    text-align: right;
+    margin-top: var(--spacing-sm);
+  }
+}
+
+/* ============================================================================
+   UPCOMING BOOKINGS SECTION
+   ============================================================================ */
+.upcoming-bookings-section {
+  margin-top: var(--spacing-xxl);
+  padding-top: var(--spacing-xl);
+  border-top: 1px solid var(--gray-200);
+}
+
+.upcoming-bookings-section h3 {
+  margin-bottom: var(--spacing-lg);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.upcoming-bookings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.upcoming-booking-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  transition: border-color 0.2s;
+}
+
+.upcoming-booking-card:hover {
+  border-color: var(--primary);
+}
+
+.booking-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.room-badge {
+  padding: 4px 10px;
+  background: var(--gray-100);
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge.scheduled,
+.status-badge.confirmed {
+  padding: 4px 10px;
+  background: var(--gray-100);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.booking-card-body {
+  margin-bottom: var(--spacing-md);
+}
+
+.booking-card-body p {
+  margin: 6px 0;
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.booking-card-body .client-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--gray-900);
+}
+
+.booking-card-body .service-name {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.booking-card-body .special-note {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--gray-600);
+  background: var(--gray-100);
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: var(--spacing-sm);
+}
+
+.booking-card-footer {
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--gray-100);
+}
+
+.booking-card-footer .btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   ROOM TIMER - Countdown for occupied rooms
+   ============================================================================ */
+.room-timer {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--gray-100);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+}
+
+.room-timer.critical {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+  border-color: var(--error);
+  animation: pulse-timer 1s ease-in-out infinite;
+}
+
+@keyframes pulse-timer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ============================================================================
+   CUSTOMER INFO SECTION - Displayed on pending/occupied rooms
+   ============================================================================ */
+.room-customer-info {
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+}
+
+.room-customer-info .customer-info-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  margin-bottom: var(--spacing-sm);
+  letter-spacing: 0.03em;
+}
+
+.room-customer-info .customer-info-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--gray-700);
+  padding: 3px 0;
+}
+
+.room-customer-info .customer-info-row span:first-child {
+  font-size: 0.9rem;
+}
+
+/* ============================================================================
+   START SERVICE BUTTON - For therapists to start pending services
+   ============================================================================ */
+.start-service-btn {
+  width: 100%;
+  margin-top: var(--spacing-md);
+  padding: 12px 16px !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, var(--primary), #2d7f50) !important;
+  border: none !important;
+  color: var(--white) !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(27, 94, 55, 0.2);
+}
+
+.start-service-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(27, 94, 55, 0.3);
+}
+
+.start-service-btn:active {
+  transform: translateY(0);
+}
+
+/* ============================================================================
+   SERVICE ACTION BUTTONS - Start/Stop buttons container
+   ============================================================================ */
+.service-action-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.service-action-buttons .start-service-btn {
+  flex: 2;
+  margin-top: 0;
+}
+
+.service-action-buttons .stop-service-btn {
+  flex: 1;
+}
+
+/* ============================================================================
+   STOP SERVICE BUTTON
+   ============================================================================ */
+.stop-service-btn {
+  width: 100%;
+  padding: 10px 16px !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  background: var(--white) !important;
+  border: 2px solid var(--error) !important;
+  color: var(--error) !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stop-service-btn:hover {
+  background: var(--error) !important;
+  color: var(--white) !important;
+}
+
+/* ============================================================================
+   STOP SERVICE MODAL
+   ============================================================================ */
+.stop-service-modal {
+  max-width: 450px;
+}
+
+.stop-service-info {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.stop-service-info p {
+  margin: 6px 0;
+  font-size: 0.9rem;
+  color: var(--gray-700);
+}
+
+.stop-service-info p strong {
+  color: var(--gray-900);
+  min-width: 80px;
+  display: inline-block;
+}
+
+/* ============================================================================
+   HOME SERVICES SECTION
+   ============================================================================ */
+.home-services-section {
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--gray-200);
+}
+
+.home-services-section h3 {
+  margin-bottom: var(--spacing-lg);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.home-services-section h3::before {
+  content: '🏠';
+}
+
+.home-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+/* Home Service Card */
+.home-service-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: var(--spacing-lg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.home-service-card.pending {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.03);
+}
+
+.home-service-card.occupied {
+  border-color: var(--primary);
+  background: rgba(27, 94, 55, 0.03);
+}
+
+.home-service-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Home Service Header */
+.home-service-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.home-service-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+  border: 1px solid #7dd3fc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.home-service-status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.home-service-status-badge.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid #f59e0b;
+  animation: pulse-pending 2s ease-in-out infinite;
+}
+
+.home-service-status-badge.occupied {
+  background: rgba(27, 94, 55, 0.1);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+/* Home Service Title */
+.home-service-title {
+  font-size: 1.1rem;
+  margin: 0 0 var(--spacing-sm) 0;
+  color: var(--gray-900);
+  font-weight: 600;
+}
+
+/* Home Service Therapist */
+.home-service-therapist {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(27, 94, 55, 0.1);
+  border: 1px solid rgba(27, 94, 55, 0.3);
+  border-radius: 6px;
+  margin-bottom: var(--spacing-md);
+}
+
+.home-service-therapist .therapist-icon {
+  font-size: 1rem;
+}
+
+.home-service-therapist .therapist-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* Home Service Info */
+.home-service-info {
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+}
+
+.home-service-info .info-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  margin-bottom: var(--spacing-sm);
+  letter-spacing: 0.03em;
+}
+
+.home-service-info .info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--gray-700);
+  padding: 3px 0;
+}
+
+.home-service-info .info-row span:first-child {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+/* Advance Booking Home Service Styles */
+.home-service-card.advance-booking {
+  border-style: dashed;
+}
+
+.home-service-type-badge {
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-left: auto;
+}
+
+.home-service-type-badge.scheduled {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  border: 1px solid #818cf8;
+}
+
+/* Scheduled DateTime Display */
+.home-service-scheduled {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 6px;
+  margin-bottom: var(--spacing-md);
+}
+
+.home-service-scheduled .schedule-icon {
+  font-size: 1rem;
+}
+
+.home-service-scheduled .schedule-datetime {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+/* Payment Status Badge */
+.home-service-info .payment-status {
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.home-service-info .payment-status.paid {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+.home-service-info .payment-status.pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .home-services-grid {
+    grid-template-columns: 1fr;
+  }
+}

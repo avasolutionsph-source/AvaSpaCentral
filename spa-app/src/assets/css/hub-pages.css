@@ -1,0 +1,364 @@
+/* ===========================================
+   Hub Pages - Shared Styles
+   Used by: InventoryHub, HRHub, FinanceHub, ServiceHub, MyPortal
+   =========================================== */
+
+/* Hub Container */
+.hub-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: calc(100vh - 60px);
+}
+
+/* Hub Header with Tabs */
+.hub-header {
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-200);
+  padding: var(--spacing-md) var(--spacing-lg);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.hub-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.hub-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+.hub-title h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.hub-title-icon {
+  font-size: 1.5rem;
+}
+
+.hub-subtitle {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  margin: 0;
+  margin-top: 2px;
+}
+
+/* Tab Navigation */
+.hub-tabs {
+  display: flex;
+  gap: var(--spacing-xs);
+  border-bottom: 2px solid var(--gray-200);
+  margin: 0 calc(-1 * var(--spacing-lg));
+  padding: 0 var(--spacing-lg);
+}
+
+.hub-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.hub-tab:hover {
+  color: var(--gray-900);
+  background: var(--gray-50);
+}
+
+.hub-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.hub-tab-icon {
+  font-size: 1rem;
+}
+
+.hub-tab-badge {
+  background: var(--primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.hub-tab-badge.warning {
+  background: var(--warning);
+  color: var(--gray-900);
+}
+
+.hub-tab-badge.danger {
+  background: var(--error);
+}
+
+/* Hub Content Area */
+.hub-content {
+  flex: 1;
+  overflow: auto;
+  background: var(--gray-50);
+}
+
+/* Embedded Page Styles - Remove headers when embedded */
+.hub-content .products-page,
+.hub-content .inventory-page,
+.hub-content .suppliers-page,
+.hub-content .purchase-orders-page,
+.hub-content .employees-page,
+.hub-content .payroll-page,
+.hub-content .expenses-page,
+.hub-content .cash-drawer-history-page,
+.hub-content .rooms-page,
+.hub-content .service-history-page,
+.hub-content .my-schedule-page,
+.hub-content .payroll-requests-page {
+  padding: var(--spacing-lg);
+  min-height: auto;
+}
+
+/* Hide page headers when embedded in hub */
+.hub-content .page-header {
+  display: none;
+}
+
+/* Header Actions (stats + button) */
+.hub-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+/* Quick Stats Bar (optional - shown above tabs) */
+.hub-quick-stats {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.hub-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--gray-100);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+}
+
+.hub-stat-icon {
+  font-size: 0.9rem;
+}
+
+.hub-stat-value {
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.hub-stat-label {
+  color: var(--gray-600);
+}
+
+.hub-stat.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.hub-stat.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.hub-stat.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* My Portal Clock In/Out Section */
+.my-portal-clock-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--gray-50, #f9fafb);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: var(--radius-lg, 12px);
+  padding: 1rem 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.my-portal-clock-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.my-portal-clock-time {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900, #111);
+  font-variant-numeric: tabular-nums;
+}
+
+.my-portal-clock-date {
+  font-size: 0.85rem;
+  color: var(--gray-500, #6b7280);
+}
+
+.my-portal-clock-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.my-portal-clock-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.my-portal-clock-buttons .btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hub-header {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .my-portal-clock-section {
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  .my-portal-clock-buttons {
+    width: 100%;
+  }
+
+  .my-portal-clock-buttons .btn {
+    flex: 1;
+  }
+
+  .hub-tabs {
+    margin: 0 calc(-1 * var(--spacing-md));
+    padding: 0 var(--spacing-md);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .hub-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hub-tab {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.8rem;
+  }
+
+  .hub-title h1 {
+    font-size: 1.25rem;
+  }
+
+  .hub-quick-stats {
+    gap: var(--spacing-xs);
+  }
+
+  .hub-stat {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  .hub-content .products-page,
+  .hub-content .inventory-page,
+  .hub-content .suppliers-page,
+  .hub-content .purchase-orders-page,
+  .hub-content .employees-page,
+  .hub-content .payroll-page,
+  .hub-content .expenses-page,
+  .hub-content .cash-drawer-history-page,
+  .hub-content .rooms-page,
+  .hub-content .service-history-page,
+  .hub-content .my-schedule-page,
+  .hub-content .payroll-requests-page {
+    padding: var(--spacing-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .hub-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .hub-tab {
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--spacing-xs);
+    font-size: 0.7rem;
+  }
+
+  .hub-tab-icon {
+    font-size: 1.1rem;
+  }
+
+  .hub-tab-badge {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+  }
+}
+
+/* ===========================================
+   Embedded Page Styles for Request Components
+   =========================================== */
+
+.hub-content .my-requests-page,
+.hub-content .hr-requests-page {
+  padding: var(--spacing-lg);
+  min-height: auto;
+}
+
+@media (max-width: 768px) {
+  .hub-content .my-requests-page,
+  .hub-content .hr-requests-page {
+    padding: var(--spacing-md);
+  }
+}
+
+/* ===========================================
+   Info Badge Styles
+   =========================================== */
+
+.hub-tab-badge.info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.hub-stat.info {
+  background: #dbeafe;
+  color: #1e40af;
+}

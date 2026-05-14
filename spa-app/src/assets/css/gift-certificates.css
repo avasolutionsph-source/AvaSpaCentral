@@ -1,0 +1,284 @@
+/* ============================================================================
+   GIFT CERTIFICATES PAGE SPECIFIC STYLES
+   ============================================================================ */
+.gift-certificates-page {
+  padding: var(--spacing-lg);
+}
+
+.gc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
+}
+
+.gc-card {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  transition: all var(--transition-fast);
+}
+
+.gc-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.gc-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.gc-card.redeemed {
+  background: linear-gradient(135deg, var(--gray-300) 0%, var(--gray-400) 100%);
+  opacity: 0.7;
+}
+
+.gc-card.expired {
+  background: linear-gradient(135deg, var(--error-light) 0%, var(--error) 100%);
+}
+
+.gc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-md);
+}
+
+.gc-logo {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--white);
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+.gc-status-badge {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--white);
+}
+
+.gc-status-badge.active {
+  color: var(--success);
+}
+
+.gc-status-badge.redeemed {
+  color: var(--gray-600);
+}
+
+.gc-status-badge.expired {
+  color: var(--error);
+}
+
+.gc-code-section {
+  margin: var(--spacing-lg) 0;
+  padding: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(10px);
+}
+
+.gc-code-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.gc-code {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: 3px;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+  font-family: 'Courier New', monospace;
+}
+
+.gc-value-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: var(--spacing-md) 0;
+}
+
+.gc-amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--white);
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+.gc-balance-label {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin-top: var(--spacing-xs);
+}
+
+.gc-details {
+  padding-top: var(--spacing-md);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.gc-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-xs) 0;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.gc-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.gc-actions .btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--gray-900);
+  border: none;
+}
+
+.gc-actions .btn:hover {
+  background: var(--white);
+}
+
+/* Validation Modal */
+.validate-gc-modal {
+  max-width: 500px;
+}
+
+.gc-code-input-group {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.gc-code-input {
+  flex: 1;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+
+.gc-validation-result {
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.gc-validation-result.valid {
+  background: var(--success-light);
+  border: 2px solid var(--success);
+}
+
+.gc-validation-result.invalid {
+  background: var(--error-light);
+  border: 2px solid var(--error);
+}
+
+.gc-validation-icon {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.gc-validation-message {
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.gc-validation-details {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Create GC Modal */
+.create-gc-modal {
+  max-width: 600px;
+}
+
+.amount-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.amount-preset-btn {
+  padding: var(--spacing-md);
+  border: 2px solid var(--gray-300);
+  background: var(--white);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.amount-preset-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.amount-preset-btn.selected {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--white);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .gc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+
+  .amount-presets {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .gift-certificates-page {
+    padding: var(--spacing-md);
+  }
+
+  .gc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gc-amount {
+    font-size: 2rem;
+  }
+
+  .gc-code {
+    font-size: 1.25rem;
+  }
+
+  .gc-actions {
+    flex-direction: column;
+  }
+
+  .amount-presets {
+    grid-template-columns: 1fr;
+  }
+}

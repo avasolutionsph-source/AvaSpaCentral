@@ -1,0 +1,1022 @@
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../context/AppContext';
+import mockApi from '../mockApi';
+import { format, parseISO, startOfMonth, endOfMonth, subDays, subMonths, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import PayDisbursementModal from '../components/PayDisbursementModal';
+import PayrollBreakdownPopover from '../components/PayrollBreakdownPopover';
+import PayslipModal from '../components/PayslipModal';
+import { SettingsRepository } from '../services/storage/repositories';
+import { SavedPayrollRepository } from '../services/storage/repositories';
+import { CashAdvanceRequestRepository } from '../services/storage/repositories';
+
+const formatPeso = (value) => `₱${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// BreakdownPopover extracted to src/components/PayrollBreakdownPopover.jsx
+// (also reused by the Saved Payrolls read-only viewer).
+const BreakdownPopover = PayrollBreakdownPopover;
+
+const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittancesRef, onPayslipsRef, onSaveRef }) => {
+  const { showToast, getEffectiveBranchId, user, selectedBranch } = useApp();
+
+  const [loading, setLoading] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [payrollData, setPayrollData] = useState([]);
+  const [payModalIndex, setPayModalIndex] = useState(null);
+  const [payrollDisbursementsEnabled, setPayrollDisbursementsEnabled] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    SettingsRepository.get('nextpaySettings').then((s) => {
+      if (mounted && s) setPayrollDisbursementsEnabled(Boolean(s.enableDisbursementsPayroll));
+    }).catch(() => { /* default false */ });
+    return () => { mounted = false; };
+  }, []);
+  const [employees, setEmployees] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [payrollConfig, setPayrollConfig] = useState(null);
+
+  const [period, setPeriod] = useState('current');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
+  const [showPayslipModal, setShowPayslipModal] = useState(false);
+  const [selectedPayslip, setSelectedPayslip] = useState(null);
+
+  const [showGovRemittance, setShowGovRemittance] = useState(false);
+
+  // Breakdown popover state
+  const [activeBreakdown, setActiveBreakdown] = useState(null); // { employeeId, type }
+
+  const toggleBreakdown = (employeeId, type) => {
+    setActiveBreakdown(prev =>
+      prev?.employeeId === employeeId && prev?.type === type ? null : { employeeId, type }
+    );
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Expose functions to parent via refs
+  React.useEffect(() => {
+    if (onCalculateRef) {
+      onCalculateRef.current = handleCalculatePayroll;
+    }
+  }, [onCalculateRef]);
+
+  React.useEffect(() => {
+    if (onRemittancesRef) {
+      onRemittancesRef.current = () => setShowGovRemittance(prev => !prev);
+    }
+  }, [onRemittancesRef]);
+
+  React.useEffect(() => {
+    if (onPayslipsRef) {
+      onPayslipsRef.current = handleGeneratePayslips;
+    }
+  }, [onPayslipsRef]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [emps, att, trans, config] = await Promise.all([
+        mockApi.employees.getEmployees(),
+        mockApi.attendance.getAttendance(),
+        mockApi.transactions.getTransactions(),
+        mockApi.payrollConfig.getPayrollConfig()
+      ]);
+      let activeEmps = emps.filter(e => e.status === 'active');
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        activeEmps = activeEmps.filter(e => e.branchId === effectiveBranchId);
+      }
+      setEmployees(activeEmps);
+      setAttendance(att);
+      setTransactions(trans);
+      setPayrollConfig(config);
+      setLoading(false);
+    } catch (error) {
+      showToast('Failed to load payroll data', 'error');
+      setLoading(false);
+    }
+  };
+
+  // Compute date range for a named preset.
+  const computePresetRange = (presetId) => {
+    const today = new Date();
+    switch (presetId) {
+      case 'current':  // Current semi-monthly (1-15 or 16-end)
+        return today.getDate() <= 15
+          ? { start: new Date(today.getFullYear(), today.getMonth(), 1), end: new Date(today.getFullYear(), today.getMonth(), 15) }
+          : { start: new Date(today.getFullYear(), today.getMonth(), 16), end: endOfMonth(today) };
+      case 'last': {  // Previous semi-monthly
+        if (today.getDate() <= 15) {
+          const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          return { start: new Date(prev.getFullYear(), prev.getMonth(), 16), end: endOfMonth(prev) };
+        }
+        return { start: new Date(today.getFullYear(), today.getMonth(), 1), end: new Date(today.getFullYear(), today.getMonth(), 15) };
+      }
+      case 'thisWeek':
+        return { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) };
+      case 'thisMonth':
+        return { start: startOfMonth(today), end: endOfMonth(today) };
+      case 'lastMonth': {
+        const prev = subMonths(today, 1);
+        return { start: startOfMonth(prev), end: endOfMonth(prev) };
+      }
+      default:
+        return { start: startOfMonth(today), end: endOfMonth(today) };
+    }
+  };
+
+  // Auto-fill the date inputs on first mount so the user always sees a valid range.
+  useEffect(() => {
+    if (customStartDate || customEndDate) return;
+    const { start, end } = computePresetRange('current');
+    setCustomStartDate(format(start, 'yyyy-MM-dd'));
+    setCustomEndDate(format(end, 'yyyy-MM-dd'));
+    setPeriod('current');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Apply a preset by populating the date inputs (still editable after).
+  const applyPreset = (presetId) => {
+    const { start, end } = computePresetRange(presetId);
+    setCustomStartDate(format(start, 'yyyy-MM-dd'));
+    setCustomEndDate(format(end, 'yyyy-MM-dd'));
+    setPeriod(presetId);
+  };
+
+  // Read the date range straight from the date inputs (single source of truth).
+  // Falls back to current semi-monthly if either input is empty.
+  const getPeriodDates = () => {
+    const today = new Date();
+    if (!customStartDate || !customEndDate) {
+      const { start, end } = computePresetRange('current');
+      return { startDate: start, endDate: end };
+    }
+    return { startDate: parseISO(customStartDate), endDate: parseISO(customEndDate) };
+  };
+
+  // Philippine Labor Law Calculations
+  const calculateSSS = (monthlyGross) => {
+    // 2025 SSS Contribution Table (simplified)
+    if (monthlyGross <= 4250) return { employee: 180, employer: 420 };
+    if (monthlyGross <= 4750) return { employee: 202.50, employer: 472.50 };
+    if (monthlyGross <= 5250) return { employee: 225, employer: 525 };
+    if (monthlyGross <= 5750) return { employee: 247.50, employer: 577.50 };
+    if (monthlyGross <= 6250) return { employee: 270, employer: 630 };
+    if (monthlyGross <= 6750) return { employee: 292.50, employer: 682.50 };
+    if (monthlyGross <= 7250) return { employee: 315, employer: 735 };
+    if (monthlyGross <= 7750) return { employee: 337.50, employer: 787.50 };
+    if (monthlyGross <= 8250) return { employee: 360, employer: 840 };
+    if (monthlyGross <= 8750) return { employee: 382.50, employer: 892.50 };
+    if (monthlyGross <= 9250) return { employee: 405, employer: 945 };
+    if (monthlyGross <= 9750) return { employee: 427.50, employer: 997.50 };
+    if (monthlyGross <= 10250) return { employee: 450, employer: 1050 };
+    if (monthlyGross <= 10750) return { employee: 472.50, employer: 1102.50 };
+    if (monthlyGross <= 11250) return { employee: 495, employer: 1155 };
+    if (monthlyGross <= 11750) return { employee: 517.50, employer: 1207.50 };
+    if (monthlyGross <= 12250) return { employee: 540, employer: 1260 };
+    if (monthlyGross <= 12750) return { employee: 562.50, employer: 1312.50 };
+    if (monthlyGross <= 13250) return { employee: 585, employer: 1365 };
+    if (monthlyGross <= 13750) return { employee: 607.50, employer: 1417.50 };
+    if (monthlyGross <= 14250) return { employee: 630, employer: 1470 };
+    if (monthlyGross <= 14750) return { employee: 652.50, employer: 1522.50 };
+    if (monthlyGross <= 15250) return { employee: 675, employer: 1575 };
+    if (monthlyGross <= 15750) return { employee: 697.50, employer: 1627.50 };
+    if (monthlyGross <= 16250) return { employee: 720, employer: 1680 };
+    if (monthlyGross <= 16750) return { employee: 742.50, employer: 1732.50 };
+    if (monthlyGross <= 17250) return { employee: 765, employer: 1785 };
+    if (monthlyGross <= 17750) return { employee: 787.50, employer: 1837.50 };
+    if (monthlyGross <= 18250) return { employee: 810, employer: 1890 };
+    if (monthlyGross <= 18750) return { employee: 832.50, employer: 1942.50 };
+    if (monthlyGross <= 19250) return { employee: 855, employer: 1995 };
+    if (monthlyGross <= 19750) return { employee: 877.50, employer: 2047.50 };
+    if (monthlyGross <= 20250) return { employee: 900, employer: 2100 };
+    if (monthlyGross <= 20750) return { employee: 922.50, employer: 2152.50 };
+    if (monthlyGross <= 21250) return { employee: 945, employer: 2205 };
+    if (monthlyGross <= 21750) return { employee: 967.50, employer: 2257.50 };
+    if (monthlyGross <= 22250) return { employee: 990, employer: 2310 };
+    if (monthlyGross <= 22750) return { employee: 1012.50, employer: 2362.50 };
+    if (monthlyGross <= 23250) return { employee: 1035, employer: 2415 };
+    if (monthlyGross <= 23750) return { employee: 1057.50, employer: 2467.50 };
+    if (monthlyGross <= 24250) return { employee: 1080, employer: 2520 };
+    if (monthlyGross <= 24750) return { employee: 1102.50, employer: 2572.50 };
+    // Maximum (25000+)
+    return { employee: 1125, employer: 2625 };
+  };
+
+  const calculatePhilHealth = (monthlyGross) => {
+    // 2025 PhilHealth: 5% of monthly salary (2.5% employee, 2.5% employer)
+    const premium = monthlyGross * 0.05;
+    const maxPremium = 5000; // Maximum monthly premium
+    const actualPremium = Math.min(premium, maxPremium);
+    return {
+      employee: actualPremium / 2,
+      employer: actualPremium / 2
+    };
+  };
+
+  const calculatePagIBIG = (monthlyGross) => {
+    // 2025 Pag-IBIG: 1-2% employee, 2% employer
+    let employeeRate = monthlyGross <= 1500 ? 0.01 : 0.02;
+    let employeeContribution = monthlyGross * employeeRate;
+    let maxEmployee = 100;
+
+    return {
+      employee: Math.min(employeeContribution, maxEmployee),
+      employer: monthlyGross * 0.02
+    };
+  };
+
+  const calculateWithholdingTax = (monthlyGross, sss, philHealth, pagibig) => {
+    // Simplified withholding tax calculation (2025)
+    const taxableIncome = monthlyGross - sss - philHealth - pagibig;
+
+    if (taxableIncome <= 20833) return 0;
+    if (taxableIncome <= 33332) return (taxableIncome - 20833) * 0.15;
+    if (taxableIncome <= 66666) return 1874.85 + (taxableIncome - 33332) * 0.20;
+    if (taxableIncome <= 166666) return 8541.80 + (taxableIncome - 66666) * 0.25;
+    if (taxableIncome <= 666666) return 33541.80 + (taxableIncome - 166666) * 0.30;
+    return 183541.80 + (taxableIncome - 666666) * 0.35;
+  };
+
+  // Get configured overtime rate (or use default if disabled)
+  const getOvertimeRate = () => {
+    if (!payrollConfig) return 1.25; // Default
+    const config = payrollConfig.regularOvertime;
+    return config?.enabled ? config.rate : 1.0; // 100% if disabled
+  };
+
+  // Get configured night differential rate
+  const getNightDiffRate = () => {
+    if (!payrollConfig) return 0.10; // Default 10%
+    const config = payrollConfig.nightDifferential;
+    return config?.enabled ? config.rate : 0; // 0 if disabled
+  };
+
+  // Get configured holiday rates
+  const getHolidayRate = (isRegular) => {
+    if (!payrollConfig) return isRegular ? 2.0 : 1.3;
+    const config = isRegular ? payrollConfig.regularHoliday : payrollConfig.specialHoliday;
+    return config?.enabled ? config.rate : 1.0; // 100% if disabled
+  };
+
+  // Get rest day overtime rate
+  const getRestDayOTRate = () => {
+    if (!payrollConfig) return 1.30;
+    const config = payrollConfig.restDayOvertime;
+    return config?.enabled ? config.rate : 1.0;
+  };
+
+  const calculateEmployeePayroll = (employee, startDate, endDate, pendingCashAdvances = []) => {
+    // Get attendance for period - attendance uses employeeId field
+    const empAttendance = attendance.filter(a => {
+      const empId = a.employeeId || a.employee?._id;
+      if (!empId || empId !== employee._id) return false;
+      const attDate = parseISO(a.date);
+      return isWithinInterval(attDate, { start: startDate, end: endDate });
+    });
+
+    // Calculate hours
+    let totalHours = 0;
+    let regularHours = 0;
+    let overtimeHours = 0;
+    let nightDiffHours = 0;
+    let lateMinutes = 0;
+
+    empAttendance.forEach(record => {
+      if (!record.clockIn || !record.clockOut) return;
+
+      const clockIn = parseISO(`${record.date}T${record.clockIn}`);
+      const clockOut = parseISO(`${record.date}T${record.clockOut}`);
+      const hours = (clockOut - clockIn) / (1000 * 60 * 60);
+
+      totalHours += hours;
+      lateMinutes += record.lateMinutes || 0;
+
+      // Calculate actual night differential hours (10PM - 6AM)
+      // Night differential applies only to hours worked between 10:00 PM and 6:00 AM
+      const calculateNightHours = (start, end) => {
+        let nightHours = 0;
+        const startTime = new Date(start);
+        const endTime = new Date(end);
+
+        // Night period: 10 PM (22:00) to 6 AM (06:00)
+        // We need to check each hour of the shift
+        let current = new Date(startTime);
+
+        while (current < endTime) {
+          const hour = current.getHours();
+          // Night hours are 22, 23, 0, 1, 2, 3, 4, 5 (10 PM to 6 AM)
+          if (hour >= 22 || hour < 6) {
+            // Add partial hour or full hour
+            const nextHour = new Date(current);
+            nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+            const hoursInThisSlot = Math.min(
+              (nextHour - current) / (1000 * 60 * 60),
+              (endTime - current) / (1000 * 60 * 60)
+            );
+            nightHours += hoursInThisSlot;
+          }
+          current.setHours(current.getHours() + 1, 0, 0, 0);
+        }
+
+        return nightHours;
+      };
+
+      nightDiffHours += calculateNightHours(clockIn, clockOut);
+
+      if (hours > 8) {
+        regularHours += 8;
+        overtimeHours += (hours - 8);
+      } else {
+        regularHours += hours;
+      }
+    });
+
+    // Calculate pay using configurable rates
+    // Support both hourlyRate and dailyRate (dailyRate / 8 = hourlyRate)
+    const hourlyRate = employee.hourlyRate || (employee.dailyRate ? employee.dailyRate / 8 : 0);
+    const regularPay = regularHours * hourlyRate;
+    const overtimeRate = getOvertimeRate();
+    const overtimePay = overtimeHours * hourlyRate * overtimeRate;
+
+    // Calculate night differential pay
+    const nightDiffRate = getNightDiffRate();
+    const nightDiffPay = nightDiffHours * hourlyRate * nightDiffRate;
+
+    // Calculate commissions
+    const empTransactions = transactions.filter(t => {
+      if (t.employee?.id !== employee._id) return false;
+      const transDate = parseISO(t.date);
+      return isWithinInterval(transDate, { start: startDate, end: endDate });
+    });
+
+    let commissions = 0;
+    const commissionDetails = [];
+    empTransactions.forEach(t => {
+      let comm = 0;
+      if (employee.commission?.type === 'percentage') {
+        comm = t.totalAmount * (employee.commission.value / 100);
+      } else if (employee.commission?.type === 'fixed') {
+        comm = employee.commission.value;
+      }
+      commissions += comm;
+      commissionDetails.push({
+        receipt: t.receiptNumber || '—',
+        serviceTotal: t.totalAmount,
+        commission: comm,
+        date: t.date
+      });
+    });
+
+    // Gross pay (now includes night differential)
+    const grossPay = regularPay + overtimePay + nightDiffPay + commissions;
+
+    // Calculate monthly gross for deductions (semi-monthly × 2)
+    const monthlyGross = grossPay * 2;
+
+    // Calculate deductions
+    const sss = calculateSSS(monthlyGross);
+    const philHealth = calculatePhilHealth(monthlyGross);
+    const pagibig = calculatePagIBIG(monthlyGross);
+    const withholdingTax = calculateWithholdingTax(
+      monthlyGross,
+      sss.employee,
+      philHealth.employee,
+      pagibig.employee
+    );
+
+    // Cash advance deduction: sum of all approved-but-undeducted advances
+    // for this employee. The save flow will mark these as deducted so they
+    // don't get pulled into a future payroll.
+    const cashAdvanceTotal = pendingCashAdvances.reduce(
+      (sum, ca) => sum + Number(ca.amount || 0),
+      0
+    );
+    const cashAdvanceIds = pendingCashAdvances.map(ca => ca._id);
+
+    // Semi-monthly deductions (divide statutory contributions by 2; cash
+    // advances are deducted in full because they're a flat repayment, not a
+    // recurring monthly contribution).
+    const totalDeductions = (
+      (sss.employee / 2) +
+      (philHealth.employee / 2) +
+      (pagibig.employee / 2) +
+      (withholdingTax / 2) +
+      cashAdvanceTotal
+    );
+
+    const netPay = grossPay - totalDeductions;
+
+    const branchId = getEffectiveBranchId();
+    return {
+      employee,
+      ...(branchId && { branchId }),
+      daysWorked: empAttendance.length,
+      regularHours: Math.round(regularHours * 10) / 10,
+      overtimeHours: Math.round(overtimeHours * 10) / 10,
+      nightDiffHours: Math.round(nightDiffHours * 10) / 10,
+      lateMinutes,
+      regularPay,
+      overtimePay,
+      nightDiffPay,
+      commissions,
+      grossPay,
+      deductions: {
+        sss: sss.employee / 2,
+        philHealth: philHealth.employee / 2,
+        pagibig: pagibig.employee / 2,
+        withholdingTax: withholdingTax / 2,
+        cashAdvance: cashAdvanceTotal,
+        total: totalDeductions
+      },
+      netPay,
+      status: 'pending',
+      period: {
+        start: format(startDate, 'yyyy-MM-dd'),
+        end: format(endDate, 'yyyy-MM-dd')
+      },
+      // Store applied rates for payslip display
+      appliedRates: {
+        overtime: overtimeRate,
+        nightDiff: nightDiffRate
+      },
+      // Store breakdown details for clickable popovers
+      _hourlyRate: hourlyRate,
+      _commissionDetails: commissionDetails,
+      _monthlyGross: monthlyGross,
+      // IDs of cash advances rolled into this row's deductions. The save
+      // flow uses this list to mark them deducted_at = now() so they are
+      // not pulled into a future payroll run.
+      _cashAdvanceIds: cashAdvanceIds
+    };
+  };
+
+  const handleCalculatePayroll = async () => {
+    if (employees.length === 0) {
+      showToast('No active employees found', 'error');
+      return;
+    }
+
+    setCalculating(true);
+
+    const { startDate, endDate } = getPeriodDates();
+
+    // Fetch approved-but-undeducted cash advances per employee in parallel.
+    // These will be folded into each employee's deductions and the IDs
+    // stashed so the save flow can mark them deducted afterwards.
+    const cashAdvancesByEmployee = {};
+    try {
+      const lookups = await Promise.all(
+        employees.map(emp =>
+          CashAdvanceRequestRepository.getApprovedUndeductedByEmployee(emp._id)
+            .then(list => [emp._id, list])
+            .catch(() => [emp._id, []])
+        )
+      );
+      for (const [empId, list] of lookups) {
+        cashAdvancesByEmployee[empId] = list;
+      }
+    } catch (err) {
+      console.warn('[Payroll] cash advance lookup failed, continuing without:', err);
+    }
+
+    const calculated = employees.map(emp =>
+      calculateEmployeePayroll(emp, startDate, endDate, cashAdvancesByEmployee[emp._id] || [])
+    );
+
+    setPayrollData(calculated);
+    setCalculating(false);
+    showToast(`Payroll calculated for ${calculated.length} employees`, 'success');
+  };
+
+  const calculateSummary = () => {
+    return {
+      employees: payrollData.length,
+      grossPay: payrollData.reduce((sum, p) => sum + p.grossPay, 0),
+      totalDeductions: payrollData.reduce((sum, p) => sum + p.deductions.total, 0),
+      netPay: payrollData.reduce((sum, p) => sum + p.netPay, 0),
+      commissions: payrollData.reduce((sum, p) => sum + p.commissions, 0),
+      overtime: payrollData.reduce((sum, p) => sum + p.overtimePay, 0),
+      nightDiff: payrollData.reduce((sum, p) => sum + (p.nightDiffPay || 0), 0)
+    };
+  };
+
+  const summary = calculateSummary();
+
+  const handleViewPayslip = (payroll) => {
+    setSelectedPayslip(payroll);
+    setShowPayslipModal(true);
+  };
+
+  const handleGeneratePayslips = () => {
+    if (payrollData.length === 0) {
+      showToast('Please calculate payroll first', 'error');
+      return;
+    }
+    showToast('Payslips generated successfully!', 'success');
+    // In real app, would generate PDF files
+  };
+
+  const calculateGovRemittance = () => {
+    const totalSSS = { employee: 0, employer: 0 };
+    const totalPhilHealth = { employee: 0, employer: 0 };
+    const totalPagIBIG = { employee: 0, employer: 0 };
+
+    payrollData.forEach(p => {
+      const monthlyGross = p.grossPay * 2;
+      const sss = calculateSSS(monthlyGross);
+      const philHealth = calculatePhilHealth(monthlyGross);
+      const pagibig = calculatePagIBIG(monthlyGross);
+
+      totalSSS.employee += sss.employee;
+      totalSSS.employer += sss.employer;
+      totalPhilHealth.employee += philHealth.employee;
+      totalPhilHealth.employer += philHealth.employer;
+      totalPagIBIG.employee += pagibig.employee;
+      totalPagIBIG.employer += pagibig.employer;
+    });
+
+    return { totalSSS, totalPhilHealth, totalPagIBIG };
+  };
+
+  const handleApprovePayroll = (index) => {
+    const updated = [...payrollData];
+    updated[index].status = 'approved';
+    setPayrollData(updated);
+    showToast('Payroll approved', 'success');
+  };
+
+  const handleMarkAsPaid = (index) => {
+    if (payrollDisbursementsEnabled) {
+      // Open NextPay disbursement modal — local 'paid' state is set in onSubmitted.
+      setPayModalIndex(index);
+      return;
+    }
+    // Fallback when payroll disbursements toggle is off: legacy badge-only behavior.
+    const updated = [...payrollData];
+    updated[index].status = 'paid';
+    setPayrollData(updated);
+    showToast('Marked as paid', 'success');
+  };
+
+  const handleSavePayroll = async () => {
+    if (!user?.businessId) {
+      showToast('Cannot save: not logged in', 'error');
+      return;
+    }
+    if (payrollData.length === 0) {
+      showToast('Calculate payroll first', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const period0 = payrollData[0]?.period;
+      if (!period0?.start || !period0?.end) {
+        throw new Error('Period dates missing on payroll rows');
+      }
+      const branchId = getEffectiveBranchId();
+      const payload = {
+        business_id: user.businessId,
+        branch_id: branchId || null,
+        branch_name: selectedBranch?.name || user?.branchName || null,
+        period_label: `${format(parseISO(period0.start), 'MMM d, yyyy')} – ${format(parseISO(period0.end), 'MMM d, yyyy')}`,
+        period_start: period0.start,
+        period_end: period0.end,
+        period_type: period,
+        saved_by_user_id: user?.id || null,
+        saved_by_name: user
+          ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || user.email
+          : null,
+        rows: payrollData,
+        summary,
+      };
+      const saved = await SavedPayrollRepository.create(payload);
+      const savedPayrollId = saved?.id || null;
+
+      // Mark every cash advance rolled into this payroll as deducted so it
+      // isn't pulled into a future payroll's deductions. Best-effort —
+      // failures here log but don't block the save (the user already saw
+      // the toast and the saved_payrolls row is durable).
+      try {
+        const allCaIds = payrollData.flatMap(row => row._cashAdvanceIds || []);
+        if (allCaIds.length > 0) {
+          await Promise.all(
+            allCaIds.map(caId =>
+              CashAdvanceRequestRepository.markDeducted(caId, savedPayrollId)
+                .catch(e => console.warn('[Payroll] markDeducted failed for', caId, e))
+            )
+          );
+        }
+      } catch (markErr) {
+        console.warn('[Payroll] cash advance mark-deducted batch failed:', markErr);
+      }
+
+      showToast('Payroll saved to cloud', 'success');
+    } catch (err) {
+      console.error('[Payroll] save failed:', err);
+      showToast('Failed to save payroll: ' + (err?.message || 'unknown error'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Expose handleSavePayroll to HRHub via ref. Must come AFTER handleSavePayroll +
+  // summary are declared, otherwise the dep array hits a TDZ on first render.
+  useEffect(() => {
+    if (onSaveRef) onSaveRef.current = handleSavePayroll;
+  }, [onSaveRef, payrollData, user, selectedBranch, period, summary]);
+
+  if (loading) {
+    return <div className="page-loading"><div className="spinner"></div><p>Loading payroll data...</p></div>;
+  }
+
+  return (
+    <div className="payroll-page">
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1>Payroll Management</h1>
+            <p>Calculate and manage employee payroll with Philippine labor law compliance</p>
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+            <button className="btn btn-secondary" onClick={() => setShowGovRemittance(!showGovRemittance)}>
+              📊 Government Remittances
+            </button>
+            <button className="btn btn-secondary" onClick={handleGeneratePayslips} disabled={payrollData.length === 0}>
+              📄 Generate Payslips
+            </button>
+            <button className="btn btn-primary" onClick={handleCalculatePayroll}>
+              💰 Calculate Payroll
+            </button>
+          </div>
+        </div>
+      )}
+
+
+      {/* Period Selector — preset buttons populate the date inputs; inputs always editable */}
+      <div className="period-selector-section">
+        <label>Pay Period:</label>
+        <div className="period-buttons">
+          <button
+            type="button"
+            className={`period-btn ${period === 'current' ? 'active' : ''}`}
+            onClick={() => applyPreset('current')}
+            title="Semi-monthly (1-15 or 16-end of current month)"
+          >
+            Current Period
+          </button>
+          <button
+            type="button"
+            className={`period-btn ${period === 'last' ? 'active' : ''}`}
+            onClick={() => applyPreset('last')}
+            title="Previous semi-monthly cycle"
+          >
+            Last Period
+          </button>
+          <button
+            type="button"
+            className={`period-btn ${period === 'thisWeek' ? 'active' : ''}`}
+            onClick={() => applyPreset('thisWeek')}
+          >
+            This Week
+          </button>
+          <button
+            type="button"
+            className={`period-btn ${period === 'thisMonth' ? 'active' : ''}`}
+            onClick={() => applyPreset('thisMonth')}
+          >
+            This Month
+          </button>
+          <button
+            type="button"
+            className={`period-btn ${period === 'lastMonth' ? 'active' : ''}`}
+            onClick={() => applyPreset('lastMonth')}
+          >
+            Last Month
+          </button>
+        </div>
+        <div className="custom-date-range" style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.85rem', color: '#475569' }}>From</span>
+          <input
+            type="date"
+            value={customStartDate}
+            onChange={(e) => { setCustomStartDate(e.target.value); setPeriod('custom'); }}
+          />
+          <span style={{ fontSize: '0.85rem', color: '#475569' }}>to</span>
+          <input
+            type="date"
+            value={customEndDate}
+            onChange={(e) => { setCustomEndDate(e.target.value); setPeriod('custom'); }}
+          />
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+            (presets pre-fill these; you can still edit)
+          </span>
+        </div>
+        {payrollData.length > 0 && payrollData[0].period && (
+          <div className="payroll-period-banner" style={{
+            marginTop: '0.75rem',
+            padding: '0.5rem 0.85rem',
+            background: '#ecfdf5',
+            border: '1px solid #6ee7b7',
+            borderRadius: 6,
+            color: '#065f46',
+            fontSize: '0.9rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+          }}>
+            <span>📅</span>
+            <strong>Generated for:</strong>
+            <span>
+              {format(parseISO(payrollData[0].period.start), 'MMM d, yyyy')}
+              {' – '}
+              {format(parseISO(payrollData[0].period.end), 'MMM d, yyyy')}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Summary Cards */}
+      {payrollData.length > 0 && (
+        <div className="payroll-summary-grid">
+          <div className="payroll-summary-card total">
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <div className="payroll-summary-value">{summary.employees}</div>
+            <div className="payroll-summary-label">Employees</div>
+          </div>
+          <div className="payroll-summary-card gross">
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <path d="M12 8v8"/>
+                <path d="M8 12h8"/>
+                <line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+            </div>
+            <div className="payroll-summary-value">₱{summary.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="payroll-summary-label">Gross Pay</div>
+          </div>
+          <div className="payroll-summary-card deductions">
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                <polyline points="17 6 23 6 23 12"/>
+              </svg>
+            </div>
+            <div className="payroll-summary-value">₱{summary.totalDeductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="payroll-summary-label">Deductions</div>
+          </div>
+          <div className="payroll-summary-card net">
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v20"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div className="payroll-summary-value">₱{summary.netPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="payroll-summary-label">Net Pay</div>
+          </div>
+          <div className="payroll-summary-card commissions">
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v12"/>
+                <path d="M15 9.5c0-1.38-1.34-2.5-3-2.5s-3 1.12-3 2.5 1.34 2.5 3 2.5 3 1.12 3 2.5-1.34 2.5-3 2.5"/>
+              </svg>
+            </div>
+            <div className="payroll-summary-value">₱{summary.commissions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="payroll-summary-label">Commissions</div>
+          </div>
+          <div className="payroll-summary-card overtime">
+            <div className="payroll-summary-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div className="payroll-summary-value">₱{summary.overtime.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="payroll-summary-label">Overtime Pay</div>
+          </div>
+        </div>
+      )}
+
+      {/* Government Remittance */}
+      {showGovRemittance && payrollData.length > 0 && (
+        <div className="gov-remittance-section">
+          <h2>Government Remittances</h2>
+          <div className="gov-remittance-cards">
+            {(() => {
+              const { totalSSS, totalPhilHealth, totalPagIBIG } = calculateGovRemittance();
+              return (
+                <>
+                  <div className="gov-remittance-card">
+                    <h3>SSS Contribution</h3>
+                    <div className="gov-remittance-amount">
+                      ₱{(totalSSS.employee + totalSSS.employer).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="gov-remittance-breakdown">
+                      <div><span>Employee Share:</span><span>₱{totalSSS.employee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                      <div><span>Employer Share:</span><span>₱{totalSSS.employer.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                    </div>
+                    <button className="btn btn-sm btn-primary">Download SSS Report</button>
+                  </div>
+                  <div className="gov-remittance-card">
+                    <h3>PhilHealth Contribution</h3>
+                    <div className="gov-remittance-amount">
+                      ₱{(totalPhilHealth.employee + totalPhilHealth.employer).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="gov-remittance-breakdown">
+                      <div><span>Employee Share:</span><span>₱{totalPhilHealth.employee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                      <div><span>Employer Share:</span><span>₱{totalPhilHealth.employer.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                    </div>
+                    <button className="btn btn-sm btn-primary">Download PhilHealth Report</button>
+                  </div>
+                  <div className="gov-remittance-card">
+                    <h3>Pag-IBIG Contribution</h3>
+                    <div className="gov-remittance-amount">
+                      ₱{(totalPagIBIG.employee + totalPagIBIG.employer).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="gov-remittance-breakdown">
+                      <div><span>Employee Share:</span><span>₱{totalPagIBIG.employee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                      <div><span>Employer Share:</span><span>₱{totalPagIBIG.employer.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                    </div>
+                    <button className="btn btn-sm btn-primary">Download Pag-IBIG Report</button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Payroll Table */}
+      {payrollData.length === 0 ? (
+        <div className="empty-payroll">
+          <p>No payroll calculated yet</p>
+          <button className="btn btn-primary" onClick={handleCalculatePayroll}>Calculate Payroll</button>
+        </div>
+      ) : (
+        <div className="payroll-table-container">
+          <table className="payroll-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th className="number">Days</th>
+                <th className="number">Hours</th>
+                <th className="number">Regular Pay</th>
+                <th className="number">OT Pay</th>
+                <th className="number">Commission</th>
+                <th className="number">Gross Pay</th>
+                <th className="number">Deductions</th>
+                <th className="number">Net Pay</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payrollData.map((payroll, index) => (
+                <tr key={payroll.employee._id}>
+                  <td>
+                    <div className="payroll-employee-cell">
+                      <div className="payroll-employee-avatar">
+                        {payroll.employee?.firstName?.charAt(0)}{payroll.employee?.lastName?.charAt(0)}
+                      </div>
+                      <div className="payroll-employee-info">
+                        <span className="payroll-employee-name">
+                          {payroll.employee.firstName} {payroll.employee.lastName}
+                        </span>
+                        <span className="payroll-employee-position">{payroll.employee.position}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="number">{payroll.daysWorked}</td>
+                  <td className="number">{payroll.regularHours + payroll.overtimeHours}h</td>
+                  {['regularPay', 'overtimePay', 'commissions', 'grossPay', 'deductions', 'netPay'].map(field => {
+                    const value = field === 'deductions' ? payroll.deductions.total : payroll[field];
+                    const isActive = activeBreakdown?.employeeId === payroll.employee._id && activeBreakdown?.type === field;
+                    return (
+                      <td key={field} className="number" style={{ position: 'relative' }}>
+                        <span
+                          className="payroll-clickable-value"
+                          onClick={() => toggleBreakdown(payroll.employee._id, field)}
+                        >
+                          {formatPeso(value)}
+                        </span>
+                        {isActive && (
+                          <BreakdownPopover
+                            type={field}
+                            payroll={payroll}
+                            onClose={() => setActiveBreakdown(null)}
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td>
+                    <span className={`payroll-status-badge ${payroll.status}`}>
+                      {payroll.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="payroll-actions">
+                      <button className="btn btn-xs btn-secondary" onClick={() => handleViewPayslip(payroll)}>
+                        View
+                      </button>
+                      {payroll.status === 'pending' && (
+                        <button className="btn btn-xs btn-success" onClick={() => handleApprovePayroll(index)}>
+                          Approve
+                        </button>
+                      )}
+                      {payroll.status === 'approved' && (
+                        <button className="btn btn-xs btn-primary" onClick={() => handleMarkAsPaid(index)}>
+                          Pay
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Calculating Overlay */}
+      {calculating && (
+        <div className="calculating-overlay">
+          <div className="calculating-modal">
+            <div className="spinner"></div>
+            <h3>Calculating Payroll...</h3>
+            <p>Processing {employees.length} employees</p>
+          </div>
+        </div>
+      )}
+
+      {/* Pay via NextPay modal — synthetic source_id since payroll rows aren't
+          persisted (Phase C deferred). Disbursement record created + audit log
+          shows it in /disbursements; local row badge flips to 'paid' optimistically. */}
+      {payModalIndex !== null && payrollData[payModalIndex] && (() => {
+        const row = payrollData[payModalIndex];
+        const emp = row.employee;
+        const periodKey = (row.period?.start || '').replace(/-/g, '');
+        return (
+          <PayDisbursementModal
+            sourceType="payroll_request"
+            sourceId={`payroll-${emp._id}-${row.period?.start || 'na'}`}
+            businessId={user?.businessId}
+            branchId={getEffectiveBranchId?.()}
+            amount={row.netPay}
+            recipient={{
+              name: `${emp.firstName ?? emp.first_name ?? ''} ${emp.lastName ?? emp.last_name ?? ''}`.trim() || 'Employee',
+              firstName: emp.firstName ?? emp.first_name,
+              lastName: emp.lastName ?? emp.last_name,
+              email: emp.email,
+              phone: emp.phone,
+              payout: {
+                bankCode: emp.payoutBankCode ?? emp.payout_bank_code ?? null,
+                accountNumber: emp.payoutAccountNumber || emp.payout_account_number || '',
+                accountName: emp.payoutAccountName || emp.payout_account_name
+                  || `${emp.firstName ?? emp.first_name ?? ''} ${emp.lastName ?? emp.last_name ?? ''}`.trim() || '',
+                method: emp.payoutMethod || emp.payout_method || 'instapay',
+              },
+            }}
+            recipientEntity={{ table: 'employees', id: emp._id }}
+            referenceCode={`PAY-${String(emp._id).slice(-4)}-${periodKey || 'na'}`}
+            onClose={() => setPayModalIndex(null)}
+            onSubmitted={() => {
+              const updated = [...payrollData];
+              updated[payModalIndex].status = 'paid';
+              setPayrollData(updated);
+              setPayModalIndex(null);
+              showToast('Disbursement submitted to NextPay', 'success');
+            }}
+          />
+        );
+      })()}
+
+      {/* Payslip Modal — extracted to shared component for reuse in Saved Payrolls viewer */}
+      {showPayslipModal && selectedPayslip && (
+        <PayslipModal
+          payslip={selectedPayslip}
+          businessName="DAET MASSAGE & SPA"
+          onClose={() => setShowPayslipModal(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Payroll;

@@ -1,0 +1,2606 @@
+/**
+ * Supabase Sync Manager
+ *
+ * Handles synchronization between local Dexie database and Supabase cloud.
+ * Supports offline-first architecture with real-time cross-device updates.
+ */
+
+import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { db } from '../../db';
+import NetworkDetector from '../sync/NetworkDetector';
+import authService from './authService';
+import dataChangeEmitter from '../sync/DataChangeEmitter';
+import {
+  upsertPayrollConfig,
+  deletePayrollConfigKey,
+  upsertServiceRotation,
+  deleteServiceRotation,
+  restInsert,
+  restUpdateById,
+  restSoftDeleteById,
+  restSelect,
+} from '../brandingService';
+
+/**
+ * Debounce utility for batching rapid data changes
+ */
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+/**
+ * Race a promise against a hard timeout. Resolves with the original
+ * promise's result, or rejects with a timeout error after `ms`. Used to
+ * cap supabase-js calls (especially reads) so a stuck call can't freeze
+ * the entire sync loop indefinitely.
+ */
+function withTimeout(promise, ms, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+// Auto-revive cooldown: a queue item parked as `failed` becomes eligible
+// for a fresh retry after this many minutes. Lets devices self-heal once
+// the underlying issue (e.g. expired token, transient outage) is gone.
+const FAILED_REVIVE_COOLDOWN_MS = 5 * 60 * 1000;
+
+/**
+ * Validate if a string is a valid UUID
+ */
+function isValidUUID(str) {
+  if (!str || typeof str !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+/**
+ * Generate a UUID v4 (for repairing old non-UUID IDs)
+ */
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Entities that can be synced to Supabase
+const SYNCABLE_ENTITIES = [
+  // Core entities (CRITICAL - must be synced)
+  'business', 'users',
+  // Products & Services
+  'products', 'employees', 'customers', 'suppliers', 'rooms',
+  // Operations
+  'transactions', 'appointments', 'expenses', 'giftCertificates',
+  // Inventory
+  'purchaseOrders', 'inventoryMovements', 'stockHistory', 'productConsumption',
+  // HR
+  'attendance', 'shiftSchedules', 'activityLogs', 'payrollRequests',
+  'payrollConfig', 'payrollConfigLogs', 'timeOffRequests',
+  // HR Requests
+  'otRequests', 'leaveRequests', 'cashAdvanceRequests', 'incidentReports',
+  // Financial
+  'cashDrawerSessions', 'cashDrawerShifts',
+  // Settings & Config (no 'settings' — handled directly via businesses table)
+  'businessConfig', 'serviceRotation',
+  // Services & Bookings
+  'loyaltyHistory', 'advanceBookings', 'activeServices', 'homeServices',
+  // Pahatid — universal drop-off requests
+  'transportRequests'
+];
+
+// Map Dexie table names to Supabase table names (snake_case)
+const TABLE_NAME_MAP = {
+  business: 'businesses', // Special case: singular to plural
+  giftCertificates: 'gift_certificates',
+  purchaseOrders: 'purchase_orders',
+  shiftSchedules: 'shift_schedules',
+  activityLogs: 'activity_logs',
+  payrollRequests: 'payroll_requests',
+  timeOffRequests: 'time_off_requests',
+  inventoryMovements: 'inventory_movements',
+  stockHistory: 'stock_history',
+  productConsumption: 'product_consumption',
+  cashDrawerSessions: 'cash_drawer_sessions',
+  cashDrawerShifts: 'cash_drawer_shifts',
+  payrollConfig: 'payroll_config',
+  payrollConfigLogs: 'payroll_config_logs',
+  businessConfig: 'business_config',
+  serviceRotation: 'service_rotation',
+  loyaltyHistory: 'loyalty_history',
+  advanceBookings: 'advance_bookings',
+  activeServices: 'active_services',
+  homeServices: 'home_services',
+  transportRequests: 'transport_requests',
+  // HR Requests
+  otRequests: 'ot_requests',
+  leaveRequests: 'leave_requests',
+  cashAdvanceRequests: 'cash_advance_requests',
+  incidentReports: 'incident_reports',
+};
+
+// Per-entity pull cooldowns (ms). Realtime subscriptions deliver live
+// changes for every entity (see _setupRealtimeSubscriptions), so the REST
+// pull in _pullChanges is only a reconciliation safety net for when the
+// websocket drops. Without cooldowns, a tab that triggers visibility
+// events repeatedly would re-pull all ~30 tables on every focus, which
+// dominates traffic on small Supabase instances and produces 522/524
+// timeouts. forcePull() clears syncMetadata first so it bypasses these.
+const DEFAULT_PULL_COOLDOWN_MS = 60 * 1000;
+const PULL_COOLDOWN_MS = {
+  // Hot — operational data that must be fresh on every reconciliation
+  attendance: 0,
+  transactions: 0,
+  appointments: 0,
+  advanceBookings: 0,
+  activeServices: 0,
+  homeServices: 0,
+  transportRequests: 0,
+  cashDrawerSessions: 0,
+  cashDrawerShifts: 0,
+  activityLogs: 0,
+  // Cold — config that rarely changes; trust realtime between long pulls
+  business: 5 * 60 * 1000,
+  businessConfig: 5 * 60 * 1000,
+  payrollConfig: 5 * 60 * 1000,
+  payrollConfigLogs: 5 * 60 * 1000,
+  serviceRotation: 5 * 60 * 1000,
+  // (everything else falls through to DEFAULT_PULL_COOLDOWN_MS)
+};
+
+// Valid Supabase columns per table (prevents sending non-existent columns)
+// This must match your actual Supabase table schemas
+const SUPABASE_TABLE_COLUMNS = {
+  // === Core Entities ===
+  employees: [
+    'id', 'business_id', 'first_name', 'last_name', 'email', 'phone',
+    'department', 'position', 'status', 'hire_date', 'hourly_rate', 'daily_rate',
+    'commission_rate', 'commission', 'monthly_rate', 'photo_url', 'address',
+    'emergency_contact', 'skills', 'metadata', 'notes', 'gender', 'branch_id',
+    'payout_bank_code', 'payout_account_number', 'payout_account_name', 'payout_method',
+    'sync_status', 'created_at', 'updated_at', 'deleted', 'deleted_at'
+  ],
+  users: [
+    'id', 'auth_id', 'email', 'username', 'first_name', 'last_name',
+    'role', 'business_id', 'employee_id', 'status', 'last_login',
+    'password', 'branch_id', 'sync_status',
+    'created_at', 'updated_at', 'deleted'
+  ],
+  customers: [
+    'id', 'business_id', 'name', 'first_name', 'last_name', 'email', 'phone',
+    'address', 'birthday', 'gender', 'notes', 'status', 'tier', 'total_spent', 'visit_count',
+    'last_visit', 'loyalty_points', 'preferences', 'branch_id', 'sync_status',
+    'created_at', 'updated_at', 'deleted', 'deleted_at'
+  ],
+  products: [
+    'id', 'business_id', 'name', 'type', 'category', 'description', 'price',
+    'cost', 'duration', 'active', 'stock_quantity', 'reorder_level', 'sku',
+    'services_since_last_adjustment', 'image_url', 'hide_from_pos', 'items_used',
+    'metadata', 'sync_status', 'branch_id', 'display_order',
+    // Unit of measurement (pcs, L, kg, etc.). Without this in the allowlist
+    // the sync strips it on push and the inventory/stock UI falls back to
+    // the 'pcs' default on every other device.
+    'unit',
+    'created_at', 'updated_at', 'deleted', 'deleted_at'
+  ],
+  rooms: [
+    'id', 'business_id', 'name', 'type', 'capacity', 'description', 'status',
+    'amenities', 'advance_booking_id', 'service_duration', 'branch_id',
+    'assigned_employee_id', 'assigned_employee_name', 'customer_name',
+    'customer_phone', 'customer_email', 'service_names', 'transaction_id',
+    'start_time', 'payment_timing', 'display_order',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  suppliers: [
+    'id', 'business_id', 'name', 'contact_person', 'email', 'phone',
+    'address', 'payment_terms', 'notes', 'status', 'branch_id',
+    'payout_bank_code', 'payout_account_number', 'payout_account_name', 'payout_method',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+
+  // === Operations ===
+  transactions: [
+    'id', 'business_id', 'customer_id', 'employee_id', 'date',
+    'subtotal', 'discount', 'discount_type', 'tax', 'service_charge',
+    'total', 'total_amount', 'payment_method', 'amount_paid', 'change_amount',
+    'amount_received', 'change_given', 'status', 'items', 'notes',
+    'receipt_number', 'gift_certificate_code', 'gift_certificate_amount',
+    'card_transaction_id', 'gcash_reference', 'booking_source',
+    'room_id', 'room_name', 'is_home_service', 'home_service_address',
+    'employee', 'customer', 'upgrade_history',
+    'cashier_id', 'cashier_name', 'shift_id', 'drawer_session_id',
+    'branch_id', 'pax_count', 'guest_summary',
+    // Void + cancel audit. voided_* fires from Service History's Void
+    // button; cancelled_* fires when a service is cancelled in Rooms and
+    // the link cascades to the transaction. Both routes must round-trip
+    // through Supabase so reports on other devices reflect the same
+    // exclusion logic ServiceHistory applies locally.
+    'voided_at', 'voided_by', 'void_reason',
+    'cancelled_at', 'cancelled_by', 'cancelled_by_role', 'cancel_reason',
+    // Under-time audit. Therapist stopped an in-progress service before
+    // the scheduled duration completed — status flips to 'under_time' and
+    // actual vs scheduled duration is stamped so management can audit.
+    'under_time_at', 'actual_duration', 'scheduled_duration',
+    'stopped_by', 'stopped_by_role', 'stop_reason',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  appointments: [
+    'id', 'business_id', 'customer_id', 'employee_id', 'room_id',
+    'scheduled_date_time', 'duration', 'service_id', 'service_name',
+    'status', 'notes', 'branch_id', 'pax_count',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  expenses: [
+    'id', 'business_id', 'date', 'category', 'expense_type', 'amount',
+    'description', 'vendor', 'receipt_url', 'status', 'approved_by',
+    'payment_method', 'branch_id',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  gift_certificates: [
+    'id', 'business_id', 'code', 'amount', 'balance',
+    'recipient_name', 'recipient_email', 'purchaser_name',
+    'status', 'expiry_date', 'no_expiry', 'usage_history', 'message',
+    'branch_id', 'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+
+  // === Inventory ===
+  purchase_orders: [
+    'id', 'business_id', 'supplier_id', 'supplier_name', 'order_date', 'expected_date',
+    'status', 'items', 'total', 'notes', 'branch_id',
+    'payment_status', 'paid_at', 'paid_by', 'disbursement_id',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  inventory_movements: [
+    'id', 'business_id', 'product_id', 'type', 'quantity', 'date',
+    'reference_id', 'notes', 'branch_id',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+  stock_history: [
+    'id', 'business_id', 'product_id', 'date', 'type',
+    'quantity_before', 'quantity_after', 'reason', 'user_id', 'branch_id',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+  product_consumption: [
+    'id', 'business_id', 'product_id', 'date', 'month',
+    'quantity_used', 'transaction_id', 'service_id', 'employee_id', 'branch_id',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+
+  // === HR ===
+  attendance: [
+    'id', 'business_id', 'employee_id', 'date', 'clock_in', 'clock_out',
+    'status', 'hours_worked', 'overtime_hours', 'late_minutes', 'notes',
+    'clock_in_location', 'clock_out_location', 'clock_in_gps', 'clock_out_gps',
+    'clock_in_photo', 'clock_out_photo', 'is_out_of_range', 'branch_id',
+    // Actor audit — who pressed Clock In / Clock Out. Distinct from
+    // employee_id (whose attendance this is) so the trail can tell
+    // self-clock apart from a manager / receptionist clocking the
+    // employee in or out on their behalf.
+    'clocked_in_by', 'clocked_in_by_id', 'clocked_in_by_role',
+    'clocked_out_by', 'clocked_out_by_id', 'clocked_out_by_role',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+  shift_schedules: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'employee_position',
+    'week_start', 'effective_date', 'is_active', 'schedule', 'weekly_schedule',
+    'notes', 'branch_id', 'sync_status', 'created_by', 'created_at', 'updated_at'
+  ],
+  payroll_config: [
+    'id', 'business_id', 'key', 'value', 'updated_at'
+  ],
+  payroll_config_logs: [
+    'id', 'business_id', 'user_id', 'user_name', 'changes', 'timestamp',
+    'updated_at'
+  ],
+  payroll_requests: [
+    'id', 'business_id', 'employee_id', 'request_type', 'amount',
+    'status', 'requested_date', 'approved_by', 'approved_at', 'notes',
+    'branch_id', 'sync_status', 'created_at', 'updated_at'
+  ],
+  time_off_requests: [
+    'id', 'business_id', 'employee_id', 'start_date', 'end_date',
+    'type', 'status', 'reason', 'approved_by', 'branch_id',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+
+  // === HR Requests ===
+  ot_requests: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'date', 'start_time', 'end_time',
+    'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason', 'branch_id',
+    'created_at', 'updated_at'
+  ],
+  leave_requests: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'type', 'start_date', 'end_date',
+    'reason', 'status', 'approved_by', 'approved_at', 'rejection_reason', 'branch_id',
+    'created_at', 'updated_at'
+  ],
+  cash_advance_requests: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'amount', 'reason',
+    'status', 'approved_by', 'approved_at', 'rejection_reason', 'branch_id',
+    'paid_at', 'paid_by', 'disbursement_id',
+    'deducted_at', 'deducted_in_payroll_id',
+    'created_at', 'updated_at'
+  ],
+  incident_reports: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'title', 'description',
+    'incident_date', 'status', 'acknowledged_by', 'acknowledged_at', 'review_notes',
+    'resolved_by', 'resolved_at', 'resolution', 'closed_by', 'closed_at', 'closing_notes',
+    'branch_id', 'created_at', 'updated_at'
+  ],
+
+  // === Financial ===
+  cash_drawer_sessions: [
+    'id', 'business_id', 'user_id', 'user_name', 'user_role',
+    'opened_by', 'opened_by_name', 'closed_by', 'closed_by_name',
+    'open_date', 'open_time', 'close_time',
+    'opening_balance', 'opening_float', 'closing_balance',
+    'expected_balance', 'expected_cash', 'actual_cash',
+    'difference', 'variance',
+    'status', 'transactions', 'notes', 'branch_id',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+  cash_drawer_shifts: [
+    'id', 'business_id', 'session_id', 'branch_id',
+    'user_id', 'user_name', 'user_role',
+    'start_time', 'end_time', 'start_count', 'end_count',
+    'cash_sales', 'variance', 'status', 'notes',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+
+  // === Reports (cloud-only; sync bypassed but kept here for forward-compat) ===
+  saved_reports: [
+    'id', 'business_id', 'branch_id', 'branch_name',
+    'period', 'period_label', 'period_key',
+    'saved_by_user_id', 'saved_by_name',
+    'data', 'manual',
+    'created_at'
+  ],
+  saved_payrolls: [
+    'id', 'business_id', 'branch_id', 'branch_name',
+    'period_label', 'period_start', 'period_end', 'period_type',
+    'saved_by_user_id', 'saved_by_name',
+    'rows', 'summary',
+    'created_at'
+  ],
+
+  // === Services & Bookings ===
+  advance_bookings: [
+    'id', 'business_id', 'customer_id', 'customer_name', 'employee_id',
+    'employee_name', 'booking_date_time', 'status', 'services', 'total_amount',
+    'service_name', 'estimated_duration', 'service_price',
+    'room_id', 'room_name', 'is_home_service',
+    'client_name', 'client_phone', 'client_email', 'client_address',
+    'payment_method', 'payment_timing', 'payment_status', 'transaction_id',
+    'special_requests', 'client_notes',
+    'cancel_reason', 'cancelled_at', 'cancelled_by', 'cancelled_by_role',
+    'notes', 'branch_id', 'pax_count', 'guest_summary',
+    // Pasundo + rider acknowledgement — therapist may run a home service via
+    // an advance booking (scheduled) instead of a walk-in home_services row.
+    'pickup_requested_at', 'pickup_requested_by', 'pickup_requested_by_role',
+    'pickup_requested_by_user_id',
+    'pickup_acknowledged_at', 'pickup_acknowledged_by', 'pickup_acknowledged_by_user_id',
+    'sync_status', 'deleted', 'deleted_at',
+    'created_at', 'updated_at'
+  ],
+  active_services: [
+    'id', 'business_id', 'room_id', 'advance_booking_id', 'customer_id',
+    'employee_id', 'service_id', 'status', 'start_time', 'end_time', 'duration',
+    'branch_id', 'guest_number',
+    'sync_status', 'created_at', 'updated_at'
+  ],
+  home_services: [
+    'id', 'business_id', 'employee_id', 'employee_name', 'transaction_id',
+    'customer_id', 'customer_name', 'customer_phone', 'customer_email',
+    'status', 'scheduled_time', 'address', 'notes', 'services',
+    'service_names', 'service_duration', 'branch_id',
+    // Pricing — surfaced on the rider card so they know "magkano need
+    // bayaran" at the destination without re-pulling the transaction.
+    'service_price', 'total_amount', 'pax_count',
+    // Lifecycle stamps. start_time mirrors active_services/rooms so the
+    // rider can show the same countdown as the therapist's Rooms page.
+    'start_time', 'started_at', 'started_by',
+    'completed_at', 'completed_by', 'completion_notes',
+    'cancelled_at', 'cancelled_by', 'cancellation_reason',
+    // Pasundo — therapist's pickup request. Notification fans out to
+    // riders in the branch when pickup_requested_at flips from null.
+    'pickup_requested_at', 'pickup_requested_by', 'pickup_requested_by_role',
+    'pickup_requested_by_user_id',
+    // Rider acknowledgement — rider taps "On my way" on their pasundo card.
+    // Flips the therapist's Rooms card from yellow to green and fires a
+    // one-shot ping to the originating therapist.
+    'pickup_acknowledged_at', 'pickup_acknowledged_by', 'pickup_acknowledged_by_user_id',
+    // Rider completion — rider taps "Done" after the pickup. Hides the
+    // card from the rider's active list and flips the therapist's badge.
+    'pickup_completed_at', 'pickup_completed_by', 'pickup_completed_by_user_id',
+    // Live location tracking — each side publishes its own GPS fix every
+    // ~15s while a pasundo is active so the other side can render a map.
+    'rider_current_lat', 'rider_current_lng', 'rider_location_updated_at',
+    'therapist_current_lat', 'therapist_current_lng', 'therapist_location_updated_at',
+    'sync_status', 'deleted', 'deleted_at', 'created_at', 'updated_at'
+  ],
+  service_rotation: [
+    'id', 'business_id', 'date', 'rotation_data', 'created_at', 'updated_at'
+  ],
+  transport_requests: [
+    'id', 'business_id', 'branch_id',
+    'requested_by_user_id', 'requested_by_name', 'requested_by_role',
+    'pickup_address', 'destination_address', 'reason',
+    'status', 'requested_at',
+    'acknowledged_at', 'acknowledged_by', 'acknowledged_by_user_id',
+    'completed_at', 'completed_by', 'completed_by_user_id',
+    'cancelled_at', 'cancelled_by', 'cancellation_reason',
+    'sync_status', 'deleted', 'deleted_at',
+    'created_at', 'updated_at'
+  ],
+
+  // === Logs & History ===
+  activity_logs: [
+    'id', 'business_id', 'user_id', 'user_name', 'type', 'action',
+    'entity_type', 'entity_id', 'details', 'ip_address', 'timestamp', 'branch_id',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+  loyalty_history: [
+    'id', 'business_id', 'customer_id', 'date', 'type', 'points',
+    'balance_after', 'reference_id', 'notes', 'branch_id',
+    'sync_status', 'deleted', 'created_at', 'updated_at'
+  ],
+  // All tables are now whitelisted - no more unfiltered pass-through
+};
+
+// Map camelCase field names to snake_case for Supabase
+const FIELD_NAME_MAP = {
+  scheduledDateTime: 'scheduled_date_time',
+  employeeId: 'employee_id',
+  customerId: 'customer_id',
+  productId: 'product_id',
+  supplierId: 'supplier_id',
+  roomId: 'room_id',
+  transactionId: 'transaction_id',
+  businessId: 'business_id',
+  userId: 'user_id',
+  authId: 'auth_id',
+  firstName: 'first_name',
+  lastName: 'last_name',
+  orderDate: 'order_date',
+  expectedDate: 'expected_date',
+  openTime: 'open_time',
+  closeTime: 'close_time',
+  openDate: 'open_date',
+  openingBalance: 'opening_balance',
+  openingFloat: 'opening_float',
+  closingBalance: 'closing_balance',
+  expectedBalance: 'expected_balance',
+  expectedCash: 'expected_cash',
+  actualCash: 'actual_cash',
+  openedBy: 'opened_by',
+  openedByName: 'opened_by_name',
+  closedBy: 'closed_by',
+  closedByName: 'closed_by_name',
+  cashierId: 'cashier_id',
+  cashierName: 'cashier_name',
+  shiftId: 'shift_id',
+  drawerSessionId: 'drawer_session_id',
+  sessionId: 'session_id',
+  startCount: 'start_count',
+  endCount: 'end_count',
+  cashSales: 'cash_sales',
+  recipientName: 'recipient_name',
+  recipientEmail: 'recipient_email',
+  purchaserName: 'purchaser_name',
+  expiryDate: 'expiry_date',
+  clockIn: 'clock_in',
+  clockOut: 'clock_out',
+  hoursWorked: 'hours_worked',
+  weekStart: 'week_start',
+  isActive: 'is_active',
+  requestType: 'request_type',
+  requestedDate: 'requested_date',
+  approvedBy: 'approved_by',
+  approvedAt: 'approved_at',
+  deductedAt: 'deducted_at',
+  deductedInPayrollId: 'deducted_in_payroll_id',
+  startDate: 'start_date',
+  endDate: 'end_date',
+  quantityBefore: 'quantity_before',
+  quantityAfter: 'quantity_after',
+  quantityUsed: 'quantity_used',
+  hireDate: 'hire_date',
+  hourlyRate: 'hourly_rate',
+  commissionRate: 'commission_rate',
+  photoUrl: 'photo_url',
+  totalSpent: 'total_spent',
+  visitCount: 'visit_count',
+  lastVisit: 'last_visit',
+  loyaltyPoints: 'loyalty_points',
+  contactPerson: 'contact_person',
+  stock: 'stock_quantity',
+  stockQuantity: 'stock_quantity',
+  lowStockAlert: 'reorder_level',
+  reorderLevel: 'reorder_level',
+  servicesSinceLastAdjustment: 'services_since_last_adjustment',
+  imageUrl: 'image_url',
+  displayOrder: 'display_order',
+  receiptNumber: 'receipt_number',
+  paymentMethod: 'payment_method',
+  receiptUrl: 'receipt_url',
+  expenseType: 'expense_type',
+  balanceAfter: 'balance_after',
+  referenceId: 'reference_id',
+  bookingDateTime: 'booking_date_time',
+  startTime: 'start_time',
+  endTime: 'end_time',
+  scheduledTime: 'scheduled_time',
+  advanceBookingId: 'advance_booking_id',
+  serviceId: 'service_id',
+  ipAddress: 'ip_address',
+  entityType: 'entity_type',
+  entityId: 'entity_id',
+  rotationData: 'rotation_data',
+  lastServed: 'last_served',
+  deviceId: 'device_id',
+  retryCount: 'retry_count',
+  processedAt: 'processed_at',
+  lastLogin: 'last_login',
+  lastSyncTimestamp: 'last_sync_timestamp',
+  lastPushTimestamp: 'last_push_timestamp',
+  lastPullTimestamp: 'last_pull_timestamp',
+  itemCount: 'item_count',
+  // Product fields
+  hideFromPOS: 'hide_from_pos',
+  stockQuantity: 'stock_quantity',
+  reorderLevel: 'reorder_level',
+  itemsUsed: 'items_used',
+  noExpiry: 'no_expiry',
+  usageHistory: 'usage_history',
+  giftCertificateCode: 'gift_certificate_code',
+  giftCertificateAmount: 'gift_certificate_amount',
+  serviceCharge: 'service_charge',
+  discountType: 'discount_type',
+  amountPaid: 'amount_paid',
+  changeAmount: 'change_amount',
+  serviceName: 'service_name',
+  customerName: 'customer_name',
+  totalAmount: 'total_amount',
+  amountReceived: 'amount_received',
+  cardTransactionId: 'card_transaction_id',
+  gcashReference: 'gcash_reference',
+  bookingSource: 'booking_source',
+  roomId: 'room_id',
+  roomName: 'room_name',
+  isHomeService: 'is_home_service',
+  homeServiceAddress: 'home_service_address',
+  assignedEmployeeId: 'assigned_employee_id',
+  assignedEmployeeName: 'assigned_employee_name',
+  customerPhone: 'customer_phone',
+  customerEmail: 'customer_email',
+  serviceNames: 'service_names',
+  transactionId: 'transaction_id',
+  paymentTiming: 'payment_timing',
+  dailyRate: 'daily_rate',
+  monthlyRate: 'monthly_rate',
+  commissionRate: 'commission_rate',
+  supplierName: 'supplier_name',
+  employeeName: 'employee_name',
+  estimatedDuration: 'estimated_duration',
+  servicePrice: 'service_price',
+  clientName: 'client_name',
+  clientPhone: 'client_phone',
+  clientEmail: 'client_email',
+  clientAddress: 'client_address',
+  clientNotes: 'client_notes',
+  specialRequests: 'special_requests',
+  cancelReason: 'cancel_reason',
+  cancelledAt: 'cancelled_at',
+  cancelledBy: 'cancelled_by',
+  cancelledByRole: 'cancelled_by_role',
+  cancellationReason: 'cancellation_reason',
+  startedAt: 'started_at',
+  startedBy: 'started_by',
+  completedAt: 'completed_at',
+  completedBy: 'completed_by',
+  completionNotes: 'completion_notes',
+  pickupRequestedAt: 'pickup_requested_at',
+  pickupRequestedBy: 'pickup_requested_by',
+  pickupRequestedByRole: 'pickup_requested_by_role',
+  pickupRequestedByUserId: 'pickup_requested_by_user_id',
+  pickupAcknowledgedAt: 'pickup_acknowledged_at',
+  pickupAcknowledgedBy: 'pickup_acknowledged_by',
+  pickupAcknowledgedByUserId: 'pickup_acknowledged_by_user_id',
+  pickupCompletedAt: 'pickup_completed_at',
+  pickupCompletedBy: 'pickup_completed_by',
+  pickupCompletedByUserId: 'pickup_completed_by_user_id',
+  // Transport requests / Pahatid
+  requestedByUserId: 'requested_by_user_id',
+  requestedByName: 'requested_by_name',
+  requestedByRole: 'requested_by_role',
+  pickupAddress: 'pickup_address',
+  destinationAddress: 'destination_address',
+  requestedAt: 'requested_at',
+  acknowledgedAt: 'acknowledged_at',
+  acknowledgedBy: 'acknowledged_by',
+  acknowledgedByUserId: 'acknowledged_by_user_id',
+  completedByUserId: 'completed_by_user_id',
+  riderCurrentLat: 'rider_current_lat',
+  riderCurrentLng: 'rider_current_lng',
+  riderLocationUpdatedAt: 'rider_location_updated_at',
+  therapistCurrentLat: 'therapist_current_lat',
+  therapistCurrentLng: 'therapist_current_lng',
+  therapistLocationUpdatedAt: 'therapist_location_updated_at',
+  voidReason: 'void_reason',
+  voidedAt: 'voided_at',
+  voidedBy: 'voided_by',
+  // Under-time audit fields (transactions)
+  underTimeAt: 'under_time_at',
+  actualDuration: 'actual_duration',
+  scheduledDuration: 'scheduled_duration',
+  stoppedBy: 'stopped_by',
+  stoppedByRole: 'stopped_by_role',
+  stopReason: 'stop_reason',
+  // Attendance actor audit
+  clockedInBy: 'clocked_in_by',
+  clockedInById: 'clocked_in_by_id',
+  clockedInByRole: 'clocked_in_by_role',
+  clockedOutBy: 'clocked_out_by',
+  clockedOutById: 'clocked_out_by_id',
+  clockedOutByRole: 'clocked_out_by_role',
+  serviceDuration: 'service_duration',
+  employeePosition: 'employee_position',
+  isOutOfRange: 'is_out_of_range',
+  clockInGps: 'clock_in_gps',
+  clockOutGps: 'clock_out_gps',
+  clockInPhoto: 'clock_in_photo',
+  clockOutPhoto: 'clock_out_photo',
+  paymentStatus: 'payment_status',
+  paidAt: 'paid_at',
+  paidBy: 'paid_by',
+  disbursementId: 'disbursement_id',
+  overtimeHours: 'overtime_hours',
+  lateMinutes: 'late_minutes',
+  clockInLocation: 'clock_in_location',
+  clockOutLocation: 'clock_out_location',
+  emergencyContact: 'emergency_contact',
+  paymentTerms: 'payment_terms',
+  deletedAt: 'deleted_at',
+  // HR Request fields
+  employeeName: 'employee_name',
+  incidentDate: 'incident_date',
+  acknowledgedBy: 'acknowledged_by',
+  acknowledgedAt: 'acknowledged_at',
+  reviewNotes: 'review_notes',
+  resolvedBy: 'resolved_by',
+  resolvedAt: 'resolved_at',
+  closedBy: 'closed_by',
+  closedAt: 'closed_at',
+  closingNotes: 'closing_notes',
+  rejectionReason: 'rejection_reason',
+  // Shift schedule fields
+  weeklySchedule: 'weekly_schedule',
+  effectiveDate: 'effective_date',
+  employeePosition: 'employee_position',
+  createdBy: 'created_by',
+  // Stock & inventory fields
+  quantityChange: 'quantity_change',
+  userName: 'user_name',
+  purchaseOrderId: 'purchase_order_id',
+  // Purchase order fields
+  poNumber: 'po_number',
+  receivedAt: 'received_at',
+  // Room fields
+  currentAppointmentId: 'current_appointment_id',
+  serviceDuration: 'service_duration',
+  branchId: 'branch_id',
+  // Multi-pax fields
+  paxCount: 'pax_count',
+  guestNumber: 'guest_number',
+  guestSummary: 'guest_summary',
+  // Transaction fields
+  amountReceived: 'amount_received',
+  changeGiven: 'change_given',
+  // Attendance fields
+  clockInGps: 'clock_in_gps',
+  clockOutGps: 'clock_out_gps',
+  clockInPhoto: 'clock_in_photo',
+  clockOutPhoto: 'clock_out_photo',
+  isOutOfRange: 'is_out_of_range',
+  clockIn: 'clock_in',
+  clockOut: 'clock_out',
+  // Payout fields
+  payoutBankCode: 'payout_bank_code',
+  payoutAccountNumber: 'payout_account_number',
+  payoutAccountName: 'payout_account_name',
+  payoutMethod: 'payout_method',
+  // Misc
+  syncStatus: 'sync_status',
+};
+
+class SupabaseSyncManager {
+  constructor() {
+    this._isSyncing = false;
+    // Set when a dataChange fires while a sync is in flight; the
+    // finally blocks of pushOnly() / sync() drain it so the local
+    // change always lands on the server.
+    this._pendingPush = false;
+    this._listeners = [];
+    this._lastSync = null;
+    this._subscriptions = [];
+    this._deviceId = this._getDeviceId();
+    this._syncInterval = null;
+    this._currentBusinessId = null; // Track current business for data isolation
+    this._initialized = false;
+
+    this.config = {
+      autoSync: true,
+      syncOnReconnect: true,
+      syncInterval: 300000, // 5 minutes (fallback, event-driven sync is primary)
+      eventDrivenDebounce: 500, // 500ms debounce for rapid changes
+      batchSize: 50,
+      conflictResolution: 'server-wins', // or 'last-write-wins'
+      maxRetries: 3,
+      baseRetryDelay: 1000, // 1 second base delay for exponential backoff
+    };
+
+    // Debounced sync for event-driven updates
+    this._debouncedSync = debounce(() => {
+      if (NetworkDetector.isOnline && authService.currentUser) {
+        console.log('[SupabaseSyncManager] Event-driven sync triggered');
+        this.sync();
+      }
+    }, this.config.eventDrivenDebounce);
+
+    // Local writes only need to push — they don't need to pull all 33 tables
+    // because realtime subscriptions already deliver remote changes for the
+    // hot tables. Pulling here would repeat ~33 GETs per local save and was
+    // the dominant source of REST traffic.
+    this._debouncedPush = debounce(() => {
+      if (NetworkDetector.isOnline && authService.currentUser) {
+        console.log('[SupabaseSyncManager] Event-driven push triggered (no pull)');
+        this.pushOnly();
+      }
+    }, this.config.eventDrivenDebounce);
+
+    // Unsubscribe function for data change listener
+    this._dataChangeUnsubscribe = null;
+    // Unsubscribe function for network status listener
+    this._networkUnsubscribe = null;
+  }
+
+  _getDeviceId() {
+    let deviceId = localStorage.getItem('deviceId');
+    if (!deviceId) {
+      deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('deviceId', deviceId);
+    }
+    return deviceId;
+  }
+
+  _toSupabaseTableName(dexieTable) {
+    return TABLE_NAME_MAP[dexieTable] || dexieTable;
+  }
+
+  _toDexieTableName(supabaseTable) {
+    const reversed = Object.entries(TABLE_NAME_MAP).find(([, v]) => v === supabaseTable);
+    return reversed ? reversed[0] : supabaseTable;
+  }
+
+  /**
+   * Convert field name from camelCase to snake_case
+   */
+  _toSnakeCase(fieldName) {
+    return FIELD_NAME_MAP[fieldName] || fieldName;
+  }
+
+  /**
+   * Convert field name from snake_case to camelCase
+   */
+  _toCamelCase(fieldName) {
+    const reversed = Object.entries(FIELD_NAME_MAP).find(([, v]) => v === fieldName);
+    return reversed ? reversed[0] : fieldName;
+  }
+
+  /**
+   * Convert Dexie record to Supabase format
+   * Returns null if record has invalid data (e.g., old mock data with non-UUID businessId)
+   */
+  _toSupabaseFormat(record, entityType) {
+    const businessId = authService.currentUser?.businessId;
+
+    // Validate businessId is a proper UUID (skip old mock data like 'biz_001')
+    if (!isValidUUID(businessId)) {
+      console.warn(`[SupabaseSyncManager] Skipping record - invalid businessId: ${businessId}`);
+      return null;
+    }
+
+    // Also check if the record has an old mock businessId that doesn't match
+    if (record.businessId && !isValidUUID(record.businessId)) {
+      console.warn(`[SupabaseSyncManager] Skipping record - old mock data with businessId: ${record.businessId}`);
+      return null;
+    }
+
+    // Skip records with non-UUID IDs (old mock data like 'booking_001', etc.)
+    // Exceptions: serviceRotation uses date strings; payrollConfig uses key strings
+    if (record._id && !isValidUUID(record._id) && entityType !== 'serviceRotation' && entityType !== 'payrollConfig') {
+      console.log(`[SupabaseSyncManager] Skipping ${entityType} with non-UUID id: ${record._id}`);
+      return null;
+    }
+
+    const converted = { business_id: businessId };
+
+    for (const [key, value] of Object.entries(record)) {
+      // Handle special Dexie fields
+      if (key === '_id') {
+        converted.id = value;
+      } else if (key === 'id' && converted.id) {
+        // Skip auto-increment 'id' if we already have a UUID '_id'
+        continue;
+      } else if (key === '_createdAt') {
+        converted.created_at = value;
+      } else if (key === '_updatedAt') {
+        converted.updated_at = value;
+      } else if (key === '_deleted') {
+        converted.deleted = value || false;
+      } else if (key === '_deletedAt') {
+        converted.deleted_at = value;
+      } else if (key.startsWith('_')) {
+        // Skip other internal fields
+        continue;
+      } else {
+        // Convert field name to snake_case
+        const snakeKey = this._toSnakeCase(key);
+        converted[snakeKey] = value;
+      }
+    }
+
+    // Get table name for schema-aware processing
+    const tableName = this._toSupabaseTableName(entityType);
+    const validColumns = SUPABASE_TABLE_COLUMNS[tableName];
+
+    // Ensure timestamps exist (only if table has these columns)
+    if (!converted.created_at && (!validColumns || validColumns.includes('created_at'))) {
+      converted.created_at = new Date().toISOString();
+    }
+    if (!converted.updated_at && (!validColumns || validColumns.includes('updated_at'))) {
+      converted.updated_at = new Date().toISOString();
+    }
+
+    // Special handling for shift_schedules: put weeklySchedule into schedule JSONB column
+    if (tableName === 'shift_schedules') {
+      if (converted.weekly_schedule) {
+        converted.schedule = { weeklySchedule: converted.weekly_schedule };
+        // Explicitly null out weekly_schedule so Supabase clears the old column data
+        converted.weekly_schedule = null;
+      }
+    }
+
+    // Special handling for service_rotation: wrap rotation fields into rotation_data JSONB.
+    // Local _id is the date string (e.g. "2026-04-20"), but the Supabase id column is
+    // UUID, so strip it and let the server auto-generate one. Uniqueness is enforced
+    // via (business_id, date) so push uses upsert on that constraint.
+    if (tableName === 'service_rotation') {
+      const rotationFields = ['queue', 'serviceCount', 'service_count',
+        'employeeOrder', 'employee_order', 'currentIndex', 'current_index',
+        'servicesCompleted', 'services_completed', 'lastAdvanced', 'last_advanced', 'lastServed', 'last_served'];
+      const rotationData = {};
+      for (const field of rotationFields) {
+        if (converted[field] !== undefined) {
+          rotationData[field] = converted[field];
+          delete converted[field];
+        }
+      }
+      if (Object.keys(rotationData).length > 0) {
+        converted.rotation_data = rotationData;
+      }
+      delete converted.id;
+      converted.business_id = businessId;
+    }
+
+    // Special handling for employees: flatten commission object and store extras in metadata
+    if (tableName === 'employees') {
+      // Convert commission object { type, value } to commission_rate number
+      if (converted.commission && typeof converted.commission === 'object') {
+        converted.commission_rate = parseFloat(converted.commission.value) || 0;
+        // Store commission type in metadata so we can reconstruct the object on pull
+        converted.metadata = {
+          ...(converted.metadata || {}),
+          commissionType: converted.commission.type || 'percentage',
+        };
+        delete converted.commission;
+      }
+
+      // Store fields that don't have dedicated Supabase columns in metadata JSONB
+      const metadataExtras = {};
+      const extraFields = ['role', 'active', 'rateType', 'rate_type', 'monthlyRate', 'monthly_rate'];
+      for (const field of extraFields) {
+        if (converted[field] !== undefined) {
+          // Use camelCase key in metadata for consistency
+          const camelKey = field.includes('_') ? this._toCamelCase(field) : field;
+          metadataExtras[camelKey] = converted[field];
+          delete converted[field];
+        }
+      }
+      if (Object.keys(metadataExtras).length > 0) {
+        converted.metadata = { ...(converted.metadata || {}), ...metadataExtras };
+      }
+    }
+
+    // Special handling for payroll_config_logs: pack individual fields into changes JSONB
+    if (tableName === 'payroll_config_logs') {
+      const changeFields = ['config_key', 'old_value', 'new_value', 'description'];
+      const changesData = {};
+      for (const field of changeFields) {
+        if (converted[field] !== undefined) {
+          changesData[field] = converted[field];
+          delete converted[field];
+        }
+      }
+      if (Object.keys(changesData).length > 0) {
+        converted.changes = changesData;
+      }
+    }
+
+    // Fix corrupted data before pushing
+    if (tableName === 'gift_certificates') {
+      // Ensure balance is never null/NaN (use amount as fallback)
+      if (converted.balance == null || !Number.isFinite(converted.balance)) {
+        converted.balance = converted.amount || 0;
+      }
+    }
+
+    // Special handling for payroll_config: strip the string key from id (Supabase
+    // needs UUID) and always attach business_id from the current user. Uniqueness
+    // is enforced via (business_id, key) so push uses upsert on that constraint.
+    if (tableName === 'payroll_config') {
+      delete converted.id;
+      converted.business_id = businessId;
+    }
+
+    // Filter to only include valid Supabase columns for this table
+    if (validColumns) {
+      const filtered = {};
+      const skippedFields = [];
+
+      for (const [key, value] of Object.entries(converted)) {
+        if (validColumns.includes(key)) {
+          filtered[key] = value;
+        } else {
+          skippedFields.push(key);
+        }
+      }
+
+      if (skippedFields.length > 0) {
+        console.log(`[SupabaseSyncManager] Filtered out fields not in ${tableName} schema:`, skippedFields);
+      }
+
+      return filtered;
+    }
+
+    return converted;
+  }
+
+  /**
+   * Convert Supabase record to Dexie format
+   */
+  _toDexieFormat(record, entityType = null) {
+    const converted = {
+      _syncStatus: 'synced',
+      _lastSyncedAt: new Date().toISOString(),
+    };
+
+    for (const [key, value] of Object.entries(record)) {
+      // Handle special Supabase fields
+      if (key === 'id') {
+        converted._id = value;
+      } else if (key === 'created_at') {
+        converted._createdAt = value;
+      } else if (key === 'updated_at') {
+        converted._updatedAt = value;
+      } else if (key === 'deleted') {
+        converted._deleted = value;
+      } else if (key === 'deleted_at') {
+        converted._deletedAt = value;
+      } else if (key === 'business_id') {
+        // Map business_id to businessId for local storage and sync consistency
+        converted.businessId = value;
+      } else {
+        // Convert field name to camelCase
+        const camelKey = this._toCamelCase(key);
+        converted[camelKey] = value;
+      }
+    }
+
+    // Special handling for payroll_config: local Dexie keys the table by the
+    // config key string (e.g., "regularOvertime"), not the Supabase UUID, so
+    // the record identity survives round-trips through sync.
+    if (entityType === 'payrollConfig' && converted.key) {
+      converted._id = converted.key;
+    }
+
+    // Special handling for service_rotation: local Dexie keys the table by the
+    // date string (e.g., "2026-04-20"), not the Supabase UUID. Same round-trip
+    // reasoning as payroll_config.
+    if (entityType === 'serviceRotation' && converted.date) {
+      converted._id = converted.date;
+    }
+
+    // Special handling for payroll_config_logs: unpack changes JSONB into individual fields
+    if (entityType === 'payrollConfigLogs') {
+      if (converted.changes && typeof converted.changes === 'object') {
+        const changes = converted.changes;
+        if (changes.config_key !== undefined) converted.configKey = changes.config_key;
+        if (changes.old_value !== undefined) converted.oldValue = changes.old_value;
+        if (changes.new_value !== undefined) converted.newValue = changes.new_value;
+        if (changes.description !== undefined) converted.description = changes.description;
+        delete converted.changes;
+      }
+    }
+
+    // Special handling for shift_schedules: unwrap weeklySchedule from schedule JSONB
+    // Always prefer schedule.weeklySchedule (the canonical source) over weekly_schedule column
+    if (entityType === 'shiftSchedules') {
+      if (converted.schedule && converted.schedule.weeklySchedule) {
+        converted.weeklySchedule = converted.schedule.weeklySchedule;
+      }
+      // Remove the JSONB wrapper to avoid confusion in Dexie
+      delete converted.schedule;
+    }
+
+    // Special handling for employees: reconstruct commission object and extract metadata fields
+    if (entityType === 'employees') {
+      const metadata = converted.metadata || {};
+
+      // Reconstruct commission object from commission_rate + metadata.commissionType
+      const commissionRate = converted.commissionRate;
+      if (commissionRate !== undefined) {
+        converted.commission = {
+          type: metadata.commissionType || 'percentage',
+          value: typeof commissionRate === 'number' ? commissionRate : parseFloat(commissionRate) || 0,
+        };
+        delete converted.commissionRate;
+      }
+
+      // Restore fields from metadata that don't have dedicated Supabase columns
+      if (metadata.rateType) converted.rateType = metadata.rateType;
+      if (metadata.monthlyRate !== undefined) converted.monthlyRate = metadata.monthlyRate;
+      if (metadata.role) converted.role = metadata.role;
+      if (metadata.active !== undefined) converted.active = metadata.active;
+    }
+
+    // Special handling for serviceRotation: unwrap rotationData JSONB back to top-level fields
+    if (entityType === 'serviceRotation') {
+      if (converted.rotationData && typeof converted.rotationData === 'object') {
+        const rd = converted.rotationData;
+        if (rd.serviceCount) converted.serviceCount = rd.serviceCount;
+        if (rd.service_count) converted.serviceCount = rd.service_count;
+        if (rd.lastServed) converted.lastServed = rd.lastServed;
+        if (rd.last_served) converted.lastServed = rd.last_served;
+        if (rd.queue) converted.queue = rd.queue;
+        if (rd.employeeOrder) converted.employeeOrder = rd.employeeOrder;
+        if (rd.employee_order) converted.employeeOrder = rd.employee_order;
+        delete converted.rotationData;
+      }
+    }
+
+    return converted;
+  }
+
+  /**
+   * Initialize sync manager
+   */
+  async initialize() {
+    // De-duplicate concurrent callers. Without this, login() + the
+    // authService.subscribe(SIGNED_IN) handler both call initialize() at
+    // nearly the same instant, which races twice through _isLocalDataEmpty
+    // and can trigger duplicate forcePulls.
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = this._runInitialize().finally(() => {
+      this._initPromise = null;
+    });
+    return this._initPromise;
+  }
+
+  async _runInitialize() {
+    if (!isSupabaseConfigured()) {
+      console.log('[SupabaseSyncManager] Supabase not configured, sync disabled');
+      return;
+    }
+
+    const newBusinessId = authService.currentUser?.businessId;
+    const storedBusinessId = localStorage.getItem('currentBusinessId');
+
+    console.log('[SupabaseSyncManager] Initializing...');
+    console.log('[SupabaseSyncManager] Current business:', newBusinessId, 'Stored business:', storedBusinessId);
+
+    // Warn if no businessId is available - this means sync won't work properly
+    if (!newBusinessId) {
+      console.warn('[SupabaseSyncManager] WARNING: No business ID found in current user session. Sync operations will be limited. User:', authService.currentUser);
+    }
+
+    // Check if user switched to a different business account
+    if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
+      console.log('[SupabaseSyncManager] Business account changed! Clearing local data...');
+      await this._clearLocalDataForAccountSwitch();
+    }
+
+    // Store current business ID for future comparison
+    if (newBusinessId) {
+      localStorage.setItem('currentBusinessId', newBusinessId);
+      this._currentBusinessId = newBusinessId;
+    }
+
+    // Auto-repair any records with invalid businessId (from before the fix)
+    // This runs on every initialization to ensure data integrity
+    if (newBusinessId && isValidUUID(newBusinessId)) {
+      await this._autoRepairBusinessIds();
+    }
+
+    // Check if local data was cleared (e.g., after logout)
+    // If so, clear sync metadata to force a full pull from Supabase
+    const localDataEmpty = await this._isLocalDataEmpty();
+    if (localDataEmpty && newBusinessId) {
+      console.log('[SupabaseSyncManager] Local data empty - clearing sync metadata for full pull');
+      await db.syncMetadata.clear();
+    }
+
+    // Reset any stuck processing items from previous crashes/interruptions
+    // This ensures sync items don't get permanently stuck if app closes during sync
+    const stuckCount = await this.resetStuckItems();
+    if (stuckCount > 0) {
+      console.log(`[SupabaseSyncManager] Recovered ${stuckCount} stuck sync items`);
+    }
+
+    // Purge orphaned sync queue entries for entity types with no Supabase table
+    try {
+      const orphanedSettings = await db.syncQueue.where('entityType').equals('settings').toArray();
+      if (orphanedSettings.length > 0) {
+        await db.syncQueue.where('entityType').equals('settings').delete();
+        console.log(`[SupabaseSyncManager] Purged ${orphanedSettings.length} orphaned 'settings' sync entries`);
+      }
+    } catch (e) { /* ignore */ }
+
+    // Start network detector (only once)
+    if (!this._initialized) {
+      NetworkDetector.start();
+
+      // Listen for network changes (store unsubscribe to prevent memory leak)
+      if (this._networkUnsubscribe) {
+        this._networkUnsubscribe();
+      }
+      this._networkUnsubscribe = NetworkDetector.subscribe((isOnline) => {
+        if (isOnline && this.config.syncOnReconnect) {
+          console.log('[SupabaseSyncManager] Online - triggering sync');
+          this.sync();
+        }
+      });
+    }
+
+    // EVENT-DRIVEN PUSH: Listen for local data changes and push immediately (debounced).
+    // Pulling on every write was wasteful — realtime subscriptions deliver
+    // cross-device updates, so this only needs to push the new local change.
+    if (!this._dataChangeUnsubscribe) {
+      this._dataChangeUnsubscribe = dataChangeEmitter.subscribe((change) => {
+        console.log('[SupabaseSyncManager] Data changed:', change.entityType, change.operation);
+        this._debouncedPush();
+      });
+    }
+
+    // Visibility-based safety net: realtime subscriptions can silently
+    // drop (e.g. tab suspended, websocket killed by aggressive battery
+    // savers, network switch). When the app regains focus, force a sync
+    // so any data that the realtime channel missed gets reconciled.
+    if (!this._visibilityHandler) {
+      this._visibilityHandler = () => {
+        if (document.visibilityState === 'visible' && navigator.onLine) {
+          console.log('[SupabaseSyncManager] App regained focus - triggering sync to catch missed realtime updates');
+          this.sync().catch((err) =>
+            console.warn('[SupabaseSyncManager] Visibility-triggered sync failed:', err)
+          );
+        }
+      };
+      document.addEventListener('visibilitychange', this._visibilityHandler);
+    }
+
+    // Setup real-time subscriptions if authenticated
+    if (authService.currentUser) {
+      // Clear old subscriptions first
+      this._subscriptions.forEach(sub => {
+        supabase.removeChannel(sub);
+      });
+      this._subscriptions = [];
+
+      this._setupRealtimeSubscriptions();
+    }
+
+    // No periodic interval — every syncable entity has a realtime
+    // subscription, and the visibility / reconnect handlers already trigger
+    // a reconciliation pull when needed. Polling here would just duplicate
+    // what realtime already delivers.
+
+    this._initialized = true;
+    console.log('[SupabaseSyncManager] Initialized with event-driven sync');
+
+    // UpdatePanel sets this flag right before its cache-bust reload. Honour
+    // it by going through forcePull() instead of sync() — sync() pushes
+    // first and its 60s budget can be consumed entirely by a slow/failing
+    // push cycle, leaving the pull starved (the symptom being a blank
+    // attendance table after Update even though logout/login fills it).
+    let forcePullRequested = false;
+    try {
+      if (typeof sessionStorage !== 'undefined' &&
+          sessionStorage.getItem('daet-spa-force-pull-after-update')) {
+        forcePullRequested = true;
+        sessionStorage.removeItem('daet-spa-force-pull-after-update');
+      }
+    } catch {
+      // sessionStorage blocked — fall back to normal sync path
+    }
+
+    // Determine sync strategy based on state
+    // IMPORTANT: Check localDataEmpty FIRST because logout clears both data AND storedBusinessId
+    if (newBusinessId && localDataEmpty) {
+      // Local data is empty - need to restore from Supabase
+      // This happens after logout cleanup OR on a new device/browser
+      console.log('[SupabaseSyncManager] Local data empty - restoring data from Supabase...');
+      await this.forcePull();
+    } else if (newBusinessId && storedBusinessId && newBusinessId !== storedBusinessId) {
+      // Business account changed - pull fresh data
+      console.log('[SupabaseSyncManager] Business account changed - pulling fresh data from Supabase...');
+      await this.forcePull();
+    } else if (newBusinessId && forcePullRequested) {
+      console.log('[SupabaseSyncManager] Post-update force-pull requested by UpdatePanel');
+      await this.forcePull();
+    } else if (newBusinessId) {
+      // Normal case - regular sync (push local changes, pull remote changes)
+      console.log('[SupabaseSyncManager] Normal sync...');
+      await this.sync();
+    }
+  }
+
+  /**
+   * Public wrapper for local-data-empty check. Used by AppContext to decide
+   * whether to show the initial-sync loader on first login.
+   */
+  async isLocalDataEmpty() {
+    return this._isLocalDataEmpty();
+  }
+
+  /**
+   * Check if local data tables are empty (indicating logout cleanup occurred)
+   * Used to determine if we need to force pull from Supabase
+   */
+  async _isLocalDataEmpty() {
+    try {
+      const productCount = await db.products.count();
+      const customerCount = await db.customers.count();
+      const employeeCount = await db.employees.count();
+      return productCount === 0 && customerCount === 0 && employeeCount === 0;
+    } catch (error) {
+      console.warn('[SupabaseSyncManager] Error checking local data:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Clear local Dexie data when switching business accounts
+   * This ensures data isolation between different accounts
+   */
+  async _clearLocalDataForAccountSwitch() {
+    console.log('[SupabaseSyncManager] Clearing local data for account switch...');
+
+    // Tables to clear (all syncable entities except sync infrastructure)
+    const tablesToClear = [
+      'products', 'employees', 'customers', 'suppliers', 'rooms',
+      'transactions', 'appointments', 'expenses', 'giftCertificates',
+      'purchaseOrders', 'inventoryMovements', 'stockHistory', 'productConsumption',
+      'attendance', 'shiftSchedules', 'activityLogs', 'payrollRequests',
+      'payrollConfig', 'payrollConfigLogs', 'timeOffRequests',
+      'cashDrawerSessions', 'businessConfig', 'serviceRotation',
+      'loyaltyHistory', 'advanceBookings', 'activeServices', 'homeServices',
+      'transportRequests',
+      'business', 'users'
+    ];
+
+    for (const tableName of tablesToClear) {
+      try {
+        if (db[tableName]) {
+          await db[tableName].clear();
+          console.log(`[SupabaseSyncManager] Cleared ${tableName}`);
+        }
+      } catch (error) {
+        console.warn(`[SupabaseSyncManager] Error clearing ${tableName}:`, error);
+      }
+    }
+
+    // Clear sync queue and metadata
+    await db.syncQueue.clear();
+    await db.syncMetadata.clear();
+
+    console.log('[SupabaseSyncManager] Local data cleared for account switch');
+  }
+
+  /**
+   * Start periodic sync interval
+   */
+  _startPeriodicSync() {
+    if (this._syncInterval) {
+      clearInterval(this._syncInterval);
+    }
+
+    this._syncInterval = setInterval(() => {
+      if (NetworkDetector.isOnline && authService.currentUser) {
+        this.sync();
+      }
+    }, this.config.syncInterval);
+  }
+
+  /**
+   * Setup real-time subscriptions for cross-device updates
+   */
+  _setupRealtimeSubscriptions() {
+    const businessId = authService.currentUser?.businessId;
+    if (!businessId) {
+      console.warn('[SupabaseSyncManager] No business ID available - realtime subscriptions will NOT be created. This means cross-device sync will not work until you re-login.');
+      return;
+    }
+
+    console.log('[SupabaseSyncManager] Setting up real-time subscriptions');
+
+    // Subscribe to every syncable entity. Each subscription is a websocket
+    // channel — virtually free compared to the periodic REST pulls it
+    // replaces. Covering everything lets us drop the 5-minute safety-net
+    // interval entirely and rely on visibility-handler reconciliation.
+    const realtimeEntities = [
+      // Core entities
+      'business', 'users', 'businessConfig',
+      // Core operational
+      'products', 'employees', 'customers', 'appointments', 'transactions', 'rooms',
+      // Inventory & Financial
+      'inventoryMovements', 'cashDrawerSessions', 'cashDrawerShifts',
+      'giftCertificates', 'expenses', 'purchaseOrders',
+      'stockHistory', 'productConsumption',
+      // HR (staff coordination)
+      'attendance', 'shiftSchedules', 'payrollRequests',
+      'payrollConfig', 'payrollConfigLogs',
+      'timeOffRequests', 'otRequests', 'leaveRequests',
+      'cashAdvanceRequests', 'incidentReports',
+      // Services & Bookings
+      'advanceBookings', 'activeServices', 'suppliers',
+      'serviceRotation', 'homeServices', 'loyaltyHistory',
+      // Pahatid — universal drop-off requests
+      'transportRequests',
+      // Audit
+      'activityLogs',
+    ];
+
+    realtimeEntities.forEach(entityType => {
+      const tableName = this._toSupabaseTableName(entityType);
+
+      // Special case: businesses table uses 'id' not 'business_id'
+      const filterColumn = entityType === 'business' ? 'id' : 'business_id';
+      const channelName = `${tableName}_changes_${this._deviceId}`;
+
+      console.log(`[SupabaseSyncManager] Setting up subscription for ${tableName} (filter: ${filterColumn}=eq.${businessId})`);
+
+      const subscription = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: tableName,
+            filter: `${filterColumn}=eq.${businessId}`,
+          },
+          (payload) => {
+            console.log(`[SupabaseSyncManager] Received realtime event from ${tableName}:`, payload.eventType);
+            this._handleRealtimeChange(entityType, payload);
+          }
+        )
+        .subscribe((status, err) => {
+          if (err) {
+            console.error(`[SupabaseSyncManager] Subscription error for ${tableName}:`, err);
+          } else {
+            console.log(`[SupabaseSyncManager] Subscription ${tableName}: ${status}`);
+          }
+        });
+
+      this._subscriptions.push(subscription);
+    });
+  }
+
+  /**
+   * Handle real-time changes from other devices
+   */
+  async _handleRealtimeChange(entityType, payload) {
+    // Validate payload structure
+    if (!payload || typeof payload !== 'object') {
+      console.warn('[SupabaseSyncManager] Invalid realtime payload: not an object');
+      return;
+    }
+
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+
+    // Validate event type
+    if (!eventType || !['INSERT', 'UPDATE', 'DELETE'].includes(eventType)) {
+      console.warn(`[SupabaseSyncManager] Invalid realtime event type: ${eventType}`);
+      return;
+    }
+
+    // Validate record data based on event type
+    if ((eventType === 'INSERT' || eventType === 'UPDATE') && !newRecord) {
+      console.warn(`[SupabaseSyncManager] Missing new record for ${eventType} event`);
+      return;
+    }
+    if (eventType === 'DELETE' && !oldRecord?.id) {
+      console.warn(`[SupabaseSyncManager] Missing old record id for DELETE event`);
+      return;
+    }
+
+    // Validate record has required id field
+    if (newRecord && !newRecord.id) {
+      console.warn(`[SupabaseSyncManager] Record missing id field:`, newRecord);
+      return;
+    }
+
+    // Validate business_id matches current user (prevent cross-account data injection)
+    const currentBusinessId = authService.currentUser?.businessId;
+    const recordBusinessId = (newRecord || oldRecord)?.business_id;
+    if (entityType !== 'business' && recordBusinessId && recordBusinessId !== currentBusinessId) {
+      console.warn(`[SupabaseSyncManager] Business ID mismatch - ignoring record for different business`);
+      return;
+    }
+
+    // entityType is already the Dexie table name (e.g., 'products')
+    const dexieTableName = entityType;
+
+    console.log(`[SupabaseSyncManager] Real-time ${eventType} on ${entityType}:`, newRecord || oldRecord);
+
+    try {
+      // Check if table exists
+      if (!db[dexieTableName]) {
+        console.warn(`[SupabaseSyncManager] Table ${dexieTableName} not found in Dexie`);
+        return;
+      }
+
+      switch (eventType) {
+        case 'INSERT':
+        case 'UPDATE':
+          const dexieRecord = this._toDexieFormat(newRecord, entityType);
+          // Skip overwrite if there are pending local changes for this entity (same check as _pullChanges)
+          const hasPendingLocal = await db.syncQueue
+            .where('entityType').equals(entityType)
+            .filter(item => item.entityId === dexieRecord._id && (item.status === 'pending' || item.status === 'processing'))
+            .first();
+          if (hasPendingLocal) {
+            console.log(`[SupabaseSyncManager] Skipping realtime update - pending local changes for ${entityType}/${dexieRecord._id}`);
+            break;
+          }
+          // Timestamp guard: don't overwrite local data with older server data
+          const existingLocal = await db[dexieTableName].get(dexieRecord._id);
+          if (existingLocal?.updatedAt && dexieRecord.updatedAt) {
+            if (new Date(existingLocal.updatedAt) > new Date(dexieRecord.updatedAt)) {
+              console.log(`[SupabaseSyncManager] Skipping stale realtime update for ${entityType}/${dexieRecord._id} (local is newer)`);
+              break;
+            }
+          }
+          // Handle soft-deleted records: remove from local instead of re-adding
+          if (newRecord.deleted) {
+            console.log(`[SupabaseSyncManager] Removing soft-deleted record from Dexie ${dexieTableName}: ${dexieRecord._id}`);
+            await db[dexieTableName].delete(dexieRecord._id);
+          } else {
+            console.log(`[SupabaseSyncManager] Saving to Dexie ${dexieTableName}:`, dexieRecord);
+            await db[dexieTableName].put(dexieRecord);
+          }
+          console.log(`[SupabaseSyncManager] Saved successfully`);
+          break;
+
+        case 'DELETE':
+          console.log(`[SupabaseSyncManager] Deleting from Dexie ${dexieTableName}: ${oldRecord.id}`);
+          await db[dexieTableName].delete(oldRecord.id);
+          break;
+      }
+
+      this._notifyListeners({
+        type: 'realtime_update',
+        entityType,
+        eventType,
+        record: newRecord || oldRecord,
+      });
+    } catch (error) {
+      console.error('[SupabaseSyncManager] Real-time sync error:', error);
+    }
+  }
+
+  /**
+   * Cleanup subscriptions and intervals
+   */
+  cleanup() {
+    console.log('[SupabaseSyncManager] Cleaning up...');
+
+    // Unsubscribe from data change events
+    if (this._dataChangeUnsubscribe) {
+      this._dataChangeUnsubscribe();
+      this._dataChangeUnsubscribe = null;
+    }
+
+    // Unsubscribe from network status events
+    if (this._networkUnsubscribe) {
+      this._networkUnsubscribe();
+      this._networkUnsubscribe = null;
+    }
+
+    // Unsubscribe from all real-time channels
+    this._subscriptions.forEach(sub => {
+      supabase.removeChannel(sub);
+    });
+    this._subscriptions = [];
+
+    // Stop periodic sync
+    if (this._syncInterval) {
+      clearInterval(this._syncInterval);
+      this._syncInterval = null;
+    }
+
+    // Stop network detector
+    NetworkDetector.stop();
+
+    // Reset state
+    this._currentBusinessId = null;
+    this._initialized = false;
+  }
+
+  /**
+   * Full cleanup on logout - clears local data to prevent data leakage
+   */
+  async cleanupOnLogout() {
+    console.log('[SupabaseSyncManager] Cleaning up on logout...');
+
+    // First do regular cleanup (stops intervals, listeners, etc.)
+    this.cleanup();
+
+    // NOTE: We do NOT clear local data here anymore.
+    // The initialize() method already handles account switching by comparing
+    // businessId on next login - it will clear data only if a DIFFERENT account logs in.
+    // This preserves rooms, products, and all other data for same-account re-login,
+    // which is critical when Supabase sync is not configured.
+
+    console.log('[SupabaseSyncManager] Logout cleanup complete');
+  }
+
+  /**
+   * Subscribe to sync events
+   */
+  subscribe(callback) {
+    this._listeners.push(callback);
+    return () => {
+      this._listeners = this._listeners.filter(l => l !== callback);
+    };
+  }
+
+  _notifyListeners(status) {
+    this._listeners.forEach(listener => {
+      try {
+        listener(status);
+      } catch (error) {
+        console.error('[SupabaseSyncManager] Listener error:', error);
+      }
+    });
+  }
+
+  /**
+   * Get sync status
+   */
+  async getStatus() {
+    const pending = await db.syncQueue.where('status').equals('pending').count();
+    const failed = await db.syncQueue.where('status').equals('failed').count();
+
+    return {
+      isOnline: NetworkDetector.isOnline,
+      isConfigured: isSupabaseConfigured(),
+      isSyncing: this._isSyncing,
+      lastSync: this._lastSync,
+      pendingCount: pending,
+      failedCount: failed,
+      deviceId: this._deviceId,
+    };
+  }
+
+  /**
+   * Get all sync queue items for debugging/viewing
+   */
+  async getQueueItems() {
+    return await db.syncQueue.toArray();
+  }
+
+  /**
+   * Delete a specific sync queue item by id
+   */
+  async deleteQueueItem(id) {
+    await db.syncQueue.delete(id);
+  }
+
+  /**
+   * Push-only operation: drains the local sync queue without pulling.
+   * Used for event-driven updates from local writes (saving an appointment,
+   * a transaction, etc.) where the only thing the server needs is our delta —
+   * remote changes flow back through realtime subscriptions, so a pull would
+   * just be redundant table-wide GETs.
+   */
+  async pushOnly() {
+    if (!isSupabaseConfigured()) {
+      return { success: false, message: 'Supabase not configured' };
+    }
+    // Previously this returned early if _isSyncing was true and the
+    // triggering dataChange was lost — the room-assignment write would
+    // sit in the local queue until the next user action kicked another
+    // sync, which is the exact bug therapists hit when the producer
+    // had a long-running pull / push in flight while assigning. Now we
+    // mark "another push is needed" and the in-flight sync re-fires
+    // pushOnly when it finishes (see _drainPendingPush in the finally
+    // blocks of sync() / pushOnly()).
+    if (this._isSyncing) {
+      this._pendingPush = true;
+      return { success: false, message: 'Sync in progress; queued retry' };
+    }
+    if (!NetworkDetector.isOnline) {
+      return { success: false, message: 'Offline' };
+    }
+    if (!authService.currentUser) {
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    await this.resetStuckItems();
+    this._isSyncing = true;
+    this._notifyListeners({ type: 'sync_start' });
+
+    try {
+      const pushResult = await this._pushChanges();
+      this._lastSync = new Date().toISOString();
+      this._notifyListeners({
+        type: 'sync_complete',
+        pushed: pushResult.pushed,
+        pulled: 0,
+        failed: pushResult.failed,
+      });
+      return {
+        success: true,
+        pushed: pushResult.pushed,
+        pulled: 0,
+        failed: pushResult.failed,
+      };
+    } catch (error) {
+      console.error('[SupabaseSyncManager] Push error:', error);
+      this._notifyListeners({ type: 'sync_error', error: error.message });
+      return { success: false, error: error.message };
+    } finally {
+      this._isSyncing = false;
+      this._drainPendingPush();
+    }
+  }
+
+  /**
+   * If a dataChange fired while we were busy syncing, run a fresh
+   * pushOnly now so the local change actually lands on the server
+   * instead of waiting for the next manual sync. Idempotent — the
+   * pending flag resets before re-entering pushOnly so a fresh sync
+   * inside that call can set it again if more writes arrived.
+   */
+  _drainPendingPush() {
+    if (!this._pendingPush) return;
+    this._pendingPush = false;
+    // Defer to a microtask so the current sync's listeners see the
+    // 'sync_complete' state before we reset _isSyncing under them.
+    Promise.resolve().then(() => {
+      this.pushOnly().catch((err) =>
+        console.warn('[SupabaseSyncManager] drain pending push failed:', err)
+      );
+    });
+  }
+
+  /**
+   * Main sync operation - push local changes and pull remote changes
+   */
+  async sync() {
+    if (!isSupabaseConfigured()) {
+      return { success: false, message: 'Supabase not configured' };
+    }
+
+    if (this._isSyncing) {
+      return { success: false, message: 'Sync already in progress' };
+    }
+
+    if (!NetworkDetector.isOnline) {
+      return { success: false, message: 'Offline' };
+    }
+
+    if (!authService.currentUser) {
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    // Reset any items stuck in 'processing' from a previous failed sync
+    await this.resetStuckItems();
+
+    this._isSyncing = true;
+    this._notifyListeners({ type: 'sync_start' });
+
+    // Timeout to prevent sync from getting stuck indefinitely. A full pull hits
+    // ~30 entity tables, so 30s was tight under any latency; 60s gives headroom
+    // while the REST helpers keep individual writes on their own 12s limits.
+    const SYNC_TIMEOUT_MS = 60000; // 60 seconds
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Sync timed out after 60 seconds')), SYNC_TIMEOUT_MS)
+    );
+
+    try {
+      const syncWork = async () => {
+        // 1. Push local changes to Supabase
+        const pushResult = await this._pushChanges();
+
+        // 2. Pull changes from Supabase
+        const pullResult = await this._pullChanges();
+
+        return { pushResult, pullResult };
+      };
+
+      const { pushResult, pullResult } = await Promise.race([syncWork(), timeoutPromise]);
+
+      this._lastSync = new Date().toISOString();
+
+      this._notifyListeners({
+        type: 'sync_complete',
+        pushed: pushResult.pushed,
+        pulled: pullResult.pulled,
+        failed: pushResult.failed + pullResult.failed,
+      });
+
+      return {
+        success: true,
+        pushed: pushResult.pushed,
+        pulled: pullResult.pulled,
+        failed: pushResult.failed + pullResult.failed,
+      };
+    } catch (error) {
+      console.error('[SupabaseSyncManager] Sync error:', error);
+      this._notifyListeners({ type: 'sync_error', error: error.message });
+      return { success: false, error: error.message };
+    } finally {
+      this._isSyncing = false;
+      this._drainPendingPush();
+    }
+  }
+
+  /**
+   * Push local changes to Supabase
+   */
+  async _pushChanges() {
+    // Self-heal: revive items that previously hit max-retries and got parked
+    // as `failed`, but only after the cool-down. Without this, a transient
+    // outage (network, expired token, supabase-js hang) can permanently
+    // strand local writes — and the user has no way to recover them short
+    // of a manual force-repush. With this, a device that comes back online
+    // a few minutes later picks up its own backlog automatically.
+    await this._reviveFailedQueueItems();
+
+    const pendingItems = await db.syncQueue.where('status').equals('pending').toArray();
+    let pushed = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    // Filter out items that should wait due to exponential backoff
+    const itemsToProcess = pendingItems.filter(item => {
+      if (this._shouldSkipDueToBackoff(item)) {
+        skipped++;
+        return false;
+      }
+      return true;
+    });
+
+    console.log(`[SupabaseSyncManager] Pushing ${itemsToProcess.length} changes (${skipped} skipped due to backoff)`);
+    if (itemsToProcess.length > 0) {
+      console.log('[SupabaseSyncManager] Processing items:', itemsToProcess.map(i => `${i.entityType}/${i.operation}`));
+    }
+
+    for (const item of itemsToProcess) {
+      try {
+        await db.syncQueue.update(item.id, { status: 'processing' });
+
+        // Skip and remove entity types that have no Supabase table
+        const SKIP_ENTITY_TYPES = ['settings'];
+        if (SKIP_ENTITY_TYPES.includes(item.entityType)) {
+          await db.syncQueue.delete(item.id);
+          continue;
+        }
+
+        const tableName = this._toSupabaseTableName(item.entityType);
+        const supabaseRecord = this._toSupabaseFormat(item.data, item.entityType);
+
+        // Skip records with invalid data (e.g., old mock data)
+        if (supabaseRecord === null) {
+          console.log(`[SupabaseSyncManager] Removing invalid sync item: ${item.entityType}/${item.entityId}`);
+          await db.syncQueue.delete(item.id);
+          continue;
+        }
+
+        // payroll_config and service_rotation both identify rows by a natural key
+        // (business_id,key / business_id,date) rather than a UUID, and both hit the
+        // supabase-js write hang when routed through .from().upsert(). Use the raw
+        // REST helpers in brandingService so the call either lands or times out in
+        // 12s instead of stalling the whole 30s sync budget.
+        if (tableName === 'payroll_config') {
+          const bizId = authService.currentUser?.businessId;
+          if (!bizId) throw new Error('No businessId in session for payroll_config sync');
+          if (item.operation === 'delete') {
+            await deletePayrollConfigKey(bizId, item.entityId);
+          } else {
+            console.log(`[SupabaseSyncManager] UPSERT into ${tableName} via REST:`, supabaseRecord.key);
+            await upsertPayrollConfig(bizId, supabaseRecord.key, supabaseRecord.value);
+          }
+        } else if (tableName === 'service_rotation') {
+          const bizId = authService.currentUser?.businessId;
+          if (!bizId) throw new Error('No businessId in session for service_rotation sync');
+          // entityId in the queue is the local _id (date string like "2026-04-20")
+          const date = supabaseRecord.date || item.entityId;
+          if (item.operation === 'delete') {
+            await deleteServiceRotation(bizId, date);
+          } else {
+            console.log(`[SupabaseSyncManager] UPSERT into ${tableName} via REST:`, date);
+            await upsertServiceRotation(bizId, date, supabaseRecord.rotation_data);
+          }
+        } else {
+          // All other tables go through the raw-REST helpers in brandingService
+          // instead of supabase-js, which has a known write-hang where the
+          // promise never resolves and the entire sync loop stalls. The REST
+          // helpers have a hard 12s timeout so a stuck call surfaces as a
+          // retryable error instead of freezing every other queued change.
+          switch (item.operation) {
+            case 'create':
+              console.log(`[SupabaseSyncManager] INSERT into ${tableName}:`, supabaseRecord);
+              try {
+                await restInsert(tableName, supabaseRecord);
+              } catch (createError) {
+                // 23505 = unique violation. The row already exists in Supabase
+                // (often from a previous push that succeeded server-side but
+                // failed to clear locally). Retry as an UPDATE so the latest
+                // local data wins.
+                if (createError.code === '23505') {
+                  console.log(`[SupabaseSyncManager] Duplicate detected for ${tableName}, retrying as UPDATE`);
+                  await restUpdateById(tableName, supabaseRecord.id, supabaseRecord);
+                } else {
+                  throw createError;
+                }
+              }
+              console.log(`[SupabaseSyncManager] INSERT successful for ${tableName}`);
+              break;
+
+            case 'update':
+              await restUpdateById(tableName, supabaseRecord.id, supabaseRecord);
+              break;
+
+            case 'delete':
+              await restSoftDeleteById(tableName, item.entityId);
+              break;
+          }
+        }
+
+        // Remove from queue on success
+        await db.syncQueue.delete(item.id);
+
+        // Update local record sync status
+        if (item.operation !== 'delete') {
+          // item.entityType is already a Dexie table name (e.g., 'products')
+          const dexieTableName = item.entityType;
+          await db[dexieTableName].update(item.entityId, {
+            _syncStatus: 'synced',
+            _lastSyncedAt: new Date().toISOString(),
+          });
+        }
+
+        pushed++;
+      } catch (error) {
+        // Log full error details for debugging
+        console.error(`[SupabaseSyncManager] Push error for ${item.entityType}/${item.entityId}:`, {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          fullError: error
+        });
+        console.error(`[SupabaseSyncManager] Failed record data:`, JSON.stringify(this._toSupabaseFormat(item.data, item.entityType), null, 2));
+        const newRetryCount = (item.retryCount || 0) + 1;
+        const maxRetries = this.config.maxRetries;
+
+        // Calculate next retry time with exponential backoff (1s, 2s, 4s, 8s, 16s)
+        const backoffDelay = this.config.baseRetryDelay * Math.pow(2, newRetryCount - 1);
+        const nextRetryAt = new Date(Date.now() + backoffDelay).toISOString();
+
+        const isParked = newRetryCount >= maxRetries;
+        await db.syncQueue.update(item.id, {
+          status: isParked ? 'failed' : 'pending',
+          error: error.message,
+          retryCount: newRetryCount,
+          nextRetryAt: isParked ? null : nextRetryAt,
+          // Track when this item last had an attempt so the auto-revive
+          // path can check whether the cool-down has elapsed.
+          updatedAt: new Date().toISOString(),
+        });
+
+        if (isParked) {
+          this._notifyListeners({
+            type: 'items_parked',
+            entityType: item.entityType,
+            entityId: item.entityId,
+            error: error.message,
+          });
+        }
+
+        failed++;
+      }
+    }
+
+    return { pushed, failed };
+  }
+
+  /**
+   * Calculate if an item should be skipped due to backoff
+   */
+  _shouldSkipDueToBackoff(item) {
+    if (!item.nextRetryAt) return false;
+    return new Date(item.nextRetryAt) > new Date();
+  }
+
+  /**
+   * Move queue items from `failed` back to `pending` once enough time has
+   * passed since their last attempt. Resets the retry counter so the
+   * exponential-backoff schedule starts fresh — important because
+   * `failed` items are otherwise dead weight that will never sync until
+   * a manual force-repush.
+   */
+  async _reviveFailedQueueItems() {
+    const failedItems = await db.syncQueue.where('status').equals('failed').toArray();
+    if (failedItems.length === 0) return 0;
+
+    const cutoff = Date.now() - FAILED_REVIVE_COOLDOWN_MS;
+    let revived = 0;
+    for (const item of failedItems) {
+      const lastTry = item.updatedAt ? new Date(item.updatedAt).getTime()
+        : item.createdAt ? new Date(item.createdAt).getTime()
+        : 0;
+      if (lastTry && lastTry > cutoff) continue; // still in cooldown
+
+      await db.syncQueue.update(item.id, {
+        status: 'pending',
+        retryCount: 0,
+        nextRetryAt: null,
+        error: null,
+      });
+      revived++;
+    }
+    if (revived > 0) {
+      console.log(`[SupabaseSyncManager] Revived ${revived} parked sync items for retry`);
+    }
+    return revived;
+  }
+
+  /**
+   * Remove pending sync queue items for a specific entity
+   */
+  async _removePendingQueueItems(entityType, entityId) {
+    const items = await db.syncQueue
+      .filter(item => item.entityType === entityType && item.entityId === entityId)
+      .toArray();
+    for (const item of items) {
+      if (item.id !== undefined) {
+        await db.syncQueue.delete(item.id);
+      }
+    }
+  }
+
+  /**
+   * Force re-push ALL local data to Supabase
+   * This recovers data that was created when sync was broken
+   */
+  async forceRepush() {
+    if (!isSupabaseConfigured() || !authService.currentUser) {
+      return { success: false, message: 'Not configured or not authenticated' };
+    }
+
+    const businessId = authService.currentUser.businessId;
+    if (!businessId) return { success: false, message: 'No business ID' };
+
+    console.log('[SupabaseSyncManager] Force re-push: re-queuing all local data...');
+
+    let totalQueued = 0;
+
+    // Clear any failed/parked items from sync queue
+    const stuckItems = await db.syncQueue
+      .filter(item => item.status === 'failed' || item.status === 'parked' || item.status === 'processing')
+      .toArray();
+    for (const item of stuckItems) {
+      await db.syncQueue.update(item.id, { status: 'pending', retryCount: 0, nextRetryAt: null });
+      totalQueued++;
+    }
+
+    // For each entity type, find records that aren't in Supabase yet
+    for (const entityType of SYNCABLE_ENTITIES) {
+      try {
+        const dexieTableName = entityType;
+        if (!db[dexieTableName]) continue;
+
+        const tableName = this._toSupabaseTableName(entityType);
+
+        // Get all local records for this business
+        const localRecords = await db[dexieTableName]
+          .filter(item => item.businessId === businessId)
+          .toArray();
+
+        if (localRecords.length === 0) continue;
+
+        // Get all IDs from Supabase for this entity
+        const { data: remoteRecords } = await supabase
+          .from(tableName)
+          .select('id')
+          .eq('business_id', businessId);
+
+        const remoteIds = new Set((remoteRecords || []).map(r => r.id));
+
+        // Find records that exist locally but not in Supabase
+        const missingRecords = localRecords.filter(r => !remoteIds.has(r._id));
+
+        if (missingRecords.length > 0) {
+          console.log(`[SupabaseSyncManager] ${entityType}: ${missingRecords.length} records missing from Supabase`);
+
+          for (const record of missingRecords) {
+            // Check if already in queue
+            const existingQueueItem = await db.syncQueue
+              .filter(q => q.entityId === record._id && q.entityType === entityType)
+              .first();
+
+            if (!existingQueueItem) {
+              await db.syncQueue.add({
+                entityType,
+                entityId: record._id,
+                operation: 'create',
+                data: record,
+                status: 'pending',
+                retryCount: 0,
+                createdAt: new Date().toISOString(),
+              });
+              totalQueued++;
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[SupabaseSyncManager] Error re-queuing ${entityType}:`, err);
+      }
+    }
+
+    console.log(`[SupabaseSyncManager] Force re-push: queued ${totalQueued} items. Starting sync...`);
+
+    // Now run the actual sync
+    const result = await this.sync();
+    return { success: true, queued: totalQueued, ...result };
+  }
+
+  /**
+   * Pull changes from Supabase
+   */
+  async _pullChanges() {
+    let pulled = 0;
+    let failed = 0;
+    const businessId = authService.currentUser?.businessId;
+
+    if (!businessId) {
+      console.warn('[SupabaseSyncManager] Cannot pull changes: No business ID available. Please log in again to sync data.');
+      return { pulled: 0, failed: 0, skipped: true, reason: 'no_business_id' };
+    }
+
+    console.log('[SupabaseSyncManager] Pulling changes from Supabase');
+
+    for (const entityType of SYNCABLE_ENTITIES) {
+      try {
+        const tableName = this._toSupabaseTableName(entityType);
+        // entityType is already a Dexie table name (e.g., 'products', 'giftCertificates')
+        const dexieTableName = entityType;
+
+        // Get last sync timestamp for this entity
+        const metadata = await db.syncMetadata.get(entityType);
+        const since = metadata?.lastSyncTimestamp;
+
+        const cooldown = PULL_COOLDOWN_MS[entityType] ?? DEFAULT_PULL_COOLDOWN_MS;
+        if (cooldown > 0 && metadata?.lastPullTimestamp) {
+          const elapsed = Date.now() - new Date(metadata.lastPullTimestamp).getTime();
+          if (elapsed < cooldown) {
+            continue;
+          }
+        }
+
+        // Use raw fetch (restSelect) instead of supabase-js. The js client
+        // serialises every REST call behind its internal auth-refresh lock;
+        // when that lock hangs (observed on cross-device login: every pull
+        // times out at 15s while raw fetch to the same project responds in
+        // <500ms) the whole pull cycle stalls. Raw fetch sidesteps the lock
+        // entirely — same pattern as restInsert/restUpdateById on the push
+        // side. AbortController inside restSelect enforces the 15s cap.
+        const idColumn = entityType === 'business' ? 'id' : 'business_id';
+        const buildQuery = (includeSince) => {
+          const parts = [
+            `${idColumn}=eq.${encodeURIComponent(businessId)}`,
+            'select=*',
+          ];
+          if (includeSince && since) {
+            parts.push(`updated_at=gt.${encodeURIComponent(since)}`);
+          }
+          return '?' + parts.join('&');
+        };
+
+        let { data, error } = await restSelect(tableName, buildQuery(true), 15000);
+
+        if (error) {
+          // Table might not exist yet, skip silently
+          if (error.code === '42P01') {
+            continue;
+          }
+          // Column 'updated_at' doesn't exist - retry without the timestamp filter
+          if (error.code === '42703' || error.message?.includes('updated_at')) {
+            console.warn(`[SupabaseSyncManager] Table ${tableName} missing updated_at column, pulling all records`);
+            const retryResult = await restSelect(tableName, buildQuery(false), 15000);
+            if (retryResult.error) {
+              throw new Error(retryResult.error.message);
+            }
+            data = retryResult.data;
+            error = null;
+          } else {
+            throw new Error(error.message);
+          }
+        }
+
+        if (data && data.length > 0) {
+          console.log(`[SupabaseSyncManager] Pulled ${data.length} ${entityType} records`);
+
+          // Get pending changes from sync queue to avoid overwriting unsynced local data
+          const pendingChanges = await db.syncQueue
+            .filter(item => item.entityType === entityType)
+            .toArray();
+          const pendingDeleteIds = new Set(
+            pendingChanges.filter(item => item.operation === 'delete').map(item => item.entityId)
+          );
+          const pendingLocalIds = new Set(
+            pendingChanges.filter(item => item.operation === 'create' || item.operation === 'update').map(item => item.entityId)
+          );
+
+          for (const record of data) {
+            const dexieRecord = this._toDexieFormat(record, entityType);
+
+            if (record.deleted) {
+              // Handle soft delete - remove from local and clear any pending queue items
+              await db[dexieTableName].delete(dexieRecord._id);
+              await this._removePendingQueueItems(entityType, dexieRecord._id);
+            } else {
+              // Local wins: skip records that have pending unsynced local changes
+              // These will be pushed to server in the next push cycle
+              if (pendingLocalIds.has(dexieRecord._id)) {
+                console.log(`[SupabaseSyncManager] Local wins: skipping pull for ${entityType}/${dexieRecord._id} (pending local changes)`);
+                continue;
+              }
+              if (pendingDeleteIds.has(dexieRecord._id)) {
+                console.log(`[SupabaseSyncManager] Local wins: skipping pull for ${entityType}/${dexieRecord._id} (pending local delete)`);
+                continue;
+              }
+              // No pending local changes - safe to upsert server data
+              await db[dexieTableName].put(dexieRecord);
+            }
+          }
+
+          pulled += data.length;
+        }
+
+        // Update sync metadata
+        await db.syncMetadata.put({
+          entityType,
+          lastSyncTimestamp: new Date().toISOString(),
+          lastPullTimestamp: new Date().toISOString(),
+          itemCount: data?.length || 0,
+        });
+      } catch (error) {
+        console.error(`[SupabaseSyncManager] Pull error for ${entityType}:`, error);
+        failed++;
+      }
+    }
+
+    return { pulled, failed };
+  }
+
+  /**
+   * Force full sync - clear sync metadata and pull everything
+   */
+  async forcePull() {
+    console.log('[SupabaseSyncManager] Force pulling all data');
+    await db.syncMetadata.clear();
+    const result = await this._pullChanges();
+    // Notify listeners so pages reload with pulled data
+    this._notifyListeners({
+      type: 'sync_complete',
+      pushed: 0,
+      pulled: result.pulled,
+      failed: result.failed,
+    });
+    return result;
+  }
+
+  /**
+   * Force push all local data to Supabase
+   */
+  async forcePush() {
+    if (!isSupabaseConfigured()) {
+      return { success: false, message: 'Supabase not configured' };
+    }
+
+    const businessId = authService.currentUser?.businessId;
+    if (!businessId) {
+      return { success: false, message: 'No business ID' };
+    }
+
+    console.log('[SupabaseSyncManager] Force pushing all data');
+
+    let pushed = 0;
+    let failed = 0;
+
+    for (const entityType of SYNCABLE_ENTITIES) {
+      try {
+        // entityType is already a Dexie table name (e.g., 'products', 'giftCertificates')
+        const dexieTableName = entityType;
+        const tableName = this._toSupabaseTableName(entityType);
+
+        const localData = await db[dexieTableName].toArray();
+
+        if (localData.length === 0) continue;
+
+        // Filter out null records (e.g., missing businessId or invalid data)
+        const supabaseRecords = localData
+          .map(record => this._toSupabaseFormat(record, entityType))
+          .filter(record => record !== null);
+
+        if (supabaseRecords.length === 0) {
+          console.log(`[SupabaseSyncManager] No valid records to push for ${entityType}`);
+          continue;
+        }
+
+        // Upsert in batches
+        for (let i = 0; i < supabaseRecords.length; i += this.config.batchSize) {
+          const batch = supabaseRecords.slice(i, i + this.config.batchSize);
+
+          const { error } = await supabase
+            .from(tableName)
+            .upsert(batch, { onConflict: 'id' });
+
+          if (error) throw error;
+          pushed += batch.length;
+        }
+
+        console.log(`[SupabaseSyncManager] Pushed ${localData.length} ${entityType} records`);
+      } catch (error) {
+        console.error(`[SupabaseSyncManager] Force push error for ${entityType}:`, error);
+        failed++;
+      }
+    }
+
+    return { success: failed === 0, pushed, failed };
+  }
+
+  /**
+   * Reset failed sync items to pending
+   */
+  async retryFailed() {
+    const failed = await db.syncQueue.where('status').equals('failed').toArray();
+    for (const item of failed) {
+      await db.syncQueue.update(item.id, { status: 'pending', error: null });
+    }
+    return { count: failed.length };
+  }
+
+  /**
+   * Clear sync queue
+   */
+  async clearQueue() {
+    await db.syncQueue.clear();
+    return { success: true };
+  }
+
+  /**
+   * Debug function - check Supabase connection and data
+   */
+  async debug() {
+    const businessId = authService.currentUser?.businessId;
+    console.log('[SupabaseSyncManager] === DEBUG INFO ===');
+    console.log('Device ID:', this._deviceId);
+    console.log('Business ID:', businessId);
+    console.log('Stored Business ID:', localStorage.getItem('currentBusinessId'));
+    console.log('Is configured:', isSupabaseConfigured());
+    console.log('Is online:', NetworkDetector.isOnline);
+    console.log('Is syncing:', this._isSyncing);
+    console.log('Last sync:', this._lastSync);
+    console.log('Active subscriptions:', this._subscriptions.length);
+
+    // Check sync queue
+    const pending = await db.syncQueue.where('status').equals('pending').toArray();
+    const failed = await db.syncQueue.where('status').equals('failed').toArray();
+    const processing = await db.syncQueue.where('status').equals('processing').toArray();
+    console.log('Pending sync items:', pending.length);
+    console.log('Processing sync items:', processing.length);
+    console.log('Failed sync items:', failed.length);
+
+    if (pending.length > 0) {
+      console.log('Pending items:', pending);
+    }
+    if (processing.length > 0) {
+      console.log('Processing items (stuck?):', processing);
+    }
+    if (failed.length > 0) {
+      console.log('Failed items with errors:');
+      failed.forEach(item => {
+        console.log(`  - ${item.entityType}/${item.operation}: ${item.error}`);
+        console.log('    Data:', item.data);
+      });
+    }
+
+    // Check Supabase products
+    if (businessId) {
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('business_id', businessId);
+
+      if (error) {
+        console.error('Error fetching products from Supabase:', error);
+      } else {
+        console.log('Products in Supabase:', products?.length || 0);
+        if (products?.length > 0) {
+          console.log('Supabase products:', products);
+        }
+      }
+    }
+
+    // Check local products
+    const localProducts = await db.products.toArray();
+    console.log('Products in local Dexie:', localProducts.length);
+    if (localProducts.length > 0) {
+      console.log('Local products:', localProducts);
+    }
+
+    console.log('[SupabaseSyncManager] === END DEBUG ===');
+
+    return {
+      deviceId: this._deviceId,
+      businessId,
+      storedBusinessId: localStorage.getItem('currentBusinessId'),
+      isConfigured: isSupabaseConfigured(),
+      isOnline: NetworkDetector.isOnline,
+      pendingCount: pending.length,
+      processingCount: processing.length,
+      failedCount: failed.length,
+      failedItems: failed,
+      subscriptions: this._subscriptions.length
+    };
+  }
+
+  /**
+   * View failed sync items with their errors
+   */
+  async getFailedItems() {
+    const failed = await db.syncQueue.where('status').equals('failed').toArray();
+    console.log('[SupabaseSyncManager] Failed items:');
+    failed.forEach(item => {
+      console.log(`  ${item.entityType}/${item.operation} (retry: ${item.retryCount})`);
+      console.log(`    Error: ${item.error}`);
+      console.log(`    Data:`, item.data);
+    });
+    return failed;
+  }
+
+  /**
+   * Reset stuck processing items back to pending
+   */
+  async resetStuckItems() {
+    const processing = await db.syncQueue.where('status').equals('processing').toArray();
+    for (const item of processing) {
+      await db.syncQueue.update(item.id, { status: 'pending' });
+    }
+    console.log(`[SupabaseSyncManager] Reset ${processing.length} stuck items to pending`);
+    return processing.length;
+  }
+
+  /**
+   * Clean up old mock data with invalid UUIDs from sync queue and local database
+   * This removes data created with mock businessIds like 'biz_001'
+   */
+  async cleanOldMockData() {
+    console.log('[SupabaseSyncManager] Cleaning old mock data...');
+    let cleaned = { syncQueue: 0, localRecords: 0 };
+
+    // Clean sync queue items with invalid businessId or payrollConfig with non-UUID ids
+    const allQueueItems = await db.syncQueue.toArray();
+    for (const item of allQueueItems) {
+      const businessId = item.data?.businessId;
+      const entityId = item.entityId;
+
+      // Remove items with invalid businessId
+      if (businessId && !isValidUUID(businessId)) {
+        await db.syncQueue.delete(item.id);
+        cleaned.syncQueue++;
+        console.log(`[SupabaseSyncManager] Removed sync queue item: ${item.entityType}/${item.entityId} (businessId: ${businessId})`);
+        continue;
+      }
+
+      // Remove payrollConfig items with non-UUID entityId (they use string keys like "nightDifferential")
+      if (item.entityType === 'payrollConfig' && entityId && !isValidUUID(entityId)) {
+        await db.syncQueue.delete(item.id);
+        cleaned.syncQueue++;
+        console.log(`[SupabaseSyncManager] Removed payrollConfig sync queue item with non-UUID id: ${entityId}`);
+      }
+    }
+
+    // Clean local records with invalid businessId in key tables
+    const tablesToClean = ['products', 'employees', 'customers', 'suppliers', 'rooms',
+      'transactions', 'appointments', 'expenses', 'giftCertificates'];
+
+    for (const tableName of tablesToClean) {
+      if (!db[tableName]) continue;
+      try {
+        const records = await db[tableName].toArray();
+        for (const record of records) {
+          if (record.businessId && !isValidUUID(record.businessId)) {
+            await db[tableName].delete(record._id);
+            cleaned.localRecords++;
+            console.log(`[SupabaseSyncManager] Removed ${tableName} record: ${record._id} (businessId: ${record.businessId})`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[SupabaseSyncManager] Error cleaning ${tableName}:`, err);
+      }
+    }
+
+    console.log(`[SupabaseSyncManager] Cleaned ${cleaned.syncQueue} sync queue items and ${cleaned.localRecords} local records`);
+    return cleaned;
+  }
+
+  /**
+   * Auto-repair local records with invalid or missing businessId or _id
+   * This fixes data created before the UUID fix was applied
+   * Called automatically during initialization
+   */
+  async _autoRepairBusinessIds() {
+    const correctBusinessId = authService.currentUser?.businessId;
+    if (!correctBusinessId || !isValidUUID(correctBusinessId)) {
+      console.log('[SupabaseSyncManager] No valid businessId for auto-repair');
+      return { repaired: 0, removed: 0 };
+    }
+
+    console.log('[SupabaseSyncManager] Auto-repairing records with invalid businessId or _id...');
+    let repaired = 0;
+    let removed = 0;
+
+    const tablesToRepair = ['products', 'employees', 'customers', 'suppliers', 'rooms',
+      'transactions', 'appointments', 'expenses', 'giftCertificates', 'purchaseOrders'];
+
+    for (const tableName of tablesToRepair) {
+      if (!db[tableName]) continue;
+      try {
+        const records = await db[tableName].toArray();
+        for (const record of records) {
+          const needsBusinessIdRepair = !record.businessId || !isValidUUID(record.businessId);
+          const needsIdRepair = !record._id || !isValidUUID(record._id);
+
+          if (needsBusinessIdRepair || needsIdRepair) {
+            const oldBusinessId = record.businessId;
+            const oldId = record._id;
+            const newId = needsIdRepair ? generateUUID() : record._id;
+
+            // If _id needs repair, we need to delete old record and create new one
+            if (needsIdRepair) {
+              // Delete old record
+              await db[tableName].delete(oldId);
+
+              // Create new record with valid UUID
+              const newRecord = {
+                ...record,
+                _id: newId,
+                businessId: correctBusinessId,
+                _syncStatus: 'pending',
+                _updatedAt: new Date().toISOString()
+              };
+              await db[tableName].add(newRecord);
+
+              // Remove any old sync queue items
+              const existingQueueItems = await db.syncQueue
+                .where('entityId').equals(oldId)
+                .toArray();
+              for (const item of existingQueueItems) {
+                await db.syncQueue.delete(item.id);
+              }
+
+              // Add to sync queue with new UUID
+              await db.syncQueue.add({
+                entityType: tableName,
+                entityId: newId,
+                operation: 'create',
+                data: newRecord,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                retryCount: 0
+              });
+
+              console.log(`[SupabaseSyncManager] Repaired ${tableName} _id: ${oldId} → ${newId}`);
+            } else {
+              // Just fix businessId
+              await db[tableName].update(record._id, {
+                businessId: correctBusinessId,
+                _syncStatus: 'pending',
+                _updatedAt: new Date().toISOString()
+              });
+
+              // Remove any existing sync queue items
+              const existingQueueItems = await db.syncQueue
+                .where('entityId').equals(record._id)
+                .toArray();
+              for (const item of existingQueueItems) {
+                await db.syncQueue.delete(item.id);
+              }
+
+              // Add to sync queue
+              await db.syncQueue.add({
+                entityType: tableName,
+                entityId: record._id,
+                operation: 'create',
+                data: { ...record, businessId: correctBusinessId },
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                retryCount: 0
+              });
+
+              console.log(`[SupabaseSyncManager] Repaired ${tableName}/${record._id} businessId: ${oldBusinessId || 'null'} → ${correctBusinessId}`);
+            }
+
+            repaired++;
+          }
+        }
+      } catch (err) {
+        console.warn(`[SupabaseSyncManager] Error repairing ${tableName}:`, err);
+      }
+    }
+
+    if (repaired > 0) {
+      console.log(`[SupabaseSyncManager] Auto-repair complete: ${repaired} records fixed`);
+    }
+    return { repaired, removed };
+  }
+
+  /**
+   * Get parked (permanently failed) sync items for admin review
+   */
+  async getParkedItems() {
+    return db.syncQueue.where('status').equals('failed').toArray();
+  }
+
+  /**
+   * Retry a specific parked item
+   */
+  async retryParkedItem(id) {
+    await db.syncQueue.update(id, {
+      status: 'pending',
+      retryCount: 0,
+      error: undefined,
+      nextRetryAt: undefined,
+    });
+  }
+}
+
+// Export singleton instance
+const supabaseSyncManager = new SupabaseSyncManager();
+export default supabaseSyncManager;

@@ -191,10 +191,12 @@ const methods = [
       // 6. NextPay webhook triggers Supabase account provisioning
       // ====================================
 
-      // Frontend stub: simulate processing then go to success.
+      // Frontend stub: simulate brief payment processing, then go to the
+      // building/provisioning page (which runs the post-payment animation
+      // and opens the spa software).
       sessionStorage.setItem('ava_checkout_method', method);
-      await new Promise((r) => setTimeout(r, 1200));
-      window.location.href = '/checkout/success';
+      await new Promise((r) => setTimeout(r, 800));
+      window.location.href = '/checkout/building';
     });
   }
 </script>

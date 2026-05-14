@@ -1,0 +1,673 @@
+/* =====================================================
+   UTILITY CLASSES
+   Common reusable utility classes to replace inline styles
+   ===================================================== */
+
+/* =====================================================
+   FLEXBOX UTILITIES
+   ===================================================== */
+
+/* Flex container */
+.flex { display: flex; }
+.inline-flex { display: inline-flex; }
+
+/* Flex direction */
+.flex-row { flex-direction: row; }
+.flex-col { flex-direction: column; }
+
+/* Justify content */
+.justify-start { justify-content: flex-start; }
+.justify-end { justify-content: flex-end; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-around { justify-content: space-around; }
+
+/* Align items */
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.items-center { align-items: center; }
+.items-stretch { align-items: stretch; }
+
+/* Flex wrap */
+.flex-wrap { flex-wrap: wrap; }
+.flex-nowrap { flex-wrap: nowrap; }
+
+/* Flex grow/shrink */
+.flex-1 { flex: 1; }
+.flex-auto { flex: auto; }
+.flex-none { flex: none; }
+.flex-grow { flex-grow: 1; }
+.flex-shrink-0 { flex-shrink: 0; }
+
+/* Gap utilities */
+.gap-xs { gap: var(--spacing-xs); }
+.gap-sm { gap: var(--spacing-sm); }
+.gap-md { gap: var(--spacing-md); }
+.gap-lg { gap: var(--spacing-lg); }
+.gap-xl { gap: var(--spacing-xl); }
+
+/* Common flex patterns */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-gap-sm {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.flex-gap-md {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+/* =====================================================
+   SPACING UTILITIES (Margin & Padding)
+   ===================================================== */
+
+/* Margin - All sides */
+.m-0 { margin: 0; }
+.m-xs { margin: var(--spacing-xs); }
+.m-sm { margin: var(--spacing-sm); }
+.m-md { margin: var(--spacing-md); }
+.m-lg { margin: var(--spacing-lg); }
+.m-xl { margin: var(--spacing-xl); }
+
+/* Margin - Top */
+.mt-0 { margin-top: 0; }
+.mt-xs { margin-top: var(--spacing-xs); }
+.mt-sm { margin-top: var(--spacing-sm); }
+.mt-md { margin-top: var(--spacing-md); }
+.mt-lg { margin-top: var(--spacing-lg); }
+.mt-xl { margin-top: var(--spacing-xl); }
+
+/* Margin - Bottom */
+.mb-0 { margin-bottom: 0; }
+.mb-xs { margin-bottom: var(--spacing-xs); }
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+.mb-xl { margin-bottom: var(--spacing-xl); }
+
+/* Margin - Left */
+.ml-0 { margin-left: 0; }
+.ml-xs { margin-left: var(--spacing-xs); }
+.ml-sm { margin-left: var(--spacing-sm); }
+.ml-md { margin-left: var(--spacing-md); }
+.ml-lg { margin-left: var(--spacing-lg); }
+.ml-auto { margin-left: auto; }
+
+/* Margin - Right */
+.mr-0 { margin-right: 0; }
+.mr-xs { margin-right: var(--spacing-xs); }
+.mr-sm { margin-right: var(--spacing-sm); }
+.mr-md { margin-right: var(--spacing-md); }
+.mr-lg { margin-right: var(--spacing-lg); }
+.mr-auto { margin-right: auto; }
+
+/* Margin - Horizontal/Vertical/Auto */
+.mx-auto { margin-left: auto; margin-right: auto; }
+.my-auto { margin-top: auto; margin-bottom: auto; }
+.m-auto { margin: auto; }
+
+/* Padding - All sides */
+.p-0 { padding: 0; }
+.p-xs { padding: var(--spacing-xs); }
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+.p-xl { padding: var(--spacing-xl); }
+
+/* Padding - Top */
+.pt-0 { padding-top: 0; }
+.pt-xs { padding-top: var(--spacing-xs); }
+.pt-sm { padding-top: var(--spacing-sm); }
+.pt-md { padding-top: var(--spacing-md); }
+.pt-lg { padding-top: var(--spacing-lg); }
+
+/* Padding - Bottom */
+.pb-0 { padding-bottom: 0; }
+.pb-xs { padding-bottom: var(--spacing-xs); }
+.pb-sm { padding-bottom: var(--spacing-sm); }
+.pb-md { padding-bottom: var(--spacing-md); }
+.pb-lg { padding-bottom: var(--spacing-lg); }
+
+/* =====================================================
+   TYPOGRAPHY UTILITIES
+   ===================================================== */
+
+/* Font size */
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.875rem; }
+.text-base { font-size: 1rem; }
+.text-lg { font-size: 1.125rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.text-3xl { font-size: 1.875rem; }
+
+/* Font weight */
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+
+/* Text alignment */
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+/* Text color */
+.text-primary { color: var(--primary); }
+.text-gray-500 { color: var(--gray-500); }
+.text-gray-600 { color: var(--gray-600); }
+.text-gray-700 { color: var(--gray-700); }
+.text-gray-900 { color: var(--gray-900); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-error { color: var(--error); }
+.text-white { color: var(--white); }
+
+/* Text transform */
+.uppercase { text-transform: uppercase; }
+.lowercase { text-transform: lowercase; }
+.capitalize { text-transform: capitalize; }
+
+/* =====================================================
+   BACKGROUND UTILITIES
+   ===================================================== */
+
+.bg-white { background-color: var(--white); }
+.bg-gray-50 { background-color: var(--gray-50); }
+.bg-gray-100 { background-color: var(--gray-100); }
+.bg-gray-200 { background-color: var(--gray-200); }
+.bg-primary { background-color: var(--primary); }
+.bg-primary-light { background-color: var(--primary-light); }
+.bg-success { background-color: var(--success); }
+.bg-warning { background-color: var(--warning); }
+.bg-error { background-color: var(--error); }
+
+/* =====================================================
+   BORDER UTILITIES
+   ===================================================== */
+
+.border { border: 1px solid var(--gray-200); }
+.border-0 { border: none; }
+.border-t { border-top: 1px solid var(--gray-200); }
+.border-b { border-bottom: 1px solid var(--gray-200); }
+.border-l { border-left: 1px solid var(--gray-200); }
+.border-r { border-right: 1px solid var(--gray-200); }
+
+.rounded { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-full { border-radius: 9999px; }
+
+/* =====================================================
+   WIDTH & HEIGHT UTILITIES
+   ===================================================== */
+
+.w-full { width: 100%; }
+.w-auto { width: auto; }
+.h-full { height: 100%; }
+.h-auto { height: auto; }
+
+/* =====================================================
+   DISPLAY UTILITIES
+   ===================================================== */
+
+.block { display: block; }
+.inline-block { display: inline-block; }
+.hidden { display: none; }
+
+/* =====================================================
+   CHART CONTAINER UTILITIES
+   ===================================================== */
+
+.chart-container-sm {
+  height: 200px;
+  margin-top: var(--spacing-md);
+}
+
+.chart-container-md {
+  height: 250px;
+  margin-top: var(--spacing-md);
+}
+
+.chart-container-lg {
+  height: 300px;
+  margin-top: var(--spacing-lg);
+}
+
+.chart-container-xl {
+  height: 350px;
+  margin-top: var(--spacing-lg);
+}
+
+/* =====================================================
+   CURSOR UTILITIES
+   ===================================================== */
+
+.cursor-pointer { cursor: pointer; }
+.cursor-default { cursor: default; }
+.cursor-not-allowed { cursor: not-allowed; }
+
+/* =====================================================
+   OVERFLOW UTILITIES
+   ===================================================== */
+
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow: auto; }
+.overflow-x-auto { overflow-x: auto; }
+.overflow-y-auto { overflow-y: auto; }
+
+/* =====================================================
+   POSITION UTILITIES
+   ===================================================== */
+
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed { position: fixed; }
+.sticky { position: sticky; }
+
+/* =====================================================
+   Z-INDEX UTILITIES
+   ===================================================== */
+
+.z-0 { z-index: 0; }
+.z-10 { z-index: 10; }
+.z-20 { z-index: 20; }
+.z-50 { z-index: 50; }
+.z-100 { z-index: 100; }
+
+/* =====================================================
+   SHADOW UTILITIES
+   ===================================================== */
+
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow { box-shadow: var(--shadow); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-none { box-shadow: none; }
+
+/* =====================================================
+   TRANSITION UTILITIES
+   ===================================================== */
+
+.transition {
+  transition: all 0.2s ease-in-out;
+}
+
+.transition-colors {
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.transition-transform {
+  transition: transform 0.2s ease-in-out;
+}
+
+/* =====================================================
+   OPACITY UTILITIES
+   ===================================================== */
+
+.opacity-0 { opacity: 0; }
+.opacity-50 { opacity: 0.5; }
+.opacity-75 { opacity: 0.75; }
+.opacity-100 { opacity: 1; }
+
+/* =====================================================
+   RESPONSIVE HELPERS
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .hidden-mobile { display: none !important; }
+  .flex-col-mobile { flex-direction: column; }
+}
+
+@media (min-width: 769px) {
+  .hidden-desktop { display: none !important; }
+}
+
+/* =====================================================
+   SKELETON LOADING ANIMATIONS
+   ===================================================== */
+
+/* Base skeleton with shimmer effect */
+.skeleton {
+  background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite ease-in-out;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Skeleton card */
+.skeleton-card {
+  background: var(--color-white);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Skeleton KPI grid */
+.skeleton-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+/* Skeleton charts row */
+.skeleton-charts-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.skeleton-chart-container {
+  background: var(--color-white);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Skeleton chart bars */
+.skeleton-chart {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  flex: 1;
+  gap: 12px;
+  padding: 0 20px;
+}
+
+.skeleton-bar {
+  flex: 1;
+  background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite ease-in-out;
+  border-radius: 4px 4px 0 0;
+}
+
+/* Skeleton section */
+.skeleton-section {
+  background: var(--color-white);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Skeleton table */
+.skeleton-table {
+  width: 100%;
+}
+
+.skeleton-table-header {
+  display: flex;
+  gap: 24px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 8px;
+}
+
+.skeleton-table-row {
+  display: flex;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+/* Skeleton list */
+.skeleton-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton-list-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--color-white);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.skeleton-list-content {
+  flex: 1;
+}
+
+/* Skeleton POS */
+.pos-skeleton {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 20px;
+  height: calc(100vh - 140px);
+}
+
+.skeleton-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+.skeleton-product-card {
+  background: var(--color-white);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.skeleton-cart {
+  background: var(--color-white);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.skeleton-cart-items {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.skeleton-cart-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+/* Dashboard skeleton */
+.dashboard-skeleton {
+  padding: 20px;
+}
+
+@media (max-width: 768px) {
+  .skeleton-charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pos-skeleton {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =====================================================
+   PWA INSTALL PROMPT
+   ===================================================== */
+
+.pwa-install-prompt {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  animation: pwa-slide-up 0.3s ease-out;
+}
+
+@keyframes pwa-slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.pwa-prompt-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-white);
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--color-border);
+  max-width: 400px;
+}
+
+.pwa-prompt-icon img {
+  border-radius: 10px;
+}
+
+.pwa-prompt-text {
+  flex: 1;
+}
+
+.pwa-prompt-text h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.pwa-prompt-text p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.pwa-ios-icon {
+  font-size: 14px;
+}
+
+.pwa-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pwa-install-btn {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pwa-install-btn:hover {
+  background: var(--color-primary-dark);
+}
+
+.pwa-dismiss-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.pwa-dismiss-btn:hover {
+  color: var(--color-text);
+}
+
+@media (max-width: 480px) {
+  .pwa-install-prompt {
+    left: 10px;
+    right: 10px;
+    transform: none;
+  }
+
+  .pwa-prompt-content {
+    max-width: none;
+  }
+}
+
+/* ============================================
+   Optimized Image Component Styles
+   ============================================ */
+
+.optimized-image {
+  display: inline-block;
+  border-radius: inherit;
+}
+
+.optimized-image picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.optimized-image img {
+  display: block;
+  border-radius: inherit;
+}
+
+.optimized-image-skeleton {
+  border-radius: inherit;
+}
+
+.optimized-image-error {
+  border-radius: inherit;
+}
+
+/* Shimmer animation for image loading */
+@keyframes optimized-image-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.optimized-image-skeleton {
+  animation: optimized-image-shimmer 1.5s ease-in-out infinite;
+}

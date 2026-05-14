@@ -1,0 +1,1127 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useApp, ALL_BRANCHES } from '../context/AppContext';
+import mockApi from '../mockApi';
+import dataChangeEmitter from '../services/sync/DataChangeEmitter';
+import supabaseSyncManager from '../services/supabase/SupabaseSyncManager';
+// ChartJS is registered globally in main.jsx via utils/chartConfig
+import { Line, Pie, Bar, Doughnut } from 'react-chartjs-2';
+import { DashboardSkeleton } from '../components/Skeleton';
+
+const Dashboard = () => {
+  const navigate = useNavigate();
+  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch, getEffectiveBranchId } = useApp();
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [kpis, setKpis] = useState(null);
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [dailyGoal, setDailyGoal] = useState(15000);
+  const [newGoal, setNewGoal] = useState('');
+  const [pendingRevenue, setPendingRevenue] = useState(0);
+  const [todaysBookings, setTodaysBookings] = useState(0);
+  const [showAiInsights, setShowAiInsights] = useState(true);
+  const [salaryHealth, setSalaryHealth] = useState(null);
+  const [insightsData, setInsightsData] = useState({ products: [], rooms: [] });
+  const [chartData, setChartData] = useState(null);
+  const [bookingSlug, setBookingSlug] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [isLandscape, setIsLandscape] = useState(false);
+
+  // Use global branch from AppContext
+  const selectedBranchId = selectedBranch?.id || null;
+
+  // Track landscape state so the toolbar button can flip its label.
+  useEffect(() => {
+    const update = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+
+  // Auto-request fullscreen when the user physically rotates the device to
+  // landscape. Browsers gate fullscreen on a user gesture, so this only
+  // works AFTER the user has tapped the Landscape button at least once in
+  // this session — Chrome/Edge then treat the rotation itself as a
+  // continuation. iOS Safari ignores it entirely (no Fullscreen API),
+  // which is fine; the rotate-the-device gesture still works there.
+  useEffect(() => {
+    const tryAutoFullscreen = async () => {
+      const goingLandscape = window.innerWidth > window.innerHeight;
+      if (!goingLandscape) return;
+      if (document.fullscreenElement) return;
+      try {
+        await document.documentElement.requestFullscreen?.();
+        if (window.screen?.orientation?.lock) {
+          try { await window.screen.orientation.lock('landscape'); } catch {}
+        }
+      } catch {
+        // Browser blocked us (no prior gesture). User can still tap the
+        // Landscape button to opt in explicitly.
+      }
+    };
+    window.addEventListener('orientationchange', tryAutoFullscreen);
+    return () => window.removeEventListener('orientationchange', tryAutoFullscreen);
+  }, []);
+
+  // Force fullscreen + landscape orientation. screen.orientation.lock is
+  // only allowed while the document is in fullscreen on most browsers, so
+  // we request fullscreen first. If the second call throws (desktop, or a
+  // browser that doesn't expose the API), we silently swallow it — the
+  // user still gets fullscreen which is the bigger win.
+  const toggleLandscape = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen?.();
+        if (window.screen?.orientation?.lock) {
+          try { await window.screen.orientation.lock('landscape'); } catch {}
+        }
+      } else {
+        // Exiting landscape: actively snap back to portrait instead of
+        // just calling unlock(). Plain unlock() on Android Chrome leaves
+        // the device sitting in landscape because the OS only flips
+        // orientation when it detects a physical rotation — users
+        // expect the screen to follow the button. Lock to portrait,
+        // exit fullscreen, then unlock so future rotations work freely.
+        if (window.screen?.orientation?.lock) {
+          try { await window.screen.orientation.lock('portrait'); } catch {}
+        }
+        await document.exitFullscreen?.();
+        if (window.screen?.orientation?.unlock) {
+          // Defer the unlock so the portrait lock actually applies first
+          // (lock+immediate-unlock is a no-op on some browsers).
+          setTimeout(() => {
+            try { window.screen.orientation.unlock(); } catch {}
+          }, 400);
+        }
+      }
+    } catch (err) {
+      showToast?.('Landscape mode is not supported on this device', 'warning');
+    }
+  };
+
+  // Fetch branches for the dropdown
+  useEffect(() => {
+    const fetchBranches = async () => {
+      if (!user?.businessId) return;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) return;
+      try {
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order.asc`,
+          { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
+        );
+        if (res.ok) setBranches(await res.json());
+      } catch {}
+    };
+    fetchBranches();
+  }, [user?.businessId]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        if (!isMounted) return;
+        setLoading(true);
+
+        // Get business settings
+        const business = await mockApi.business.getSettings();
+        if (!isMounted) return;
+        setDailyGoal(business?.settings?.dailyGoal ?? 15000);
+
+        // Get today's date (local timezone)
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        // Fetch all data - use allSettled so one failure doesn't break everything
+        const results = await Promise.allSettled([
+          mockApi.transactions.getRevenueSummary('today'),
+          mockApi.transactions.getRevenueSummary('week'),
+          mockApi.transactions.getRevenueSummary('month'),
+          mockApi.transactions.getTransactions({ limit: 10 }),
+          mockApi.appointments.getAppointments({ date: today }),
+          mockApi.attendance.getAttendance({ date: today }),
+          mockApi.products.getProducts(),
+          mockApi.rooms.getRooms(),
+          mockApi.advanceBooking.getPendingRevenue(),
+          mockApi.advanceBooking.getTodaysBookingsCount(),
+          mockApi.analytics.getSalaryHealthMetrics()
+        ]);
+
+        const val = (i, fallback) => results[i].status === 'fulfilled' ? results[i].value : fallback;
+        const todaySummary = val(0, { totalRevenue: 0, averageTransaction: 0, totalTransactions: 0 });
+        const weekSummary = val(1, { totalRevenue: 0, byDay: [], byPaymentMethod: {}, byService: [], byBookingSource: {} });
+        const monthSummary = val(2, { totalRevenue: 0 });
+        let transactions = val(3, []);
+        let appointments = val(4, []);
+        let attendance = val(5, []);
+        let products = val(6, []);
+        let rooms = val(7, []);
+        const pendingRevenueData = val(8, { total: 0 });
+        const todaysBookingsCount = val(9, 0);
+        const salaryHealthData = val(10, null);
+
+        // Filter data by branch
+        const effectiveBranchId = getEffectiveBranchId();
+        if (effectiveBranchId) {
+          transactions = transactions.filter(item => item.branchId === effectiveBranchId);
+          appointments = appointments.filter(item => item.branchId === effectiveBranchId);
+          attendance = attendance.filter(item => item.branchId === effectiveBranchId);
+          products = products.filter(item => item.branchId === effectiveBranchId);
+          rooms = rooms.filter(item => item.branchId === effectiveBranchId);
+        }
+
+        // Check if component is still mounted before updating state
+        if (!isMounted) return;
+
+        // Calculate KPIs
+        const kpiData = {
+          financial: {
+            todayRevenue: todaySummary.totalRevenue,
+            weekRevenue: weekSummary.totalRevenue,
+            monthRevenue: monthSummary.totalRevenue,
+            avgTransaction: todaySummary.averageTransaction
+          },
+          operational: {
+            pendingAppointments: appointments.filter(a => a.status === 'pending').length,
+            confirmedAppointments: appointments.filter(a => a.status === 'confirmed').length,
+            completedToday: todaySummary.totalTransactions,
+            roomUtilization: calculateRoomUtilization(rooms)
+          },
+          staff: {
+            attendanceRate: calculateAttendanceRate(attendance),
+            totalOvertime: 0,
+            lateArrivals: attendance.filter(a => a.lateMinutes > 0).length,
+            activeEmployees: attendance.length
+          },
+          inventory: {
+            criticalStock: products.filter(p => p.type === 'product' && p.stock <= p.lowStockAlert).length,
+            outOfStock: products.filter(p => p.type === 'product' && p.stock === 0).length,
+            totalValue: calculateInventoryValue(products),
+            lowStockAlerts: products.filter(p => p.type === 'product' && p.stock > 0 && p.stock <= p.lowStockAlert).length
+          }
+        };
+
+        setKpis(kpiData);
+        setChartData({
+          byDay: weekSummary.byDay || [],
+          byPaymentMethod: weekSummary.byPaymentMethod || {},
+          byService: weekSummary.byService || [],
+          byBookingSource: weekSummary.byBookingSource || {}
+        });
+        setRecentTransactions(transactions);
+        setPendingRevenue(pendingRevenueData.total);
+        setTodaysBookings(todaysBookingsCount);
+        setSalaryHealth(salaryHealthData);
+        setInsightsData({ products, rooms });
+
+        setLoading(false);
+      } catch (error) {
+        if (!isMounted) return;
+        showToast('Failed to load dashboard data', 'error');
+        setLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedBranchId]); // Reload when branch selection changes
+
+  // Fetch booking slug for the booking link display
+  useEffect(() => {
+    const fetchBookingSlug = async () => {
+      if (!user?.businessId) return;
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) return;
+
+      try {
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/businesses?id=eq.${user.businessId}&select=booking_slug`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          }
+        );
+        const data = await response.json();
+        if (data?.[0]?.booking_slug) {
+          setBookingSlug(data[0].booking_slug);
+        }
+      } catch (err) {
+        console.error('Error fetching booking slug:', err);
+      }
+    };
+
+    fetchBookingSlug();
+  }, [user?.businessId]);
+
+  // Branch is now selected globally from the BranchSelect landing page
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Get business settings
+      const business = await mockApi.business.getSettings();
+      setDailyGoal(business?.settings?.dailyGoal ?? 15000);
+
+      // Get today's date (local timezone)
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      // Fetch all data - use allSettled so one failure doesn't break everything
+      const results = await Promise.allSettled([
+        mockApi.transactions.getRevenueSummary('today'),
+        mockApi.transactions.getRevenueSummary('week'),
+        mockApi.transactions.getRevenueSummary('month'),
+        mockApi.transactions.getTransactions({ limit: 10 }),
+        mockApi.appointments.getAppointments({ date: today }),
+        mockApi.attendance.getAttendance({ date: today }),
+        mockApi.products.getProducts(),
+        mockApi.rooms.getRooms(),
+        mockApi.advanceBooking.getPendingRevenue(),
+        mockApi.advanceBooking.getTodaysBookingsCount()
+      ]);
+
+      const val = (i, fallback) => results[i].status === 'fulfilled' ? results[i].value : fallback;
+      let todaySummary = val(0, { totalRevenue: 0, averageTransaction: 0, totalTransactions: 0 });
+      let weekSummary = val(1, { totalRevenue: 0, byDay: [], byPaymentMethod: {}, byService: [], byBookingSource: {} });
+      let monthSummary = val(2, { totalRevenue: 0 });
+      let transactions = val(3, []);
+      let appointments = val(4, []);
+      let attendance = val(5, []);
+      let products = val(6, []);
+      let rooms = val(7, []);
+      let pendingRevenueData = val(8, { total: 0 });
+      let todaysBookingsCount = val(9, 0);
+
+      // Filter data by branch
+      const effectiveBranchId = getEffectiveBranchId();
+      if (effectiveBranchId) {
+        transactions = transactions.filter(item => item.branchId === effectiveBranchId);
+        appointments = appointments.filter(item => item.branchId === effectiveBranchId);
+        attendance = attendance.filter(item => item.branchId === effectiveBranchId);
+        products = products.filter(item => item.branchId === effectiveBranchId);
+        rooms = rooms.filter(item => item.branchId === effectiveBranchId);
+      }
+
+      // Calculate KPIs
+      const kpiData = {
+        financial: {
+          todayRevenue: todaySummary.totalRevenue,
+          weekRevenue: weekSummary.totalRevenue,
+          monthRevenue: monthSummary.totalRevenue,
+          avgTransaction: todaySummary.averageTransaction
+        },
+        operational: {
+          pendingAppointments: appointments.filter(a => a.status === 'pending').length,
+          confirmedAppointments: appointments.filter(a => a.status === 'confirmed').length,
+          completedToday: todaySummary.totalTransactions,
+          roomUtilization: calculateRoomUtilization(rooms)
+        },
+        staff: {
+          attendanceRate: calculateAttendanceRate(attendance),
+          totalOvertime: 0, // Would calculate from attendance
+          lateArrivals: attendance.filter(a => a.lateMinutes > 0).length,
+          activeEmployees: attendance.length
+        },
+        inventory: {
+          criticalStock: products.filter(p => p.type === 'product' && p.stock <= p.lowStockAlert).length,
+          outOfStock: products.filter(p => p.type === 'product' && p.stock === 0).length,
+          totalValue: calculateInventoryValue(products),
+          lowStockAlerts: products.filter(p => p.type === 'product' && p.stock > 0 && p.stock <= p.lowStockAlert).length
+        }
+      };
+
+      setKpis(kpiData);
+      setChartData({
+        byDay: weekSummary.byDay || [],
+        byPaymentMethod: weekSummary.byPaymentMethod || {},
+        byService: weekSummary.byService || [],
+        byBookingSource: weekSummary.byBookingSource || {}
+      });
+      setRecentTransactions(transactions);
+      setPendingRevenue(pendingRevenueData.total);
+      setTodaysBookings(todaysBookingsCount);
+      setInsightsData({ products, rooms });
+
+      setLoading(false);
+    } catch (error) {
+      showToast('Failed to load dashboard data', 'error');
+      setLoading(false);
+    }
+  };
+
+  const refreshDashboard = useCallback(async () => {
+    setRefreshing(true);
+    await loadDashboardData();
+    setRefreshing(false);
+    showToast('Dashboard refreshed', 'success');
+  }, [showToast]);
+
+  // Auto-refresh when transactions change (local POS sales) plus realtime
+  // echoes from other devices and visibility resume on phone wake.
+  useEffect(() => {
+    const watched = ['transactions', 'attendance', 'expenses', 'products', 'rooms'];
+    let dataDebounce = null;
+    const unsubscribeData = dataChangeEmitter.subscribe((change) => {
+      if (watched.includes(change.entityType)) {
+        clearTimeout(dataDebounce);
+        dataDebounce = setTimeout(() => loadDashboardData(), 500);
+      }
+    });
+
+    let syncDebounce = null;
+    const unsubscribeSync = supabaseSyncManager.subscribe((status) => {
+      if (
+        (status?.type === 'realtime_update' && watched.includes(status.entityType)) ||
+        (status?.type === 'sync_complete' && status?.pulled > 0) ||
+        (status?.type === 'pull_complete' && status?.pulled > 0)
+      ) {
+        clearTimeout(syncDebounce);
+        syncDebounce = setTimeout(() => loadDashboardData(), 500);
+      }
+    });
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadDashboardData();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubscribeData();
+      unsubscribeSync();
+      clearTimeout(dataDebounce);
+      clearTimeout(syncDebounce);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Periodic refresh as a safety net (every 60 seconds) for environments
+  // where realtime is misbehaving. Should rarely be the source of truth now
+  // that the page reacts to realtime + dataChange + visibility events.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [selectedBranchId]);
+
+  const calculateRoomUtilization = (rooms) => {
+    const occupied = rooms.filter(r => r.status === 'occupied').length;
+    const available = rooms.filter(r => r.status === 'available').length;
+    const total = occupied + available;
+    return total > 0 ? Math.round((occupied / total) * 100) : 0;
+  };
+
+  const calculateAttendanceRate = (attendance) => {
+    if (!attendance || !Array.isArray(attendance)) return 0;
+    const present = attendance.filter(a => a.status === 'present').length;
+    const total = attendance.length;
+    return total > 0 ? Math.round((present / total) * 100) : 0;
+  };
+
+  const calculateInventoryValue = (products) => {
+    if (!products || !Array.isArray(products)) return 0;
+    return products
+      .filter(p => p.type === 'product')
+      .reduce((sum, p) => sum + ((p.stock || 0) * (p.cost || 0)), 0);
+  };
+
+  // Memoized AI Insights - only recalculates when dependencies change
+  const aiInsights = useMemo(() => {
+    if (!kpis || !recentTransactions) return [];
+
+    const insights = [];
+    const kpiData = kpis;
+    const transactions = recentTransactions;
+    const pendingRevenueData = { total: pendingRevenue };
+
+    // 1. Revenue Performance & Trend Analysis
+    const revenueGrowth = dailyGoal > 0 ? ((kpiData.financial.weekRevenue / 7) / dailyGoal) * 100 : 0;
+    const monthlyProjection = (kpiData.financial.weekRevenue / 7) * 30;
+
+    if (revenueGrowth >= 120) {
+      insights.push({
+        id: 'revenue_excellent',
+        type: 'success',
+        icon: '📈',
+        title: 'Outstanding Revenue Performance',
+        message: `Your average daily revenue is ${revenueGrowth.toFixed(0)}% of goal (₱${(kpiData.financial.weekRevenue / 7).toLocaleString(undefined, { maximumFractionDigits: 0 })}). Monthly projection: ₱${monthlyProjection.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+        action: 'View Detailed Analytics',
+        actionLink: '/ai-insights',
+        priority: 1,
+        metric: `+${(revenueGrowth - 100).toFixed(0)}%`
+      });
+    } else if (revenueGrowth >= 90 && revenueGrowth < 120) {
+      insights.push({
+        id: 'revenue_good',
+        type: 'success',
+        icon: '✅',
+        title: 'Revenue On Track',
+        message: `Averaging ${revenueGrowth.toFixed(0)}% of daily goal. On pace for ₱${monthlyProjection.toLocaleString(undefined, { maximumFractionDigits: 0 })} this month.`,
+        action: 'View Trends',
+        actionLink: '/reports',
+        priority: 2,
+        metric: `${revenueGrowth.toFixed(0)}%`
+      });
+    } else if (revenueGrowth < 70) {
+      insights.push({
+        id: 'revenue_low',
+        type: 'warning',
+        icon: '📉',
+        title: 'Revenue Recovery Needed',
+        message: `Daily average is ${revenueGrowth.toFixed(0)}% of goal. Shortfall risk: ₱${((dailyGoal * 30) - monthlyProjection).toLocaleString(undefined, { maximumFractionDigits: 0 })} this month.`,
+        action: 'Launch Campaign',
+        actionLink: '/products',
+        priority: 1,
+        metric: `-${(100 - revenueGrowth).toFixed(0)}%`
+      });
+    }
+
+    // 2. Customer Value & Retention Analysis
+    const avgTransaction = kpiData.financial.avgTransaction;
+    const transactionCount = transactions.length;
+    const potentialRevenue = (avgTransaction * 0.3) * transactionCount; // 30% increase potential
+
+    if (avgTransaction < 1200) {
+      insights.push({
+        id: 'upsell_opportunity',
+        type: 'info',
+        icon: '💎',
+        title: 'High-Value Upsell Opportunity',
+        message: `Average ticket is ₱${avgTransaction.toLocaleString()}. A 30% increase could generate ₱${potentialRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} more revenue daily.`,
+        action: 'Create Bundles',
+        actionLink: '/products',
+        priority: 2,
+        metric: `₱${avgTransaction.toLocaleString()}`
+      });
+    } else {
+      insights.push({
+        id: 'premium_customers',
+        type: 'success',
+        icon: '👑',
+        title: 'Premium Customer Base',
+        message: `Strong average ticket of ₱${avgTransaction.toLocaleString()}. Focus on retention and referral programs.`,
+        action: 'View Top Customers',
+        actionLink: '/customers',
+        priority: 3,
+        metric: `₱${avgTransaction.toLocaleString()}`
+      });
+    }
+
+    // 3. Operational Efficiency Insights
+    if (kpiData.operational.roomUtilization < 40) {
+      const unutilizedCapacity = 100 - kpiData.operational.roomUtilization;
+      insights.push({
+        id: 'low_utilization',
+        type: 'warning',
+        icon: '🏠',
+        title: 'Capacity Optimization Needed',
+        message: `${unutilizedCapacity}% of room capacity unused. Peak-hour promotions or flexible scheduling could boost revenue by ₱${(dailyGoal * 0.2).toLocaleString(undefined, { maximumFractionDigits: 0 })}/day.`,
+        action: 'Optimize Schedule',
+        actionLink: '/rooms',
+        priority: 2,
+        metric: `${kpiData.operational.roomUtilization}%`
+      });
+    } else if (kpiData.operational.roomUtilization > 85) {
+      insights.push({
+        id: 'high_utilization',
+        type: 'critical',
+        icon: '🔥',
+        title: 'Peak Capacity - Growth Opportunity',
+        message: `${kpiData.operational.roomUtilization}% utilization indicates strong demand. Consider expansion, premium pricing, or advance booking requirements.`,
+        action: 'Expansion Analysis',
+        actionLink: '/ai-insights',
+        priority: 1,
+        metric: `${kpiData.operational.roomUtilization}%`
+      });
+    }
+
+    // 4. Inventory Management & Cost Control
+    if (kpiData.inventory.criticalStock > 0) {
+      const stockValue = kpiData.inventory.criticalStock * 500; // Estimated avg value
+      insights.push({
+        id: 'critical_stock',
+        type: 'critical',
+        icon: '⚠️',
+        title: 'Urgent: Stock Replenishment Required',
+        message: `${kpiData.inventory.criticalStock} products critically low. Service disruption risk affects ~₱${stockValue.toLocaleString()} in potential revenue.`,
+        action: 'Reorder Now',
+        actionLink: '/inventory',
+        priority: 1,
+        metric: `${kpiData.inventory.criticalStock} items`
+      });
+    }
+
+    if (kpiData.inventory.lowStockAlerts > 0 && kpiData.inventory.criticalStock === 0) {
+      insights.push({
+        id: 'low_stock_planning',
+        type: 'info',
+        icon: '📦',
+        title: 'Proactive Inventory Planning',
+        message: `${kpiData.inventory.lowStockAlerts} products running low. Schedule reorders within 2 weeks to maintain service quality.`,
+        action: 'Plan Reorders',
+        actionLink: '/inventory',
+        priority: 3,
+        metric: `${kpiData.inventory.lowStockAlerts} items`
+      });
+    }
+
+    // 5. Advance Booking Intelligence
+    if (todaysBookings > 5) {
+      insights.push({
+        id: 'high_bookings',
+        type: 'success',
+        icon: '📅',
+        title: 'High-Volume Day Ahead',
+        message: `${todaysBookings} advance bookings today (₱${(todaysBookings * avgTransaction).toLocaleString(undefined, { maximumFractionDigits: 0 })} projected). Ensure adequate staffing and supplies.`,
+        action: 'View Schedule',
+        actionLink: '/appointments',
+        priority: 2,
+        metric: `${todaysBookings} bookings`
+      });
+    } else if (todaysBookings <= 2 && todaysBookings > 0) {
+      insights.push({
+        id: 'low_bookings',
+        type: 'info',
+        icon: '📱',
+        title: 'Booking Volume Below Average',
+        message: `Only ${todaysBookings} advance bookings. Consider SMS/social media outreach to fill capacity.`,
+        action: 'Boost Marketing',
+        actionLink: '/appointments',
+        priority: 3,
+        metric: `${todaysBookings} bookings`
+      });
+    }
+
+    // 6. Revenue Collection & Cash Flow
+    if (pendingRevenueData.total > 5000) {
+      const conversionRate = 85; // Assumed conversion rate
+      const expectedCollection = pendingRevenueData.total * (conversionRate / 100);
+      insights.push({
+        id: 'pending_revenue',
+        type: 'warning',
+        icon: '💰',
+        title: 'Significant Receivables Pending',
+        message: `₱${pendingRevenueData.total.toLocaleString()} in pay-after bookings. Expected collection: ₱${expectedCollection.toLocaleString(undefined, { maximumFractionDigits: 0 })} (${conversionRate}% rate).`,
+        action: 'Follow Up',
+        actionLink: '/appointments',
+        priority: 2,
+        metric: `₱${pendingRevenueData.total.toLocaleString()}`
+      });
+    }
+
+    // 7. Staff Performance & Productivity
+    if (kpiData.staff.lateArrivals > 3) {
+      const productivityImpact = kpiData.staff.lateArrivals * 200; // Estimated cost per late arrival
+      insights.push({
+        id: 'attendance_issue',
+        type: 'warning',
+        icon: '⏰',
+        title: 'Punctuality Affecting Service',
+        message: `${kpiData.staff.lateArrivals} late arrivals today (~₱${productivityImpact.toLocaleString()} productivity impact). Review scheduling or incentives.`,
+        action: 'View Attendance',
+        actionLink: '/attendance',
+        priority: 2,
+        metric: `${kpiData.staff.lateArrivals} late`
+      });
+    } else if (kpiData.staff.attendanceRate === 100 && kpiData.staff.lateArrivals === 0) {
+      insights.push({
+        id: 'perfect_attendance',
+        type: 'success',
+        icon: '⭐',
+        title: 'Perfect Team Performance',
+        message: '100% attendance, zero tardiness. Consider team recognition or performance bonuses.',
+        action: 'View Team',
+        actionLink: '/employees',
+        priority: 4,
+        metric: '100%'
+      });
+    }
+
+    // 8. Service Performance Analysis (based on transactions). Match the
+    // billable rule used by Service History / Reports so cancelled and
+    // voided receipts don't skew the avg-revenue-per-service metric.
+    const billableTxns = transactions.filter(t => t.status !== 'voided' && t.status !== 'cancelled');
+    const serviceRevenue = billableTxns.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const revenuePerService = transactionCount > 0 ? serviceRevenue / transactionCount : 0;
+
+    if (revenuePerService > 1500) {
+      insights.push({
+        id: 'premium_services',
+        type: 'success',
+        icon: '💫',
+        title: 'Premium Service Mix',
+        message: `High-value services dominate (₱${revenuePerService.toLocaleString(undefined, { maximumFractionDigits: 0 })}/transaction). Maintain quality and consider luxury add-ons.`,
+        action: 'Analyze Services',
+        actionLink: '/ai-insights',
+        priority: 3,
+        metric: `₱${revenuePerService.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+      });
+    }
+
+    // 9. Time-based Recommendations
+    const currentHour = new Date().getHours();
+    if (currentHour >= 9 && currentHour <= 11 && kpiData.financial.todayRevenue < dailyGoal * 0.2) {
+      insights.push({
+        id: 'morning_boost',
+        type: 'info',
+        icon: '☀️',
+        title: 'Morning Performance Opportunity',
+        message: 'Morning bookings are light. Consider breakfast spa packages or early-bird discounts.',
+        action: 'Create Promotion',
+        actionLink: '/products',
+        priority: 3,
+        metric: 'Morning'
+      });
+    }
+
+    // 10. Month-end Performance Tracking
+    const today = new Date();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const dayOfMonth = today.getDate();
+    const monthProgress = (dayOfMonth / daysInMonth) * 100;
+    const revenueProgress = dailyGoal > 0 ? (kpiData.financial.monthRevenue / (dailyGoal * daysInMonth)) * 100 : 0;
+
+    if (revenueProgress < monthProgress - 10) {
+      insights.push({
+        id: 'month_target_risk',
+        type: 'warning',
+        icon: '📊',
+        title: 'Monthly Target At Risk',
+        message: `${monthProgress.toFixed(0)}% through month, but only ${revenueProgress.toFixed(0)}% of target reached. Gap: ₱${((dailyGoal * daysInMonth) - kpiData.financial.monthRevenue).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+        action: 'Action Plan',
+        actionLink: '/reports',
+        priority: 1,
+        metric: `${revenueProgress.toFixed(0)}%`
+      });
+    } else if (revenueProgress > monthProgress + 10) {
+      insights.push({
+        id: 'month_target_ahead',
+        type: 'success',
+        icon: '🎯',
+        title: 'Ahead of Monthly Target',
+        message: `${revenueProgress.toFixed(0)}% of monthly target achieved (${monthProgress.toFixed(0)}% through month). Surplus: ₱${(kpiData.financial.monthRevenue - (dailyGoal * dayOfMonth)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+        action: 'View Analytics',
+        actionLink: '/ai-insights',
+        priority: 2,
+        metric: `+${(revenueProgress - monthProgress).toFixed(0)}%`
+      });
+    }
+
+    // Sort by priority
+    insights.sort((a, b) => a.priority - b.priority);
+
+    return insights.slice(0, 9); // Show top 9 insights
+  }, [kpis, recentTransactions, pendingRevenue, todaysBookings, dailyGoal]);
+
+  const handleSetGoal = useCallback(async () => {
+    try {
+      const goal = parseFloat(newGoal);
+      if (isNaN(goal) || goal <= 0) {
+        showToast('Please enter a valid goal amount', 'error');
+        return;
+      }
+
+      await mockApi.business.updateDailyGoal(goal);
+      setDailyGoal(goal);
+      setShowGoalModal(false);
+      setNewGoal('');
+      showToast(`Daily goal set to ₱${goal.toLocaleString()}`, 'success');
+    } catch (error) {
+      showToast('Failed to update goal', 'error');
+    }
+  }, [newGoal, showToast]);
+
+  const generateAlerts = useCallback(async () => {
+    try {
+      const newAlerts = [];
+
+      // Low stock alerts
+      const products = await mockApi.products.getProducts();
+      const lowStock = products.filter(p => p.type === 'product' && p.stock > 0 && p.stock <= p.lowStockAlert);
+      if (lowStock.length > 0) {
+        newAlerts.push({
+          id: 'alert_low_stock',
+          type: 'critical',
+          title: 'Low Stock Alert',
+          message: `${lowStock.length} items need reordering`,
+          action: 'View Inventory',
+          actionLink: '/products'
+        });
+      }
+
+      // Revenue below goal
+      if (kpis && dailyGoal > 0) {
+        const goalProgress = (kpis.financial.todayRevenue / dailyGoal) * 100;
+        const currentHour = new Date().getHours();
+        if (goalProgress < 50 && currentHour >= 17) {
+          newAlerts.push({
+            id: 'alert_revenue',
+            type: 'warning',
+            title: 'Revenue Below Target',
+            message: `Only ${goalProgress.toFixed(0)}% of daily goal reached`,
+            action: 'View Details',
+            actionLink: '/dashboard'
+          });
+        }
+      }
+
+      // Late arrivals
+      if (kpis && kpis.staff.lateArrivals > 2) {
+        newAlerts.push({
+          id: 'alert_late',
+          type: 'warning',
+          title: 'Multiple Late Arrivals',
+          message: `${kpis.staff.lateArrivals} employees late today`,
+          action: 'View Attendance',
+          actionLink: '/attendance'
+        });
+      }
+
+      // Pending appointments
+      if (kpis && kpis.operational.pendingAppointments > 0) {
+        newAlerts.push({
+          id: 'alert_appointments',
+          type: 'info',
+          title: 'Pending Appointments',
+          message: `${kpis.operational.pendingAppointments} appointments need confirmation`,
+          action: 'View Appointments',
+          actionLink: '/appointments'
+        });
+      }
+
+      setAlerts(newAlerts);
+      showToast(`${newAlerts.length} alerts generated`, 'success');
+    } catch (error) {
+      showToast('Failed to generate alerts', 'error');
+    }
+  }, [kpis, dailyGoal, showToast]);
+
+  const dismissAlert = useCallback((alertId) => {
+    setAlerts(prev => prev.filter(a => a.id !== alertId));
+  }, []);
+
+  // Memoized chart data from real transaction data
+  const revenueChartData = useMemo(() => {
+    const byDay = chartData?.byDay || [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    // Build last 7 days labels and data
+    const labels = [];
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      labels.push(dayNames[d.getDay()]);
+      const dayData = byDay.find(day => day.date === dateStr);
+      data.push(dayData ? dayData.revenue : 0);
+    }
+    return {
+      labels,
+      datasets: [{
+        label: 'Revenue (₱)',
+        data,
+        borderColor: '#1B5E37',
+        backgroundColor: 'rgba(27, 94, 55, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    };
+  }, [chartData]);
+
+  const bookingSourcesData = useMemo(() => {
+    const sources = chartData?.byBookingSource || {};
+    const labels = Object.keys(sources).length > 0 ? Object.keys(sources) : ['No data'];
+    const data = Object.keys(sources).length > 0 ? Object.values(sources) : [1];
+    const colors = ['#1B5E37', '#145A2C', '#666666', '#999999', '#E0E0E0', '#BDBDBD'];
+    return {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors.slice(0, labels.length)
+      }]
+    };
+  }, [chartData]);
+
+  const topServicesData = useMemo(() => {
+    const services = (chartData?.byService || []).slice(0, 5);
+    return {
+      labels: services.length > 0 ? services.map(s => s.name) : ['No data'],
+      datasets: [{
+        label: 'Revenue (₱)',
+        data: services.length > 0 ? services.map(s => s.revenue) : [0],
+        backgroundColor: '#1B5E37'
+      }]
+    };
+  }, [chartData]);
+
+  const paymentMethodsData = useMemo(() => {
+    const methods = chartData?.byPaymentMethod || {};
+    const labels = Object.keys(methods).length > 0 ? Object.keys(methods) : ['No data'];
+    const data = Object.keys(methods).length > 0 ? Object.values(methods) : [1];
+    return {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: ['#1B5E37', '#666666', '#999999']
+      }]
+    };
+  }, [chartData]);
+
+  // Memoized chart options
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false
+  }), []);
+
+  const exportDailySales = useCallback(async () => {
+    try {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const transactions = await mockApi.transactions.getTransactions({
+        startDate: today,
+        endDate: today
+      });
+
+      // Generate CSV — include all rows (cancelled/voided too) with a
+      // Status column so the export is a complete audit trail, but only
+      // count billable transactions in the Total Sales summary so it
+      // matches the Service History / Reports revenue figures.
+      let csv = 'Time,Receipt#,Status,Items,Employee,Customer,Payment Method,Subtotal,Discount,Total\n';
+
+      transactions.forEach(t => {
+        const time = new Date(t.date).toLocaleTimeString();
+        const items = (t.items || []).map(i => i.name).join(' + ');
+        csv += `"${time}","${t.receiptNumber}","${t.status || 'completed'}","${items}","${t.employee?.name}","${t.customer?.name || 'Walk-in'}","${t.paymentMethod}","₱${t.subtotal}","₱${t.discount}","₱${t.totalAmount}"\n`;
+      });
+
+      // Add summary — exclude voided + cancelled from totals
+      const billable = transactions.filter(t => t.status !== 'voided' && t.status !== 'cancelled');
+      const total = billable.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+      csv += '\nSummary\n';
+      csv += `Total Transactions,${billable.length}\n`;
+      csv += `Total Sales,"₱${total.toFixed(2)}"\n`;
+
+      // Download
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `daily-sales-${today}.csv`;
+      a.click();
+
+      showToast('Daily sales report downloaded', 'success');
+    } catch (error) {
+      showToast('Failed to export sales', 'error');
+    }
+  }, [showToast]);
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
+  return (
+    <div className="dashboard-page">
+      {/* Header Actions */}
+      <div className="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Real-time business overview{selectedBranch ? ` - ${selectedBranch.name}` : ''}</p>
+        </div>
+        <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {branches.length > 0 && canSeeAllBranches() && (
+            <select
+              className="form-control"
+              value={selectedBranch?._allBranches ? '__all__' : (selectedBranchId || '')}
+              onChange={(e) => {
+                if (e.target.value === '__all__') {
+                  selectBranch(ALL_BRANCHES);
+                  return;
+                }
+                const branch = branches.find(b => b.id === e.target.value);
+                selectBranch(branch || null);
+              }}
+              style={{ minWidth: '160px', fontSize: '0.875rem' }}
+            >
+              <option value="__all__">All Branches</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          )}
+          <button
+            className="btn btn-secondary"
+            onClick={toggleLandscape}
+            title="Force fullscreen landscape mode"
+            style={{
+              border: '2px solid #f97316',
+              color: '#f97316',
+              background: 'transparent',
+              fontWeight: 600,
+            }}
+          >
+            {isLandscape ? '⤢ Exit Landscape' : '⤢ Landscape'}
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={refreshDashboard}
+            disabled={refreshing}
+          >
+            {refreshing ? '↻ Refreshing...' : '↻ Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {/* Top Quick Action Buttons */}
+      <div className="top-quick-actions">
+        <button className="quick-action-btn primary" onClick={() => navigate('/pos')}>
+          <span className="quick-btn-icon">💳</span>
+          <span className="quick-btn-text">New Sale</span>
+        </button>
+        <button className="quick-action-btn success" onClick={() => navigate('/appointments')}>
+          <span className="quick-btn-icon">📅</span>
+          <span className="quick-btn-text">New Booking</span>
+        </button>
+        <button className="quick-action-btn info" onClick={() => navigate('/customers')}>
+          <span className="quick-btn-icon">👤</span>
+          <span className="quick-btn-text">Add Customer</span>
+        </button>
+        <button className="quick-action-btn warning" onClick={() => navigate('/attendance')}>
+          <span className="quick-btn-icon">⏰</span>
+          <span className="quick-btn-text">Clock In/Out</span>
+        </button>
+        <button className="quick-action-btn purple" onClick={() => navigate('/inventory')}>
+          <span className="quick-btn-icon">📦</span>
+          <span className="quick-btn-text">Inventory</span>
+        </button>
+        <button className="quick-action-btn gradient" onClick={() => navigate('/daet-insights')}>
+          <span className="quick-btn-icon">🤖</span>
+          <span className="quick-btn-text">Insights</span>
+        </button>
+        <button className="quick-action-btn secondary" onClick={() => navigate('/reports')}>
+          <span className="quick-btn-icon">📊</span>
+          <span className="quick-btn-text">Reports</span>
+        </button>
+        <button className="quick-action-btn dark" onClick={() => navigate('/employees')}>
+          <span className="quick-btn-icon">👥</span>
+          <span className="quick-btn-text">Employees</span>
+        </button>
+      </div>
+
+      {/* Customer Booking Link — only shown in All Branches view. Customers
+          pick their branch via the in-page selector on the booking page, so
+          no per-branch suffix is needed. */}
+      {user?.businessId && canSeeAllBranches() && selectedBranch?._allBranches && (
+        <div className="booking-link-card">
+          <div className="booking-link-header">
+            <span className="booking-link-icon">🔗</span>
+            <div>
+              <h3>Customer Booking Link</h3>
+              <p>Share this link with customers to let them book online</p>
+            </div>
+          </div>
+          <div className="booking-link-content">
+            <code className="booking-link-url">
+              {`${window.location.origin}/book/${bookingSlug || user.businessId}`}
+            </code>
+            <button
+              className="copy-link-btn"
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/book/${bookingSlug || user.businessId}`);
+                showToast('Booking link copied to clipboard!', 'success');
+              }}
+            >
+              📋 Copy Link
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Transactions */}
+      <div className="dashboard-section">
+        <div className="section-header">
+          <h3>💵 Recent Transactions</h3>
+        </div>
+        <div className="transactions-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Receipt #</th>
+                <th>Time</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Payment</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTransactions.map((t) => (
+                <tr key={t._id}>
+                  <td>{t.receiptNumber}</td>
+                  <td>{new Date(t.date).toLocaleTimeString()}</td>
+                  <td>{t.customer?.name || 'Walk-in'}</td>
+                  <td className="amount">₱{(t.totalAmount ?? 0).toLocaleString()}</td>
+                  <td><span className="badge">{t.paymentMethod}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Set Goal Modal */}
+      {showGoalModal && (
+        <div className="modal-overlay" onClick={() => setShowGoalModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Set Daily Revenue Goal</h2>
+              <button className="modal-close" onClick={() => setShowGoalModal(false)}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Current Goal: ₱{dailyGoal.toLocaleString()}</label>
+                <input
+                  type="number"
+                  value={newGoal}
+                  onChange={(e) => setNewGoal(e.target.value)}
+                  placeholder="Enter new daily goal"
+                  className="form-control"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowGoalModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSetGoal}>
+                Save Goal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Dashboard;

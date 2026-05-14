@@ -1,0 +1,990 @@
+/* ============================================================================
+   APPOINTMENTS PAGE SPECIFIC STYLES
+   ============================================================================ */
+.appointments-page {
+  padding: var(--spacing-lg);
+}
+
+/* View Toggle */
+.view-mode-toggle {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Calendar View */
+.calendar-view {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+  padding: var(--spacing-lg);
+}
+
+.appointments-page .calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.appointments-page .calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.appointments-page .calendar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  min-width: 200px;
+  text-align: center;
+}
+
+.appointments-page .calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--gray-200);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.appointments-page .calendar-day-header {
+  background: var(--gray-100);
+  padding: var(--spacing-md);
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--gray-700);
+  text-transform: uppercase;
+}
+
+.appointments-page .calendar-day {
+  background: var(--white);
+  min-height: 100px;
+  padding: var(--spacing-sm);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.appointments-page .calendar-day:hover {
+  background: var(--gray-50);
+}
+
+.appointments-page .calendar-day.other-month {
+  background: var(--gray-50);
+  opacity: 0.5;
+}
+
+.appointments-page .calendar-day.today {
+  background: var(--primary-light);
+  border: 2px solid var(--primary);
+}
+
+.appointments-page .calendar-day-number {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: var(--spacing-xs);
+}
+
+.appointments-page .calendar-day.today .calendar-day-number {
+  color: var(--primary-dark);
+}
+
+.calendar-appointments {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.calendar-appointment-dot {
+  width: 100%;
+  padding: 2px 4px;
+  background: var(--primary);
+  color: var(--white);
+  font-size: 0.7rem;
+  border-radius: var(--radius-sm);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.calendar-appointment-dot.pending {
+  background: var(--warning);
+}
+
+.calendar-appointment-dot.confirmed {
+  background: var(--success);
+}
+
+.calendar-appointment-dot.cancelled {
+  background: var(--gray-400);
+}
+
+/* List View */
+.appointments-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.appointment-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  gap: var(--spacing-lg);
+  transition: all var(--transition-fast);
+}
+
+.appointment-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.appointment-time-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
+  padding: var(--spacing-md);
+  background: var(--primary-light);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--primary);
+}
+
+.appointment-time-block.pending {
+  background: var(--warning-light);
+  border-left-color: var(--warning);
+}
+
+.appointment-time-block.confirmed {
+  background: var(--success-light);
+  border-left-color: var(--success);
+}
+
+.appointment-time-block.completed {
+  background: var(--gray-100);
+  border-left-color: var(--gray-400);
+}
+
+.appointment-time-block.cancelled {
+  background: var(--error-light);
+  border-left-color: var(--error);
+}
+
+.appointment-time {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.appointment-date {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  margin-top: var(--spacing-xs);
+}
+
+.appointment-details {
+  flex: 1;
+}
+
+.appointment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-md);
+}
+
+.appointment-customer {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: var(--spacing-xs);
+}
+
+.appointment-service {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+}
+
+.appointment-status-badge {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.appointment-status-badge.pending {
+  background: var(--warning-light);
+  color: var(--warning-dark);
+}
+
+.appointment-status-badge.confirmed {
+  background: var(--success-light);
+  color: var(--success-dark);
+}
+
+.appointment-status-badge.completed {
+  background: var(--gray-200);
+  color: var(--gray-700);
+}
+
+.appointment-status-badge.cancelled {
+  background: var(--error-light);
+  color: var(--error-dark);
+}
+
+.appointment-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.appointment-info-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+.appointment-info-icon {
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+.appointment-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--gray-200);
+}
+
+/* Appointment Modal */
+.appointment-modal {
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.time-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.time-slot-btn {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--gray-300);
+  background: var(--white);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
+
+.time-slot-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.time-slot-btn.selected {
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
+}
+
+.time-slot-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.booking-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.booking-source-btn {
+  padding: var(--spacing-md);
+  border: 2px solid var(--gray-300);
+  background: var(--white);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.booking-source-btn:hover {
+  border-color: var(--primary);
+}
+
+.booking-source-btn.selected {
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
+}
+
+/* Status Change Buttons */
+.status-change-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* Empty State */
+.empty-appointments {
+  text-align: center;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  color: var(--gray-500);
+}
+
+.empty-appointments-icon {
+  font-size: 4rem;
+  margin-bottom: var(--spacing-md);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .appointments-page .calendar-day {
+    min-height: 80px;
+  }
+
+  .time-slot-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .appointment-info {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .appointments-page {
+    padding: var(--spacing-md);
+    /* Belt-and-braces against children that try to overflow horizontally
+       (e.g. wide tab rows) and squeeze the calendar grid. */
+    overflow-x: hidden;
+  }
+
+  .appointments-page .calendar-grid {
+    gap: 0;
+  }
+
+  .appointments-page .calendar-day {
+    /* Bigger tap target — Apple/MD guidelines want ~44px and the old 60px
+       still felt cramped because the number was top-left while the entire
+       cell shrank against the appointments dots. Hold a comfortable height
+       so the last row (26-30) doesn't get squeezed when the bottom-nav
+       eats screen space. */
+    min-height: 56px;
+    padding: 6px 4px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .appointments-page .calendar-day-number {
+    font-size: 0.85rem;
+    /* Centered makes touch easier and visually balances the cell. */
+    text-align: center;
+    margin-bottom: 2px;
+  }
+
+  .calendar-appointment-dot {
+    font-size: 0.6rem;
+    padding: 1px 2px;
+  }
+
+  .appointment-card {
+    flex-direction: column;
+  }
+
+  .appointment-time-block {
+    min-width: auto;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .time-slot-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .booking-source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .appointment-actions {
+    flex-direction: column;
+  }
+}
+
+/* ============================================================================
+   TABS CONTAINER
+   ============================================================================ */
+.tabs-container {
+  display: flex;
+  gap: var(--spacing-xs);
+  border-bottom: 2px solid var(--gray-200);
+  margin-bottom: var(--spacing-lg);
+}
+
+.tabs-container .tab {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--gray-600);
+}
+
+.tabs-container .tab:hover {
+  color: var(--primary-600);
+  background: var(--primary-50);
+}
+
+.tabs-container .tab.active {
+  color: var(--primary-600);
+  border-bottom-color: var(--primary-600);
+}
+
+/* ============================================================================
+   ADVANCE BOOKINGS TAB
+   ============================================================================ */
+.advance-bookings-tab {
+  min-height: 400px;
+}
+
+.bookings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+.booking-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.booking-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.booking-card.cancelled {
+  opacity: 0.6;
+  background: var(--gray-50);
+}
+
+.booking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.booking-datetime {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--gray-600);
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.status-scheduled {
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.status-badge.status-confirmed {
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.status-badge.status-in-progress {
+  background: var(--purple-100);
+  color: var(--purple-700);
+}
+
+.status-badge.status-completed {
+  background: var(--gray-200);
+  color: var(--gray-700);
+}
+
+.status-badge.status-cancelled {
+  background: var(--red-100);
+  color: var(--red-700);
+}
+
+.booking-body {
+  margin-bottom: var(--spacing-md);
+}
+
+.booking-body .client-name {
+  margin-bottom: var(--spacing-sm);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.booking-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  font-size: 0.9rem;
+  color: var(--gray-700);
+}
+
+.detail-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.detail-text {
+  flex: 1;
+}
+
+.detail-text.address {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+}
+
+.detail-row.special-requests {
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  background: var(--gray-50);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  font-style: italic;
+}
+
+.payment-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--gray-100);
+}
+
+.payment-badge {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.payment-badge.paid {
+  background: var(--success-100);
+  color: var(--success-700);
+}
+
+.payment-badge.pending {
+  background: var(--warning-100);
+  color: var(--warning-700);
+}
+
+.payment-info .amount {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary-600);
+}
+
+.booking-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--gray-100);
+}
+
+.booking-actions .btn {
+  flex: 1;
+}
+
+.booking-actions .status-text {
+  flex: 1;
+  text-align: center;
+  padding: var(--spacing-xs);
+  font-weight: 500;
+  color: var(--gray-600);
+}
+
+.booking-actions .status-text.cancelled {
+  color: var(--red-600);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xxl);
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  margin-bottom: var(--spacing-sm);
+  color: var(--gray-800);
+}
+
+.empty-state p {
+  color: var(--gray-600);
+  max-width: 400px;
+}
+
+/* ============================================================================
+   CONFLICT WARNINGS
+   ============================================================================ */
+.conflict-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.conflict-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: #FEF3C7;
+  border: 1px solid #F59E0B;
+}
+
+.conflict-warning.therapist-conflict {
+  background: #FEE2E2;
+  border-color: #EF4444;
+}
+
+.conflict-warning.room-conflict {
+  background: #FEF3C7;
+  border-color: #F59E0B;
+}
+
+.conflict-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.conflict-details {
+  flex: 1;
+}
+
+.conflict-details strong {
+  display: block;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.conflict-details p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+.checking-availability {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--gray-50);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-md);
+}
+
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   MOBILE OPTIMIZATIONS FOR APPOINTMENTS
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .appointments-page {
+    padding: var(--spacing-md);
+  }
+
+  .calendar-view {
+    padding: var(--spacing-md);
+  }
+
+  .appointments-page .calendar-header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: stretch;
+  }
+
+  .appointments-page .calendar-nav {
+    justify-content: center;
+  }
+
+  .appointments-page .calendar-title {
+    font-size: 1.125rem;
+    min-width: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .appointments-page {
+    padding: var(--spacing-sm);
+  }
+
+  .view-mode-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .view-mode-toggle .btn {
+    flex: 1;
+  }
+
+  .appointments-page .calendar-grid {
+    font-size: 0.75rem;
+  }
+
+  .appointments-page .calendar-day-header {
+    padding: var(--spacing-sm);
+    font-size: 0.6875rem;
+  }
+
+  .appointments-page .calendar-day {
+    min-height: 70px;
+    padding: var(--spacing-xs);
+  }
+
+  .appointments-page .calendar-day-number {
+    font-size: 0.75rem;
+  }
+
+  .appointments-page .calendar-appointment {
+    padding: 2px 4px;
+    font-size: 0.625rem;
+    margin-bottom: 2px;
+  }
+
+  /* List view optimizations */
+  .appointment-card {
+    padding: var(--spacing-md);
+  }
+
+  .appointment-card-header {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    align-items: flex-start;
+  }
+
+  .appointment-time {
+    font-size: 0.875rem;
+  }
+
+  .appointment-details {
+    gap: var(--spacing-sm);
+  }
+
+  .appointment-info {
+    font-size: 0.8125rem;
+  }
+
+  .appointment-actions {
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+
+  .appointment-actions .btn {
+    font-size: 0.75rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  /* Filters */
+  .appointments-filters {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .appointments-filters select,
+  .appointments-filters input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-view {
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+  }
+
+  .appointments-page .calendar-day {
+    min-height: 55px;
+  }
+
+  .appointments-page .calendar-day-header {
+    padding: var(--spacing-xs);
+  }
+
+  .appointments-page .calendar-appointment {
+    display: none;
+  }
+
+  .appointments-page .calendar-day .appointment-count {
+    display: block;
+    font-size: 0.625rem;
+    text-align: center;
+    background: var(--primary);
+    color: white;
+    border-radius: var(--radius-full);
+    padding: 2px 6px;
+    margin-top: 2px;
+  }
+}
+
+/* ==========================================================================
+   COMPACT CALENDAR NAV BUTTONS (chevron-style, used on Bookings calendar)
+   ========================================================================== */
+.calendar-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--gray-700);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.calendar-nav-btn:hover {
+  background: var(--gray-100);
+  color: var(--primary);
+}
+
+.calendar-nav-btn:active {
+  background: var(--gray-200);
+}
+
+/* Mobile: match image 2 — keep title centered between two compact arrows
+   instead of stacking the header vertically. Today is a red ring on the
+   day number, not a filled cell. */
+@media (max-width: 1024px) {
+  .appointments-page .calendar-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .appointments-page .calendar-title {
+    flex: 1;
+    text-align: center;
+    font-size: 1.0625rem;
+    min-width: 0;
+  }
+
+  /* Single compact filter row matching image 2:
+     [Calendar] [List]   [Status: All ▾]   then the result text on its own line. */
+  .appointments-page .filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .appointments-page .view-mode-toggle {
+    display: inline-flex;
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .appointments-page .view-mode-toggle .btn {
+    flex: 0 0 auto;
+  }
+
+  .appointments-page .filter-select {
+    flex: 0 1 auto;
+    min-width: 130px;
+    max-width: 170px;
+  }
+
+  .appointments-page .results-count {
+    flex: 0 0 100%;
+    margin-left: 0;
+    font-size: 0.8125rem;
+    color: var(--gray-700);
+    text-align: left;
+  }
+
+  /* Today indicator: red ring around the day number (matches image 2),
+     no filled background or border on the cell itself. */
+  .appointments-page .calendar-day.today {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+  }
+
+  .appointments-page .calendar-day.today .calendar-day-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    margin-bottom: 0;
+  }
+}

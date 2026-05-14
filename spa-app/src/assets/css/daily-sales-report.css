@@ -1,0 +1,633 @@
+/* ===========================================
+   Daily Sales Report
+   Used by: DailySalesReport (Sales > Reports tab)
+   =========================================== */
+
+.daily-sales-report {
+  padding: 20px 24px 40px;
+  background: var(--gray-100, #f6f7f9);
+  min-height: 100%;
+}
+
+/* --- Sub-tabs (Current / Saved) ----------------------------------------- */
+
+.dsr-subtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+}
+
+.dsr-subtab {
+  position: relative;
+  background: transparent;
+  border: 0;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gray-600, #6b7280);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dsr-subtab:hover { color: var(--gray-900, #111827); }
+
+.dsr-subtab.active { color: var(--primary, #5f1c1c); }
+
+.dsr-subtab.active::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--primary, #5f1c1c);
+}
+
+.dsr-subtab-count {
+  background: var(--gray-200, #e5e7eb);
+  color: var(--gray-700, #374151);
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.dsr-subtab.active .dsr-subtab-count {
+  background: var(--primary, #5f1c1c);
+  color: #fff;
+}
+
+/* --- Saved reports list ------------------------------------------------- */
+
+.dsr-saved-list {
+  background: #fff;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.dsr-saved-table th,
+.dsr-saved-table td {
+  padding: 12px 16px;
+}
+
+.dsr-period-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gray-700, #374151);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dsr-link-btn {
+  background: transparent;
+  border: 0;
+  color: var(--primary, #5f1c1c);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.dsr-link-btn:hover { text-decoration: underline; }
+
+.dsr-link-btn.danger { color: #b91c1c; }
+
+.dsr-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #fff;
+  border: 1px dashed var(--gray-300, #d1d5db);
+  border-radius: 12px;
+  max-width: 500px;
+  margin: 20px auto;
+}
+
+.dsr-empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+.dsr-empty-state h3 {
+  margin: 0 0 6px;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-empty-state p {
+  margin: 0;
+  color: var(--gray-600, #6b7280);
+  font-size: 0.9rem;
+}
+
+/* --- Modal (delete confirmation) ---------------------------------------- */
+
+.dsr-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.dsr-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
+
+.dsr-modal h3 {
+  margin: 0 0 8px;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-modal p {
+  margin: 0 0 18px;
+  color: var(--gray-600, #6b7280);
+}
+
+.dsr-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* --- Read-only snapshot view (flatten inputs to static text) ----------- */
+
+.dsr-readonly .dsr-field-value input,
+.dsr-readonly .dsr-field-value select,
+.dsr-readonly .dsr-field-value textarea,
+.dsr-readonly .dsr-sig input {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 2px 0 !important;
+  cursor: default;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-readonly .dsr-field-value textarea {
+  resize: none;
+}
+
+/* --- Toolbar (period filter + actions) ---------------------------------- */
+
+.dsr-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.dsr-period-group {
+  display: inline-flex;
+  background: #fff;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 10px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.dsr-period-btn {
+  border: 0;
+  background: transparent;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-700, #374151);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dsr-period-btn:hover {
+  background: var(--gray-100, #f3f4f6);
+}
+
+.dsr-period-btn.active {
+  background: var(--primary, #5f1c1c);
+  color: #fff;
+}
+
+.dsr-meta {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.dsr-range {
+  font-size: 0.9rem;
+  color: var(--gray-700, #374151);
+  font-weight: 600;
+}
+
+/* --- Report sheet (printable) ------------------------------------------ */
+
+.dsr-sheet {
+  background: #fff;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 14px;
+  padding: 32px;
+  max-width: 960px;
+  margin: 0 auto;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.dsr-header {
+  text-align: center;
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--gray-200, #e5e7eb);
+}
+
+.dsr-header h1 {
+  margin: 0 0 6px;
+  font-size: 1.6rem;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--gray-600, #6b7280);
+}
+
+.dsr-section {
+  margin-bottom: 26px;
+}
+
+.dsr-section h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gray-900, #111827);
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+  letter-spacing: 0.01em;
+}
+
+/* --- Fields / grids ----------------------------------------------------- */
+
+.dsr-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 18px;
+}
+
+.dsr-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .dsr-grid-2,
+  .dsr-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Toolbar: period chips on one row (horizontal scroll if needed) and the
+     action buttons (Save Report / Print) on a separate row below. Without
+     this they share a row that's wider than the viewport, hiding Print. */
+  .dsr-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .dsr-period-group {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+
+  .dsr-period-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .dsr-meta {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .dsr-meta .btn {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+
+  .dsr-sheet {
+    padding: 16px;
+  }
+}
+
+.dsr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dsr-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray-600, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dsr-field-value {
+  font-size: 0.92rem;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-field-value input,
+.dsr-field-value select,
+.dsr-field-value textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--gray-300, #d1d5db);
+  border-radius: 7px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-field-value textarea {
+  resize: vertical;
+  min-height: 52px;
+}
+
+.dsr-field-value input:focus,
+.dsr-field-value select:focus,
+.dsr-field-value textarea:focus {
+  outline: none;
+  border-color: var(--primary, #5f1c1c);
+  box-shadow: 0 0 0 2px rgba(95, 28, 28, 0.12);
+}
+
+/* --- Key / value rows (sales summary, cash flow) ---------------------- */
+
+.dsr-kv-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dsr-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--gray-50, #f9fafb);
+  border-radius: 7px;
+  font-size: 0.92rem;
+  border-left: 3px solid transparent;
+}
+
+.dsr-kv.strong {
+  background: #fff;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.dsr-kv-label {
+  color: var(--gray-700, #374151);
+}
+
+.dsr-kv-value {
+  color: var(--gray-900, #111827);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.dsr-kv.tone-good {
+  border-left-color: #16a34a;
+}
+
+.dsr-kv.tone-good .dsr-kv-value {
+  color: #15803d;
+}
+
+.dsr-kv.tone-warn {
+  border-left-color: #ca8a04;
+}
+
+.dsr-kv.tone-warn .dsr-kv-value {
+  color: #a16207;
+}
+
+.dsr-kv.tone-bad {
+  border-left-color: #dc2626;
+}
+
+.dsr-kv.tone-bad .dsr-kv-value {
+  color: #b91c1c;
+}
+
+/* --- Tables ------------------------------------------------------------- */
+
+.dsr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.dsr-table th,
+.dsr-table td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-100, #f3f4f6);
+}
+
+.dsr-table th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gray-600, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--gray-50, #f9fafb);
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+}
+
+.dsr-table td.right,
+.dsr-table th.right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dsr-table .dsr-small {
+  color: var(--gray-600, #6b7280);
+  font-size: 0.82rem;
+}
+
+.dsr-table .dsr-empty {
+  text-align: center;
+  color: var(--gray-500, #9ca3af);
+  padding: 16px;
+  font-style: italic;
+}
+
+.dsr-table tr.dsr-total td {
+  font-weight: 700;
+  background: var(--gray-50, #f9fafb);
+  border-top: 2px solid var(--gray-300, #d1d5db);
+  border-bottom: none;
+}
+
+/* --- KPI cards ---------------------------------------------------------- */
+
+.dsr-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.dsr-kpi {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: #fff;
+}
+
+.dsr-kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray-600, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.dsr-kpi-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--gray-900, #111827);
+  font-variant-numeric: tabular-nums;
+}
+
+.dsr-kpi.tone-good {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+}
+
+.dsr-kpi.tone-good .dsr-kpi-value {
+  color: #15803d;
+}
+
+.dsr-kpi.tone-warn {
+  background: #fefce8;
+  border-color: #fef08a;
+}
+
+.dsr-kpi.tone-warn .dsr-kpi-value {
+  color: #a16207;
+}
+
+.dsr-kpi.tone-bad {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.dsr-kpi.tone-bad .dsr-kpi-value {
+  color: #b91c1c;
+}
+
+/* --- Signature blocks --------------------------------------------------- */
+
+.dsr-signoff {
+  margin-top: 34px;
+}
+
+.dsr-sig {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.dsr-sig input {
+  border: 0;
+  border-bottom: 1px solid transparent;
+  padding: 6px 2px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  text-align: center;
+  background: transparent;
+  color: var(--gray-900, #111827);
+}
+
+.dsr-sig input:focus {
+  outline: none;
+  border-bottom-color: var(--primary, #5f1c1c);
+}
+
+.dsr-sig-line {
+  height: 1px;
+  background: var(--gray-400, #9ca3af);
+}
+
+.dsr-sig-label {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--gray-600, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 3px;
+}
+
+/* --- Print styles ------------------------------------------------------- */
+
+@media print {
+  /* Hide everything outside the report sheet */
+  body * { visibility: hidden !important; }
+  .dsr-sheet, .dsr-sheet * { visibility: visible !important; }
+
+  .daily-sales-report {
+    padding: 0;
+    background: #fff;
+  }
+
+  .dsr-toolbar { display: none !important; }
+
+  .dsr-sheet {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 18mm 16mm;
+    border: 0;
+    box-shadow: none;
+    max-width: none;
+  }
+
+  .dsr-section { break-inside: avoid; page-break-inside: avoid; }
+  .dsr-kpi-grid { break-inside: avoid; }
+
+  /* Flatten inputs for print — show values as plain text */
+  .dsr-field-value input,
+  .dsr-field-value select,
+  .dsr-field-value textarea,
+  .dsr-sig input {
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    color: var(--gray-900, #111827) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

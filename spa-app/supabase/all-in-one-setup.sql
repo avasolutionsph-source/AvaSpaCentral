@@ -1214,6 +1214,33 @@ ALTER TABLE users ADD CONSTRAINT users_role_check
   CHECK (role IN ('Owner', 'Manager', 'Receptionist', 'Therapist', 'Branch Owner'));
 
 -- ============================================================================
+-- 4B. SECURITY DEFINER HELPER FUNCTIONS (moved up from Section 6B)
+-- These need to exist BEFORE Section 5's RLS policies reference them. They
+-- depend on the users.branch_id column added in Section 2 of this block, so
+-- they must come AFTER Section 4 (where users role constraint is updated).
+-- The duplicate CREATE OR REPLACE in the original Section 6B below becomes
+-- a harmless refresh.
+-- ============================================================================
+
+-- Get current user's role (bypasses RLS)
+CREATE OR REPLACE FUNCTION get_current_user_role()
+RETURNS TEXT AS $$
+  SELECT role FROM users WHERE auth_id = auth.uid() LIMIT 1;
+$$ LANGUAGE SQL SECURITY DEFINER;
+
+-- Get current user's branch_id (bypasses RLS)
+CREATE OR REPLACE FUNCTION get_current_user_branch_id()
+RETURNS UUID AS $$
+  SELECT branch_id FROM users WHERE auth_id = auth.uid() LIMIT 1;
+$$ LANGUAGE SQL SECURITY DEFINER;
+
+-- Get current user's business_id (bypasses RLS)
+CREATE OR REPLACE FUNCTION get_current_user_business_id()
+RETURNS UUID AS $$
+  SELECT business_id FROM users WHERE auth_id = auth.uid() LIMIT 1;
+$$ LANGUAGE SQL SECURITY DEFINER;
+
+-- ============================================================================
 -- 5. ROW LEVEL SECURITY POLICIES
 -- ============================================================================
 

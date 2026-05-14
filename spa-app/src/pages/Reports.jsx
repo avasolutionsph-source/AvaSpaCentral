@@ -537,7 +537,7 @@ const Reports = ({ embedded = false }) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('Daet Massage & Spa', 14, 18);
+    doc.text('AVA Spa Central', 14, 18);
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');

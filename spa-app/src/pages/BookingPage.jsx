@@ -2921,7 +2921,7 @@ const BookingPage = () => {
                   <label>Hotel Name *</label>
                   <input
                     type="text"
-                    placeholder="e.g. Daet Seaside Hotel"
+                    placeholder="e.g. Your Branch Name"
                     value={serviceAddress}
                     onChange={(e) => setServiceAddress(e.target.value)}
                     required

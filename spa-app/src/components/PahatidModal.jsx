@@ -129,7 +129,7 @@ export default function PahatidModal({ open, onClose, onCreated }) {
               onChange={(e) => setDestination(e.target.value)}
               required
               autoFocus
-              placeholder="e.g. 123 San Felipe St., Daet"
+              placeholder="e.g. 123 Main St., City"
               style={inputStyle}
             />
           </label>

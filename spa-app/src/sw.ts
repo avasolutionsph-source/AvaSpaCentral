@@ -137,7 +137,7 @@ self.addEventListener('push', (event) => {
     try {
       return event.data.json();
     } catch {
-      return { title: 'Daet Spa', message: event.data.text() };
+      return { title: 'AVA Spa Central', message: event.data.text() };
     }
   })();
 
@@ -147,7 +147,7 @@ self.addEventListener('push', (event) => {
   // generic "site updated" fallback (or, on some Android builds,
   // nothing at all), which was the closed-app silence the user saw.
 
-  const title = data.title || 'Daet Massage & Spa';
+  const title = data.title || 'AVA Spa Central';
   const isLoop = data.soundClass === 'loop';
 
   // Cast through Record<string, unknown> because the TS DOM lib's

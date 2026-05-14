@@ -59,7 +59,7 @@ export function startSystemTriggers() {
       type: NotificationService.TYPES.APP_UPDATE_AVAILABLE,
       targetRole: ALL_ROLES,
       title: 'Update available',
-      message: 'A new version of Daet Spa is ready. Tap to reload.',
+      message: 'A new version of AVA Spa Central is ready. Tap to reload.',
       action: '/app-update',
       soundClass: 'oneshot',
     });

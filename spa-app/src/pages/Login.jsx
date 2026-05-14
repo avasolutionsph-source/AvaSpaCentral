@@ -154,7 +154,7 @@ const Login = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1 className="brand-logo">Daet Massage & Spa</h1>
+          <h1 className="brand-logo">AVA Spa Central</h1>
           {selectedBranch && (
             <p className="branch-select-role" style={{ display: 'inline-block', marginBottom: '8px' }}>
               {selectedBranch.name}

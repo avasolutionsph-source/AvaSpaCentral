@@ -18,7 +18,7 @@ export default function AppUpdate() {
           <div className="settings-section-icon">🔄</div>
           <div className="settings-section-title">
             <h2>Update App</h2>
-            <p>Pull the latest version of Daet Massage &amp; Spa without reinstalling. Your offline records and sync queue stay intact.</p>
+            <p>Pull the latest version of AVA Spa Central without reinstalling. Your offline records and sync queue stay intact.</p>
           </div>
         </div>
         <div className="settings-section-body">

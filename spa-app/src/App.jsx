@@ -57,7 +57,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Settings = lazy(() => import('./pages/Settings'));
 const AIChatbot = lazy(() => import('./pages/AIChatbot'));
-const DaetInsights = lazy(() => import('./pages/AvaSenseiUltrathink'));
+const AvaInsights = lazy(() => import('./pages/AvaSenseiUltrathink'));
 const AIInsights = lazy(() => import('./pages/AIInsights'));
 
 // Analytics Pages
@@ -181,7 +181,7 @@ const RequireBranch = ({ children }) => {
         <div className="branch-select-overlay">
           <div className="branch-select-container">
             <div className="branch-select-header">
-              <h1>Daet Massage &amp; Spa</h1>
+              <h1>AVA Spa Central</h1>
               <p className="branch-select-subtitle">We can’t open your branch</p>
             </div>
             <div className="branch-select-error">
@@ -414,7 +414,7 @@ function AppRoutes() {
           <Route path="rider-bookings" element={<ProtectedRoute page="rider-bookings"><Suspense fallback={<PageLoader />}><RiderBookings /></Suspense></ProtectedRoute>} />
           <Route path="reports" element={<ProtectedRoute page="reports"><Suspense fallback={<PageLoader />}><Reports /></Suspense></ProtectedRoute>} />
           <Route path="calendar" element={<ProtectedRoute page="calendar"><Suspense fallback={<PageLoader />}><Calendar /></Suspense></ProtectedRoute>} />
-          <Route path="daet-insights" element={<ProtectedRoute page="daet-insights"><Suspense fallback={<PageLoader />}><DaetInsights /></Suspense></ProtectedRoute>} />
+          <Route path="daet-insights" element={<ProtectedRoute page="daet-insights"><Suspense fallback={<PageLoader />}><AvaInsights /></Suspense></ProtectedRoute>} />
           <Route path="ai-chatbot" element={<ProtectedRoute page="ai-chatbot"><Suspense fallback={<PageLoader />}><AIChatbot /></Suspense></ProtectedRoute>} />
           <Route path="ai-insights" element={<ProtectedRoute page="dashboard"><Suspense fallback={<PageLoader />}><AIInsights /></Suspense></ProtectedRoute>} />
           <Route path="settings" element={<ProtectedRoute page="settings"><Suspense fallback={<PageLoader />}><Settings /></Suspense></ProtectedRoute>} />

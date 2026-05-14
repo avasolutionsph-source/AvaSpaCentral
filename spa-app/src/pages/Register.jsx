@@ -149,7 +149,7 @@ const Register = () => {
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1 className="brand-logo">Daet Massage & Spa</h1>
+          <h1 className="brand-logo">AVA Spa Central</h1>
           <p className="brand-tagline">Business Management System</p>
         </div>
 

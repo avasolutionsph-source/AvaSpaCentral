@@ -94,7 +94,7 @@ const Settings = () => {
   // in the branch-scoped `businessContact` record so every branch can expose
   // its own storefront details.
   const [businessInfo, setBusinessInfo] = useState({
-    name: 'Daet Massage & Spa',
+    name: 'AVA Spa Central',
     address: '',
     phone: '',
     email: ''
@@ -238,7 +238,7 @@ const Settings = () => {
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || 'Admin',
     lastName: user?.lastName || 'User',
-    email: user?.email || 'admin@daetmassagespa.com',
+    email: user?.email || 'admin@example.com',
     phone: '',
     currentPassword: '',
     newPassword: '',
@@ -1658,7 +1658,7 @@ const Settings = () => {
               const cloudWideInfo = wideValue('businessInfo') || {};
               const cloudContact = branchValue('businessContact') || {};
               const mergedInfo = {
-                name: cloudWideInfo.name ?? (savedBusinessInfo?.name ?? 'Daet Massage & Spa'),
+                name: cloudWideInfo.name ?? (savedBusinessInfo?.name ?? 'AVA Spa Central'),
                 address: cloudContact.address ?? '',
                 phone: cloudContact.phone ?? '',
                 email: cloudContact.email ?? '',
@@ -2940,7 +2940,7 @@ const Settings = () => {
                 {[
                   { id: 'candle', label: 'Candle Ambiance', src: '/videos/candle.mp4' },
                   { id: 'candle2', label: 'Candle Ambiance 2', src: '/videos/candle2.mp4' },
-                  { id: 'daet', label: 'Daet Template', src: '/videos/daet.mp4' },
+                  { id: 'daet', label: 'Spa Promo Template', src: '/videos/daet.mp4' },
                   { id: 'template3', label: 'Template 3', src: '/videos/template3.mp4' },
                   { id: 'template4', label: 'Template 4', src: '/videos/template4.mp4' },
                   { id: 'template5', label: 'Template 5', src: '/videos/template5.mp4' },
@@ -3195,7 +3195,7 @@ const Settings = () => {
                     type="text"
                     value={brandingSettings.businessName}
                     onChange={e => setBrandingSettings(prev => ({ ...prev, businessName: e.target.value }))}
-                    placeholder="e.g. Daet Massage & Spa"
+                    placeholder="e.g. AVA Spa Central"
                     disabled={!canEdit()}
                   />
                 </div>
@@ -3785,7 +3785,7 @@ const Settings = () => {
                     className="form-control"
                     value={brandingSettings.footerLine1}
                     onChange={e => setBrandingSettings(prev => ({ ...prev, footerLine1: e.target.value }))}
-                    placeholder="e.g. Daet Massage and Spa"
+                    placeholder="e.g. AVA Spa Central"
                     disabled={!canEdit()}
                   />
                 </div>
@@ -3818,7 +3818,7 @@ const Settings = () => {
                     className="form-control"
                     value={brandingSettings.footerLine4}
                     onChange={e => setBrandingSettings(prev => ({ ...prev, footerLine4: e.target.value }))}
-                    placeholder="e.g. © 2026 Daet Massage and Spa. All rights reserved."
+                    placeholder="e.g. © 2026 AVA Spa Central. All rights reserved."
                     disabled={!canEdit()}
                   />
                 </div>
@@ -4002,7 +4002,7 @@ const Settings = () => {
               <div className="settings-form-group">
                 <label>Custom Booking Slug</label>
                 <p className="settings-help-text">
-                  Create a memorable, custom URL for your booking page (e.g., "daet-spa" instead of long ID)
+                  Create a memorable, custom URL for your booking page (e.g., "my-spa" instead of long ID)
                 </p>
                 <div className="booking-slug-input-group">
                   <span className="booking-slug-prefix">{window.location.origin}/book/</span>
@@ -5105,7 +5105,7 @@ const Settings = () => {
                         name="ownerUsername"
                         value={branchForm.ownerUsername}
                         onChange={handleBranchFormChange}
-                        placeholder="e.g., daet_owner"
+                        placeholder="e.g., spa_owner"
                       />
                     </div>
                     <div className="form-group">

@@ -523,7 +523,7 @@ const AIChatbot = () => {
     <div className="chatbot-page">
       <div className="page-header">
         <div>
-          <h1>Daet AI</h1>
+          <h1>AVA AI</h1>
           <p>Your AI business assistant - Get instant insights and manage your spa with ease</p>
         </div>
         <div className="header-actions">
@@ -552,7 +552,7 @@ const AIChatbot = () => {
                   <div className="message-content">
                     <div className="message-header">
                       <span className="message-sender">
-                        {message.type === 'bot' ? 'Daet AI' : 'You'}
+                        {message.type === 'bot' ? 'AVA AI' : 'You'}
                       </span>
                       <span className="message-time">
                         {new Date(message.timestamp).toLocaleTimeString('en-US', {

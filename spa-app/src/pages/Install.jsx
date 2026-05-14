@@ -104,9 +104,9 @@ const Install = () => {
       <div style={styles.card}>
         <picture>
           <source srcSet="/pwa-192x192.webp" type="image/webp" />
-          <img src="/pwa-192x192.png" alt="Daet Spa" style={styles.icon} width="96" height="96" />
+          <img src="/pwa-192x192.png" alt="AVA Spa Central" style={styles.icon} width="96" height="96" />
         </picture>
-        <h1 style={styles.title}>Install Daet Spa</h1>
+        <h1 style={styles.title}>Install AVA Spa Central</h1>
         <p style={styles.subtitle}>Employee app for clock-in, POS, and daily operations.</p>
 
         <div style={styles.body}>
@@ -117,7 +117,7 @@ const Install = () => {
 
         {installed ? (
           <div style={{ ...styles.body, color: '#1B5E37', textAlign: 'center', fontWeight: 600 }}>
-            ✓ Installed — buksan mo na lang ang Daet Spa app sa home screen mo.
+            ✓ Installed — buksan mo na lang ang AVA Spa Central app sa home screen mo.
           </div>
         ) : isIOS ? (
           <div style={styles.body}>

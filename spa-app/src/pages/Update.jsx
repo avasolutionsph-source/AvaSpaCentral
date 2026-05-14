@@ -26,7 +26,7 @@ export default function Update() {
         </div>
         <h1 style={styles.title}>Update App</h1>
         <p style={styles.subtitle}>
-          Pull the latest version of Daet Massage &amp; Spa without reinstalling.
+          Pull the latest version of AVA Spa Central without reinstalling.
         </p>
 
         <UpdatePanel />

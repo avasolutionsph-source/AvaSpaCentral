@@ -215,7 +215,7 @@ const BranchSelect = () => {
         <div className="branch-select-overlay">
           <div className="branch-select-container">
             <div className="branch-select-header">
-              <h1>Daet Massage & Spa</h1>
+              <h1>AVA Spa Central</h1>
               <p className="branch-select-subtitle">Something went wrong</p>
             </div>
             <div className="branch-select-error">
@@ -236,7 +236,7 @@ const BranchSelect = () => {
         <div className="branch-select-overlay">
           <div className="branch-select-container">
             <div className="branch-select-header">
-              <h1>Daet Massage & Spa</h1>
+              <h1>AVA Spa Central</h1>
               <p className="branch-select-subtitle">No branches available</p>
             </div>
             <div className="branch-select-error">
@@ -259,7 +259,7 @@ const BranchSelect = () => {
             {branding.logoUrl ? (
               <img src={branding.logoUrl} alt="Logo" className="branch-select-header-logo" />
             ) : (
-              <h1>Daet Massage &amp; Spa</h1>
+              <h1>AVA Spa Central</h1>
             )}
             <p className="branch-select-subtitle">Choose a branch</p>
           </div>

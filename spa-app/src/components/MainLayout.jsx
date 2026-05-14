@@ -393,7 +393,7 @@ const MainLayout = () => {
       label: 'Intelligence',
       items: [
         { path: '/daet-insights', label: 'Insights', icon: 'sensei', page: 'daet-insights' },
-        { path: '/ai-chatbot', label: 'Daet AI', icon: 'ai', page: 'ai-chatbot' },
+        { path: '/ai-chatbot', label: 'AVA AI', icon: 'ai', page: 'ai-chatbot' },
       ],
       hasDivider: true
     },
@@ -453,7 +453,7 @@ const MainLayout = () => {
       >
         <div className="sidebar-header">
           <div className="brand" ref={branchMenuRef} style={{ position: 'relative' }}>
-            <span className="brand-text">Daet Massage & Spa</span>
+            <span className="brand-text">AVA Spa Central</span>
             {sidebarOpen && selectedBranch && (
               canSwitchBranch ? (
                 <button

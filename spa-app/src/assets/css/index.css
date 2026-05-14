@@ -7681,7 +7681,7 @@ a:focus:not(:focus-visible),
   /* Print header for pages */
   .dashboard-page::before,
   .reports-page::before {
-    content: "Printed from Daet Massage & Spa";
+    content: "Printed from AVA Spa Central";
     display: block;
     text-align: center;
     font-size: 0.8rem;

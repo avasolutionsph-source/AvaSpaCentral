@@ -5,6 +5,13 @@
   base    = "astro-site"
   command = "npm run build"
   publish = "dist"
+  # Skip a deploy if no files inside astro-site/ (or the root config) changed.
+  # Without this, edits anywhere in the repo — e.g. inside spa-app/, README
+  # changes, docs — queue a marketing-site rebuild, and the cascade of
+  # builds gets auto-cancelled whenever a newer push lands first.
+  # `git diff --quiet` exits 0 when there are NO matching changes, which
+  # Netlify reads as "ignore this build".
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ../netlify.toml"
 
 [build.environment]
   NODE_VERSION = "20"

@@ -5,6 +5,7 @@ import FaqItem from '../components/FaqItem.astro';
 
 const tiers = [
   {
+    slug: 'starter',
     name: 'Starter',
     desc: 'Perfect for single-branch spas.',
     regular: '₱3,400',
@@ -20,6 +21,7 @@ const tiers = [
     cta: 'secondary',
   },
   {
+    slug: 'advance',
     name: 'Advance',
     desc: 'Perfect for growing spa businesses.',
     regular: '₱17,000',
@@ -35,6 +37,7 @@ const tiers = [
     popular: true,
   },
   {
+    slug: 'enterprise',
     name: 'Enterprise',
     desc: 'Perfect for large spa operations.',
     regular: '₱33,000',
@@ -139,7 +142,7 @@ const valueProps = [
               </div>
             )}
 
-            <a href="#" class={`btn ${t.cta === 'primary' ? 'btn-primary' : 'btn-secondary'} w-full`}>Get Started</a>
+            <a href={`/checkout?plan=${t.slug}`} class={`btn ${t.cta === 'primary' ? 'btn-primary' : 'btn-secondary'} w-full`}>Get Started</a>
           </div>
         ))}
       </div>

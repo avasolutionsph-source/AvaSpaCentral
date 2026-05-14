@@ -1,0 +1,236 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const plans = {
+  starter: {
+    slug: 'starter',
+    name: 'Starter',
+    desc: 'Perfect for single-branch spas.',
+    regular: '₱3,400',
+    promo: '₱1,700',
+    feats: [
+      '1 Branch Only',
+      '1 Login Account (Owner Only)',
+      'Shared Tablet Time In/Out for Staff',
+      'Generic Booking URL',
+      '100MB Storage',
+    ],
+  },
+  advance: {
+    slug: 'advance',
+    name: 'Advance',
+    desc: 'Perfect for growing spa businesses.',
+    regular: '₱17,000',
+    promo: '₱8,500',
+    feats: [
+      '2 – 3 Branches',
+      'Multi-user Accounts',
+      'Generic Booking URL',
+      '250MB Storage',
+    ],
+  },
+  enterprise: {
+    slug: 'enterprise',
+    name: 'Enterprise',
+    desc: 'Perfect for large spa operations.',
+    regular: '₱33,000',
+    promo: '₱16,500',
+    feats: [
+      '4 or More Branches',
+      'Multi-user Accounts',
+      'Own Domain Support',
+      '500MB Storage',
+      'Priority Support',
+    ],
+  },
+};
+---
+
+<Layout title="Checkout — AVA Spa Central" description="Complete your subscription to AVA Spa Central. Secure checkout powered by NextPay.">
+
+  <!-- HEADER -->
+  <section class="pt-[80px] pb-10 bg-ivory" style="background: radial-gradient(circle at 15% 30%, rgba(0,92,69,.05) 0%, transparent 38%), radial-gradient(circle at 85% 70%, rgba(201,154,58,.06) 0%, transparent 42%), var(--color-ivory);">
+    <div class="container-spa">
+      <div class="max-w-[680px]">
+        <span class="eyebrow inline-block mb-3">Step 1 of 3 · Account Details</span>
+        <h1 class="mb-3 text-[clamp(2rem,4vw,2.8rem)]">Set up your <span class="italic text-emerald-brand font-medium">AVA account.</span></h1>
+        <p class="text-base max-w-[520px] leading-relaxed">Tell us about your business and create your login. Mabilis lang — under two minutes ito.</p>
+      </div>
+      <!-- Progress -->
+      <div class="flex items-center gap-3 mt-8 max-w-[520px]">
+        <div class="flex-1 h-1 rounded-full bg-emerald-brand"></div>
+        <div class="flex-1 h-1 rounded-full bg-border-soft"></div>
+        <div class="flex-1 h-1 rounded-full bg-border-soft"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHECKOUT -->
+  <section class="py-[60px]">
+    <div class="container-spa">
+      <div class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
+
+        <!-- FORM -->
+        <form id="checkoutForm" class="bg-white border border-border-soft rounded-2xl p-8 md:p-10 shadow-md-spa">
+          <!-- Account section -->
+          <div class="mb-9">
+            <h3 class="font-serif text-[1.4rem] text-emerald-deep font-semibold mb-1.5">Account Login</h3>
+            <p class="text-[0.88rem] text-muted mb-5">Email at password mo para sa AVA dashboard.</p>
+            <div class="grid grid-cols-1 gap-4">
+              <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Email Address
+                <input type="email" name="email" required autocomplete="email" placeholder="you@yourspa.com" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors"/>
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Password
+                  <input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors"/>
+                </label>
+                <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Confirm Password
+                  <input type="password" name="passwordConfirm" required minlength="8" autocomplete="new-password" placeholder="Re-enter password" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors"/>
+                </label>
+              </div>
+              <p id="passwordError" class="hidden text-[0.82rem] text-red-600 -mt-1">Passwords do not match.</p>
+            </div>
+          </div>
+
+          <hr class="border-border-soft mb-9"/>
+
+          <!-- Business section -->
+          <div class="mb-9">
+            <h3 class="font-serif text-[1.4rem] text-emerald-deep font-semibold mb-1.5">Business Information</h3>
+            <p class="text-[0.88rem] text-muted mb-5">Para sa receipt at sa setup ng spa profile mo.</p>
+            <div class="grid grid-cols-1 gap-4">
+              <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Spa / Business Name
+                <input type="text" name="businessName" required placeholder="e.g. Serenity Wellness Spa" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors"/>
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Owner Full Name
+                  <input type="text" name="ownerName" required placeholder="Juan Dela Cruz" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors"/>
+                </label>
+                <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Mobile Number
+                  <input type="tel" name="phone" required pattern="[0-9+\-\s]{7,}" placeholder="+63 9XX XXX XXXX" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors"/>
+                </label>
+              </div>
+              <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Business Address
+                <input type="text" name="address" required placeholder="City, Province" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors"/>
+              </label>
+              <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Number of Branches
+                <input type="number" name="branches" required min="1" value="1" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors w-32"/>
+              </label>
+            </div>
+          </div>
+
+          <hr class="border-border-soft mb-7"/>
+
+          <!-- Terms -->
+          <label class="flex items-start gap-3 mb-7 cursor-pointer">
+            <input type="checkbox" name="terms" required class="mt-1 w-4 h-4 accent-emerald-brand"/>
+            <span class="text-[0.86rem] text-muted leading-relaxed">I agree to the <a href="#" class="text-emerald-brand hover:underline">Terms of Service</a> and <a href="#" class="text-emerald-brand hover:underline">Privacy Policy</a>.</span>
+          </label>
+
+          <!-- Submit -->
+          <div class="flex flex-col sm:flex-row gap-3 items-center sm:justify-between">
+            <a href="/pricing" class="text-[0.88rem] text-muted hover:text-emerald-brand transition-colors">← Back to Pricing</a>
+            <button type="submit" class="btn btn-primary px-9">Continue to Payment →</button>
+          </div>
+        </form>
+
+        <!-- ORDER SUMMARY -->
+        <aside class="lg:sticky lg:top-[100px]">
+          <div class="bg-emerald-deep text-white rounded-2xl p-7 shadow-lg-spa relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-40 h-40 rounded-full" style="background: radial-gradient(circle, rgba(201,154,58,.18) 0%, transparent 60%); transform: translate(40%, -40%);"></div>
+            <div class="relative z-[1]">
+              <span class="eyebrow !text-gold-soft mb-3 block">Order Summary</span>
+              <h3 id="planName" class="font-serif text-[1.8rem] font-semibold !text-white mb-1.5 tracking-tight">—</h3>
+              <p id="planDesc" class="text-[0.88rem] !text-white/70 mb-6">—</p>
+
+              <div class="flex items-baseline gap-2 mb-1">
+                <span id="planPromo" class="font-serif text-[2.4rem] !text-gold-soft font-semibold leading-none">—</span>
+                <span class="text-[0.7rem] uppercase tracking-wider !text-white/55 font-semibold">/ month</span>
+              </div>
+              <div class="flex items-center gap-2 mb-6">
+                <span id="planRegular" class="text-[0.86rem] !text-white/45 line-through">—</span>
+                <span class="text-[0.7rem] uppercase tracking-wider bg-gold-brand/30 text-gold-soft px-2 py-0.5 rounded font-semibold">50% OFF</span>
+              </div>
+
+              <h4 class="text-[0.72rem] uppercase tracking-wider !text-gold-soft font-bold mb-3">What's Included</h4>
+              <ul id="planFeats" class="list-none flex flex-col gap-2 m-0 p-0 mb-6"></ul>
+
+              <hr class="border-white/15 mb-5"/>
+
+              <div class="flex justify-between items-baseline mb-1.5">
+                <span class="text-[0.88rem] !text-white/70">Subtotal</span>
+                <span id="subtotal" class="!text-white font-semibold">—</span>
+              </div>
+              <div class="flex justify-between items-baseline mb-4">
+                <span class="text-[0.88rem] !text-white/70">VAT (incl.)</span>
+                <span class="!text-white/70 text-[0.88rem]">—</span>
+              </div>
+              <div class="flex justify-between items-baseline pt-3 border-t border-white/15">
+                <span class="font-semibold !text-white">Total today</span>
+                <span id="total" class="font-serif text-[1.5rem] !text-gold-soft font-semibold">—</span>
+              </div>
+
+              <p class="text-[0.78rem] !text-white/55 mt-5 leading-relaxed">Secure payment via NextPay. Cancel anytime — walang lock-in.</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 justify-center mt-5 text-[0.78rem] text-muted">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4 text-emerald-brand"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>256-bit SSL · NextPay secured</span>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<script is:inline define:vars={{ plans }}>
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get('plan');
+  const plan = plans[slug] || plans.advance;
+
+  document.getElementById('planName').textContent = plan.name;
+  document.getElementById('planDesc').textContent = plan.desc;
+  document.getElementById('planPromo').textContent = plan.promo;
+  document.getElementById('planRegular').textContent = plan.regular;
+  document.getElementById('subtotal').textContent = plan.promo;
+  document.getElementById('total').textContent = plan.promo;
+
+  const featsList = document.getElementById('planFeats');
+  featsList.innerHTML = plan.feats.map(f => `
+    <li class="flex items-start gap-2.5 text-[0.88rem] !text-white/85">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4 text-gold-soft flex-shrink-0 mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>${f}</span>
+    </li>
+  `).join('');
+
+  // Form submit
+  const form = document.getElementById('checkoutForm');
+  const passwordError = document.getElementById('passwordError');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    if (data.password !== data.passwordConfirm) {
+      passwordError.classList.remove('hidden');
+      return;
+    }
+    passwordError.classList.add('hidden');
+
+    // Save customer + plan to sessionStorage for the next step
+    const { password, passwordConfirm, terms, ...safeData } = data;
+    sessionStorage.setItem('ava_checkout', JSON.stringify({
+      plan: plan.slug,
+      planName: plan.name,
+      planPrice: plan.promo,
+      customer: safeData,
+      // NOTE: storing password in sessionStorage is a stopgap for the frontend prototype.
+      // In production this submits directly to a server endpoint that hashes + persists it,
+      // never round-trips through the browser session.
+      passwordPending: password,
+    }));
+
+    window.location.href = '/checkout/payment';
+  });
+</script>

@@ -1,0 +1,118 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Welcome to AVA — Subscription Active" description="Your AVA Spa Central subscription is now active. Check your inbox for login details.">
+
+  <section class="py-[80px] min-h-[80vh] flex items-center" style="background: radial-gradient(circle at 12% 30%, rgba(0,92,69,.06) 0%, transparent 40%), radial-gradient(circle at 88% 70%, rgba(201,154,58,.08) 0%, transparent 45%), var(--color-ivory);">
+    <div class="container-spa">
+      <div class="max-w-[680px] mx-auto text-center mb-10">
+        <!-- Success badge -->
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-emerald-brand rounded-full mb-7 shadow-lg-spa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="w-10 h-10 text-white"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+
+        <span class="eyebrow inline-block mb-3">Payment Confirmed</span>
+        <h1 class="mb-4 text-[clamp(2rem,4vw,2.8rem)]">Welcome to <span class="italic text-emerald-brand font-medium">AVA Spa Central.</span></h1>
+        <p class="text-base max-w-[480px] mx-auto leading-relaxed mb-2">Salamat sa pagtitiwala! Aktibo na ang subscription mo, at nasa inbox mo na ang login credentials.</p>
+        <p class="text-[0.88rem] text-muted">Reference: <code id="orderRef" class="font-mono text-emerald-deep">—</code></p>
+      </div>
+
+      <!-- ORDER DETAILS -->
+      <div class="max-w-[680px] mx-auto bg-white border border-border-soft rounded-2xl p-8 md:p-10 shadow-md-spa mb-8">
+        <div class="flex justify-between items-start mb-6 pb-6 border-b border-border-soft">
+          <div>
+            <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Plan Activated</p>
+            <h3 id="planName" class="font-serif text-[1.6rem] text-emerald-deep font-semibold">—</h3>
+          </div>
+          <div class="text-right">
+            <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Amount Paid</p>
+            <p id="amountPaid" class="font-serif text-[1.6rem] text-gold-brand font-semibold">—</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+          <div>
+            <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Business</p>
+            <p id="businessName" class="text-ink font-semibold">—</p>
+          </div>
+          <div>
+            <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Account Email</p>
+            <p id="accountEmail" class="text-ink font-semibold break-all">—</p>
+          </div>
+          <div>
+            <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Payment Method</p>
+            <p id="paymentMethod" class="text-ink font-semibold capitalize">—</p>
+          </div>
+          <div>
+            <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Next Billing</p>
+            <p id="nextBilling" class="text-ink font-semibold">—</p>
+          </div>
+        </div>
+
+        <hr class="border-border-soft mb-6"/>
+
+        <h4 class="text-[0.88rem] font-semibold text-ink mb-4">What happens next</h4>
+        <ul class="list-none flex flex-col gap-3 m-0 p-0">
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 w-6 h-6 bg-emerald-brand/10 text-emerald-brand rounded-full flex items-center justify-center text-[0.78rem] font-bold">1</span>
+            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Check your email.</strong> Pinadala namin ang login link at temporary password sa <span id="emailInline" class="text-emerald-brand">—</span>.</p>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 w-6 h-6 bg-emerald-brand/10 text-emerald-brand rounded-full flex items-center justify-center text-[0.78rem] font-bold">2</span>
+            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Log in to your dashboard.</strong> Mag-set up ka ng spa profile, services, and branches.</p>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="flex-shrink-0 w-6 h-6 bg-emerald-brand/10 text-emerald-brand rounded-full flex items-center justify-center text-[0.78rem] font-bold">3</span>
+            <p class="text-[0.92rem] text-muted leading-relaxed flex-1"><strong class="text-ink">Onboarding call.</strong> Tatawagan ka ng team within 1 business day para tulungan ka mag-onboard.</p>
+          </li>
+        </ul>
+      </div>
+
+      <!-- ACTIONS -->
+      <div class="max-w-[680px] mx-auto flex flex-col sm:flex-row gap-3 justify-center">
+        <a id="dashboardLink" href="#" class="btn btn-primary px-8">Go to Dashboard →</a>
+        <a href="/" class="btn btn-secondary px-8">Back to Home</a>
+      </div>
+
+      <p class="text-center text-[0.82rem] text-muted mt-8">May tanong? Mag-email sa <a href="mailto:support@avaspacentral.com" class="text-emerald-brand hover:underline">support@avaspacentral.com</a></p>
+    </div>
+  </section>
+
+</Layout>
+
+<script is:inline>
+  const raw = sessionStorage.getItem('ava_checkout');
+  const method = sessionStorage.getItem('ava_checkout_method');
+
+  if (!raw) {
+    // No checkout data — user probably navigated here directly.
+    document.getElementById('planName').textContent = '—';
+  } else {
+    const data = JSON.parse(raw);
+
+    // Generate a pseudo order ref. Real one would come from NextPay's payment ID.
+    const ref = 'AVA-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+
+    // Next billing = 30 days from now.
+    const next = new Date();
+    next.setDate(next.getDate() + 30);
+    const nextStr = next.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    document.getElementById('orderRef').textContent = ref;
+    document.getElementById('planName').textContent = data.planName;
+    document.getElementById('amountPaid').textContent = data.planPrice;
+    document.getElementById('businessName').textContent = data.customer.businessName || '—';
+    document.getElementById('accountEmail').textContent = data.customer.email || '—';
+    document.getElementById('emailInline').textContent = data.customer.email || '—';
+    document.getElementById('paymentMethod').textContent = (method || 'gcash').replace('otc', 'Over-the-Counter');
+    document.getElementById('nextBilling').textContent = nextStr;
+
+    // Dashboard URL — placeholder; replace with your real app URL.
+    document.getElementById('dashboardLink').href = 'https://app.avaspacentral.com/login?email=' + encodeURIComponent(data.customer.email || '');
+
+    // Clear the checkout session data — the order is complete.
+    sessionStorage.removeItem('ava_checkout');
+    sessionStorage.removeItem('ava_checkout_method');
+  }
+</script>

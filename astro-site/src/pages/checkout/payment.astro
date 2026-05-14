@@ -1,0 +1,208 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const methods = [
+  {
+    id: 'gcash',
+    name: 'GCash',
+    desc: 'Pay using your GCash wallet — instant confirmation.',
+    badge: 'Most popular',
+    iconBg: 'bg-blue-50',
+    iconColor: 'text-blue-600',
+  },
+  {
+    id: 'maya',
+    name: 'Maya',
+    desc: 'Pay via Maya wallet or Maya account balance.',
+    iconBg: 'bg-emerald-50',
+    iconColor: 'text-emerald-700',
+  },
+  {
+    id: 'card',
+    name: 'Credit / Debit Card',
+    desc: 'Visa, Mastercard, and JCB cards accepted.',
+    iconBg: 'bg-gold-soft/30',
+    iconColor: 'text-gold-brand',
+  },
+  {
+    id: 'bank',
+    name: 'Online Bank Transfer',
+    desc: 'BPI, BDO, UnionBank, Metrobank and more.',
+    iconBg: 'bg-ivory',
+    iconColor: 'text-emerald-brand',
+  },
+  {
+    id: 'otc',
+    name: 'Over-the-Counter',
+    desc: '7-Eleven, M Lhuillier, Cebuana — pay in person.',
+    iconBg: 'bg-cream',
+    iconColor: 'text-emerald-deep',
+  },
+];
+---
+
+<Layout title="Payment — AVA Spa Central" description="Choose your payment method to complete your AVA Spa Central subscription.">
+
+  <!-- HEADER -->
+  <section class="pt-[80px] pb-10 bg-ivory" style="background: radial-gradient(circle at 15% 30%, rgba(0,92,69,.05) 0%, transparent 38%), radial-gradient(circle at 85% 70%, rgba(201,154,58,.06) 0%, transparent 42%), var(--color-ivory);">
+    <div class="container-spa">
+      <div class="max-w-[680px]">
+        <span class="eyebrow inline-block mb-3">Step 2 of 3 · Payment Method</span>
+        <h1 class="mb-3 text-[clamp(2rem,4vw,2.8rem)]">Choose how you want to <span class="italic text-emerald-brand font-medium">pay.</span></h1>
+        <p class="text-base max-w-[520px] leading-relaxed">Secured by NextPay — kahit anong method, mabilis at safe ang processing.</p>
+      </div>
+      <div class="flex items-center gap-3 mt-8 max-w-[520px]">
+        <div class="flex-1 h-1 rounded-full bg-emerald-brand"></div>
+        <div class="flex-1 h-1 rounded-full bg-emerald-brand"></div>
+        <div class="flex-1 h-1 rounded-full bg-border-soft"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAYMENT -->
+  <section class="py-[60px]">
+    <div class="container-spa">
+      <div class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
+
+        <!-- METHODS -->
+        <form id="paymentForm" class="bg-white border border-border-soft rounded-2xl p-8 md:p-10 shadow-md-spa">
+          <h3 class="font-serif text-[1.4rem] text-emerald-deep font-semibold mb-1.5">Payment Method</h3>
+          <p class="text-[0.88rem] text-muted mb-6">Pumili ng method. Magre-redirect kami sa NextPay para sa secure processing.</p>
+
+          <div class="flex flex-col gap-3 mb-8">
+            {methods.map((m, i) => (
+              <label class={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition-all hover:border-emerald-brand has-checked:border-emerald-brand has-checked:bg-emerald-brand/[0.03] ${i === 0 ? 'border-emerald-brand bg-emerald-brand/[0.03]' : 'border-border-soft'}`}>
+                <input type="radio" name="method" value={m.id} required checked={i === 0} class="w-4 h-4 accent-emerald-brand"/>
+                <div class={`w-11 h-11 rounded-lg flex items-center justify-center ${m.iconBg} ${m.iconColor}`}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-5 h-5">
+                    {m.id === 'gcash' && <><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/></>}
+                    {m.id === 'maya' && <><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 11h20"/></>}
+                    {m.id === 'card' && <><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></>}
+                    {m.id === 'bank' && <><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-7"/><path d="M15 21v-7"/></>}
+                    {m.id === 'otc' && <><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></>}
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <strong class="text-ink text-[0.95rem] font-semibold">{m.name}</strong>
+                    {m.badge && <span class="text-[0.66rem] uppercase tracking-wider bg-emerald-brand/10 text-emerald-brand px-2 py-0.5 rounded font-bold">{m.badge}</span>}
+                  </div>
+                  <p class="text-[0.82rem] text-muted leading-snug">{m.desc}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <!-- Notice -->
+          <div class="flex items-start gap-3 p-4 bg-ivory border border-border-soft rounded-xl mb-7">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-5 h-5 text-emerald-brand flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/></svg>
+            <div>
+              <p class="text-[0.86rem] text-ink font-semibold mb-1">Sandali lang sa NextPay</p>
+              <p class="text-[0.82rem] text-muted leading-relaxed">Pagkatapos mong i-click ang Pay Now, magre-redirect ka sa NextPay's secure payment page. Babalik ka dito kapag tapos na ang bayad.</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3 items-center sm:justify-between">
+            <a href="/checkout" class="text-[0.88rem] text-muted hover:text-emerald-brand transition-colors">← Back to Account Details</a>
+            <button type="submit" id="payBtn" class="btn btn-primary px-9">
+              <span id="payBtnLabel">Pay <span id="payAmount">—</span> →</span>
+              <span id="payBtnSpinner" class="hidden">Processing…</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- ORDER SUMMARY -->
+        <aside class="lg:sticky lg:top-[100px]">
+          <div class="bg-emerald-deep text-white rounded-2xl p-7 shadow-lg-spa relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-40 h-40 rounded-full" style="background: radial-gradient(circle, rgba(201,154,58,.18) 0%, transparent 60%); transform: translate(40%, -40%);"></div>
+            <div class="relative z-[1]">
+              <span class="eyebrow !text-gold-soft mb-3 block">Order Summary</span>
+              <h3 id="planName" class="font-serif text-[1.8rem] font-semibold !text-white mb-1.5 tracking-tight">—</h3>
+
+              <div class="bg-white/[0.06] border border-white/10 rounded-lg p-4 mb-5">
+                <p class="text-[0.74rem] uppercase tracking-wider !text-white/55 mb-1.5 font-semibold">Customer</p>
+                <p id="customerBusiness" class="!text-white text-[0.95rem] font-semibold mb-0.5">—</p>
+                <p id="customerEmail" class="!text-white/65 text-[0.84rem]">—</p>
+              </div>
+
+              <hr class="border-white/15 mb-5"/>
+
+              <div class="flex justify-between items-baseline mb-1.5">
+                <span class="text-[0.88rem] !text-white/70">Plan (monthly)</span>
+                <span id="planPrice" class="!text-white font-semibold">—</span>
+              </div>
+              <div class="flex justify-between items-baseline mb-4">
+                <span class="text-[0.88rem] !text-white/70">VAT (incl.)</span>
+                <span class="!text-white/70 text-[0.88rem]">—</span>
+              </div>
+              <div class="flex justify-between items-baseline pt-3 border-t border-white/15">
+                <span class="font-semibold !text-white">Total today</span>
+                <span id="totalAmount" class="font-serif text-[1.5rem] !text-gold-soft font-semibold">—</span>
+              </div>
+
+              <p class="text-[0.78rem] !text-white/55 mt-5 leading-relaxed">Recurring monthly. Cancel anytime mula sa dashboard.</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 justify-center mt-5 text-[0.78rem] text-muted">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4 text-emerald-brand"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>256-bit SSL · NextPay secured</span>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </section>
+
+</Layout>
+
+<script is:inline>
+  const raw = sessionStorage.getItem('ava_checkout');
+  if (!raw) {
+    window.location.href = '/checkout';
+  } else {
+    const data = JSON.parse(raw);
+    document.getElementById('planName').textContent = data.planName;
+    document.getElementById('planPrice').textContent = data.planPrice;
+    document.getElementById('totalAmount').textContent = data.planPrice;
+    document.getElementById('payAmount').textContent = data.planPrice;
+    document.getElementById('customerBusiness').textContent = data.customer.businessName || '—';
+    document.getElementById('customerEmail').textContent = data.customer.email || '—';
+
+    const form = document.getElementById('paymentForm');
+    const payBtn = document.getElementById('payBtn');
+    const payBtnLabel = document.getElementById('payBtnLabel');
+    const payBtnSpinner = document.getElementById('payBtnSpinner');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const method = new FormData(form).get('method');
+
+      payBtn.disabled = true;
+      payBtnLabel.classList.add('hidden');
+      payBtnSpinner.classList.remove('hidden');
+
+      // === Real flow would happen here ===
+      // 1. POST to /api/checkout/create-payment with { plan, customer, method }
+      // 2. Server creates NextPay payment link via NextPay API
+      // 3. Server returns { paymentUrl }
+      // 4. window.location.href = paymentUrl (redirect to NextPay hosted page)
+      // 5. After NextPay payment, user returns to /checkout/success
+      // 6. NextPay webhook triggers Supabase account provisioning
+      // ====================================
+
+      // Frontend stub: simulate processing then go to success.
+      sessionStorage.setItem('ava_checkout_method', method);
+      await new Promise((r) => setTimeout(r, 1200));
+      window.location.href = '/checkout/success';
+    });
+  }
+</script>
+
+<style>
+  /* Tailwind has-checked workaround for radio cards */
+  label:has(input[type="radio"]:checked) {
+    border-color: var(--color-emerald-brand);
+    background: rgba(0, 92, 69, 0.03);
+  }
+</style>

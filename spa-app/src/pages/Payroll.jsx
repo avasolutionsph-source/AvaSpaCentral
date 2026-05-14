@@ -1011,7 +1011,7 @@ const Payroll = ({ embedded = false, onDataChange, onCalculateRef, onRemittances
       {showPayslipModal && selectedPayslip && (
         <PayslipModal
           payslip={selectedPayslip}
-          businessName="DAET MASSAGE & SPA"
+          businessName="AVA SPA CENTRAL"
           onClose={() => setShowPayslipModal(false)}
         />
       )}

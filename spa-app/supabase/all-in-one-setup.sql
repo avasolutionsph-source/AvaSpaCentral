@@ -2841,6 +2841,93 @@ WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id 
 
 
 -- ============================================================================
+-- LEGACY TABLE STUBS — required for migrations to run on a fresh install
+-- ----------------------------------------------------------------------------
+-- These four tables were created ad-hoc on the original Daet project (outside
+-- the supabase-schema.sql / supabase-*.sql files) and the date-stamped
+-- migrations below reference them (ADD COLUMN, CREATE INDEX, DROP POLICY).
+-- Without stubs, every reference fails on a fresh install with
+-- "relation ... does not exist".
+--
+-- Stubs only declare the columns directly referenced by later statements.
+-- Feature code in the spa-app may add more columns at runtime — those are
+-- not blockers for the setup script.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS cash_advance_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    employee_id UUID,
+    amount DECIMAL(12,2) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'pending',
+    requested_date DATE,
+    notes TEXT,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE cash_advance_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Business isolation" ON cash_advance_requests;
+CREATE POLICY "Business isolation" ON cash_advance_requests
+    FOR ALL USING (business_id = get_user_business_id());
+
+CREATE TABLE IF NOT EXISTS incident_reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    employee_id UUID,
+    incident_date DATE,
+    description TEXT,
+    status VARCHAR(20) DEFAULT 'open',
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE incident_reports ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Business isolation" ON incident_reports;
+CREATE POLICY "Business isolation" ON incident_reports
+    FOR ALL USING (business_id = get_user_business_id());
+
+CREATE TABLE IF NOT EXISTS leave_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    employee_id UUID,
+    start_date DATE,
+    end_date DATE,
+    type VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'pending',
+    reason TEXT,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE leave_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Business isolation" ON leave_requests;
+CREATE POLICY "Business isolation" ON leave_requests
+    FOR ALL USING (business_id = get_user_business_id());
+
+CREATE TABLE IF NOT EXISTS ot_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    employee_id UUID,
+    request_date DATE,
+    hours DECIMAL(5,2) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'pending',
+    reason TEXT,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE ot_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Business isolation" ON ot_requests;
+CREATE POLICY "Business isolation" ON ot_requests
+    FOR ALL USING (business_id = get_user_business_id());
+
+
+-- ============================================================================
 -- MIGRATION: 20260501120000_create_payment_intents.sql
 -- ============================================================================
 -- AVADAETSPA/supabase/migrations/20260501120000_create_payment_intents.sql
@@ -2949,7 +3036,15 @@ ALTER TABLE advance_bookings
 -- Runs every 5 minutes via pg_cron. Requires the pg_cron extension to be
 -- enabled on the Supabase project (Database → Extensions → search 'pg_cron').
 
-CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- pg_cron is a Supabase Pro+ feature. Wrap the extension + the schedule in
+-- exception handlers so unavailable pg_cron doesn't break the whole setup.
+-- The function itself is fine to create without pg_cron.
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_cron;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pg_cron extension not available — skipping expire-payment-intents schedule. The cleanup function is still created and can be called manually or via Edge Function.';
+END $$;
 
 CREATE OR REPLACE FUNCTION expire_stale_payment_intents() RETURNS void AS $$
 BEGIN
@@ -2981,6 +3076,8 @@ BEGIN
       $cron$SELECT expire_stale_payment_intents();$cron$
     );
   END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pg_cron not available — skipping expire-payment-intents schedule.';
 END $$;
 
 
@@ -3147,7 +3244,18 @@ ALTER TABLE suppliers
 -- Function secret so the function checks the inbound header against the
 -- same string.)
 
-CREATE EXTENSION IF NOT EXISTS pg_net;
+-- pg_net + Vault + pg_cron may not be available on all Supabase plans/projects.
+-- Wrapped in exception handlers so unavailability doesn't break the setup —
+-- the polling cron is only needed for NextPay disbursements anyway, which
+-- you wire up later. The hardcoded thyexktqknzqnjlnzdmv project URL also
+-- belongs to the original Daet project; rewrite it to your own once you
+-- enable disbursements.
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_net;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pg_net extension not available — skipping poll-disbursements cron setup';
+END $$;
 
 DO $$
 BEGIN
@@ -3158,6 +3266,8 @@ BEGIN
       'Auth secret pg_cron passes as X-Cron-Secret to poll-disbursements'
     );
   END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Vault schema not available — skipping poll_cron_secret creation. Enable Supabase Vault later if you wire up NextPay polling.';
 END $$;
 
 DO $$
@@ -3180,6 +3290,8 @@ BEGIN
       $cron$
     );
   END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pg_cron not available — skipping poll-disbursements schedule. Enable pg_cron later if you wire up NextPay polling.';
 END $$;
 
 
@@ -3948,22 +4060,26 @@ ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 -- A user can see / write only their own subscriptions. The notify-push
 -- Edge Function uses the service role and bypasses RLS, so it sees all
 -- rows regardless of these policies.
+DROP POLICY IF EXISTS "Users select own push_subscriptions" ON public.push_subscriptions;
 CREATE POLICY "Users select own push_subscriptions"
   ON public.push_subscriptions
   FOR SELECT
   USING (user_id = (SELECT id FROM public.users WHERE auth_id = (SELECT auth.uid())));
 
+DROP POLICY IF EXISTS "Users insert own push_subscriptions" ON public.push_subscriptions;
 CREATE POLICY "Users insert own push_subscriptions"
   ON public.push_subscriptions
   FOR INSERT
   WITH CHECK (user_id = (SELECT id FROM public.users WHERE auth_id = (SELECT auth.uid())));
 
+DROP POLICY IF EXISTS "Users update own push_subscriptions" ON public.push_subscriptions;
 CREATE POLICY "Users update own push_subscriptions"
   ON public.push_subscriptions
   FOR UPDATE
   USING (user_id = (SELECT id FROM public.users WHERE auth_id = (SELECT auth.uid())))
   WITH CHECK (user_id = (SELECT id FROM public.users WHERE auth_id = (SELECT auth.uid())));
 
+DROP POLICY IF EXISTS "Users delete own push_subscriptions" ON public.push_subscriptions;
 CREATE POLICY "Users delete own push_subscriptions"
   ON public.push_subscriptions
   FOR DELETE

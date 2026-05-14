@@ -1,5 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+
+const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
 ---
 
 <Layout title="Welcome to AVA — Subscription Active" description="Your AVA Spa Central subscription is now active. Check your inbox for login details.">
@@ -81,7 +83,7 @@ import Layout from '../../layouts/Layout.astro';
 
 </Layout>
 
-<script is:inline>
+<script is:inline define:vars={{ spaAppUrl }}>
   const raw = sessionStorage.getItem('ava_checkout');
   const method = sessionStorage.getItem('ava_checkout_method');
 
@@ -109,14 +111,15 @@ import Layout from '../../layouts/Layout.astro';
     document.getElementById('nextBilling').textContent = nextStr;
 
     // Install URL — points to the spa PWA's /install page which handles the
-    // install prompt (and iOS Add-to-Home-Screen fallback). Replace
-    // 'http://localhost:3000' with the hosted spa app URL once deployed.
+    // install prompt (and iOS Add-to-Home-Screen fallback). Base URL comes
+    // from PUBLIC_SPA_APP_URL (Netlify env var); defaults to the local
+    // dev server.
     const params = new URLSearchParams();
     if (data.customer.email) params.set('email', data.customer.email);
     if (data.customer.businessName) params.set('business', data.customer.businessName);
     const qs = params.toString();
     const dashboardLink = document.getElementById('dashboardLink');
-    dashboardLink.href = 'http://localhost:3000/install' + (qs ? '?' + qs : '');
+    dashboardLink.href = spaAppUrl.replace(/\/$/, '') + '/install' + (qs ? '?' + qs : '');
     dashboardLink.target = '_blank';
     dashboardLink.rel = 'noopener noreferrer';
 

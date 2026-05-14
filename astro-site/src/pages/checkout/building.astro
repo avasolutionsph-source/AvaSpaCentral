@@ -1,5 +1,10 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+
+// Where the spa PWA lives. Override on Netlify by setting
+// PUBLIC_SPA_APP_URL in Site settings → Build & deploy → Environment.
+// Falls back to the local Vite dev server for local development.
+const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
 ---
 
 <Layout title="Building Your Spa — AVA Spa Central" description="We're setting up your AVA Spa Central account. This will only take a moment.">
@@ -105,10 +110,11 @@ import Layout from '../../layouts/Layout.astro';
 
 </Layout>
 
-<script is:inline>
-  // Build URL for the spa PWA's install page. Replace 'http://localhost:3000'
-  // with the hosted spa app URL once deployed. The /install route handles
-  // the PWA install prompt (with iOS Add-to-Home-Screen fallback) so the
+<script is:inline define:vars={{ spaAppUrl }}>
+  // Build URL for the spa PWA's install page. Base URL comes from the
+  // PUBLIC_SPA_APP_URL env var (set in Netlify site settings); defaults to
+  // the local Vite dev server when unset. The /install route handles the
+  // PWA install prompt (with iOS Add-to-Home-Screen fallback) so the
   // customer ends up with the app installed on their device.
   function buildSpaUrl() {
     const raw = sessionStorage.getItem('ava_checkout');
@@ -117,7 +123,7 @@ import Layout from '../../layouts/Layout.astro';
     if (data?.customer?.email) params.set('email', data.customer.email);
     if (data?.customer?.businessName) params.set('business', data.customer.businessName);
     const qs = params.toString();
-    return 'http://localhost:3000/install' + (qs ? '?' + qs : '');
+    return spaAppUrl.replace(/\/$/, '') + '/install' + (qs ? '?' + qs : '');
   }
 
   const steps = [

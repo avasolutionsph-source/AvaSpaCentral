@@ -4,7 +4,7 @@
 -- ============================================================================
 -- Phase A: cash_advance as a valid disbursement source_type
 ALTER TABLE disbursements
-  DROP CONSTRAINT disbursements_source_type_check,
+  DROP CONSTRAINT IF EXISTS disbursements_source_type_check,
   ADD CONSTRAINT disbursements_source_type_check CHECK (
     source_type IN ('payroll_request', 'purchase_order', 'expense', 'cash_advance')
   );

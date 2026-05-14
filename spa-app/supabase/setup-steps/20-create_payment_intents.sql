@@ -4,7 +4,7 @@
 -- ============================================================================
 -- AVADAETSPA/supabase/migrations/20260501120000_create_payment_intents.sql
 
-CREATE TABLE payment_intents (
+CREATE TABLE IF NOT EXISTS payment_intents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL,
   branch_id UUID NOT NULL,
@@ -33,9 +33,9 @@ CREATE TABLE payment_intents (
   paid_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_payment_intents_source ON payment_intents(source_type, source_id);
-CREATE INDEX idx_payment_intents_status ON payment_intents(status);
-CREATE INDEX idx_payment_intents_branch_created ON payment_intents(branch_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_source ON payment_intents(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_status ON payment_intents(status);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_branch_created ON payment_intents(branch_id, created_at DESC);
 
 -- RLS: read scoped to user's branch; writes only via service role (Edge Functions)
 ALTER TABLE payment_intents ENABLE ROW LEVEL SECURITY;

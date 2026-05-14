@@ -5,7 +5,7 @@
 -- Bug 1: app uses status='voided' but DB CHECK only allowed 'void'.
 -- Add 'voided' as a valid status; keeps existing 'void' rows untouched.
 ALTER TABLE transactions
-  DROP CONSTRAINT transactions_status_check,
+  DROP CONSTRAINT IF EXISTS transactions_status_check,
   ADD CONSTRAINT transactions_status_check CHECK (
     status IN ('completed','pending','cancelled','refunded','void','voided')
   );

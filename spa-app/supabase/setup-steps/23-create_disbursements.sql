@@ -10,7 +10,7 @@
 -- per-recipient cascade to payroll_requests / purchase_orders / expenses
 -- is unambiguous on webhook receipt.
 
-CREATE TABLE disbursements (
+CREATE TABLE IF NOT EXISTS disbursements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL,
   branch_id UUID,                                     -- nullable: payroll is org-wide
@@ -51,9 +51,9 @@ CREATE TABLE disbursements (
   settled_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_disbursements_source ON disbursements(source_type, source_id);
-CREATE INDEX idx_disbursements_status ON disbursements(status);
-CREATE INDEX idx_disbursements_branch_created ON disbursements(branch_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_disbursements_source ON disbursements(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_disbursements_status ON disbursements(status);
+CREATE INDEX IF NOT EXISTS idx_disbursements_branch_created ON disbursements(branch_id, created_at DESC);
 
 ALTER TABLE disbursements ENABLE ROW LEVEL SECURITY;
 

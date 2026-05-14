@@ -2,7 +2,7 @@
 -- Run this in Supabase SQL Editor as step 30.
 
 -- ============================================================================
-CREATE TABLE saved_payrolls (
+CREATE TABLE IF NOT EXISTS saved_payrolls (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL,
   branch_id UUID,
@@ -22,11 +22,11 @@ CREATE TABLE saved_payrolls (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_saved_payrolls_business_created
+CREATE INDEX IF NOT EXISTS idx_saved_payrolls_business_created
   ON saved_payrolls(business_id, created_at DESC);
-CREATE INDEX idx_saved_payrolls_branch
+CREATE INDEX IF NOT EXISTS idx_saved_payrolls_branch
   ON saved_payrolls(branch_id);
-CREATE INDEX idx_saved_payrolls_period
+CREATE INDEX IF NOT EXISTS idx_saved_payrolls_period
   ON saved_payrolls(business_id, period_start, period_end);
 
 ALTER TABLE saved_payrolls ENABLE ROW LEVEL SECURITY;

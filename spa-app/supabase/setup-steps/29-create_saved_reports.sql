@@ -2,7 +2,7 @@
 -- Run this in Supabase SQL Editor as step 29.
 
 -- ============================================================================
-CREATE TABLE saved_reports (
+CREATE TABLE IF NOT EXISTS saved_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL,
   branch_id UUID,
@@ -21,9 +21,9 @@ CREATE TABLE saved_reports (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_saved_reports_business_created
+CREATE INDEX IF NOT EXISTS idx_saved_reports_business_created
   ON saved_reports(business_id, created_at DESC);
-CREATE INDEX idx_saved_reports_branch
+CREATE INDEX IF NOT EXISTS idx_saved_reports_branch
   ON saved_reports(branch_id);
 
 ALTER TABLE saved_reports ENABLE ROW LEVEL SECURITY;

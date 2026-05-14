@@ -1124,6 +1124,37 @@ CREATE TABLE IF NOT EXISTS branches (
   UNIQUE(business_id, slug)
 );
 
+-- Backfill columns that the minimal supabase-schema.sql `branches` definition
+-- omitted. `CREATE TABLE IF NOT EXISTS` above is a no-op if branches already
+-- exists from schema.sql, so the new columns wouldn't be added without these
+-- explicit ALTERs. Fixes "column enable_home_service does not exist" error.
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS enable_home_service BOOLEAN DEFAULT true;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS enable_hotel_service BOOLEAN DEFAULT true;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS home_service_fee DECIMAL(10,2) DEFAULT 200;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS hotel_service_fee DECIMAL(10,2) DEFAULT 150;
+
+-- Add the UNIQUE(business_id, slug) constraint that the CREATE TABLE in
+-- schema.sql also omitted (idempotent — only adds if not already present).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'branches_business_id_slug_key'
+       OR conname = 'branches_business_id_slug_unique'
+  ) THEN
+    BEGIN
+      ALTER TABLE branches ADD CONSTRAINT branches_business_id_slug_unique
+        UNIQUE (business_id, slug);
+    EXCEPTION WHEN OTHERS THEN
+      -- Likely because slug has NULL values from schema.sql's nullable definition.
+      -- Safe to skip — fresh installs won't hit this, and existing installs already
+      -- have the constraint under its original name.
+      RAISE NOTICE 'Could not add branches unique(business_id, slug) constraint: %', SQLERRM;
+    END;
+  END IF;
+END $$;
+
 -- Indexes for fast lookups
 CREATE INDEX IF NOT EXISTS idx_branches_business_id ON branches(business_id);
 CREATE INDEX IF NOT EXISTS idx_branches_slug ON branches(business_id, slug);

@@ -8,7 +8,13 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # Node 22 is required for the Netlify Functions runtime here because
+  # @supabase/supabase-js v2.89+ initializes a Realtime client at
+  # createClient() time and that needs native WebSocket. Node 20 doesn't
+  # expose WebSocket globally (it landed stable in Node 22), so getting
+  # an admin client throws "Node.js 20 detected without native WebSocket
+  # support" before we can even run the email pre-check.
+  NODE_VERSION = "22"
   # Netlify's default secret scanner matches the *values* of all env vars
   # against the build output, then fails the deploy if any are found.
   # SUPABASE_URL is public-by-design (it's the REST endpoint every browser

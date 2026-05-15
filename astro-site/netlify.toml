@@ -9,6 +9,14 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Netlify's default secret scanner matches the *values* of all env vars
+  # against the build output, then fails the deploy if any are found.
+  # SUPABASE_URL is public-by-design (it's the REST endpoint every browser
+  # request hits) and PUBLIC_SPA_APP_URL is the spa-app's hosted URL —
+  # neither is a secret. Whitelist them so deploys don't fail when the
+  # Netlify Functions bundle references process.env.SUPABASE_URL. The
+  # real secret (SUPABASE_SERVICE_ROLE_KEY) is left in the scan set.
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,PUBLIC_SPA_APP_URL,SPA_APP_URL,VITE_SUPABASE_URL"
 
 # Serverless functions live next to the Astro pages so the deploy bundles
 # everything together. Functions handle checkout signup, provisioning

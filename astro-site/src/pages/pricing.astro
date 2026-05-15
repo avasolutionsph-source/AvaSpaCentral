@@ -79,7 +79,7 @@ const valueProps = [
   </section>
 
   <!-- TIERS (image) -->
-  <section class="py-[70px] pb-[110px] relative overflow-hidden" style="background-image:url('/2.png'); background-size:cover; background-position:center; background-repeat:no-repeat;">
+  <section class="py-[70px] pb-[50px] relative overflow-hidden" style="background-image:url('/2.png'); background-size:cover; background-position:center; background-repeat:no-repeat;">
     <div class="absolute inset-0 z-[1]" style="background:linear-gradient(180deg, rgba(250,247,241,.93) 0%, rgba(250,247,241,.85) 50%, rgba(250,247,241,.93) 100%);"></div>
     <SectionDecor orbs={["gold-tl","em-br"]} />
     <div class="container-spa relative z-[2]">
@@ -141,27 +141,26 @@ const valueProps = [
   </section>
 
   <!-- LIFETIME -->
-  <section class="pt-[60px] pb-[110px] bg-ivory relative overflow-hidden">
-    <SectionDecor orbs={["em-tl","gold-br"]} image="/6-nobg.png" imagePos="tr" />
+  <section class="pt-[20px] pb-[90px] bg-ivory relative overflow-hidden">
     <div class="container-spa relative z-[2]">
-      <div class="max-w-[1180px] mx-auto rounded-3xl p-[60px] text-white relative overflow-hidden reveal" style="background:linear-gradient(135deg, var(--color-emerald-deep) 0%, var(--color-emerald-brand) 100%);">
-        <div class="absolute top-[-120px] right-[-120px] w-[440px] h-[440px] pointer-events-none" style="background:radial-gradient(circle, rgba(201,154,58,.2) 0%, transparent 60%);"></div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-15 items-center relative z-[1]">
+      <div class="max-w-[1180px] mx-auto bg-white border border-gold-brand/40 rounded-[22px] p-[44px_40px] md:p-[52px_56px] relative overflow-hidden shadow-sm-spa reveal">
+        <span class="absolute top-0 left-0 right-0 h-[3px] pointer-events-none" style="background:linear-gradient(90deg, transparent 0%, var(--color-gold-brand) 30%, var(--color-gold-brand) 70%, transparent 100%);"></span>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-start relative z-[1]">
           <div>
-            <span class="eyebrow !text-gold-soft mb-3.5 block">Lifetime Ownership Package</span>
-            <h2 class="!text-white text-[clamp(1.8rem,2.8vw,2.4rem)] font-medium leading-tight mb-4 tracking-tight">One System. Complete Control. <span class="italic !text-gold-soft font-normal">Lasting Value.</span></h2>
+            <span class="inline-flex items-center bg-gold-brand/15 text-emerald-deep border border-gold-brand/30 rounded-full px-3 py-1 text-[0.66rem] font-bold tracking-wider uppercase mb-4">Lifetime Ownership Package</span>
+            <h2 class="text-emerald-deep text-[clamp(1.8rem,2.8vw,2.4rem)] font-medium leading-tight mb-4 tracking-tight">One System. Complete Control. <span class="italic text-gold-brand font-normal">Lasting Value.</span></h2>
             <div class="flex items-baseline gap-2.5 mb-2 flex-wrap">
-              <span class="font-serif text-[2.8rem] text-white font-semibold leading-none">₱898,000</span>
-              <span class="text-[0.7rem] uppercase tracking-wider text-white/65 font-semibold">One-Time Payment</span>
+              <span class="font-serif text-[2.8rem] text-emerald-deep font-semibold leading-none">₱898,000</span>
+              <span class="text-[0.7rem] uppercase tracking-wider text-muted font-semibold">One-Time Payment</span>
             </div>
-            <p class="!text-white/75 text-base leading-relaxed my-4 mb-7 max-w-[440px]">A complete, owned spa management system — branded for you, deployed by us, yours forever. White-label opportunity included.</p>
-            <a href="#" class="btn btn-gold">Inquire About Lifetime →</a>
+            <p class="text-ink/80 text-base leading-relaxed my-4 mb-7 max-w-[440px]">A complete, owned spa management system — branded for you, deployed by us, yours forever. White-label opportunity included.</p>
+            <a href="#" class="btn btn-primary">Inquire About Lifetime →</a>
           </div>
           <div>
-            <h4 class="font-sans text-[0.74rem] text-gold-soft uppercase tracking-wider font-bold mb-4">What's Included</h4>
-            <ul class="list-none grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 m-0 p-0">
+            <h4 class="font-sans text-[0.7rem] text-muted uppercase tracking-wider font-bold mb-4">What's Included</h4>
+            <ul class="list-none grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 m-0 p-0">
               {['Lifetime Software License','Unlimited Usage','White Label Opportunity','Custom Branding','Initial Deployment','Technical Setup','Real-Time Monitoring','Sales & Transaction Reports','Branch Monitoring','Employee Monitoring','Centralized Management','Cloud-Based Access','Business Analytics','Secure Data Management','Scalable System','System Updates'].map(item => (
-                <li class="text-[0.86rem] text-white/85 flex items-start gap-2 leading-snug"><span class="text-gold-brand text-[0.7rem] mt-1">✦</span>{item}</li>
+                <li class="text-[0.86rem] text-ink flex items-start gap-2 leading-snug"><span class="text-gold-brand text-[0.7rem] mt-1">✦</span>{item}</li>
               ))}
             </ul>
           </div>

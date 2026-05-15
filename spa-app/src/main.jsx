@@ -2,6 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
+import ConfigError from './components/ConfigError'
+import { isSupabaseConfigured } from './services/supabase/supabaseClient'
 import './assets/css/index.css'
 import './assets/css/utilities.css'
 import './assets/css/pos.css'
@@ -122,8 +124,21 @@ const updateSW = registerSW({
   }
 })
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+// In production, a missing/invalid Supabase URL would otherwise crash the
+// app boot with "Invalid supabaseUrl" and leave the user staring at a blank
+// page. Detect that here and render an actionable screen so whoever
+// deployed the site can see exactly what to fix.
+const rootEl = ReactDOM.createRoot(document.getElementById('root'))
+if (import.meta.env.PROD && !isSupabaseConfigured()) {
+  rootEl.render(
+    <React.StrictMode>
+      <ConfigError />
+    </React.StrictMode>,
+  )
+} else {
+  rootEl.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  )
+}

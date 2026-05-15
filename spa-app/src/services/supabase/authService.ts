@@ -92,10 +92,47 @@ class AuthService {
           ]);
         }
       } else {
+        // getSession() didn't return in time. The supabase-js client holds an
+        // internal storage lock for the entire duration of that pending call,
+        // so ANY subsequent auth method (signInWithPassword, signOut, etc.)
+        // will also hang until the orphan getSession resolves. We can't
+        // cancel the in-flight call, but we CAN purge the persisted session
+        // and force one clean reload so supabase-js boots without stale
+        // state to refresh against. A sessionStorage guard prevents a reload
+        // loop if the hang reproduces on a clean boot.
         console.warn(
-          '[AuthService] getSession() timed out — proceeding without an initial session. ' +
-            'The onAuthStateChange listener will populate user state when supabase-js recovers.',
+          '[AuthService] getSession() timed out — supabase-js refresh lock is stuck. ' +
+            'Clearing persisted session and reloading once to recover.',
         );
+        try {
+          const RECOVERY_FLAG = 'spa-erp-supabase-recovery';
+          const alreadyTried =
+            typeof sessionStorage !== 'undefined' &&
+            sessionStorage.getItem(RECOVERY_FLAG) === '1';
+
+          // Always clear the corrupt persisted session — even on the second
+          // attempt, leaving it in place would re-trigger the hang.
+          try { localStorage.removeItem('spa-erp-auth'); } catch {}
+          try { localStorage.removeItem('user'); } catch {}
+          try { localStorage.removeItem('token'); } catch {}
+          try {
+            Object.keys(localStorage).forEach((key) => {
+              if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                localStorage.removeItem(key);
+              }
+            });
+          } catch {}
+
+          if (!alreadyTried && typeof window !== 'undefined') {
+            try { sessionStorage.setItem(RECOVERY_FLAG, '1'); } catch {}
+            window.location.reload();
+            return;
+          }
+          // Second attempt: don't reload (loop guard). Let the user land on
+          // the login form with a fresh client state on next navigation.
+        } catch (recoveryErr) {
+          console.warn('[AuthService] recovery cleanup failed:', recoveryErr);
+        }
       }
     } catch (err) {
       console.warn('[AuthService] getSession() threw — proceeding without session:', err);

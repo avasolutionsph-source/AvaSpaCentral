@@ -1,8 +1,9 @@
-# Netlify config — tells Netlify how to build and publish the Astro project
-# that lives in the astro-site/ subdirectory.
+# Netlify config for the AVA Spa Central marketing site (Astro).
+# Lives in astro-site/ so each Netlify site (marketing vs. spa-app PWA)
+# reads its own config from its base directory and the repo root has no
+# global netlify.toml that would override the UI base-directory setting.
 
 [build]
-  base    = "astro-site"
   command = "npm run build"
   publish = "dist"
 

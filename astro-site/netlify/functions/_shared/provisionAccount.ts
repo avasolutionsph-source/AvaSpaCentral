@@ -44,6 +44,7 @@ export async function provisionAccount({ session, spaAppBaseUrl }: ProvisionInpu
       name: session.business_name,
       address: session.business_address,
       phone: session.business_phone,
+      email: session.email,
       bookingSlug,
       planTier: session.plan_tier,
     });
@@ -131,20 +132,28 @@ interface InsertBusinessArgs {
   name: string;
   address: string | null;
   phone: string | null;
+  email: string;
   bookingSlug: string;
   planTier: PlanTier;
 }
 
 async function insertBusiness(args: InsertBusinessArgs) {
   const supabase = getAdminClient();
+  // Set the columns the public BookingPage queries explicitly — the schema
+  // gives most of them defaults, but we want every freshly-provisioned
+  // tenant to render a valid page from minute zero (color, owner email)
+  // without the owner needing to visit Settings first.
   const { data, error } = await supabase
     .from('businesses')
     .insert({
       name: args.name,
       address: args.address,
       phone: args.phone,
+      email: args.email,
       booking_slug: args.bookingSlug,
       plan_tier: args.planTier,
+      primary_color: '#1B5E37',
+      country: 'Philippines',
     })
     .select('id')
     .single();

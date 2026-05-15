@@ -160,6 +160,11 @@ const BookingPage = () => {
   // Loading & error states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Structured diagnostic info captured next to `error` so the Oops panel
+  // can show *why* the fetch failed — not just "Unable to connect". Fields
+  // are set at each error path so support can read the failure off the
+  // page instead of asking the customer to open DevTools.
+  const [errorDetail, setErrorDetail] = useState(null);
 
   // Business info
   const [business, setBusiness] = useState(null);
@@ -389,6 +394,15 @@ const BookingPage = () => {
         if (!supabaseUrl || !supabaseKey) {
           console.error('[BookingPage] Supabase not configured');
           setError('System configuration error. Please contact the business.');
+          setErrorDetail({
+            stage: 'config_check',
+            slug: businessIdOrSlug,
+            hint: 'VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY are unset for this site. Set them in Netlify Site settings → Build & deploy → Environment, then re-deploy.',
+            missing: [
+              !supabaseUrl && 'VITE_SUPABASE_URL',
+              !supabaseKey && 'VITE_SUPABASE_ANON_KEY',
+            ].filter(Boolean),
+          });
           setLoading(false);
           return;
         }
@@ -427,11 +441,42 @@ const BookingPage = () => {
           console.log('[BookingPage] REST API response data:', data);
 
           if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
+            // Capture the response body so the Oops panel can show the exact
+            // PostgREST error — usually one of:
+            //   401 "Invalid API key"             → wrong VITE_SUPABASE_ANON_KEY
+            //   401 "JWT expired"                 → stale anon key
+            //   404 "relation does not exist"     → wrong project (schema missing)
+            //   400 "column ... does not exist"   → schema drift
+            const errMessage = (data && (data.message || data.error || data.hint))
+              || `HTTP ${response.status}`;
+            setErrorDetail({
+              stage: 'fetch_business',
+              slug: businessIdOrSlug,
+              supabaseUrl,
+              queryUrl: testUrl,
+              httpStatus: response.status,
+              body: data,
+              hint: response.status === 401
+                ? 'Anon key rejected. Confirm VITE_SUPABASE_ANON_KEY matches the project at VITE_SUPABASE_URL.'
+                : response.status === 404
+                ? 'businesses table missing on this project. Run the 01-schema.sql setup against the project at VITE_SUPABASE_URL.'
+                : null,
+            });
+            throw new Error(`API error: ${response.status} — ${errMessage}`);
           }
 
           if (!data || data.length === 0) {
             setError('Business not found. Please check your booking link.');
+            setErrorDetail({
+              stage: 'business_lookup',
+              slug: businessIdOrSlug,
+              supabaseUrl,
+              queryUrl: testUrl,
+              httpStatus: response.status,
+              hint: businessIdOrSlug && !isUUID(businessIdOrSlug)
+                ? `No business with booking_slug = "${businessIdOrSlug}" exists on the project at VITE_SUPABASE_URL. If you signed up via checkout, the tenant may have been provisioned on a different Supabase project — check that VITE_SUPABASE_URL (spa-app) and SUPABASE_URL (marketing-site Functions) point at the SAME project.`
+                : 'The provided business id was not found on this project.',
+            });
             setLoading(false);
             return;
           }
@@ -702,6 +747,18 @@ const BookingPage = () => {
 
         } catch (fetchErr) {
           console.error('[BookingPage] Direct fetch error:', fetchErr);
+          // If we already populated errorDetail from a !response.ok branch
+          // above, keep that — it's more specific than the generic catch.
+          setErrorDetail((prev) => prev || {
+            stage: fetchErr.name === 'AbortError' ? 'business_fetch_timeout' : 'business_fetch_threw',
+            slug: businessIdOrSlug,
+            supabaseUrl,
+            errorName: fetchErr.name,
+            errorMessage: fetchErr.message ?? String(fetchErr),
+            hint: fetchErr.name === 'AbortError'
+              ? 'The Supabase REST endpoint took longer than 10s to respond. Check VITE_SUPABASE_URL and the project status.'
+              : 'Likely causes: VITE_SUPABASE_URL points at a non-existent project, CORS blocked by browser extension, or DNS/connectivity issue. Open DevTools → Network for the failing request.',
+          });
           if (fetchErr.name === 'AbortError') {
             setError('Connection timeout. Please check your internet and try again.');
           } else {
@@ -1684,6 +1741,92 @@ const BookingPage = () => {
         <div className="booking-error">
           <h2>Oops!</h2>
           <p>{error}</p>
+          {errorDetail && (
+            <details
+              style={{
+                marginTop: 18,
+                padding: '12px 14px',
+                background: 'rgba(0,0,0,0.04)',
+                border: '1px solid rgba(0,0,0,0.08)',
+                borderRadius: 8,
+                textAlign: 'left',
+                fontSize: 13,
+                color: '#374151',
+              }}
+            >
+              <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#1B5E37' }}>
+                Diagnostic details (tap to expand)
+              </summary>
+              <div style={{ marginTop: 8, lineHeight: 1.55 }}>
+                {errorDetail.stage && (
+                  <div><strong>Stage:</strong> <code>{errorDetail.stage}</code></div>
+                )}
+                {errorDetail.slug && (
+                  <div><strong>Slug:</strong> <code>{errorDetail.slug}</code></div>
+                )}
+                {errorDetail.httpStatus != null && (
+                  <div><strong>HTTP status:</strong> <code>{errorDetail.httpStatus}</code></div>
+                )}
+                {errorDetail.supabaseUrl && (
+                  <div style={{ wordBreak: 'break-all' }}>
+                    <strong>VITE_SUPABASE_URL:</strong>{' '}
+                    <code>{errorDetail.supabaseUrl}</code>
+                  </div>
+                )}
+                {errorDetail.queryUrl && (
+                  <div style={{ wordBreak: 'break-all' }}>
+                    <strong>Request:</strong> <code>{errorDetail.queryUrl}</code>
+                  </div>
+                )}
+                {Array.isArray(errorDetail.missing) && errorDetail.missing.length > 0 && (
+                  <div>
+                    <strong>Missing env vars:</strong>{' '}
+                    <code>{errorDetail.missing.join(', ')}</code>
+                  </div>
+                )}
+                {errorDetail.errorName && (
+                  <div><strong>Error name:</strong> <code>{errorDetail.errorName}</code></div>
+                )}
+                {errorDetail.errorMessage && (
+                  <div style={{ wordBreak: 'break-word' }}>
+                    <strong>Message:</strong> {errorDetail.errorMessage}
+                  </div>
+                )}
+                {errorDetail.body && (
+                  <pre
+                    style={{
+                      marginTop: 8,
+                      padding: 8,
+                      background: 'rgba(0,0,0,0.06)',
+                      borderRadius: 6,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      fontSize: 12,
+                    }}
+                  >
+                    {(() => {
+                      try { return JSON.stringify(errorDetail.body, null, 2); }
+                      catch { return String(errorDetail.body); }
+                    })()}
+                  </pre>
+                )}
+                {errorDetail.hint && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: '8px 10px',
+                      background: '#fef3c7',
+                      border: '1px solid #fcd34d',
+                      borderRadius: 6,
+                      color: '#7c2d12',
+                    }}
+                  >
+                    <strong>Hint:</strong> {errorDetail.hint}
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
         </div>
       </div>
     );

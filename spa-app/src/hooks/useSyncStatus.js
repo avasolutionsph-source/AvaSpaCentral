@@ -42,10 +42,9 @@ export function useSyncStatus() {
     // Load immediately
     loadStatus();
 
-    // Poll every 3 seconds for status updates
-    const interval = setInterval(loadStatus, 3000);
-
-    // Also subscribe to sync events for immediate updates
+    // Subscribe to sync events — every state transition emits, so the
+    // subscription alone keeps status fresh. The previous 3s setInterval
+    // duplicated this signal and just added IndexedDB chatter.
     const unsubscribe = supabaseSyncManager.subscribe(() => {
       // Small delay to let the sync queue update
       setTimeout(loadStatus, 200);
@@ -53,7 +52,6 @@ export function useSyncStatus() {
 
     return () => {
       mounted = false;
-      clearInterval(interval);
       unsubscribe();
     };
   }, []);

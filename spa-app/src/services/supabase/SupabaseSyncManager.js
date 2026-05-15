@@ -135,7 +135,7 @@ const TABLE_NAME_MAP = {
 // events repeatedly would re-pull all ~30 tables on every focus, which
 // dominates traffic on small Supabase instances and produces 522/524
 // timeouts. forcePull() clears syncMetadata first so it bypasses these.
-const DEFAULT_PULL_COOLDOWN_MS = 60 * 1000;
+const DEFAULT_PULL_COOLDOWN_MS = 120 * 1000;
 const PULL_COOLDOWN_MS = {
   // Hot — operational data that must be fresh on every reconciliation
   attendance: 0,
@@ -732,8 +732,10 @@ class SupabaseSyncManager {
     this._listeners = [];
     this._lastSync = null;
     this._subscriptions = [];
+    this._realtimeBusinessId = null; // business the active subscriptions are filtered by
     this._deviceId = this._getDeviceId();
     this._syncInterval = null;
+    this._visibilitySyncTimer = null; // debounce timer for visibilitychange-triggered syncs
     this._currentBusinessId = null; // Track current business for data isolation
     this._initialized = false;
 
@@ -741,7 +743,15 @@ class SupabaseSyncManager {
       autoSync: true,
       syncOnReconnect: true,
       syncInterval: 300000, // 5 minutes (fallback, event-driven sync is primary)
-      eventDrivenDebounce: 500, // 500ms debounce for rapid changes
+      // 5s debounce: bursts that fan out many writes (e.g. checkout
+      // finalizing N rows in one click) now coalesce into a single push
+      // cycle instead of N sequential ones. 500ms was too tight to catch
+      // these bursts, and a sync-per-row was both wasteful and racy. The
+      // longer window also lets sequential-but-related ops (POS checkout
+      // → payroll fan-out, inventory receive setting N stockHistory rows)
+      // batch into one push cycle at the cost of ~2s extra cross-device
+      // sync latency.
+      eventDrivenDebounce: 5000,
       batchSize: 50,
       conflictResolution: 'server-wins', // or 'last-write-wins'
       maxRetries: 3,
@@ -1165,6 +1175,32 @@ class SupabaseSyncManager {
       }
     } catch (e) { /* ignore */ }
 
+    // One-time sweep: clear stuck homeServices delete queue entries left
+    // behind before the 404-on-delete fix landed. These items kept
+    // looping pending → failed → revived → pending → failed because the
+    // target row was already gone server-side and every retry got a
+    // PGRST116 "no row matched". Narrow scope: only homeServices, only
+    // delete ops, only the ones already in trouble. Gated on a localStorage
+    // flag so it runs once per browser, not every initialize().
+    try {
+      const SWEEP_FLAG = 'daet-spa-stale-homeservices-delete-sweep-done';
+      if (typeof localStorage !== 'undefined' && !localStorage.getItem(SWEEP_FLAG)) {
+        const maxRetries = this.config.maxRetries;
+        const stuck = await db.syncQueue
+          .where('entityType').equals('homeServices')
+          .and((it) =>
+            it.operation === 'delete'
+            && (it.status === 'failed' || (it.retryCount || 0) >= maxRetries)
+          )
+          .toArray();
+        if (stuck.length > 0) {
+          await db.syncQueue.bulkDelete(stuck.map((it) => it.id));
+          console.log(`[SupabaseSyncManager] Purged ${stuck.length} stale homeServices delete queue entries`);
+        }
+        localStorage.setItem(SWEEP_FLAG, '1');
+      }
+    } catch (e) { /* ignore */ }
+
     // Start network detector (only once)
     if (!this._initialized) {
       NetworkDetector.start();
@@ -1195,27 +1231,54 @@ class SupabaseSyncManager {
     // drop (e.g. tab suspended, websocket killed by aggressive battery
     // savers, network switch). When the app regains focus, force a sync
     // so any data that the realtime channel missed gets reconciled.
+    //
+    // Debounced so a rapid focus/blur cycle (alt-tab spam, mobile screen
+    // wake bouncing visibility) fires at most one sync. The _isSyncing
+    // lock inside sync() also drops concurrent calls, but it doesn't
+    // suppress the per-event overhead of dispatching them.
     if (!this._visibilityHandler) {
       this._visibilityHandler = () => {
-        if (document.visibilityState === 'visible' && navigator.onLine) {
+        if (document.visibilityState !== 'visible' || !navigator.onLine) {
+          return;
+        }
+        if (this._visibilitySyncTimer) {
+          clearTimeout(this._visibilitySyncTimer);
+        }
+        this._visibilitySyncTimer = setTimeout(() => {
+          this._visibilitySyncTimer = null;
           console.log('[SupabaseSyncManager] App regained focus - triggering sync to catch missed realtime updates');
           this.sync().catch((err) =>
             console.warn('[SupabaseSyncManager] Visibility-triggered sync failed:', err)
           );
-        }
+        }, 2000);
       };
       document.addEventListener('visibilitychange', this._visibilityHandler);
     }
 
-    // Setup real-time subscriptions if authenticated
+    // Setup real-time subscriptions if authenticated.
+    //
+    // Idempotent: realtime is only torn down + rebuilt when there are no
+    // active subscriptions yet OR the business actually changed. Without
+    // this guard, initialize() — which fires on startup, SIGNED_IN, and
+    // every token-refresh — would churn ~30 channels per call, dominating
+    // realtime.subscription INSERT traffic in pg_stat_statements.
     if (authService.currentUser) {
-      // Clear old subscriptions first
-      this._subscriptions.forEach(sub => {
-        supabase.removeChannel(sub);
-      });
-      this._subscriptions = [];
+      const activeBizId = authService.currentUser?.businessId || null;
+      const subsExist = this._subscriptions.length > 0;
+      const bizChanged = subsExist && this._realtimeBusinessId !== activeBizId;
 
-      this._setupRealtimeSubscriptions();
+      if (!subsExist || bizChanged) {
+        if (subsExist) {
+          this._subscriptions.forEach(sub => {
+            supabase.removeChannel(sub);
+          });
+          this._subscriptions = [];
+        }
+        this._setupRealtimeSubscriptions();
+        this._realtimeBusinessId = activeBizId;
+      } else {
+        console.log('[SupabaseSyncManager] Realtime subscriptions already active for this business — skipping rebuild');
+      }
     }
 
     // No periodic interval — every syncable entity has a realtime
@@ -1379,7 +1442,66 @@ class SupabaseSyncManager {
       'activityLogs',
     ];
 
-    realtimeEntities.forEach(entityType => {
+    // Role-scoped realtime allowlist. Locked-role staff (Therapist /
+    // Rider / Utility) never open POS, inventory, supplier, or admin-
+    // audit pages, so paying for a websocket channel + a payload per
+    // tenant change on those tables is pure waste — it dominates
+    // realtime.list_changes in pg_stat_statements.
+    //
+    // Safety net: anything dropped is still pulled via _pullChanges on
+    // visibility/reconnect, so those pages stay fresh — they just don't
+    // get instant cross-device events. Reversible: remove a role from
+    // this map and it falls through to the full realtimeEntities list.
+    //
+    // Owner / Manager / Branch Owner / Receptionist / unknown roles
+    // intentionally NOT listed here — they need the full admin-tier
+    // stream and Receptionist is too admin-adjacent to trim safely
+    // without more research.
+    const ROLE_REALTIME_COMMON = [
+      // Profile + business basics — every staff role needs these.
+      'business', 'users', 'employees', 'businessConfig',
+    ];
+    const ROLE_REALTIME_HR_SELF = [
+      // HR self-service tables. Every locked-role staff member sees
+      // their own attendance + leave/OT/cash-advance requests update
+      // in realtime so they don't have to refresh to see "Approved".
+      'attendance', 'shiftSchedules',
+      'timeOffRequests', 'otRequests', 'leaveRequests',
+      'cashAdvanceRequests', 'payrollRequests', 'incidentReports',
+    ];
+    const REALTIME_ENTITIES_BY_ROLE = {
+      Utility: [
+        ...ROLE_REALTIME_COMMON,
+        ...ROLE_REALTIME_HR_SELF,
+      ],
+      Rider: [
+        ...ROLE_REALTIME_COMMON,
+        ...ROLE_REALTIME_HR_SELF,
+        // Delivery / pasundo + the rows the rider page renders for
+        // auto-dispatch ETA + customer info.
+        'homeServices', 'transportRequests', 'rooms', 'customers', 'activeServices',
+      ],
+      Therapist: [
+        ...ROLE_REALTIME_COMMON,
+        ...ROLE_REALTIME_HR_SELF,
+        // Service flow + customer-facing data the therapist screen
+        // renders during a service.
+        'appointments', 'transactions', 'rooms', 'customers', 'activeServices',
+        'serviceRotation', 'loyaltyHistory',
+        'homeServices', 'transportRequests', 'productConsumption',
+      ],
+    };
+
+    const role = authService.currentUser?.role;
+    const roleAllowlist = REALTIME_ENTITIES_BY_ROLE[role];
+    const scopedEntities = roleAllowlist
+      ? realtimeEntities.filter(e => roleAllowlist.includes(e))
+      : realtimeEntities;
+    if (roleAllowlist) {
+      console.log(`[SupabaseSyncManager] Role-scoped realtime: ${role} subscribing to ${scopedEntities.length}/${realtimeEntities.length} entities`);
+    }
+
+    scopedEntities.forEach(entityType => {
       const tableName = this._toSupabaseTableName(entityType);
 
       // Special case: businesses table uses 'id' not 'business_id'
@@ -1541,11 +1663,19 @@ class SupabaseSyncManager {
       supabase.removeChannel(sub);
     });
     this._subscriptions = [];
+    this._realtimeBusinessId = null;
 
     // Stop periodic sync
     if (this._syncInterval) {
       clearInterval(this._syncInterval);
       this._syncInterval = null;
+    }
+
+    // Cancel any pending visibility-debounce timer so it doesn't fire
+    // after logout/reset against a no-longer-relevant session.
+    if (this._visibilitySyncTimer) {
+      clearTimeout(this._visibilitySyncTimer);
+      this._visibilitySyncTimer = null;
     }
 
     // Stop network detector
@@ -1792,6 +1922,12 @@ class SupabaseSyncManager {
     let pushed = 0;
     let failed = 0;
     let skipped = 0;
+    // Tracked per-cycle so a JWT-expired storm (e.g. PasundoLiveMap
+    // queueing GPS updates every 5s while the token quietly expired)
+    // doesn't burn one auth-refresh + N more 401s. First 401 in the
+    // cycle triggers a single getSession() refresh and aborts the loop;
+    // the next sync trigger (focus/data/network) picks up the new token.
+    let authRefreshAttempted = false;
 
     // Filter out items that should wait due to exponential backoff
     const itemsToProcess = pendingItems.filter(item => {
@@ -1904,6 +2040,50 @@ class SupabaseSyncManager {
 
         pushed++;
       } catch (error) {
+        // JWT-expired storm guard. If the access token expired mid-cycle,
+        // every remaining queued item will hit the same 401 / PGRST303 /
+        // "JWT expired" with the same dead token. Burning N retries
+        // against a token that can't possibly succeed is pure waste.
+        // Instead: trigger one refresh, requeue the current item as
+        // pending (no retry-count bump — this isn't its fault), and
+        // abort the loop. The next sync cycle (focus, data change, or
+        // network reconnect) picks up the fresh token from localStorage.
+        const isJwtExpiredError =
+          error.status === 401
+          || error.code === 'PGRST303'
+          || (typeof error.message === 'string' && /jwt expired/i.test(error.message));
+        if (isJwtExpiredError) {
+          await db.syncQueue.update(item.id, { status: 'pending' });
+          if (!authRefreshAttempted) {
+            authRefreshAttempted = true;
+            console.warn('[SupabaseSyncManager] JWT expired during push — refreshing session and aborting cycle');
+            try {
+              await supabase.auth.getSession();
+            } catch (refreshErr) {
+              console.warn('[SupabaseSyncManager] Session refresh failed:', refreshErr?.message || refreshErr);
+            }
+          } else {
+            console.warn('[SupabaseSyncManager] JWT expired again after refresh attempt — aborting cycle anyway');
+          }
+          break;
+        }
+
+        // A delete that hits "row not found" already represents the
+        // desired state — the row is gone server-side. Drop the queue
+        // entry instead of retrying forever (the bug pattern that left
+        // homeServices delete ops cycling indefinitely through
+        // pending → failed → revived → pending).
+        const isMissingRowError =
+          error.status === 404
+          || error.code === 'PGRST116'
+          || (typeof error.message === 'string' && /no row matched/i.test(error.message));
+        if (item.operation === 'delete' && isMissingRowError) {
+          console.log(`[SupabaseSyncManager] Delete target already gone server-side for ${item.entityType}/${item.entityId} — treating as success`);
+          await db.syncQueue.delete(item.id);
+          pushed++;
+          continue;
+        }
+
         // Log full error details for debugging
         console.error(`[SupabaseSyncManager] Push error for ${item.entityType}/${item.entityId}:`, {
           message: error.message,
@@ -1921,11 +2101,24 @@ class SupabaseSyncManager {
         const nextRetryAt = new Date(Date.now() + backoffDelay).toISOString();
 
         const isParked = newRetryCount >= maxRetries;
+
+        // Promote chronically broken items to `permanentlyFailed` so the
+        // 5-minute revive loop stops cycling them back to `pending` and
+        // re-failing forever. Trip conditions:
+        //   * we've already parked once (retryCount >= maxRetries) AND
+        //     the same error message keeps coming back, OR
+        //   * we've hit 2× maxRetries regardless of error stability.
+        const sameErrorPersists =
+          isParked && item.error && error.message && item.error === error.message;
+        const wayPastBudget = newRetryCount >= maxRetries * 2;
+        const permanentlyFailed = sameErrorPersists || wayPastBudget;
+
         await db.syncQueue.update(item.id, {
           status: isParked ? 'failed' : 'pending',
           error: error.message,
           retryCount: newRetryCount,
           nextRetryAt: isParked ? null : nextRetryAt,
+          permanentlyFailed: permanentlyFailed || undefined,
           // Track when this item last had an attempt so the auto-revive
           // path can check whether the cool-down has elapsed.
           updatedAt: new Date().toISOString(),
@@ -1937,6 +2130,7 @@ class SupabaseSyncManager {
             entityType: item.entityType,
             entityId: item.entityId,
             error: error.message,
+            permanentlyFailed,
           });
         }
 
@@ -1969,6 +2163,12 @@ class SupabaseSyncManager {
     const cutoff = Date.now() - FAILED_REVIVE_COOLDOWN_MS;
     let revived = 0;
     for (const item of failedItems) {
+      // Items the push catch tagged as permanentlyFailed stay in `failed`
+      // forever. Without this guard they get cycled back to `pending`
+      // every 5 minutes only to fail with the same error again — that's
+      // the infinite-loop pattern the homeServices delete bug fell into.
+      if (item.permanentlyFailed) continue;
+
       const lastTry = item.updatedAt ? new Date(item.updatedAt).getTime()
         : item.createdAt ? new Date(item.createdAt).getTime()
         : 0;
@@ -2133,10 +2333,30 @@ class SupabaseSyncManager {
           const parts = [
             `${idColumn}=eq.${encodeURIComponent(businessId)}`,
             'select=*',
+            // Bound the pull so an unfiltered "since=null" fallback can't
+            // sequential-scan a multi-million-row table. 1000 rows × pulls
+            // × tables is plenty for reconciliation; realtime delivers the
+            // live stream. Ordering newest-first ensures any truncation
+            // drops the oldest, least-relevant rows.
+            'limit=1000',
           ];
           if (includeSince && since) {
             parts.push(`updated_at=gt.${encodeURIComponent(since)}`);
+            parts.push('order=updated_at.desc.nullslast');
+          } else {
+            parts.push('order=updated_at.desc.nullslast');
           }
+          return '?' + parts.join('&');
+        };
+
+        // Retry variant for tables without an updated_at column (the
+        // 42703 path). Keep the limit, drop both the filter and the order.
+        const buildQueryNoUpdatedAt = () => {
+          const parts = [
+            `${idColumn}=eq.${encodeURIComponent(businessId)}`,
+            'select=*',
+            'limit=1000',
+          ];
           return '?' + parts.join('&');
         };
 
@@ -2149,8 +2369,8 @@ class SupabaseSyncManager {
           }
           // Column 'updated_at' doesn't exist - retry without the timestamp filter
           if (error.code === '42703' || error.message?.includes('updated_at')) {
-            console.warn(`[SupabaseSyncManager] Table ${tableName} missing updated_at column, pulling all records`);
-            const retryResult = await restSelect(tableName, buildQuery(false), 15000);
+            console.warn(`[SupabaseSyncManager] Table ${tableName} missing updated_at column, pulling all records (capped at 1000)`);
+            const retryResult = await restSelect(tableName, buildQueryNoUpdatedAt(), 15000);
             if (retryResult.error) {
               throw new Error(retryResult.error.message);
             }

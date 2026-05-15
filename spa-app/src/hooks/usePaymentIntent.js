@@ -75,7 +75,17 @@ export function usePaymentIntent(intentId) {
       )
       .subscribe();
 
-    pollRef.current = setInterval(fetchOnce, POLL_INTERVAL_MS);
+    // Polled refetches skip while the tab is backgrounded — realtime
+    // continues to push UPDATEs to setIntent, so we stay current without
+    // burning queries every 5s on hidden tabs. Poll resumes naturally
+    // on the next interval tick once the tab is visible again.
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      fetchOnce();
+    };
+    pollRef.current = setInterval(tick, POLL_INTERVAL_MS);
 
     return () => {
       mounted = false;

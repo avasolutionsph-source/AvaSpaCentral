@@ -182,22 +182,28 @@ class MigrationService {
     this._notify();
 
     try {
-      // Check if Supabase has any products (quick check)
-      const { count: supabaseCount } = await supabase
+      // Existence probe — we don't actually need the count, just "is
+      // there at least one row?". `count: 'exact'` forces a full COUNT(*)
+      // scan; LIMIT 1 stops at the first row and lets the planner pick
+      // the cheapest path.
+      const { data: probeRows, error: probeError } = await supabase
         .from('products')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', businessId);
+        .select('id')
+        .eq('business_id', businessId)
+        .limit(1);
+      if (probeError) throw probeError;
+      const supabaseHasData = (probeRows?.length ?? 0) > 0;
 
       // Check if Dexie has products
       const dexieCount = await db.products.count();
 
-      console.log(`[MigrationService] Dexie: ${dexieCount} products, Supabase: ${supabaseCount} products`);
+      console.log(`[MigrationService] Dexie: ${dexieCount} products, Supabase has data: ${supabaseHasData}`);
 
       this._progress.status = 'idle';
       this._notify();
 
       // Need migration if local has data but cloud is empty
-      return dexieCount > 0 && (supabaseCount === 0 || supabaseCount === null);
+      return dexieCount > 0 && !supabaseHasData;
     } catch (error) {
       console.error('[MigrationService] Error checking migration need:', error);
       this._progress.status = 'idle';

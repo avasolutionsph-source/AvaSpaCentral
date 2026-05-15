@@ -252,8 +252,11 @@ const MainLayout = () => {
       setSetupIssues(issues);
     };
     checkSetup();
-    // Re-check when navigating back from settings
-    const interval = setInterval(checkSetup, 30000);
+    // Re-check when navigating back from settings (route-change effect dep
+    // already triggers a fresh check on every navigation). The interval is
+    // just a safety net for users who stay on one page for a long time —
+    // 5 minutes is plenty; 30s was burning IndexedDB reads needlessly.
+    const interval = setInterval(checkSetup, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [location.pathname]);
 

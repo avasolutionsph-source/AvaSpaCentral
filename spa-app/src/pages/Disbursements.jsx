@@ -82,11 +82,23 @@ const Disbursements = () => {
     load();
 
     if (!supabase) return undefined;
+    // Without a business_id filter, every tenant's disbursement change
+    // would wake this subscriber and trigger a full refetch (multi-tenant
+    // leak + needless load). Skip the subscription entirely until we
+    // know the current user's business.
+    const businessId = user?.businessId;
+    if (!businessId) return undefined;
+
     const channel = supabase
-      .channel('disbursements-list')
+      .channel(`disbursements-list-${businessId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'disbursements' },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'disbursements',
+          filter: `business_id=eq.${businessId}`,
+        },
         () => { if (mounted) load(); },
       )
       .subscribe();
@@ -95,7 +107,7 @@ const Disbursements = () => {
       mounted = false;
       try { channel.unsubscribe(); } catch { /* best effort */ }
     };
-  }, [branchId, showToast]);
+  }, [branchId, showToast, user?.businessId]);
 
   // Read which workflows are enabled
   useEffect(() => {

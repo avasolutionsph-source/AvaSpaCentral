@@ -67,9 +67,27 @@ class DisbursementRepository {
 
   async getRecent({ branchId, limit = 50 } = {}) {
     if (!supabase) throw new Error('Supabase is not configured');
+    // Disbursements row can carry large NextPay payload blobs we don't
+    // render in the list view. Project only the columns the table renders
+    // so the row size stays small over the wire.
+    const LIST_COLUMNS = [
+      'id',
+      'created_at',
+      'source_type',
+      'source_id',
+      'recipient_name',
+      'recipient_bank_code',
+      'recipient_account_number',
+      'amount',
+      'status',
+      'failure_reason',
+      'nextpay_reference_id',
+      'branch_id',
+      'business_id',
+    ].join(',');
     let query = supabase
       .from('disbursements')
-      .select('*')
+      .select(LIST_COLUMNS)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (branchId) {

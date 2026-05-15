@@ -47,6 +47,8 @@ export function useDisbursement(disbursementId) {
       }
     };
 
+    // Initial bootstrap fetch always runs so loading flips correctly,
+    // even if the tab is hidden on mount.
     fetchOnce();
 
     const channel = supabase
@@ -63,7 +65,17 @@ export function useDisbursement(disbursementId) {
       )
       .subscribe();
 
-    pollRef.current = setInterval(fetchOnce, POLL_INTERVAL_MS);
+    // Polled refetches skip while the tab is backgrounded — realtime
+    // continues to push UPDATEs to setDisbursement, so we stay current
+    // without burning queries. Poll resumes naturally on next interval
+    // tick once the tab is visible again.
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      fetchOnce();
+    };
+    pollRef.current = setInterval(tick, POLL_INTERVAL_MS);
 
     return () => {
       mounted = false;

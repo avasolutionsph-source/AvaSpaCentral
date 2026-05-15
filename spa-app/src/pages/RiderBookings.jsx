@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, getAccessToken } from '../context/AppContext';
 import mockApi from '../mockApi';
 import dataChangeEmitter from '../services/sync/DataChangeEmitter';
 import { supabaseSyncManager } from '../services/supabase';
@@ -205,18 +205,10 @@ export default function RiderBookings() {
           const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
           if (!supabaseUrl || !supabaseKey || !user.employeeId) return [];
 
-          let token = supabaseKey;
-          try {
-            const { supabase } = await import('../services/supabase/supabaseClient');
-            const sessionPromise = supabase.auth.getSession();
-            const sessionTimeout = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('session-timeout')), 2000)
-            );
-            const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout]);
-            if (session?.access_token) token = session.access_token;
-          } catch {
-            // Fall back to anon key — the network call below still runs.
-          }
+          // getAccessToken() reads the persisted session from localStorage,
+          // so it replaces the old race-with-timeout dance against
+          // supabase.auth.getSession() and can't hang on the auth lock.
+          const token = await getAccessToken();
 
           const url = `${supabaseUrl}/rest/v1/online_bookings?rider_id=eq.${user.employeeId}&deleted=eq.false&order=preferred_date.asc`;
           const controller = new AbortController();
@@ -747,15 +739,38 @@ export default function RiderBookings() {
   // Track IDs we just wrote our own GPS to so the dataChange echo doesn't
   // reload the whole bookings list every tick (caused visible flicker).
   const selfLocationWritesRef = useRef(new Map());
+  // Last GPS fix actually written to Supabase. Used to suppress
+  // back-to-back writes when the rider is stationary (waiting at door,
+  // traffic stop). NOTE: this gate only suppresses the Supabase write —
+  // setRiderFix still runs every tick so the rider's own map marker
+  // stays smooth even while the upload is throttled.
+  const lastWrittenFixRef = useRef(null);
   useLocationTracker({
     active: true,
     intervalMs: activeDeliveryIds.length > 0 ? 5000 : 10000,
     onFix: useCallback(async ({ lat, lng }) => {
-      setRiderFix({ lat, lng, ts: Date.now() });
+      const nowMs = Date.now();
+      // Always keep the rider's own marker fresh — local-only state,
+      // no network cost.
+      setRiderFix({ lat, lng, ts: nowMs });
       if (activeDeliveryIds.length === 0) return;
+
+      // Distance + time gate for the Supabase write. Equirectangular
+      // meters — accurate at <1km scale, and we only care about the
+      // "stationary vs moving" call. Skip when <20m moved AND <30s
+      // since last write; otherwise the rider's stationary periods
+      // (waiting at door, traffic) burn 12 PATCH/min per active row.
+      const last = lastWrittenFixRef.current;
+      if (last) {
+        const dLat = (lat - last.lat) * 111_320;
+        const dLng = (lng - last.lng) * 111_320 * Math.cos((lat * Math.PI) / 180);
+        const meters = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (meters < 20 && (nowMs - last.ts) < 30_000) return;
+      }
+      lastWrittenFixRef.current = { lat, lng, ts: nowMs };
+
       const updatedAt = new Date().toISOString();
-      const now = Date.now();
-      activeDeliveryIds.forEach(id => selfLocationWritesRef.current.set(id, now));
+      activeDeliveryIds.forEach(id => selfLocationWritesRef.current.set(id, nowMs));
       // Fire updates in parallel — each call is independent and the sync layer
       // batches writes downstream. Errors are swallowed silently; the next
       // tick will retry with a fresh fix anyway.

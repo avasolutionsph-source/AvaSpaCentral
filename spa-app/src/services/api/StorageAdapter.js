@@ -2130,7 +2130,7 @@ export const usersAdapter = {
         let error = null;
         try {
           const res = await fetch(
-            `${supabaseUrl}/rest/v1/users?business_id=eq.${businessId}&select=*`,
+            `${supabaseUrl}/rest/v1/users?business_id=eq.${businessId}&select=*&limit=500`,
             {
               headers: {
                 'apikey': supabaseKey,

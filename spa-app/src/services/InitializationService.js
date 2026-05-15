@@ -198,10 +198,15 @@ class InitializationService {
    */
   async _purgeStaleLoopNotifications() {
     try {
+      // `soundClass` is not in the Dexie v15 indexed-keys list, so
+      // `.where('soundClass').equals('loop')` throws a SchemaError on
+      // every boot. Use the indexed `status` field for the initial
+      // narrow, then filter `soundClass` in memory — same result, no
+      // schema bump needed.
       const candidates = await db.notifications
-        .where('soundClass')
-        .equals('loop')
-        .filter((n) => n && n.status === 'unread' && n.payload)
+        .where('status')
+        .equals('unread')
+        .filter((n) => n && n.soundClass === 'loop' && n.payload)
         .toArray();
       if (candidates.length === 0) return;
 

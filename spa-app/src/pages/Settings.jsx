@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, getAccessToken } from '../context/AppContext';
 import mockApi from '../mockApi';
 import { format, parseISO } from 'date-fns';
 import { ConfirmDialog } from '../components/shared';
@@ -63,6 +63,23 @@ const BRANCH_CONFIG_SECTIONS = [
   { key: 'bookingCapacity', label: 'Booking Capacity' },
   { key: 'taxSettings', label: 'Tax Settings' },
   { key: 'showReceiptAfterCheckout', label: 'POS Settings' },
+];
+
+// Only these keys are actually consumed by the mount-time seeding block
+// below. Without this allowlist, the page pulls every settings row for
+// the business and discards most of them — settings grows with each new
+// feature flag / payroll config / NextPay payload, so the unfiltered
+// fetch keeps getting heavier even though the form's needs haven't
+// changed.
+const SETTINGS_KEYS_LOADED_ON_MOUNT = [
+  'businessInfo',
+  'businessContact',
+  'businessHours',
+  'taxSettings',
+  'theme',
+  'showReceiptAfterCheckout',
+  'bookingCapacity',
+  'bookingWindowMinutes',
 ];
 
 const Settings = () => {
@@ -388,16 +405,10 @@ const Settings = () => {
         return;
       }
 
-      const { supabase } = await import('../services/supabase/supabaseClient');
-      let accessToken = supabaseKey;
-      if (supabase) {
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
-        try {
-          const { data } = await Promise.race([sessionPromise, timeoutPromise]);
-          if (data?.session?.access_token) accessToken = data.session.access_token;
-        } catch {}
-      }
+      // getAccessToken() reads localStorage directly — replaces the old
+      // Promise.race(getSession, 3s-timeout) dance against the supabase-js
+      // auth lock.
+      const accessToken = await getAccessToken();
 
       const headers = {
         'apikey': supabaseKey,
@@ -625,16 +636,10 @@ const Settings = () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      // Get the current session token for authenticated request
-      const { supabase } = await import('../services/supabase/supabaseClient');
-      let accessToken = supabaseKey; // fallback to anon key
-
-      if (supabase) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session?.access_token) {
-          accessToken = sessionData.session.access_token;
-        }
-      }
+      // getAccessToken() reads localStorage directly — replaces the old
+      // supabase.auth.getSession() call that could hang on the auth lock.
+      const tokenFromStore = await getAccessToken();
+      const accessToken = tokenFromStore || supabaseKey;
 
       const response = await fetch(
         `${supabaseUrl}/rest/v1/businesses?id=eq.${user?.businessId}`,
@@ -715,19 +720,10 @@ const Settings = () => {
 
       try {
         // Get user's access token for RLS with timeout
-        const { supabase } = await import('../services/supabase/supabaseClient');
-        let accessToken = supabaseKey;
-
-        if (supabase) {
-          try {
-            const sessionPromise = supabase.auth.getSession();
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
-            const { data: sessionData } = await Promise.race([sessionPromise, timeoutPromise]);
-            if (sessionData?.session?.access_token) {
-              accessToken = sessionData.session.access_token;
-            }
-          } catch {}
-        }
+        // getAccessToken() reads localStorage directly — replaces the old
+        // Promise.race(getSession, 3s-timeout) dance against the supabase-js
+        // auth lock.
+        const accessToken = await getAccessToken();
 
         const controller = new AbortController();
         const fetchTimeout = setTimeout(() => controller.abort(), 5000);
@@ -1191,16 +1187,10 @@ const Settings = () => {
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
     try {
-      // Get auth token
-      const { supabase } = await import('../services/supabase/supabaseClient');
-      let accessToken = supabaseKey;
-
-      if (supabase) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session?.access_token) {
-          accessToken = sessionData.session.access_token;
-        }
-      }
+      // getAccessToken() reads localStorage directly — replaces the old
+      // supabase.auth.getSession() call that could hang on the auth lock.
+      const tokenFromStore = await getAccessToken();
+      const accessToken = tokenFromStore || supabaseKey;
 
       const branchData = {
         business_id: user.businessId,
@@ -1307,15 +1297,10 @@ const Settings = () => {
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
     try {
-      const { supabase } = await import('../services/supabase/supabaseClient');
-      let accessToken = supabaseKey;
-
-      if (supabase) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session?.access_token) {
-          accessToken = sessionData.session.access_token;
-        }
-      }
+      // getAccessToken() reads localStorage directly — replaces the old
+      // supabase.auth.getSession() call that could hang on the auth lock.
+      const tokenFromStore = await getAccessToken();
+      const accessToken = tokenFromStore || supabaseKey;
 
       const response = await fetch(
         `${supabaseUrl}/rest/v1/branches?id=eq.${branch.id}`,
@@ -1345,15 +1330,10 @@ const Settings = () => {
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
     try {
-      const { supabase } = await import('../services/supabase/supabaseClient');
-      let accessToken = supabaseKey;
-
-      if (supabase) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session?.access_token) {
-          accessToken = sessionData.session.access_token;
-        }
-      }
+      // getAccessToken() reads localStorage directly — replaces the old
+      // supabase.auth.getSession() call that could hang on the auth lock.
+      const tokenFromStore = await getAccessToken();
+      const accessToken = tokenFromStore || supabaseKey;
 
       const response = await fetch(
         `${supabaseUrl}/rest/v1/branches?id=eq.${branch.id}`,
@@ -1627,7 +1607,8 @@ const Settings = () => {
             const { data, error } = await supabase
               .from('settings')
               .select('key, value, branch_id')
-              .eq('business_id', user.businessId);
+              .eq('business_id', user.businessId)
+              .in('key', SETTINGS_KEYS_LOADED_ON_MOUNT);
 
             if (!error && data && data.length > 0) {
               const effectiveBranchId = getEffectiveBranchId();

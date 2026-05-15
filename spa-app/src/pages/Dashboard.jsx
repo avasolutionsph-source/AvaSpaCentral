@@ -10,7 +10,7 @@ import { DashboardSkeleton } from '../components/Skeleton';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch, getEffectiveBranchId } = useApp();
+  const { showToast, user, canSeeAllBranches, selectedBranch, selectBranch, getEffectiveBranchId, branches, bookingSlug } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -26,8 +26,8 @@ const Dashboard = () => {
   const [salaryHealth, setSalaryHealth] = useState(null);
   const [insightsData, setInsightsData] = useState({ products: [], rooms: [] });
   const [chartData, setChartData] = useState(null);
-  const [bookingSlug, setBookingSlug] = useState(null);
-  const [branches, setBranches] = useState([]);
+  // bookingSlug + branches now come from AppContext (cached once per business)
+  // so each Dashboard mount no longer re-fetches them.
   const [isLandscape, setIsLandscape] = useState(false);
 
   // Use global branch from AppContext
@@ -106,23 +106,8 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch branches for the dropdown
-  useEffect(() => {
-    const fetchBranches = async () => {
-      if (!user?.businessId) return;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !supabaseKey) return;
-      try {
-        const res = await fetch(
-          `${supabaseUrl}/rest/v1/branches?business_id=eq.${user.businessId}&is_active=eq.true&order=display_order.asc`,
-          { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` } }
-        );
-        if (res.ok) setBranches(await res.json());
-      } catch {}
-    };
-    fetchBranches();
-  }, [user?.businessId]);
+  // Branches now come from AppContext — see the `branches` destructure
+  // above. Cached once per business; no per-mount refetch.
 
   useEffect(() => {
     let isMounted = true;
@@ -239,37 +224,8 @@ const Dashboard = () => {
     };
   }, [selectedBranchId]); // Reload when branch selection changes
 
-  // Fetch booking slug for the booking link display
-  useEffect(() => {
-    const fetchBookingSlug = async () => {
-      if (!user?.businessId) return;
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      if (!supabaseUrl || !supabaseKey) return;
-
-      try {
-        const response = await fetch(
-          `${supabaseUrl}/rest/v1/businesses?id=eq.${user.businessId}&select=booking_slug`,
-          {
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`
-            }
-          }
-        );
-        const data = await response.json();
-        if (data?.[0]?.booking_slug) {
-          setBookingSlug(data[0].booking_slug);
-        }
-      } catch (err) {
-        console.error('Error fetching booking slug:', err);
-      }
-    };
-
-    fetchBookingSlug();
-  }, [user?.businessId]);
+  // bookingSlug now comes from AppContext — see the `bookingSlug`
+  // destructure above. Cached once per business; no per-mount refetch.
 
   // Branch is now selected globally from the BranchSelect landing page
 

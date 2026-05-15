@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp, ALL_BRANCHES } from '../context/AppContext';
+import { useApp, ALL_BRANCHES, getAccessToken } from '../context/AppContext';
 import { getBrandingSettings, applyColorTheme } from '../services/brandingService';
 
 const BranchSelect = () => {
@@ -37,22 +37,11 @@ const BranchSelect = () => {
       }
 
       try {
-        // Try with user's access token first (if logged in), then fall back to anon key
-        let accessToken = supabaseKey;
-
-        if (user) {
-          try {
-            const { supabase } = await import('../services/supabase/supabaseClient');
-            if (supabase) {
-              const { data: sessionData } = await supabase.auth.getSession();
-              if (sessionData?.session?.access_token) {
-                accessToken = sessionData.session.access_token;
-              }
-            }
-          } catch (e) {
-            // Fall back to anon key
-          }
-        }
+        // Logged-in users get their session token (gives them the RLS-enforced
+        // view of branches their business owns); anon visitors get the anon
+        // key. getAccessToken() reads localStorage directly so the call can't
+        // hang on supabase-js's internal auth lock.
+        const accessToken = user ? await getAccessToken() : supabaseKey;
 
         // Filter by business_id when user is logged in
         let branchQuery = `${supabaseUrl}/rest/v1/branches?is_active=eq.true&order=display_order.asc,name.asc`;

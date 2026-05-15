@@ -15,6 +15,50 @@ import PushSubscriptionService from '../services/notifications/PushSubscriptionS
 // flows. Owner can override either via Settings → Bookings.
 const DEFAULT_BOOKING_LIMITS = Object.freeze({ maxPaxPublic: 12, maxPaxStaff: 30 });
 
+/**
+ * Read the current Supabase access token without going through
+ * `supabase.auth.getSession()`.
+ *
+ * Several call sites used to do this dance to avoid the documented
+ * supabase-js hang where getSession() blocks when the client's internal
+ * refresh lock is held (see project_supabase_hang.md):
+ *
+ *   const sessionPromise = supabase.auth.getSession();
+ *   const timeoutPromise = new Promise((_, r) => setTimeout(() => r(), 3000));
+ *   const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+ *   if (data?.session?.access_token) token = data.session.access_token;
+ *
+ * Reading the persisted session from localStorage is synchronous and
+ * cannot hang, so a single centralised helper replaces every copy of the
+ * race-with-timeout pattern. Returns the anon key when there's no live
+ * session so RLS-gated requests fail fast with a 401 instead of stalling.
+ *
+ * Exported (not just via context) so non-hook call sites (services,
+ * dynamic imports) can use it too. Async on purpose to keep the
+ * call-site shape — `const token = await getAccessToken()` — identical
+ * to what the old dance returned.
+ */
+export async function getAccessToken() {
+  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  try {
+    const raw = typeof localStorage !== 'undefined'
+      ? localStorage.getItem('spa-erp-auth')
+      : null;
+    if (!raw) return SUPABASE_ANON_KEY;
+    const parsed = JSON.parse(raw);
+    // supabase-js v2 persists as { currentSession: {...} }, { session: {...} },
+    // or the session object directly. Cover the common shapes.
+    const session =
+      parsed?.currentSession ||
+      parsed?.session ||
+      (parsed?.access_token ? parsed : null);
+    if (session?.access_token) return session.access_token;
+    return SUPABASE_ANON_KEY;
+  } catch {
+    return SUPABASE_ANON_KEY;
+  }
+}
+
 // Sentinel representing "view data from all branches" for Owner/Manager users.
 // Stored in the same selectedBranch slot (so localStorage persistence Just Works).
 // Callers should treat `selectedBranch?._allBranches === true` as "no branch filter".
@@ -166,6 +210,17 @@ export const AppProvider = ({ children }) => {
   // would be each page running its own async read on render.
   const [bookingLimits, setBookingLimits] = useState(DEFAULT_BOOKING_LIMITS);
 
+  // Cached business-level data that multiple pages used to re-fetch on every
+  // mount. Hoisting it here cuts 2 REST calls per Dashboard mount (and per
+  // future consumers that ask for the same info).
+  //   - branches: active branches for the current business, used by the
+  //     dashboard dropdown and any feature page that wants to label data
+  //     with its branch name without hitting the network.
+  //   - bookingSlug: the public booking-page slug for the business, used
+  //     for the "share booking link" widget on Dashboard.
+  const [branches, setBranches] = useState([]);
+  const [bookingSlug, setBookingSlug] = useState(null);
+
   // Holds the teardown returned by startAllNotificationTriggers() so a
   // logout-then-login cycle doesn't accumulate duplicate listeners.
   const triggersUnsubRef = useRef(null);
@@ -199,6 +254,55 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     refreshBookingLimits();
   }, [user?.businessId, refreshBookingLimits]);
+
+  // Fetch branches + booking_slug once per business and cache in context.
+  // Both used to be re-fetched every Dashboard mount (and would have been
+  // re-fetched by future pages with the same needs). Anon-key reads are
+  // fine here — both queries return data that the public booking page
+  // already exposes, so there's no RLS concern.
+  useEffect(() => {
+    const businessId = user?.businessId;
+    if (!businessId) {
+      setBranches([]);
+      setBookingSlug(null);
+      return;
+    }
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const [branchesRes, businessRes] = await Promise.allSettled([
+          fetch(
+            `${supabaseUrl}/rest/v1/branches?business_id=eq.${businessId}&is_active=eq.true&order=display_order.asc`,
+            { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } },
+          ),
+          fetch(
+            `${supabaseUrl}/rest/v1/businesses?id=eq.${businessId}&select=booking_slug`,
+            { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } },
+          ),
+        ]);
+        if (cancelled) return;
+        if (branchesRes.status === 'fulfilled' && branchesRes.value.ok) {
+          const data = await branchesRes.value.json();
+          if (!cancelled) setBranches(Array.isArray(data) ? data : []);
+        }
+        if (businessRes.status === 'fulfilled' && businessRes.value.ok) {
+          const data = await businessRes.value.json();
+          const slug = Array.isArray(data) && data[0]?.booking_slug;
+          if (!cancelled && slug) setBookingSlug(slug);
+        }
+      } catch {
+        // Silent fall-back: branches stays whatever it was, bookingSlug stays
+        // null. Dashboard already falls back to user.businessId when slug is
+        // missing, and other consumers can detect [] === "not loaded yet".
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.businessId]);
 
   // Initialize app - check for existing session
   // Load and apply branding (color theme) from Supabase
@@ -356,7 +460,15 @@ export const AppProvider = ({ children }) => {
   // Toast notification system. `options.action` adds a clickable button to
   // the toast — { label, onClick } — and extends the auto-dismiss so the user
   // has time to act on it.
-  const showToast = (message, type = 'info', options = {}) => {
+  //
+  // Memoized with empty deps so the reference is stable across renders.
+  // Consumers use showToast in useCallback/useEffect deps; without this,
+  // every AppContext re-render produces a new function, which can put a
+  // failing-fetch hook into an infinite refetch loop (re-render → new
+  // showToast → new refresh callback → useEffect refires → fetch fails →
+  // showToast → re-render). setToast from useState is reference-stable, so
+  // empty deps are safe here.
+  const showToast = useCallback((message, type = 'info', options = {}) => {
     const id = Date.now();
     const action = options.action && options.action.label && options.action.onClick
       ? options.action
@@ -366,7 +478,7 @@ export const AppProvider = ({ children }) => {
     setTimeout(() => {
       setToast((current) => (current && current.id === id ? null : current));
     }, action ? 8000 : 4000);
-  };
+  }, []);
 
   // Initialize the Supabase sync manager after a user is signed in.
   // Two paths:
@@ -828,6 +940,8 @@ export const AppProvider = ({ children }) => {
     getUserBranchId,
     getEffectiveBranchId,
     canSeeAllBranches,
+    branches,
+    bookingSlug,
     // Sync-related exports
     syncStatus,
     triggerSync,

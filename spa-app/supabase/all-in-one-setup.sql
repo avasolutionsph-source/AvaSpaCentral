@@ -2687,6 +2687,11 @@ ORDER BY copies DESC, LOWER(TRIM(name));
 -- repoints every reference from the newer duplicates to that canonical id,
 -- then deletes the now-orphaned duplicate branch rows.
 --
+-- The table list is discovered from information_schema, so this works even
+-- when the schema only added branch_id to a subset of the candidate tables
+-- (e.g. home_services / customers / advance_bookings never got a branch_id
+-- column in this project).
+--
 -- Output: RAISE NOTICE lines per merge. Read them in the SQL Editor's
 -- "Messages" / "Output" tab to confirm what happened.
 -- ============================================================================
@@ -2698,7 +2703,25 @@ DECLARE
   i            int;
   groups_seen  int := 0;
   merges_done  int := 0;
+  t            text;
+  branch_tables text[];
 BEGIN
+  SELECT array_agg(c.table_name ORDER BY c.table_name)
+    INTO branch_tables
+  FROM information_schema.columns c
+  WHERE c.table_schema = 'public'
+    AND c.column_name  = 'branch_id'
+    AND c.data_type    = 'uuid'
+    AND c.table_name  <> 'branches';
+
+  IF branch_tables IS NULL THEN
+    branch_tables := ARRAY[]::text[];
+  END IF;
+
+  RAISE NOTICE 'Will repoint branch_id on % table(s): %',
+    COALESCE(array_length(branch_tables, 1), 0),
+    branch_tables;
+
   FOR dupe_group IN
     SELECT
       business_id,
@@ -2720,44 +2743,13 @@ BEGIN
       dupe_id := dupe_group.branch_ids[i];
       RAISE NOTICE '  -> merging % into %', dupe_id, canonical_id;
 
-      -- People & accounts
-      UPDATE users        SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE employees    SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE customers    SET branch_id = canonical_id WHERE branch_id = dupe_id;
+      FOREACH t IN ARRAY branch_tables LOOP
+        EXECUTE format(
+          'UPDATE %I SET branch_id = $1 WHERE branch_id = $2',
+          t
+        ) USING canonical_id, dupe_id;
+      END LOOP;
 
-      -- Operational
-      UPDATE rooms            SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE home_services    SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE advance_bookings SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE active_services  SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE transactions     SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE appointments     SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE notifications    SET branch_id = canonical_id WHERE branch_id = dupe_id;
-
-      -- Attendance / HR
-      UPDATE attendance            SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE shift_schedules       SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE time_off_requests     SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE cash_advance_requests SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE expense_requests      SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE incident_reports      SET branch_id = canonical_id WHERE branch_id = dupe_id;
-
-      -- Inventory & money
-      UPDATE products              SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE stock_movements       SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE product_consumption   SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE suppliers             SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE purchase_orders       SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE expenses              SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE gift_certificates     SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE cash_drawer_sessions  SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE cash_drawer_shifts    SET branch_id = canonical_id WHERE branch_id = dupe_id;
-
-      -- Logs & history
-      UPDATE activity_logs    SET branch_id = canonical_id WHERE branch_id = dupe_id;
-      UPDATE loyalty_history  SET branch_id = canonical_id WHERE branch_id = dupe_id;
-
-      -- Finally drop the now-orphaned duplicate branch row.
       DELETE FROM branches WHERE id = dupe_id;
       merges_done := merges_done + 1;
     END LOOP;
@@ -2787,26 +2779,50 @@ CREATE UNIQUE INDEX IF NOT EXISTS branches_unique_business_name_idx
 -- ============================================================================
 -- STEP 4 — Verify no orphaned references remain (read-only)
 -- ----------------------------------------------------------------------------
--- Expected: zero rows. Any row returned means STEP 2 missed a table — add
--- the table to the DO block above and re-run STEP 2.
+-- Expected: zero rows. Loops over every public table that actually has a
+-- branch_id uuid column and (id column) so it stays correct regardless of
+-- which optional tables exist in this environment. Any row returned means
+-- there's a branch_id pointing at a branches.id that no longer exists.
 -- ============================================================================
-SELECT 'users' AS table_name, id::text AS row_id, branch_id FROM users u
-WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id = u.branch_id)
-UNION ALL
-SELECT 'employees', id::text, branch_id FROM employees e
-WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id = e.branch_id)
-UNION ALL
-SELECT 'home_services', id::text, branch_id FROM home_services h
-WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id = h.branch_id)
-UNION ALL
-SELECT 'transactions', id::text, branch_id FROM transactions t
-WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id = t.branch_id)
-UNION ALL
-SELECT 'advance_bookings', id::text, branch_id FROM advance_bookings a
-WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id = a.branch_id)
-UNION ALL
-SELECT 'rooms', id::text, branch_id FROM rooms r
-WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id = r.branch_id);
+DROP TABLE IF EXISTS pg_temp.branch_orphan_check;
+CREATE TEMP TABLE pg_temp.branch_orphan_check (
+  table_name text,
+  row_id     text,
+  branch_id  uuid
+);
+
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOR t IN
+    SELECT c.table_name
+    FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+      AND c.column_name  = 'branch_id'
+      AND c.data_type    = 'uuid'
+      AND c.table_name  <> 'branches'
+      AND EXISTS (
+        SELECT 1 FROM information_schema.columns c2
+        WHERE c2.table_schema = c.table_schema
+          AND c2.table_name   = c.table_name
+          AND c2.column_name  = 'id'
+      )
+    ORDER BY c.table_name
+  LOOP
+    EXECUTE format(
+      'INSERT INTO pg_temp.branch_orphan_check (table_name, row_id, branch_id)
+       SELECT %L, x.id::text, x.branch_id
+       FROM %I x
+       WHERE x.branch_id IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id = x.branch_id)',
+      t, t
+    );
+  END LOOP;
+END $$;
+
+SELECT * FROM pg_temp.branch_orphan_check
+ORDER BY table_name, row_id;
 
 
 -- ============================================================================
@@ -2822,6 +2838,8 @@ WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id 
 --   dupe_id      uuid := 'REPLACE_WITH_DUPE_UUID';
 --   v_canonical_business uuid;
 --   v_dupe_business      uuid;
+--   t             text;
+--   branch_tables text[];
 -- BEGIN
 --   SELECT business_id INTO v_canonical_business FROM branches WHERE id = canonical_id;
 --   SELECT business_id INTO v_dupe_business      FROM branches WHERE id = dupe_id;
@@ -2838,33 +2856,20 @@ WHERE branch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id 
 --     RAISE EXCEPTION 'canonical_id and dupe_id are the same';
 --   END IF;
 --
---   UPDATE users        SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE employees    SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE customers    SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE rooms        SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE home_services SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE advance_bookings SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE active_services  SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE transactions     SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE appointments     SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE notifications    SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE attendance            SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE shift_schedules       SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE time_off_requests     SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE cash_advance_requests SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE expense_requests      SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE incident_reports      SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE products              SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE stock_movements       SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE product_consumption   SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE suppliers             SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE purchase_orders       SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE expenses              SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE gift_certificates     SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE cash_drawer_sessions  SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE cash_drawer_shifts    SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE activity_logs    SET branch_id = canonical_id WHERE branch_id = dupe_id;
---   UPDATE loyalty_history  SET branch_id = canonical_id WHERE branch_id = dupe_id;
+--   SELECT array_agg(c.table_name ORDER BY c.table_name)
+--     INTO branch_tables
+--   FROM information_schema.columns c
+--   WHERE c.table_schema = 'public'
+--     AND c.column_name  = 'branch_id'
+--     AND c.data_type    = 'uuid'
+--     AND c.table_name  <> 'branches';
+--
+--   FOREACH t IN ARRAY COALESCE(branch_tables, ARRAY[]::text[]) LOOP
+--     EXECUTE format(
+--       'UPDATE %I SET branch_id = $1 WHERE branch_id = $2',
+--       t
+--     ) USING canonical_id, dupe_id;
+--   END LOOP;
 --
 --   DELETE FROM branches WHERE id = dupe_id;
 --   RAISE NOTICE 'Manual merge done: % -> %', dupe_id, canonical_id;
@@ -4323,6 +4328,30 @@ ALTER TABLE public.attendance ADD COLUMN IF NOT EXISTS clocked_in_by_role  TEXT;
 ALTER TABLE public.attendance ADD COLUMN IF NOT EXISTS clocked_out_by      TEXT;
 ALTER TABLE public.attendance ADD COLUMN IF NOT EXISTS clocked_out_by_id   UUID REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public.attendance ADD COLUMN IF NOT EXISTS clocked_out_by_role TEXT;
+
+
+-- ============================================================================
+-- MIGRATION: 20260515120000_add_pull_indexes_for_sync.sql
+-- ----------------------------------------------------------------------------
+-- Covering indexes for SupabaseSyncManager._pullChanges. The sync manager
+-- pulls each table as `WHERE business_id=$1 AND updated_at>$2 ORDER BY
+-- updated_at DESC LIMIT 1000`. Without (business_id, updated_at DESC),
+-- Postgres falls back to the business_id-only index plus an in-memory sort,
+-- or a full table scan on the unfiltered fallback path. pg_stat_statements
+-- flagged the unfiltered attendance pull as ~20% of total DB time before
+-- this fix. Restricted to high-volume tables that actually have updated_at.
+-- ============================================================================
+CREATE INDEX IF NOT EXISTS idx_attendance_business_id_updated_at
+  ON public.attendance (business_id, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_business_id_updated_at
+  ON public.transactions (business_id, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_online_bookings_business_id_updated_at
+  ON public.online_bookings (business_id, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_transport_requests_business_id_updated_at
+  ON public.transport_requests (business_id, updated_at DESC);
 
 
 -- ============================================================================

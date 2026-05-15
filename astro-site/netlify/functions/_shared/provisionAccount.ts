@@ -64,6 +64,11 @@ export async function provisionAccount({ session, spaAppBaseUrl }: ProvisionInpu
       city: extractCity(session.business_address),
     });
 
+    // Step 4b: default settings (business hours, booking capacity, hero
+    // defaults) so the BookingPage renders intentionally on first visit
+    // without the owner needing to touch Settings first.
+    await insertDefaultSettings({ businessId: business.id });
+
     // Step 5: subscription
     const periodStart = new Date();
     const periodEnd = new Date(periodStart.getTime() + ONE_MONTH_MS);
@@ -189,15 +194,71 @@ interface InsertBranchesArgs {
 
 async function insertBranches({ businessId, count, city }: InsertBranchesArgs) {
   const supabase = getAdminClient();
+  // BookingPage resolves a branch from the URL with `b.slug === branchSlug`
+  // (BookingPage.jsx around line 522). If we don't stamp slug here, the
+  // legacy /book/<biz>/<branch> redirect can't pick the right branch and
+  // the in-page branch selector also has no stable handle to filter by.
   const rows = Array.from({ length: count }, (_, i) => ({
     business_id: businessId,
     name: count === 1 ? DEFAULT_BRANCH_NAME : `Branch ${i + 1}`,
+    slug: count === 1 ? 'main' : `branch-${i + 1}`,
     city,
     is_active: true,
     display_order: i + 1,
   }));
   const { error } = await supabase.from('branches').insert(rows);
   if (error) throw new Error(`Branch insert failed: ${error.message}`);
+}
+
+interface InsertDefaultSettingsArgs {
+  businessId: string;
+}
+
+// Seed the rows that the spa-app's owner-side flow normally upserts the
+// first time the Owner saves their booking config (Settings.jsx). Without
+// these, the BookingPage falls back to JS defaults — which works but
+// looks empty (no hours surface, no hero copy). Seeding makes the page
+// look intentional from minute zero.
+async function insertDefaultSettings({ businessId }: InsertDefaultSettingsArgs) {
+  const supabase = getAdminClient();
+
+  const defaultBusinessHours = {
+    monday:    { isOpen: true, open: '09:00', close: '21:00' },
+    tuesday:   { isOpen: true, open: '09:00', close: '21:00' },
+    wednesday: { isOpen: true, open: '09:00', close: '21:00' },
+    thursday:  { isOpen: true, open: '09:00', close: '21:00' },
+    friday:    { isOpen: true, open: '09:00', close: '21:00' },
+    saturday:  { isOpen: true, open: '09:00', close: '21:00' },
+    sunday:    { isOpen: true, open: '10:00', close: '20:00' },
+  };
+
+  const rows = [
+    { key: 'businessHours',         value: JSON.stringify(defaultBusinessHours) },
+    { key: 'bookingCapacity',       value: '14' },
+    { key: 'bookingWindowMinutes',  value: '90' },
+    // Hero / footer defaults so the booking page header looks intentional
+    // even before the owner customises it.
+    { key: 'heroTextEnabled',       value: 'true' },
+    { key: 'heroLogoEnabled',       value: 'false' },
+    { key: 'heroFont',              value: "'Playfair Display', serif" },
+    { key: 'heroFontColor',         value: '#ffffff' },
+    { key: 'heroFontSize',          value: 'default' },
+    { key: 'heroAnimation',         value: 'fadeIn' },
+    { key: 'heroAnimDelay',         value: '0' },
+    { key: 'heroAnimDuration',      value: 'default' },
+    { key: 'heroTextX',             value: '50' },
+    { key: 'heroTextY',             value: '50' },
+  ].map((r) => ({ business_id: businessId, key: r.key, value: r.value }));
+
+  const { error } = await supabase.from('settings').upsert(rows, {
+    onConflict: 'business_id,key',
+    ignoreDuplicates: false,
+  });
+  // Best-effort — settings seeding shouldn't block provisioning. The
+  // spa-app already tolerates missing rows via its useState defaults.
+  if (error) {
+    console.warn('[provisionAccount] Default settings seed failed (non-fatal):', error.message);
+  }
 }
 
 interface InsertSubscriptionArgs {

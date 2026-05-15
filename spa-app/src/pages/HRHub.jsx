@@ -9,6 +9,7 @@ import Payroll from './Payroll';
 import EmployeeAccounts from './EmployeeAccounts';
 import HRRequests from './HRRequests';
 import ShiftSchedules from './ShiftSchedules';
+import PlanLock, { usePlanGate } from '../components/PlanLock';
 import OTRequestRepository from '../services/storage/repositories/OTRequestRepository';
 import LeaveRequestRepository from '../services/storage/repositories/LeaveRequestRepository';
 import CashAdvanceRequestRepository from '../services/storage/repositories/CashAdvanceRequestRepository';
@@ -24,6 +25,11 @@ const HRHub = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'employees';
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Multi-user accounts require Advance tier. Compute the gate once so the
+  // tab strip, the header "+ Create Account" button, and the content render
+  // all share the same locked state and toast copy.
+  const accountsGate = usePlanGate('advance');
 
   // Refs to access child component functions
   const employeesOpenCreateRef = useRef(null);
@@ -205,8 +211,8 @@ const HRHub = () => {
                 </button>
               </>
             )}
-            {/* Accounts Tab Button */}
-            {activeTab === 'accounts' && (isOwner() || isManager() || isBranchOwner()) && (
+            {/* Accounts Tab Button — hidden on Starter; the tab is locked. */}
+            {activeTab === 'accounts' && (isOwner() || isManager() || isBranchOwner()) && !accountsGate.locked && (
               <button
                 className="btn btn-primary"
                 onClick={() => accountsOpenCreateRef.current?.()}
@@ -219,20 +225,33 @@ const HRHub = () => {
 
         {/* Tab Navigation */}
         <div className="sales-tabs">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              className={`sales-tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => handleTabChange(tab.id)}
-            >
-              <span>{tab.label}</span>
-              {tab.badge && (
-                <span className={`sales-tab-badge ${tab.badgeType || ''}`}>
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          ))}
+          {tabs.map(tab => {
+            const tabButton = (
+              <button
+                key={tab.id}
+                className={`sales-tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => handleTabChange(tab.id)}
+              >
+                <span>{tab.label}</span>
+                {tab.badge && (
+                  <span className={`sales-tab-badge ${tab.badgeType || ''}`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+            // Accounts tab is Advance+ only. Wrap with PlanLock so Starter
+            // tenants see the same dim + 🔒 Upgrade badge + hover tooltip
+            // pattern used on the Pahatid button in MainLayout.
+            if (tab.id === 'accounts' && accountsGate.locked) {
+              return (
+                <PlanLock key={tab.id} requiredTier="advance" inline>
+                  {tabButton}
+                </PlanLock>
+              );
+            }
+            return tabButton;
+          })}
         </div>
       </div>
 
@@ -244,7 +263,31 @@ const HRHub = () => {
         {activeTab === 'requests' && <HRRequests embedded onDataChange={loadStats} />}
         {activeTab === 'payroll' && <Payroll embedded onDataChange={loadStats} onCalculateRef={payrollCalculateRef} onRemittancesRef={payrollRemittancesRef} onPayslipsRef={payrollPayslipsRef} onSaveRef={payrollSaveRef} />}
         {activeTab === 'saved-payrolls' && <SavedPayrollsTabContent />}
-        {activeTab === 'accounts' && (isOwner() || isManager() || isBranchOwner()) && <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />}
+        {activeTab === 'accounts' && (isOwner() || isManager() || isBranchOwner()) && (
+          accountsGate.locked ? (
+            // Starter tenants can land here via ?tab=accounts URL even though
+            // the tab button is click-blocked by PlanLock. Render a parallel
+            // locked notice instead of leaking the real Accounts UI.
+            <div style={{
+              padding: '3rem 1.5rem',
+              textAlign: 'center',
+              color: '#6b7280',
+              maxWidth: 480,
+              margin: '0 auto',
+            }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔒</div>
+              <h3 style={{ margin: '0 0 0.5rem', color: '#1f2937' }}>
+                Multi-user accounts are an Advance feature
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.95rem' }}>
+                {accountsGate.message} Starter is Owner-only — upgrade to
+                Advance or Enterprise to create additional staff logins.
+              </p>
+            </div>
+          ) : (
+            <EmployeeAccounts embedded onDataChange={loadStats} onOpenCreateRef={accountsOpenCreateRef} />
+          )
+        )}
       </div>
     </div>
   );

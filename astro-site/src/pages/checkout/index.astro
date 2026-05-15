@@ -121,7 +121,7 @@ const plans = {
           <!-- Terms -->
           <label class="flex items-start gap-3 mb-7 cursor-pointer">
             <input type="checkbox" name="terms" required class="mt-1 w-4 h-4 accent-emerald-brand"/>
-            <span class="text-[0.86rem] text-muted leading-relaxed">I agree to the <a href="#" class="text-emerald-brand hover:underline">Terms of Service</a> and <a href="#" class="text-emerald-brand hover:underline">Privacy Policy</a>.</span>
+            <span class="text-[0.86rem] text-muted leading-relaxed">I agree to the <button type="button" data-open-legal="terms" class="text-emerald-brand hover:underline cursor-pointer">Terms of Service</button> and <button type="button" data-open-legal="privacy" class="text-emerald-brand hover:underline cursor-pointer">Privacy Policy</button>.</span>
           </label>
 
           <!-- Submit -->
@@ -180,6 +180,156 @@ const plans = {
       </div>
     </div>
   </section>
+
+  <!-- ========================================================== -->
+  <!-- LEGAL MODALS: Terms of Service + Privacy Policy             -->
+  <!-- ========================================================== -->
+  <!-- Hidden by default; opened by the [data-open-legal] buttons  -->
+  <!-- in the checkout consent line. The same markup is used for   -->
+  <!-- both — only the inner content panel switches via id.        -->
+
+  <div id="legalModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="legalModalTitle">
+    <div class="bg-ivory border border-border-soft rounded-2xl shadow-lg-spa w-full max-w-[760px] max-h-[88vh] flex flex-col overflow-hidden relative">
+      <!-- Header -->
+      <div class="flex items-center justify-between gap-3 px-7 py-5 border-b border-border-soft bg-white">
+        <div>
+          <span class="eyebrow inline-block mb-1.5" id="legalModalEyebrow">Legal</span>
+          <h2 id="legalModalTitle" class="font-serif text-[1.5rem] text-emerald-deep font-semibold tracking-tight m-0">Terms of Service</h2>
+        </div>
+        <button type="button" id="legalModalClose" aria-label="Close" class="w-9 h-9 rounded-full border border-border-soft bg-white hover:bg-ivory text-muted hover:text-ink transition-colors flex items-center justify-center text-[1.1rem] leading-none flex-shrink-0">×</button>
+      </div>
+
+      <!-- Scrollable body — content swapped based on which link was clicked -->
+      <div class="flex-1 overflow-y-auto px-7 py-6">
+
+        <!-- TERMS OF SERVICE -->
+        <article id="legalContent-terms" class="legal-prose text-[0.92rem] leading-relaxed text-ink hidden">
+          <p class="text-[0.78rem] uppercase tracking-wider text-muted font-semibold mb-4">Last updated: May 2026</p>
+          <p class="mb-4">These Terms of Service (the <strong>"Terms"</strong>) govern your access to and use of the AVA Spa Central platform (the <strong>"Service"</strong>) operated by <strong>AVA Solutions PH</strong> (<strong>"AVA"</strong>, <strong>"we"</strong>, <strong>"us"</strong>). By creating an account or paying for a subscription, you (<strong>"Customer"</strong>) agree to be bound by these Terms. If you do not agree, do not use the Service.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">1. The Service</h3>
+          <p class="mb-3">AVA Spa Central is a cloud-based spa-management platform that provides booking, point-of-sale, inventory, payroll, customer management, analytics, and related operational tooling for spa businesses in the Philippines. Features available to your account are determined by the subscription plan tier you select (Starter, Advance, or Enterprise).</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">2. Accounts and authorised users</h3>
+          <p class="mb-3">You are responsible for the accuracy of the information provided at sign-up, for safeguarding your password and any access tokens, and for all activity that occurs under your account. The Starter plan permits one (1) Owner login only; Advance and Enterprise permit multiple staff logins as configured by the Owner. You must notify us immediately at <a href="mailto:hello@avaspacentral.com" class="text-emerald-brand underline">hello@avaspacentral.com</a> of any unauthorised access.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">3. Subscription, billing, and renewal</h3>
+          <p class="mb-3">Subscriptions are billed monthly in advance in Philippine Pesos at the rate displayed at checkout. Payment is processed by our payment partner, NextPay. By subscribing you authorise AVA (via NextPay) to charge the payment method on file on each renewal date until the subscription is cancelled. Promotional rates (including the 50% launch promo) apply only for the period stated at checkout and revert to the regular rate thereafter unless we agree otherwise in writing.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">4. Cancellation and refunds</h3>
+          <p class="mb-3">You may cancel your subscription at any time from your account or by writing to <a href="mailto:hello@avaspacentral.com" class="text-emerald-brand underline">hello@avaspacentral.com</a>. Cancellation takes effect at the end of the current billing period and access continues until that date. Except where required by law, fees already paid are non-refundable. We do not pro-rate partial months.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">5. Plan limits and upgrades</h3>
+          <p class="mb-3">Each plan tier carries explicit limits — including, but not limited to, the maximum number of branches and staff login accounts. Exceeding a limit requires an upgrade to a higher tier; AVA reserves the right to refuse the creation of additional branches or accounts beyond the limit of the active plan.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">6. Your data</h3>
+          <p class="mb-3">All customer records, bookings, transactions, inventory, and other content you upload or generate through the Service (your <strong>"Business Data"</strong>) remain your property. You grant AVA a limited licence to host, process, and back up your Business Data solely to deliver the Service. We handle personal information in accordance with our <button type="button" data-open-legal="privacy" class="text-emerald-brand underline cursor-pointer">Privacy Policy</button> and the Philippine Data Privacy Act of 2012 (RA 10173).</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">7. Acceptable use</h3>
+          <p class="mb-3">You agree not to (a) use the Service to send spam, malware, or unlawful content; (b) attempt to reverse-engineer, scrape, or disrupt the Service or its infrastructure; (c) resell or sublicense access without our written consent; or (d) use the Service in violation of any applicable Philippine law including data privacy, consumer protection, and labor regulations.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">8. Availability and changes</h3>
+          <p class="mb-3">We target high availability but do not guarantee uninterrupted service. Scheduled maintenance, force majeure, and third-party outages (e.g. Supabase, NextPay) may cause temporary downtime. We may add, modify, or remove features at any time; material changes that disadvantage paying customers will be communicated at least fourteen (14) days in advance.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">9. Disclaimers and limitation of liability</h3>
+          <p class="mb-3">The Service is provided "as is" and "as available" without warranties of any kind, express or implied. To the maximum extent permitted by Philippine law, AVA's aggregate liability for any claim arising out of or related to these Terms is limited to the fees the Customer paid to AVA in the twelve (12) months preceding the event giving rise to the claim. We are not liable for indirect, incidental, consequential, or lost-profits damages.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">10. Termination by AVA</h3>
+          <p class="mb-3">We may suspend or terminate your account, with notice where practicable, if you (a) fail to pay fees when due, (b) violate these Terms, or (c) engage in conduct that puts the Service, other customers, or third parties at risk. Upon termination you may request an export of your Business Data within thirty (30) days, after which we may delete it.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">11. Governing law and disputes</h3>
+          <p class="mb-3">These Terms are governed by the laws of the Republic of the Philippines. The parties shall first attempt to resolve any dispute in good faith. Failing that, the courts of the City of Manila shall have exclusive jurisdiction, without prejudice to either party's right to seek interim relief in any competent court.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">12. Changes to these Terms</h3>
+          <p class="mb-3">We may update these Terms from time to time. Continued use of the Service after the effective date of an update constitutes acceptance. We will notify active subscribers of material changes by email at the address on file.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">13. Contact</h3>
+          <p class="mb-2">Questions about these Terms? Reach us at <a href="mailto:hello@avaspacentral.com" class="text-emerald-brand underline">hello@avaspacentral.com</a>.</p>
+        </article>
+
+        <!-- PRIVACY POLICY -->
+        <article id="legalContent-privacy" class="legal-prose text-[0.92rem] leading-relaxed text-ink hidden">
+          <p class="text-[0.78rem] uppercase tracking-wider text-muted font-semibold mb-4">Last updated: May 2026</p>
+          <p class="mb-4">This Privacy Policy explains how <strong>AVA Solutions PH</strong> (<strong>"AVA"</strong>, <strong>"we"</strong>) collects, uses, shares, and protects personal information when you sign up for or use AVA Spa Central. We comply with the <strong>Philippine Data Privacy Act of 2012 (RA 10173)</strong>, its Implementing Rules and Regulations, and applicable issuances of the National Privacy Commission.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">1. Who we are</h3>
+          <p class="mb-3">AVA acts as the <strong>Personal Information Controller</strong> for account-holder data (the Owner who signs up) and as the <strong>Personal Information Processor</strong> for any personal data the Owner uploads about employees, customers, or other third parties through the Service.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">2. Information we collect</h3>
+          <ul class="list-disc pl-5 space-y-1.5 mb-3">
+            <li><strong>Account data:</strong> email, password (hashed), owner name, mobile number, business name and address.</li>
+            <li><strong>Billing data:</strong> plan tier, amount paid, payment-method type, NextPay transaction reference. We do <em>not</em> store full card numbers — these stay with NextPay.</li>
+            <li><strong>Business Data:</strong> records you create inside the platform (customers, employees, bookings, transactions, payroll, inventory).</li>
+            <li><strong>Usage data:</strong> log-in events, IP address, device/browser metadata, error reports, and analytics events used to operate and improve the Service.</li>
+          </ul>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">3. How and why we use it</h3>
+          <p class="mb-2">We process personal information to:</p>
+          <ul class="list-disc pl-5 space-y-1.5 mb-3">
+            <li>Provide, maintain, and improve the Service (legal basis: performance of contract);</li>
+            <li>Process subscription payments and prevent fraud (contract; legitimate interest);</li>
+            <li>Send service-related notices, receipts, and security alerts (contract; legal obligation);</li>
+            <li>Respond to support requests and customer enquiries (consent; legitimate interest);</li>
+            <li>Comply with tax, accounting, and other Philippine legal obligations.</li>
+          </ul>
+          <p class="mb-3">We do <strong>not</strong> sell personal information and we do <strong>not</strong> use your Business Data to train AI models for third parties.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">4. Sharing with third parties</h3>
+          <p class="mb-2">We share personal information only with the following categories of recipients, under written data-protection terms:</p>
+          <ul class="list-disc pl-5 space-y-1.5 mb-3">
+            <li><strong>Supabase</strong> — database hosting and authentication;</li>
+            <li><strong>NextPay</strong> — subscription billing and payments;</li>
+            <li><strong>Netlify</strong> — web hosting for the marketing site and serverless functions;</li>
+            <li><strong>Email and notification providers</strong> — to deliver transactional messages;</li>
+            <li><strong>Government authorities</strong> — when required by Philippine law, valid subpoena, or NPC directive.</li>
+          </ul>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">5. Cross-border transfer</h3>
+          <p class="mb-3">Some of our service providers (e.g. Supabase, Netlify) host data outside the Philippines. We rely on contractual safeguards and the providers' own data-protection commitments to ensure your information receives a comparable level of protection.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">6. Retention</h3>
+          <p class="mb-3">We retain account and Business Data for as long as your subscription is active. After cancellation we retain your data for up to thirty (30) days to allow you to export it, then delete or anonymise it — except where a longer retention period is required by law (e.g. tax records, ten (10) years under the National Internal Revenue Code).</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">7. Your rights under the Data Privacy Act</h3>
+          <p class="mb-2">As a data subject you have the right to:</p>
+          <ul class="list-disc pl-5 space-y-1.5 mb-3">
+            <li>Be informed about how your data is processed;</li>
+            <li>Access a copy of your personal information;</li>
+            <li>Have inaccurate data corrected;</li>
+            <li>Erase or block data that is incomplete, outdated, false, or unlawfully obtained;</li>
+            <li>Object to or withdraw consent for processing where consent is the legal basis;</li>
+            <li>Receive your data in a structured, commonly-used format (portability);</li>
+            <li>Lodge a complaint with the National Privacy Commission (<a href="https://www.privacy.gov.ph/" target="_blank" rel="noopener noreferrer" class="text-emerald-brand underline">privacy.gov.ph</a>).</li>
+          </ul>
+          <p class="mb-3">To exercise any of these rights, email <a href="mailto:hello@avaspacentral.com" class="text-emerald-brand underline">hello@avaspacentral.com</a>. We respond within fifteen (15) business days.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">8. Security</h3>
+          <p class="mb-3">We implement organisational, physical, and technical safeguards including: encrypted-in-transit traffic (TLS), encryption at rest for database storage, role-based access control, multi-tenant isolation enforced by Row-Level Security, audit logging, scheduled backups, and least-privilege access for AVA personnel. No system is perfectly secure; we will notify affected users and the NPC of any personal-data breach in accordance with NPC Circular 16-03.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">9. Cookies and similar technologies</h3>
+          <p class="mb-3">The marketing site and dashboard use strictly-necessary cookies (session, authentication, CSRF) and, where permitted, analytics cookies to understand usage patterns. You can disable non-essential cookies in your browser; doing so may impact functionality.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">10. Children</h3>
+          <p class="mb-3">The Service is not directed at children under sixteen (16). We do not knowingly collect personal information from children. If you believe we have, please contact us so we can delete it.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">11. Changes</h3>
+          <p class="mb-3">We may update this Policy from time to time. Material changes will be announced by email and posted on the marketing site at least fourteen (14) days before they take effect.</p>
+
+          <h3 class="font-serif text-emerald-deep text-[1.05rem] font-semibold mt-6 mb-2">12. Contact and Data Protection Officer</h3>
+          <p class="mb-2">For privacy questions, complaints, or to exercise your data-subject rights:</p>
+          <p class="mb-1"><strong>AVA Solutions PH — Data Protection Officer</strong></p>
+          <p class="mb-1">Email: <a href="mailto:hello@avaspacentral.com" class="text-emerald-brand underline">hello@avaspacentral.com</a></p>
+          <p class="mb-3">You may also contact the National Privacy Commission at <a href="mailto:complaints@privacy.gov.ph" class="text-emerald-brand underline">complaints@privacy.gov.ph</a>.</p>
+        </article>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-end gap-3 px-7 py-4 border-t border-border-soft bg-white">
+        <button type="button" data-close-legal class="btn btn-primary px-6">I've read this</button>
+      </div>
+    </div>
+  </div>
 
 </Layout>
 
@@ -335,5 +485,66 @@ const plans = {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Continue to Payment →';
     }
+  });
+
+  // ----- Legal modal open/close ------------------------------------------
+  // Two-panel modal that shows either the Terms or the Privacy article
+  // depending on which link was clicked. Body scroll is locked while the
+  // modal is open so the long legal text scrolls inside the dialog instead
+  // of doubling the scroll surface with the page underneath.
+  const legalModal = document.getElementById('legalModal');
+  const legalTitle = document.getElementById('legalModalTitle');
+  const legalEyebrow = document.getElementById('legalModalEyebrow');
+  const legalPanels = {
+    terms:   document.getElementById('legalContent-terms'),
+    privacy: document.getElementById('legalContent-privacy'),
+  };
+  const LEGAL_META = {
+    terms:   { title: 'Terms of Service', eyebrow: 'Legal · Subscriber Agreement' },
+    privacy: { title: 'Privacy Policy',   eyebrow: 'Legal · Data Privacy Act 2012' },
+  };
+
+  function openLegal(kind) {
+    if (!legalPanels[kind]) return;
+    Object.values(legalPanels).forEach((el) => el && el.classList.add('hidden'));
+    legalPanels[kind].classList.remove('hidden');
+    legalTitle.textContent = LEGAL_META[kind].title;
+    legalEyebrow.textContent = LEGAL_META[kind].eyebrow;
+    legalModal.classList.remove('hidden');
+    legalModal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    // Scroll the dialog body back to the top each time it opens.
+    const body = legalModal.querySelector('.overflow-y-auto');
+    if (body) body.scrollTop = 0;
+  }
+
+  function closeLegal() {
+    legalModal.classList.add('hidden');
+    legalModal.classList.remove('flex');
+    document.body.style.overflow = '';
+  }
+
+  // Delegated open: matches the inline checkout consent line AND the
+  // "Privacy Policy" cross-link embedded inside the Terms article.
+  document.addEventListener('click', (e) => {
+    const opener = e.target instanceof Element && e.target.closest('[data-open-legal]');
+    if (opener) {
+      e.preventDefault();
+      openLegal(opener.getAttribute('data-open-legal'));
+    }
+    const closer = e.target instanceof Element && e.target.closest('[data-close-legal]');
+    if (closer || e.target === document.getElementById('legalModalClose')) {
+      closeLegal();
+    }
+  });
+
+  // Close on backdrop click (target IS the modal overlay itself, not a child)
+  legalModal.addEventListener('click', (e) => {
+    if (e.target === legalModal) closeLegal();
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !legalModal.classList.contains('hidden')) closeLegal();
   });
 </script>

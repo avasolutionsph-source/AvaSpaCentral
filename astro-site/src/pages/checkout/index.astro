@@ -1,6 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 
+const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
+
 const plans = {
   starter: {
     slug: 'starter',
@@ -186,7 +188,7 @@ const plans = {
 
 </Layout>
 
-<script is:inline define:vars={{ plans }}>
+<script is:inline define:vars={{ plans, spaAppUrl }}>
   const params = new URLSearchParams(window.location.search);
   const slug = params.get('plan');
   const plan = plans[slug] || plans.advance;
@@ -249,9 +251,14 @@ const plans = {
       const result = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        passwordError.textContent = result?.detail
-          ? `Sign-up error: ${result.detail}`
-          : 'Could not start checkout. Please try again.';
+        if (result?.error === 'email_already_registered') {
+          const loginHref = (spaAppUrl || '').replace(/\/$/, '') + '/login';
+          passwordError.innerHTML = `May AVA account na sa email na ito. <a href="${loginHref}" class="underline">Mag-login na lang →</a>`;
+        } else {
+          passwordError.textContent = result?.detail
+            ? `Sign-up error: ${result.detail}`
+            : 'Could not start checkout. Please try again.';
+        }
         passwordError.classList.remove('hidden');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Continue to Payment →';

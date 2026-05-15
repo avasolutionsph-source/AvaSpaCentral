@@ -38,13 +38,30 @@ export const handler: Handler = async (event) => {
   if (validation) return jsonResponse(400, { error: 'invalid_input', detail: validation });
 
   const supabase = getAdminClient();
+  const normalizedEmail = payload.email.trim().toLowerCase();
+
+  // Block the easy footgun: a customer who already has a provisioned tenant
+  // shouldn't be able to start *another* paid checkout under the same email.
+  // Auth signup would fail anyway, but only after payment — way too late.
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+  if (existingUser) {
+    return jsonResponse(409, {
+      error: 'email_already_registered',
+      detail: 'May AVA account na sa email na ito. Mag-login na lang sa /login imbes na magbayad ulit.',
+    });
+  }
+
   const token = generateToken();
 
   const { data, error } = await supabase
     .from('checkout_sessions')
     .insert({
       token,
-      email: payload.email.trim().toLowerCase(),
+      email: normalizedEmail,
       password_temp: payload.password,
       business_name: payload.businessName.trim(),
       business_address: payload.businessAddress?.trim() || null,

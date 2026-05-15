@@ -44,9 +44,14 @@ export const handler: Handler = async (event) => {
     if (business?.booking_slug && spaAppBaseUrl) {
       bookingSlug = business.booking_slug;
       bookingUrl = `${stripSlash(spaAppBaseUrl)}/book/${business.booking_slug}`;
-      const params = new URLSearchParams({ email: data.email, business: data.business_name });
-      installUrl = `${stripSlash(spaAppBaseUrl)}/install?${params.toString()}`;
-      loginUrl = `${stripSlash(spaAppBaseUrl)}/login`;
+      const installParams = new URLSearchParams({
+        email: data.email,
+        business: data.business_name,
+        book: business.booking_slug,
+      });
+      installUrl = `${stripSlash(spaAppBaseUrl)}/install?${installParams.toString()}`;
+      const loginParams = new URLSearchParams({ email: data.email });
+      loginUrl = `${stripSlash(spaAppBaseUrl)}/login?${loginParams.toString()}`;
     }
     // Compute a fresh next-billing as 30 days from now if subscription has the period stored.
     const { data: sub } = await supabase

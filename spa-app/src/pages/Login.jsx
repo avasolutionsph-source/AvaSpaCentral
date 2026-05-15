@@ -13,16 +13,31 @@ const Login = () => {
   const { login, showToast, getFirstPage, selectedBranch } = useApp();
 
   const [formData, setFormData] = useState(() => {
+    // URL query (?email=) takes precedence: it arrives from the marketing-
+    // site welcome flow and overrides any stale Remember-Me cache from a
+    // previous device user.
+    let prefillFromUrl = '';
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        prefillFromUrl = params.get('email') || params.get('username') || '';
+      }
+    } catch {
+      // bad URL — ignore
+    }
+
     let savedUsername = '';
     try {
       savedUsername = localStorage.getItem(REMEMBER_USERNAME_KEY) || '';
     } catch {
       // localStorage blocked (private mode, quota) — fall back to blank form
     }
+
+    const initialUsername = prefillFromUrl || savedUsername;
     return {
-      username: savedUsername,
+      username: initialUsername,
       password: '',
-      rememberMe: !!savedUsername,
+      rememberMe: !!initialUsername,
     };
   });
 

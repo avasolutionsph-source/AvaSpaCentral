@@ -99,7 +99,12 @@ CREATE INDEX IF NOT EXISTS idx_checkout_sessions_payment_intent
 ALTER TABLE checkout_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Deny direct access from anon + authenticated; only service-role bypasses
--- RLS, which is what the Netlify Functions use.
+-- RLS, which is what the Netlify Functions use. Drop-then-create so a
+-- partial re-run (interrupted SQL Editor session) doesn't trip on
+-- "policy already exists".
+DROP POLICY IF EXISTS checkout_sessions_no_client_read ON checkout_sessions;
+DROP POLICY IF EXISTS checkout_sessions_no_client_write ON checkout_sessions;
+
 CREATE POLICY checkout_sessions_no_client_read ON checkout_sessions
   FOR SELECT USING (false);
 CREATE POLICY checkout_sessions_no_client_write ON checkout_sessions
@@ -152,6 +157,9 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_status_renewal
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 
 -- Owners + Managers can read their business's subscription. No client writes.
+DROP POLICY IF EXISTS subscriptions_select_own ON subscriptions;
+DROP POLICY IF EXISTS subscriptions_no_client_write ON subscriptions;
+
 CREATE POLICY subscriptions_select_own ON subscriptions
   FOR SELECT
   USING (business_id = (SELECT business_id FROM users WHERE auth_id = (SELECT auth.uid()) LIMIT 1));

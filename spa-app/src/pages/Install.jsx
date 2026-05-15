@@ -6,7 +6,7 @@
  * to the employee sign-in screen.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 const Install = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -20,6 +20,40 @@ const Install = () => {
   // renders it in the TOP-RIGHT. The arrow direction follows.
   const [isIpad, setIsIpad] = useState(false);
   const [installState, setInstallState] = useState('idle'); // 'idle' | 'prompting' | 'accepted' | 'dismissed'
+  const [copyState, setCopyState] = useState({});
+
+  // Welcome context from the marketing-site success page link. When a new
+  // owner clicks "Install AVA App" right after paying, we get their email,
+  // business name, and booking slug as query params and render the page
+  // as a personalised welcome screen with their three customer-facing
+  // assets (booking URL, login link, install button). Returns null for
+  // employees who navigate directly to /install — they see the plain page.
+  const welcomeCtx = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const business = params.get('business');
+    const email = params.get('email');
+    const book = params.get('book');
+    if (!business && !email && !book) return null;
+    const origin = window.location.origin;
+    const bookingUrl = book ? `${origin}/book/${book}` : null;
+    const loginUrl = email
+      ? `${origin}/login?email=${encodeURIComponent(email)}`
+      : `${origin}/login`;
+    return { business, email, book, bookingUrl, loginUrl };
+  }, []);
+
+  const copyToClipboard = async (key, text) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyState((prev) => ({ ...prev, [key]: 'copied' }));
+      setTimeout(() => setCopyState((prev) => ({ ...prev, [key]: undefined })), 1500);
+    } catch {
+      setCopyState((prev) => ({ ...prev, [key]: 'failed' }));
+      setTimeout(() => setCopyState((prev) => ({ ...prev, [key]: undefined })), 1500);
+    }
+  };
 
   useEffect(() => {
     if (window.matchMedia('(display-mode: standalone)').matches) {
@@ -90,12 +124,89 @@ const Install = () => {
     },
     card: {
       background: '#fff',
-      maxWidth: '480px',
+      maxWidth: welcomeCtx ? '560px' : '480px',
       width: '100%',
       borderRadius: '16px',
       padding: '32px 28px',
       boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
       textAlign: 'center',
+    },
+    welcomeBadge: {
+      display: 'inline-block',
+      fontSize: '11px',
+      fontWeight: 700,
+      letterSpacing: '1.2px',
+      textTransform: 'uppercase',
+      color: '#C99A3A',
+      background: 'rgba(201,154,58,0.12)',
+      padding: '5px 10px',
+      borderRadius: '999px',
+      marginBottom: '10px',
+    },
+    linkRow: {
+      display: 'flex',
+      alignItems: 'stretch',
+      gap: '6px',
+      marginTop: '8px',
+    },
+    linkCode: {
+      flex: 1,
+      background: '#f3f4f6',
+      color: '#1B5E37',
+      padding: '10px 12px',
+      borderRadius: '8px',
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+      fontSize: '12.5px',
+      textAlign: 'left',
+      wordBreak: 'break-all',
+      border: '1px solid #e5e7eb',
+    },
+    copyBtn: {
+      background: '#1B5E37',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '8px',
+      padding: '0 14px',
+      fontSize: '12.5px',
+      fontWeight: 600,
+      cursor: 'pointer',
+    },
+    welcomePanel: {
+      textAlign: 'left',
+      background: '#f0fdf4',
+      border: '1px solid #bbf7d0',
+      borderRadius: '12px',
+      padding: '16px 18px',
+      marginBottom: '18px',
+    },
+    welcomePanelTitle: {
+      margin: '0 0 4px',
+      fontSize: '13px',
+      fontWeight: 700,
+      color: '#1B5E37',
+      textTransform: 'uppercase',
+      letterSpacing: '0.8px',
+    },
+    welcomePanelHint: {
+      margin: '0 0 6px',
+      fontSize: '13px',
+      color: '#374151',
+      lineHeight: 1.5,
+    },
+    loginCta: {
+      display: 'block',
+      width: '100%',
+      background: '#C99A3A',
+      color: '#1B5E37',
+      border: 'none',
+      borderRadius: '10px',
+      padding: '11px 14px',
+      fontSize: '14px',
+      fontWeight: 700,
+      cursor: 'pointer',
+      textDecoration: 'none',
+      textAlign: 'center',
+      marginBottom: '14px',
     },
     icon: {
       width: '96px',
@@ -196,14 +307,75 @@ const Install = () => {
           <source srcSet="/pwa-192x192.webp" type="image/webp" />
           <img src="/pwa-192x192.png" alt="AVA Spa Central" style={styles.icon} width="96" height="96" />
         </picture>
-        <h1 style={styles.title}>Install AVA Spa Central</h1>
-        <p style={styles.subtitle}>Employee app for clock-in, POS, and daily operations.</p>
 
-        <div style={styles.body}>
-          I-install ang app sa device mo para mas mabilis ang access at kahit
-          offline ay magagamit. Pag-install, diretso ka sa <strong>Login</strong> screen
-          tuwing bubuksan mo ang app.
-        </div>
+        {welcomeCtx ? (
+          <>
+            <span style={styles.welcomeBadge}>Your Spa is Live</span>
+            <h1 style={styles.title}>
+              Welcome{welcomeCtx.business ? `, ${welcomeCtx.business}` : ''}!
+            </h1>
+            <p style={styles.subtitle}>
+              Salamat sa subscription. Heto ang mga link at app mo — i-save mo
+              muna ang booking URL bago mag-install.
+            </p>
+
+            {welcomeCtx.bookingUrl && (
+              <div style={styles.welcomePanel}>
+                <p style={styles.welcomePanelTitle}>1 · Customer booking page</p>
+                <p style={styles.welcomePanelHint}>
+                  Share mo ito sa customers para mag-book online — Facebook bio,
+                  QR code, posters, lahat pwede.
+                </p>
+                <div style={styles.linkRow}>
+                  <code style={styles.linkCode}>{welcomeCtx.bookingUrl}</code>
+                  <button
+                    type="button"
+                    style={styles.copyBtn}
+                    onClick={() => copyToClipboard('book', welcomeCtx.bookingUrl)}
+                  >
+                    {copyState.book === 'copied' ? '✓' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div style={styles.welcomePanel}>
+              <p style={styles.welcomePanelTitle}>2 · Staff POS login</p>
+              <p style={styles.welcomePanelHint}>
+                Sa'yo at sa team mo — mag-login para sa POS, payroll, bookings,
+                at iba pa. Email mo: <strong>{welcomeCtx.email || '—'}</strong>
+              </p>
+              <a href={welcomeCtx.loginUrl} style={styles.loginCta}>
+                Open Staff POS Login →
+              </a>
+              <div style={styles.linkRow}>
+                <code style={styles.linkCode}>{welcomeCtx.loginUrl}</code>
+                <button
+                  type="button"
+                  style={styles.copyBtn}
+                  onClick={() => copyToClipboard('login', welcomeCtx.loginUrl)}
+                >
+                  {copyState.login === 'copied' ? '✓' : 'Copy'}
+                </button>
+              </div>
+            </div>
+
+            <p style={{ ...styles.welcomePanelTitle, marginTop: '6px', marginBottom: '10px', textAlign: 'left' }}>
+              3 · Install the app on this device
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 style={styles.title}>Install AVA Spa Central</h1>
+            <p style={styles.subtitle}>Employee app for clock-in, POS, and daily operations.</p>
+
+            <div style={styles.body}>
+              I-install ang app sa device mo para mas mabilis ang access at kahit
+              offline ay magagamit. Pag-install, diretso ka sa <strong>Login</strong> screen
+              tuwing bubuksan mo ang app.
+            </div>
+          </>
+        )}
 
         {installed ? (
           <div style={{ ...styles.body, color: '#1B5E37', textAlign: 'center', fontWeight: 600 }}>

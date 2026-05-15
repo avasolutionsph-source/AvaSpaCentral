@@ -90,8 +90,8 @@ export async function provisionAccount({ session, spaAppBaseUrl }: ProvisionInpu
       businessId: business.id,
       bookingSlug,
       bookingUrl: buildBookingUrl(spaAppBaseUrl, bookingSlug),
-      installUrl: buildInstallUrl(spaAppBaseUrl, session.email, session.business_name),
-      loginUrl: buildLoginUrl(spaAppBaseUrl),
+      installUrl: buildInstallUrl(spaAppBaseUrl, session.email, session.business_name, bookingSlug),
+      loginUrl: buildLoginUrl(spaAppBaseUrl, session.email),
       email: session.email,
       businessName: session.business_name,
       planTier: session.plan_tier,
@@ -248,13 +248,14 @@ function buildBookingUrl(base: string, slug: string): string {
   return `${stripTrailingSlash(base)}/book/${slug}`;
 }
 
-function buildInstallUrl(base: string, email: string, businessName: string): string {
-  const params = new URLSearchParams({ email, business: businessName });
+function buildInstallUrl(base: string, email: string, businessName: string, bookingSlug: string): string {
+  const params = new URLSearchParams({ email, business: businessName, book: bookingSlug });
   return `${stripTrailingSlash(base)}/install?${params.toString()}`;
 }
 
-function buildLoginUrl(base: string): string {
-  return `${stripTrailingSlash(base)}/login`;
+function buildLoginUrl(base: string, email: string): string {
+  const params = new URLSearchParams({ email });
+  return `${stripTrailingSlash(base)}/login?${params.toString()}`;
 }
 
 function stripTrailingSlash(url: string): string {
@@ -278,8 +279,8 @@ async function rebuildResultFromExisting(
     businessId: business.id,
     bookingSlug: business.booking_slug,
     bookingUrl: buildBookingUrl(spaAppBaseUrl, business.booking_slug),
-    installUrl: buildInstallUrl(spaAppBaseUrl, session.email, session.business_name),
-    loginUrl: buildLoginUrl(spaAppBaseUrl),
+    installUrl: buildInstallUrl(spaAppBaseUrl, session.email, session.business_name, business.booking_slug),
+    loginUrl: buildLoginUrl(spaAppBaseUrl, session.email),
     email: session.email,
     businessName: session.business_name,
     planTier: business.plan_tier as PlanTier,

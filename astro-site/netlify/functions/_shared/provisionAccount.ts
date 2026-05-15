@@ -232,6 +232,10 @@ async function insertDefaultSettings({ businessId }: InsertDefaultSettingsArgs) 
     sunday:    { isOpen: true, open: '10:00', close: '20:00' },
   };
 
+  // branch_id is NULL — these are business-wide defaults that apply to
+  // every branch. The settings table's unique constraint after migration
+  // 15-settings-branch-scope.sql is (business_id, branch_id, key) with
+  // NULLS NOT DISTINCT, so a fresh tenant gets exactly one row per key.
   const rows = [
     { key: 'businessHours',         value: JSON.stringify(defaultBusinessHours) },
     { key: 'bookingCapacity',       value: '14' },
@@ -248,12 +252,9 @@ async function insertDefaultSettings({ businessId }: InsertDefaultSettingsArgs) 
     { key: 'heroAnimDuration',      value: 'default' },
     { key: 'heroTextX',             value: '50' },
     { key: 'heroTextY',             value: '50' },
-  ].map((r) => ({ business_id: businessId, key: r.key, value: r.value }));
+  ].map((r) => ({ business_id: businessId, branch_id: null, key: r.key, value: r.value }));
 
-  const { error } = await supabase.from('settings').upsert(rows, {
-    onConflict: 'business_id,key',
-    ignoreDuplicates: false,
-  });
+  const { error } = await supabase.from('settings').insert(rows);
   // Best-effort — settings seeding shouldn't block provisioning. The
   // spa-app already tolerates missing rows via its useState defaults.
   if (error) {

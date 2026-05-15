@@ -564,6 +564,22 @@
   border: 1px solid var(--gray-200);
 }
 
+.room-timer-clock {
+  margin-top: var(--spacing-md);
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--gray-600);
+}
+
+.room-timer-clock-missing {
+  font-style: italic;
+  color: var(--gray-500);
+}
+
+.room-timer-clock + .room-timer {
+  margin-top: var(--spacing-xs);
+}
+
 .room-timer.critical {
   background: rgba(239, 68, 68, 0.15);
   color: var(--error);

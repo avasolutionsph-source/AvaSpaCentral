@@ -75,12 +75,29 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
   // subscriber skip the reload for our own writes; remote writes still
   // pass through.
   const selfLocationWritesRef = useRef(new Map());
+  // Last GPS fix actually written to Supabase. Used to suppress
+  // back-to-back writes when the therapist is stationary (waiting at the
+  // door, traffic stop). Stationary therapist used to push 12 identical
+  // PATCH/min per active pickup; now it's a 60s heartbeat instead.
+  const lastWrittenFixRef = useRef(null);
   useLocationTracker({
     active: therapistActivePickupIds.length > 0,
     onFix: useCallback(async ({ lat, lng }) => {
+      // Distance + time gate. Equirectangular meters — accurate at <1km
+      // scale, and we only care about the "stationary vs moving" call.
+      // Skip the write if we haven't moved >=20m AND <60s since last write.
+      const nowMs = Date.now();
+      const last = lastWrittenFixRef.current;
+      if (last) {
+        const dLat = (lat - last.lat) * 111_320;
+        const dLng = (lng - last.lng) * 111_320 * Math.cos((lat * Math.PI) / 180);
+        const meters = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (meters < 20 && (nowMs - last.ts) < 60_000) return;
+      }
+      lastWrittenFixRef.current = { lat, lng, ts: nowMs };
+
       const updatedAt = new Date().toISOString();
-      const now = Date.now();
-      therapistActivePickupIds.forEach(id => selfLocationWritesRef.current.set(id, now));
+      therapistActivePickupIds.forEach(id => selfLocationWritesRef.current.set(id, nowMs));
       await Promise.allSettled(
         therapistActivePickupIds.map(id =>
           homeServicesApi.updateHomeService(id, {
@@ -1603,6 +1620,20 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                   );
                 })()}
 
+                {/* Start/end clock for occupied rooms */}
+                {room.status === 'occupied' && room.startTime && (() => {
+                  const startedAt = new Date(room.startTime);
+                  const endsAt = room.serviceDuration
+                    ? new Date(startedAt.getTime() + room.serviceDuration * 60000)
+                    : null;
+                  return (
+                    <div className="room-timer-clock">
+                      Started {format(startedAt, 'h:mm a')}
+                      {endsAt ? ` · Ends ${format(endsAt, 'h:mm a')}` : ''}
+                    </div>
+                  );
+                })()}
+
                 {/* Countdown timer for occupied rooms */}
                 {room.status === 'occupied' && (() => {
                   const timer = getRemainingTime(room);
@@ -1900,6 +1931,32 @@ const Rooms = ({ embedded = false, onDataChange, onOpenCreateRef, onManageOrderR
                             ⏹️ Stop
                           </button>
                         )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Start/end clock for occupied home services. Legacy
+                      in_progress rows started before startedAt was being
+                      written won't have a startTime — show a muted "not
+                      recorded" line instead of hiding the block entirely
+                      so the operator knows the data is missing, not the
+                      service. */}
+                  {service.status === 'occupied' && (() => {
+                    if (!service.startTime) {
+                      return (
+                        <div className="room-timer-clock room-timer-clock-missing">
+                          Start time not recorded
+                        </div>
+                      );
+                    }
+                    const startedAt = new Date(service.startTime);
+                    const endsAt = service.serviceDuration
+                      ? new Date(startedAt.getTime() + service.serviceDuration * 60000)
+                      : null;
+                    return (
+                      <div className="room-timer-clock">
+                        Started {format(startedAt, 'h:mm a')}
+                        {endsAt ? ` · Ends ${format(endsAt, 'h:mm a')}` : ''}
                       </div>
                     );
                   })()}

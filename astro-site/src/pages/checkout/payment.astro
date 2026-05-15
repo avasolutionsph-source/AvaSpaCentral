@@ -64,6 +64,37 @@ const methods = [
     <div class="container-spa">
       <div class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 items-start">
 
+        <!-- QR PANEL (hidden until real NextPay flow creates an intent) -->
+        <div id="qrPanel" class="hidden bg-white border border-border-soft rounded-2xl p-8 md:p-10 shadow-md-spa">
+          <h3 class="font-serif text-[1.4rem] text-emerald-deep font-semibold mb-1.5">Scan to Pay</h3>
+          <p class="text-[0.88rem] text-muted mb-6">Buksan ang <span id="qrMethodLabel" class="font-semibold text-ink">GCash / Maya</span> app, i-scan ang QR code, at i-confirm ang bayad.</p>
+
+          <div class="flex flex-col items-center gap-5 mb-6">
+            <div id="qrCanvasWrap" class="w-[280px] h-[280px] bg-white border border-border-soft rounded-xl flex items-center justify-center p-3">
+              <span id="qrLoading" class="text-[0.88rem] text-muted">Generating QR…</span>
+              <img id="qrImage" alt="NextPay QR code" class="hidden w-full h-full object-contain" />
+            </div>
+            <p class="text-[0.86rem] text-muted text-center">
+              Total: <span id="qrAmount" class="font-semibold text-emerald-deep">—</span>
+              <span class="mx-1.5 text-border-soft">·</span>
+              Expires in <span id="qrCountdown" class="font-semibold text-emerald-deep tabular-nums">—</span>
+            </p>
+          </div>
+
+          <div class="flex items-start gap-3 p-4 bg-ivory border border-border-soft rounded-xl mb-7">
+            <span class="w-3 h-3 mt-1 rounded-full bg-emerald-brand animate-pulse flex-shrink-0"></span>
+            <div>
+              <p class="text-[0.86rem] text-ink font-semibold mb-1">Naghihintay ng bayad…</p>
+              <p class="text-[0.82rem] text-muted leading-relaxed">Pagkatapos mong i-confirm sa wallet app mo, awtomatiko kang dadalhin sa next step. Huwag i-close ang page na ito.</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3 items-center sm:justify-between">
+            <button id="qrCancelBtn" type="button" class="text-[0.88rem] text-muted hover:text-emerald-brand transition-colors">← Pumili ng ibang method</button>
+            <span id="qrStatusText" class="text-[0.82rem] text-muted">Status: pending</span>
+          </div>
+        </div>
+
         <!-- METHODS -->
         <form id="paymentForm" class="bg-white border border-border-soft rounded-2xl p-8 md:p-10 shadow-md-spa">
           <h3 class="font-serif text-[1.4rem] text-emerald-deep font-semibold mb-1.5">Payment Method</h3>
@@ -156,6 +187,10 @@ const methods = [
 
 </Layout>
 
+<!-- QR generation: tiny vanilla library, ~3KB. Loaded only on this page so
+     dev-mode flow (which never renders a QR) doesn't pay the cost. -->
+<script is:inline src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
 <script is:inline>
   // Two ways to arrive here:
   //   1. Step 1 (index.astro) called /api/create-checkout-session and the
@@ -189,26 +224,106 @@ const methods = [
     const payBtn = document.getElementById('payBtn');
     const payBtnLabel = document.getElementById('payBtnLabel');
     const payBtnSpinner = document.getElementById('payBtnSpinner');
+    const qrPanel = document.getElementById('qrPanel');
+    const qrImage = document.getElementById('qrImage');
+    const qrLoading = document.getElementById('qrLoading');
+    const qrAmount = document.getElementById('qrAmount');
+    const qrCountdown = document.getElementById('qrCountdown');
+    const qrMethodLabel = document.getElementById('qrMethodLabel');
+    const qrStatusText = document.getElementById('qrStatusText');
+    const qrCancelBtn = document.getElementById('qrCancelBtn');
 
     if (devMode) {
       const label = document.getElementById('payBtnLabel');
       label.innerHTML = 'Simulate Payment <span id="payAmount">' + planPrice + '</span> → (Dev Mode)';
     }
 
+    function resetPayButton() {
+      payBtnLabel.classList.remove('hidden');
+      payBtnSpinner.classList.add('hidden');
+      payBtn.disabled = false;
+    }
+
+    function methodLabel(method) {
+      switch (method) {
+        case 'gcash': return 'GCash';
+        case 'maya':  return 'Maya';
+        case 'qrph':  return 'QRPh';
+        default:      return String(method || '');
+      }
+    }
+
+    // Render the QR string returned by NextPay into the on-page <img>.
+    // Prefers NextPay's own qr_image_url when supplied (preserves their
+    // exact rendering); falls back to local generation via qrcode-generator
+    // so we never block on a missing image URL.
+    function renderQr({ qrString, qrImageUrl }) {
+      qrLoading.classList.add('hidden');
+      qrImage.classList.remove('hidden');
+      if (qrImageUrl) {
+        qrImage.src = qrImageUrl;
+        return;
+      }
+      // qrcode-generator uses error-correction levels 'L'|'M'|'Q'|'H'. 'M'
+      // is the standard for QRPh; type number 0 = auto-fit to data length.
+      // eslint-disable-next-line no-undef
+      const qr = qrcode(0, 'M');
+      qr.addData(qrString);
+      qr.make();
+      qrImage.src = qr.createDataURL(6, 4);
+    }
+
+    function startCountdown(expiresAtIso) {
+      const expiresAt = new Date(expiresAtIso).getTime();
+      const tick = () => {
+        const ms = Math.max(0, expiresAt - Date.now());
+        const totalSeconds = Math.floor(ms / 1000);
+        const m = Math.floor(totalSeconds / 60);
+        const s = String(totalSeconds % 60).padStart(2, '0');
+        qrCountdown.textContent = `${m}:${s}`;
+        if (ms <= 0) clearInterval(handle);
+      };
+      tick();
+      const handle = setInterval(tick, 1000);
+      return handle;
+    }
+
+    // Poll /api/check-provisioning-status until status leaves 'pending'.
+    // 'paid' or 'provisioned' → forward to /checkout/building (which has
+    // its own polling for the provisioning animation). 'failed'/'expired'
+    // → surface inline so the customer can retry.
+    async function pollUntilPaid() {
+      const TIMEOUT_MS = 16 * 60_000; // outlast the 15-min QR
+      const start = Date.now();
+      while (true) {
+        if (Date.now() - start > TIMEOUT_MS) return { status: 'timeout' };
+        try {
+          const res = await fetch(`/api/check-provisioning-status?token=${encodeURIComponent(token)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status && data.status !== 'pending') return data;
+            qrStatusText.textContent = `Status: ${data.status || 'pending'}`;
+          }
+        } catch {
+          // swallow — transient network blip; keep polling
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const method = new FormData(form).get('method');
+      const method = String(new FormData(form).get('method') || '');
 
       payBtn.disabled = true;
       payBtnLabel.classList.add('hidden');
       payBtnSpinner.classList.remove('hidden');
 
-      sessionStorage.setItem('ava_checkout_method', String(method || ''));
+      sessionStorage.setItem('ava_checkout_method', method);
 
       if (devMode) {
         // Dev-mode shortcut: POST straight to the webhook endpoint with the
-        // session token. In production (real NextPay configured), the form
-        // would redirect to the hosted NextPay page instead.
+        // session token. Skips NextPay entirely.
         try {
           const res = await fetch('/api/nextpay-webhook', {
             method: 'POST',
@@ -217,28 +332,76 @@ const methods = [
           });
           const result = await res.json().catch(() => ({}));
           if (!res.ok) {
-            payBtnLabel.classList.remove('hidden');
-            payBtnSpinner.classList.add('hidden');
-            payBtn.disabled = false;
+            resetPayButton();
             alert('Payment simulation failed: ' + (result?.detail || result?.error || 'unknown error'));
             return;
           }
         } catch (err) {
-          payBtnLabel.classList.remove('hidden');
-          payBtnSpinner.classList.add('hidden');
-          payBtn.disabled = false;
+          resetPayButton();
           alert('Network error during payment simulation. Please try again.');
           return;
         }
-      } else {
-        // Real NextPay path goes through hosted page. The webhook will fire
-        // server-side and the building page will pick up the result via
-        // polling. (When we wire real NextPay, replace the line below with
-        // a redirect to the hosted-page URL returned from the server.)
-        await new Promise((r) => setTimeout(r, 500));
+        window.location.href = `/checkout/building?session=${encodeURIComponent(token)}`;
+        return;
       }
 
-      window.location.href = `/checkout/building?session=${encodeURIComponent(token)}`;
+      // Real NextPay path: ask the server to mint a payment intent, swap
+      // the form for the QR panel, and poll for status until the customer
+      // pays. When paid, the server-side webhook fires provisioning and
+      // /checkout/building takes over the post-payment animation.
+      let intent;
+      try {
+        const res = await fetch('/api/create-payment-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, method }),
+        });
+        intent = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          resetPayButton();
+          if (intent?.error === 'method_not_supported') {
+            alert(intent.detail || 'This payment method is not yet supported. Pick GCash or Maya for now.');
+          } else if (intent?.error === 'session_not_pending' && intent?.status) {
+            window.location.href = `/checkout/building?session=${encodeURIComponent(token)}`;
+          } else {
+            alert('Could not start payment: ' + (intent?.detail || intent?.error || 'unknown error'));
+          }
+          return;
+        }
+      } catch (err) {
+        resetPayButton();
+        alert('Network error starting payment. Please try again.');
+        return;
+      }
+
+      form.classList.add('hidden');
+      qrPanel.classList.remove('hidden');
+      qrAmount.textContent = planPrice;
+      qrMethodLabel.textContent = methodLabel(method);
+      renderQr({ qrString: intent.qrString, qrImageUrl: intent.qrImageUrl });
+      const countdownHandle = startCountdown(intent.expiresAt);
+
+      qrCancelBtn.addEventListener('click', () => {
+        // Best-effort UX: let the customer go back and pick a different
+        // method. The pending checkout_sessions row stays valid until its
+        // 30-min TTL; create-payment-intent will refuse to issue a second
+        // intent for the same session, so they can either pay this QR or
+        // start a fresh checkout from /checkout.
+        clearInterval(countdownHandle);
+        form.classList.remove('hidden');
+        qrPanel.classList.add('hidden');
+        resetPayButton();
+      });
+
+      const result = await pollUntilPaid();
+      clearInterval(countdownHandle);
+      if (result.status === 'paid' || result.status === 'provisioned') {
+        window.location.href = `/checkout/building?session=${encodeURIComponent(token)}`;
+      } else if (result.status === 'failed' || result.status === 'expired') {
+        qrStatusText.textContent = `Status: ${result.status} — ${result.failureReason || 'please try again'}`;
+      } else {
+        qrStatusText.textContent = 'Status: timeout — refresh and try again';
+      }
     });
   }
 </script>

@@ -53,6 +53,18 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/api/create-payment-intent"
+  to   = "/.netlify/functions/create-payment-intent"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/nextpay-smoke"
+  to   = "/.netlify/functions/nextpay-smoke"
+  status = 200
+  force = true
+
 # SPA-style fallback isn't needed (Astro is static), but redirect bare /index
 # style paths and trailing slashes for cleanliness.
 [[redirects]]

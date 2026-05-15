@@ -69,12 +69,90 @@ const OpexTaxAnalytics = lazy(() => import('./pages/OpexTaxAnalytics'));
 const SalesHeatmap = lazy(() => import('./pages/SalesHeatmap'));
 
 // Loading Screen Component (for auth state)
-const LoadingScreen = () => (
-  <div className="loading-screen">
-    <div className="spinner"></div>
-    <p>Loading...</p>
-  </div>
-);
+//
+// Counts elapsed time + surfaces the AppContext state values so a silent
+// hang (supabase-js init, sync manager, etc.) doesn't look like a generic
+// "still loading…". After ~10s a diagnostic block appears showing which
+// piece of state is still falsy, so support can act on it instead of the
+// user just refreshing repeatedly.
+const LoadingScreen = () => {
+  const ctx = useApp();
+  const [elapsed, setElapsed] = React.useState(0);
+
+  React.useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const showDiagnostic = elapsed >= 8;
+
+  return (
+    <div className="loading-screen">
+      <div className="spinner"></div>
+      <p>Loading{elapsed > 0 ? ` (${elapsed}s)` : ''}…</p>
+      {showDiagnostic && (
+        <div
+          style={{
+            marginTop: 18,
+            maxWidth: 420,
+            background: 'rgba(0,0,0,0.04)',
+            border: '1px solid rgba(0,0,0,0.1)',
+            borderRadius: 10,
+            padding: '14px 16px',
+            fontSize: 13,
+            color: '#374151',
+            textAlign: 'left',
+            lineHeight: 1.55,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6 }}>
+            Still loading after {elapsed}s — diagnostic:
+          </div>
+          <div><strong>loading:</strong> <code>{String(ctx?.loading)}</code></div>
+          <div><strong>initialSyncing:</strong> <code>{String(ctx?.initialSyncing)}</code></div>
+          <div><strong>user set:</strong> <code>{ctx?.user ? 'yes' : 'no'}</code></div>
+          {ctx?.user && (
+            <>
+              <div><strong>user.businessId:</strong> <code>{ctx.user.businessId ?? 'null'}</code></div>
+              <div><strong>user.role:</strong> <code>{ctx.user.role ?? 'null'}</code></div>
+            </>
+          )}
+          <div><strong>selectedBranch:</strong> <code>{ctx?.selectedBranch?.id ?? 'null'}</code></div>
+          <div style={{ marginTop: 8, padding: '6px 8px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, color: '#7c2d12' }}>
+            <strong>Hint:</strong>{' '}
+            {!ctx?.user && ctx?.loading
+              ? 'AppContext.initApp() is still running. authService.initialize() or the sync manager may be hanging — check DevTools Network for pending Supabase requests.'
+              : ctx?.user && !ctx?.user.businessId
+              ? 'User has no businessId — the users row exists but business_id is null, or RLS blocked the SELECT. Check the users table for this auth_id.'
+              : ctx?.user && !ctx?.selectedBranch
+              ? 'User loaded but no branch auto-selected — branches fetch may have returned empty. Verify branches exist for this business_id and is_active=true.'
+              : 'See console for [AppContext] and [AuthService] logs.'}
+          </div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: 10,
+              padding: '6px 12px',
+              background: '#1B5E37',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Reload page
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Page Loader Component (for lazy loaded pages)
 const PageLoader = () => (

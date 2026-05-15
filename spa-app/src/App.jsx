@@ -203,24 +203,14 @@ const RequireBranch = ({ children }) => {
     return <LoadingScreen />;
   }
 
-  // Public user at "/" → render BookingPage directly (no redirect).
-  // Exception: an installed PWA launching at "/" should land on /login, not
-  // the public booking page. Legacy installs still have start_url: "/" in
-  // their cached manifest, so the app-side guard is what keeps them on the
-  // employee entry point.
+  // Multi-tenant SaaS deployment: root "/" is the employee entry point and
+  // always redirects unauthenticated visitors to /login. The public booking
+  // pages live at /book/:businessId — each business gets its own URL, so
+  // there's no "default business" to render at root. Single-tenant
+  // deployments that want / to render BookingPage directly should re-enable
+  // the previous branch (look up by VITE_DEFAULT_BUSINESS_SLUG).
   if (!user) {
-    const isStandalonePWA =
-      typeof window !== 'undefined' &&
-      (window.matchMedia?.('(display-mode: standalone)').matches ||
-        window.navigator.standalone === true);
-    if (isStandalonePWA) {
-      return <Navigate to="/login" replace />;
-    }
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <BookingPage />
-      </Suspense>
-    );
+    return <Navigate to="/login" replace />;
   }
 
   return children;

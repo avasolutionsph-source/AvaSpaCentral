@@ -1571,8 +1571,12 @@ const Settings = () => {
         const saved2FA = await SettingsRepository.get('twoFactorEnabled');
 
         if (savedBusinessInfo) setBusinessInfo(savedBusinessInfo);
-        if (savedBusinessHours) setBusinessHours(savedBusinessHours);
-        if (savedTaxSettings) setTaxSettings(savedTaxSettings);
+        // Array-only guards: Dexie can hand back a stale non-array value
+        // (e.g. an object from an older schema, or null from a partial
+        // migration) and feeding it to setX would later crash the render
+        // on `.map is not a function`. Keep the default array on mismatch.
+        if (Array.isArray(savedBusinessHours)) setBusinessHours(savedBusinessHours);
+        if (Array.isArray(savedTaxSettings)) setTaxSettings(savedTaxSettings);
         if (savedTheme) setTheme(savedTheme);
         if (savedSecuritySettings) setSecuritySettings(savedSecuritySettings);
         if (saved2FA !== undefined) setTwoFactorEnabled(saved2FA);
@@ -1658,12 +1662,12 @@ const Settings = () => {
               // branch row. Leaving these unset means the form keeps the
               // defaults and the section shows the "Configure now" banner.
               const cloudBusinessHours = branchValue('businessHours');
-              if (cloudBusinessHours) {
+              if (Array.isArray(cloudBusinessHours)) {
                 setBusinessHours(cloudBusinessHours);
                 await SettingsRepository.set('businessHours', cloudBusinessHours);
               }
               const cloudTax = branchValue('taxSettings');
-              if (cloudTax) {
+              if (Array.isArray(cloudTax)) {
                 setTaxSettings(cloudTax);
                 await SettingsRepository.set('taxSettings', cloudTax);
               }
@@ -1818,12 +1822,12 @@ const Settings = () => {
         SettingsRepository.set('businessContact', contact || { address: '', phone: '', email: '' }).catch(() => {});
 
         const hours = branchValue('businessHours');
-        if (hours) {
+        if (Array.isArray(hours)) {
           setBusinessHours(hours);
           SettingsRepository.set('businessHours', hours).catch(() => {});
         }
         const tax = branchValue('taxSettings');
-        if (tax) {
+        if (Array.isArray(tax)) {
           setTaxSettings(tax);
           SettingsRepository.set('taxSettings', tax).catch(() => {});
         }
@@ -1860,7 +1864,7 @@ const Settings = () => {
         mockApi.payrollConfig.getPayrollConfigLogs()
       ]);
       setPayrollConfig(config);
-      setPayrollConfigLogs(logs);
+      setPayrollConfigLogs(Array.isArray(logs) ? logs : []);
     } catch (error) {
       showToast('Failed to load payroll configuration', 'error');
     } finally {
@@ -1978,7 +1982,7 @@ const Settings = () => {
         showToast(`Payroll settings saved! ${result.changesCount} change(s) recorded.`, 'success');
         // Reload logs
         const logs = await mockApi.payrollConfig.getPayrollConfigLogs();
-        setPayrollConfigLogs(logs);
+        setPayrollConfigLogs(Array.isArray(logs) ? logs : []);
       }
     } catch (error) {
       showToast('Failed to save payroll configuration', 'error');
@@ -2010,7 +2014,7 @@ const Settings = () => {
         showToast('Payroll settings reset to defaults', 'success');
         // Reload logs
         const logs = await mockApi.payrollConfig.getPayrollConfigLogs();
-        setPayrollConfigLogs(logs);
+        setPayrollConfigLogs(Array.isArray(logs) ? logs : []);
       }
     } catch (error) {
       showToast('Failed to reset payroll configuration', 'error');
@@ -2174,7 +2178,7 @@ const Settings = () => {
     setParkedLoading(true);
     try {
       const items = await supabaseSyncManager.getParkedItems();
-      setParkedItems(items);
+      setParkedItems(Array.isArray(items) ? items : []);
     } catch (error) {
       console.error('Failed to load parked items:', error);
     } finally {

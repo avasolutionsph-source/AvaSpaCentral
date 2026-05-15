@@ -208,6 +208,13 @@ const plans = {
     </li>
   `).join('');
 
+  // Escape user/server-supplied strings before interpolating into the
+  // error block — error detail from the server can contain quotes /
+  // angle brackets when surfacing SQL messages.
+  const escapeHtml = (s) => String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
   // Form submit — POSTs directly to /api/create-checkout-session so the
   // password never lands in sessionStorage. The server stores it briefly
   // in checkout_sessions (service-role only, ~30 min TTL) and returns a
@@ -248,16 +255,43 @@ const plans = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const result = await res.json().catch(() => ({}));
+      // Try JSON first; if the function 502'd Netlify returns plaintext, so
+      // fall back to text() so we still surface SOMETHING actionable to the
+      // user instead of "Could not start checkout".
+      let result = {};
+      let rawText = '';
+      try {
+        result = await res.clone().json();
+      } catch {
+        try { rawText = await res.text(); } catch { rawText = '<unreadable>'; }
+      }
 
       if (!res.ok) {
+        // Always log the full server response to console so the user can
+        // copy/paste it back to support when reporting an issue.
+        console.error('[checkout] server error', { status: res.status, result, rawText });
+
         if (result?.error === 'email_already_registered') {
           const loginHref = (spaAppUrl || '').replace(/\/$/, '') + '/login';
           passwordError.innerHTML = `May AVA account na sa email na ito. <a href="${loginHref}" class="underline">Mag-login na lang →</a>`;
         } else {
-          passwordError.textContent = result?.detail
-            ? `Sign-up error: ${result.detail}`
-            : 'Could not start checkout. Please try again.';
+          // Build a verbose, copy-pasteable error block so a customer (or
+          // anyone on support) can see exactly which stage broke without
+          // opening DevTools.
+          const parts = [];
+          parts.push(`<strong>Sign-up error</strong> (HTTP ${res.status})`);
+          if (result?.error)  parts.push(`Code: <code>${escapeHtml(result.error)}</code>`);
+          if (result?.stage)  parts.push(`Stage: <code>${escapeHtml(result.stage)}</code>`);
+          if (result?.detail) parts.push(`Detail: ${escapeHtml(result.detail)}`);
+          if (result?.hint)   parts.push(`<em>Hint:</em> ${escapeHtml(result.hint)}`);
+          if (Array.isArray(result?.missing) && result.missing.length) {
+            parts.push(`Missing: <code>${result.missing.map(escapeHtml).join(', ')}</code>`);
+          }
+          if (!result?.detail && rawText) {
+            parts.push(`Body: <code>${escapeHtml(rawText.slice(0, 200))}</code>`);
+          }
+          if (parts.length === 1) parts.push('Could not start checkout. Open DevTools → Console for the full response and check Netlify Function logs.');
+          passwordError.innerHTML = parts.join('<br>');
         }
         passwordError.classList.remove('hidden');
         submitBtn.disabled = false;
@@ -281,7 +315,8 @@ const plans = {
       window.location.href = result.paymentUrl
         || `/checkout/payment?session=${encodeURIComponent(result.token)}`;
     } catch (err) {
-      passwordError.textContent = 'Network error. Please try again.';
+      console.error('[checkout] network error', err);
+      passwordError.innerHTML = `<strong>Network error</strong><br>${escapeHtml(err?.message || err)}<br><em>Hint:</em> check your connection, then refresh and try again. If it keeps failing, the function is unreachable — check Netlify Functions logs.`;
       passwordError.classList.remove('hidden');
       submitBtn.disabled = false;
       submitBtn.textContent = 'Continue to Payment →';

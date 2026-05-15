@@ -43,16 +43,17 @@ class AuthService {
       return;
     }
 
-    // Get initial session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session) {
-      this._session = session as unknown as AuthSession;
-      await this._loadUserProfile(session.user.id);
-    }
-
-    // Listen for auth state changes
+    // Register the auth state listener BEFORE the getSession() race. supabase-js
+    // has a documented bug where getSession() hangs forever when an internal
+    // refresh lock is held (e.g. left behind by a previous failed login). If
+    // that happens here, awaiting getSession() unconditionally would strand the
+    // app on its initial LoadingScreen — confirmed in production via the
+    // AppContext diagnostic ("loading: true, user set: no").
+    //
+    // The listener still fires when supabase eventually emits INITIAL_SESSION
+    // or SIGNED_IN, so the user state catches up as soon as the client
+    // recovers. Worst case (lock never releases), the user can still log in
+    // because signInWithUsername() takes a different code path.
     supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[AuthService] Auth state changed:', event);
       this._session = session as unknown as AuthSession;
@@ -67,6 +68,38 @@ class AuthService {
 
       this._notifyListeners(event as AuthEvent, session as unknown as AuthSession);
     });
+
+    // Race the initial getSession() against a 3s timeout. If it wins, we
+    // hydrate _currentUser eagerly so AppContext skips the login redirect
+    // for returning users. If the timeout wins, we proceed without a session
+    // and rely on the listener above to fill it in when supabase recovers.
+    try {
+      const sessionResult = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 3000),
+        ),
+      ]);
+      if (sessionResult && 'data' in sessionResult) {
+        const session = sessionResult.data?.session;
+        if (session) {
+          this._session = session as unknown as AuthSession;
+          // Profile load gets its own timeout — a hung RLS query would
+          // otherwise reproduce the same boot-time strand.
+          await Promise.race([
+            this._loadUserProfile(session.user.id),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+          ]);
+        }
+      } else {
+        console.warn(
+          '[AuthService] getSession() timed out — proceeding without an initial session. ' +
+            'The onAuthStateChange listener will populate user state when supabase-js recovers.',
+        );
+      }
+    } catch (err) {
+      console.warn('[AuthService] getSession() threw — proceeding without session:', err);
+    }
   }
 
   /**

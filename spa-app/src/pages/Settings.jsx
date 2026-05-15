@@ -83,7 +83,7 @@ const SETTINGS_KEYS_LOADED_ON_MOUNT = [
 ];
 
 const Settings = () => {
-  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId, getEffectiveBranchId, selectedBranch, refreshBookingLimits } = useApp();
+  const { showToast, user, canEdit, isOwner, isBranchOwner, hasManagementAccess, isOwnerOrManager, getUserBranchId, getEffectiveBranchId, selectedBranch, refreshBookingLimits, planTier, planLimits } = useApp();
 
   // Refs that gate auto-refresh of the form state when background sync
   // completes. Without these, a user-edit-in-progress could be clobbered by
@@ -1094,6 +1094,17 @@ const Settings = () => {
   };
 
   const handleAddBranch = () => {
+    // Same plan-tier gate as handleSaveBranch — surfaced here too so the
+    // user sees the limit message before the modal opens, not after they
+    // fill the form.
+    if (Array.isArray(branches) && branches.length >= planLimits.branches) {
+      const tierLabel = planTier ? planTier[0].toUpperCase() + planTier.slice(1) : 'your';
+      showToast(
+        `${tierLabel} plan is limited to ${planLimits.branches} branch${planLimits.branches === 1 ? '' : 'es'}. Upgrade to add more.`,
+        'error',
+      );
+      return;
+    }
     resetBranchForm();
     setEditingBranch(null);
     setShowBranchModal(true);
@@ -1143,6 +1154,18 @@ const Settings = () => {
   };
 
   const handleSaveBranch = async () => {
+    // Plan-tier gate: starter is 1 branch only, advance is 3, enterprise
+    // unlimited. Only enforced when creating a new branch — edits to an
+    // existing branch never push the count up.
+    if (!editingBranch && Array.isArray(branches) && branches.length >= planLimits.branches) {
+      const tierLabel = planTier ? planTier[0].toUpperCase() + planTier.slice(1) : 'your';
+      showToast(
+        `${tierLabel} plan is limited to ${planLimits.branches} branch${planLimits.branches === 1 ? '' : 'es'}. Upgrade to add more.`,
+        'error',
+      );
+      return;
+    }
+
     if (!branchForm.name.trim()) {
       showToast('Branch name is required', 'error');
       return;

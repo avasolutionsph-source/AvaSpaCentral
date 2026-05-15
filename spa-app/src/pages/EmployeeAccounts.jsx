@@ -18,7 +18,7 @@ import {
 } from '../components/shared';
 
 const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) => {
-  const { user, showToast, isOwner, isManager, isBranchOwner, getUserBranchId, getEffectiveBranchId } = useApp();
+  const { user, showToast, isOwner, isManager, isBranchOwner, getUserBranchId, getEffectiveBranchId, planTier, planLimits } = useApp();
 
   // Filter state
   const [filterRole, setFilterRole] = useState('all');
@@ -406,12 +406,29 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
     return confirmDelete();
   };
 
+  // Plan-tier gate wrapped around openCreate so the Starter Owner sees the
+  // upgrade nudge before the modal opens (instead of after filling the form
+  // and clicking Create). handleCreateAccount keeps its own copy of the
+  // check as a defence-in-depth — if a parent embeds this page and calls
+  // openCreate via ref before planTier loads, the submit guard still fires.
+  const guardedOpenCreate = React.useCallback(() => {
+    if (planLimits.userAccounts <= 1) {
+      const tierLabel = planTier ? planTier[0].toUpperCase() + planTier.slice(1) : 'Your';
+      showToast(
+        `${tierLabel} plan is Owner-only and does not include additional login accounts. Upgrade to Advance or Enterprise for multi-user access.`,
+        'error',
+      );
+      return;
+    }
+    openCreate();
+  }, [planLimits.userAccounts, planTier, showToast, openCreate]);
+
   // Expose openCreate to parent via ref
   React.useEffect(() => {
     if (onOpenCreateRef) {
-      onOpenCreateRef.current = openCreate;
+      onOpenCreateRef.current = guardedOpenCreate;
     }
-  }, [onOpenCreateRef, openCreate]);
+  }, [onOpenCreateRef, guardedOpenCreate]);
 
   // Handle employee selection - auto-fill name and generate username suggestion
   const handleEmployeeSelect = (e) => {
@@ -447,6 +464,19 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
 
   // Custom submit handler for Supabase integration
   const handleCreateAccount = async () => {
+    // Plan-tier gate: Starter is Owner-only and cannot create staff logins.
+    // Advance / Enterprise allow multi-user (planLimits.userAccounts ===
+    // Infinity), so this check fails closed only for Starter. The Owner row
+    // itself is created at signup, not from this page.
+    if (planLimits.userAccounts <= 1) {
+      const tierLabel = planTier ? planTier[0].toUpperCase() + planTier.slice(1) : 'Your';
+      showToast(
+        `${tierLabel} plan is Owner-only and does not include additional login accounts. Upgrade to Advance or Enterprise for multi-user access.`,
+        'error',
+      );
+      return;
+    }
+
     // Validate form first
     const validation = validateForm(formData);
     if (!validation.isValid) {
@@ -782,7 +812,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         <PageHeader
           title="Employee Accounts"
           description="Create and manage employee login accounts"
-          action={{ label: '+ Create Account', onClick: openCreate }}
+          action={{ label: '+ Create Account', onClick: guardedOpenCreate }}
         />
       )}
 
@@ -807,7 +837,7 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
           icon="👤"
           title="No accounts found"
           description={users.length === 0 ? "Create your first employee account to get started" : "Try adjusting your filters"}
-          action={users.length === 0 ? { label: 'Create First Account', onClick: openCreate } : null}
+          action={users.length === 0 ? { label: 'Create First Account', onClick: guardedOpenCreate } : null}
         />
       ) : (
         <div className="accounts-grid">

@@ -15,6 +15,29 @@ import PushSubscriptionService from '../services/notifications/PushSubscriptionS
 // flows. Owner can override either via Settings → Bookings.
 const DEFAULT_BOOKING_LIMITS = Object.freeze({ maxPaxPublic: 12, maxPaxStaff: 30 });
 
+// Plan-tier feature gates. Drives the branch-count cap in Settings → Branches
+// and the staff-account cap in Employee Accounts. Mirrors the marketing-site
+// /pricing copy — keep in sync if pricing.astro changes. Infinity is used so
+// callers can do `count < PLAN_LIMITS[tier].branches` without a special-case.
+export const PLAN_LIMITS = Object.freeze({
+  starter:    { branches: 1,        userAccounts: 1        },
+  advance:    { branches: 3,        userAccounts: Infinity },
+  enterprise: { branches: Infinity, userAccounts: Infinity },
+});
+
+export const PLAN_LABELS = Object.freeze({
+  starter: 'Starter',
+  advance: 'Advance',
+  enterprise: 'Enterprise',
+});
+
+// Resolve a tier string (possibly null/undefined for legacy tenants) to a
+// limits row. Unknown / missing tiers fall back to starter, the most
+// restrictive — failing closed is the safer default.
+export function getPlanLimits(planTier) {
+  return PLAN_LIMITS[planTier] || PLAN_LIMITS.starter;
+}
+
 /**
  * Read the current Supabase access token without going through
  * `supabase.auth.getSession()`.
@@ -220,6 +243,9 @@ export const AppProvider = ({ children }) => {
   //     for the "share booking link" widget on Dashboard.
   const [branches, setBranches] = useState([]);
   const [bookingSlug, setBookingSlug] = useState(null);
+  // Subscription tier for the active business — drives feature gates
+  // (branch cap, staff-account cap). Loaded alongside bookingSlug below.
+  const [planTier, setPlanTier] = useState(null);
 
   // Holds the teardown returned by startAllNotificationTriggers() so a
   // logout-then-login cycle doesn't accumulate duplicate listeners.
@@ -265,6 +291,7 @@ export const AppProvider = ({ children }) => {
     if (!businessId) {
       setBranches([]);
       setBookingSlug(null);
+      setPlanTier(null);
       return;
     }
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -280,7 +307,7 @@ export const AppProvider = ({ children }) => {
             { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } },
           ),
           fetch(
-            `${supabaseUrl}/rest/v1/businesses?id=eq.${businessId}&select=booking_slug`,
+            `${supabaseUrl}/rest/v1/businesses?id=eq.${businessId}&select=booking_slug,plan_tier`,
             { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } },
           ),
         ]);
@@ -291,8 +318,9 @@ export const AppProvider = ({ children }) => {
         }
         if (businessRes.status === 'fulfilled' && businessRes.value.ok) {
           const data = await businessRes.value.json();
-          const slug = Array.isArray(data) && data[0]?.booking_slug;
-          if (!cancelled && slug) setBookingSlug(slug);
+          const row = Array.isArray(data) ? data[0] : null;
+          if (!cancelled && row?.booking_slug) setBookingSlug(row.booking_slug);
+          if (!cancelled && row?.plan_tier) setPlanTier(row.plan_tier);
         }
       } catch {
         // Silent fall-back: branches stays whatever it was, bookingSlug stays
@@ -955,6 +983,8 @@ export const AppProvider = ({ children }) => {
     canSeeAllBranches,
     branches,
     bookingSlug,
+    planTier,
+    planLimits: getPlanLimits(planTier),
     // Sync-related exports
     syncStatus,
     triggerSync,

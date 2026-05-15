@@ -440,7 +440,15 @@ export const AppProvider = ({ children }) => {
 
           // initializeSyncAfterLogin is declared later in the component body;
           // safe to call here because useEffect callbacks run post-render.
-          await initializeSyncAfterLogin();
+          // Fire-and-forget — initialSyncing state still drives the overlay,
+          // but `loading` flips to false now so the protected routes can
+          // mount and React Router can resolve the post-login destination.
+          // Awaiting this stranded the simple LoadingScreen on every refresh
+          // for fresh-device users because the Dexie pull was either slow
+          // or blocked on a flaky table fetch.
+          initializeSyncAfterLogin().catch((err) => {
+            console.warn('[AppContext] initial sync error (non-fatal):', err);
+          });
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);
@@ -559,11 +567,16 @@ export const AppProvider = ({ children }) => {
 
       showToast('Login successful!', 'success');
 
-      // Initialize sync after login. This is awaited so first-login (empty
-      // Dexie) blocks behind the loader before login() returns; returning
-      // users resolve near-instantly because the helper uses fire-and-forget
-      // on that path.
-      await initializeSyncAfterLogin();
+      // Kick off the initial sync but DO NOT await it. The user can be
+      // navigated into the app immediately — the InitialSyncLoader overlay
+      // (driven by initialSyncing state) keeps the screen blocked while a
+      // fresh-device pull runs in the background, and falls off the moment
+      // the pull resolves or hits its internal timeout. Awaiting this was
+      // wedging the /login screen on "Loading..." because login() never
+      // returned, so React Router never navigated to /pos.
+      initializeSyncAfterLogin().catch((err) => {
+        console.warn('[AppContext] post-login sync error (non-fatal):', err);
+      });
 
       return response;
     } catch (error) {

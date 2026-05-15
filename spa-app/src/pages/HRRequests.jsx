@@ -10,7 +10,7 @@ import { SettingsRepository, EmployeeRepository } from '../services/storage/repo
 import { supabase } from '../services/supabase/supabaseClient';
 
 const HRRequests = ({ embedded = false, onDataChange }) => {
-  const { showToast, user, isOwner, isManager, getEffectiveBranchId, selectedBranch } = useApp();
+  const { showToast, user, isOwner, isManager, isBranchOwner, getEffectiveBranchId, selectedBranch } = useApp();
   const [activeRequestType, setActiveRequestType] = useState('all');
   const [activeStatus, setActiveStatus] = useState('pending');
   const [loading, setLoading] = useState(false);
@@ -147,7 +147,7 @@ const HRRequests = ({ embedded = false, onDataChange }) => {
   }, [requests]);
 
   const canApprove = () => {
-    return isOwner() || isManager();
+    return isOwner() || isManager() || isBranchOwner();
   };
 
   const getStatusBadgeClass = (status) => {

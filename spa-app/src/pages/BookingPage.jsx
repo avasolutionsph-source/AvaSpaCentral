@@ -541,7 +541,15 @@ const BookingPage = () => {
             }
           });
           const servicesData = await servicesResponse.json();
-          console.log('[BookingPage] Services result:', { count: servicesData?.length });
+          // PostgREST returns either an array (on 2xx) or an error object
+          // ({code,message,...} on 4xx/5xx). Coerce to array everywhere so
+          // a single failing endpoint can't crash a downstream useMemo
+          // (services.map / branches.find / therapists.filter, etc.).
+          const servicesArr = Array.isArray(servicesData) ? servicesData : [];
+          if (!Array.isArray(servicesData)) {
+            console.warn('[BookingPage] services response not an array', servicesData);
+          }
+          console.log('[BookingPage] Services result:', { count: servicesArr.length });
 
           // Fetch branches for this business
           console.log('[BookingPage] Fetching branches...');
@@ -554,21 +562,25 @@ const BookingPage = () => {
               'Content-Type': 'application/json'
             }
           });
-          const branchesData = await branchesResponse.json();
-          console.log('[BookingPage] Branches result:', { count: branchesData?.length });
-          setBranches(branchesData || []);
+          const branchesRaw = await branchesResponse.json();
+          const branchesData = Array.isArray(branchesRaw) ? branchesRaw : [];
+          if (!Array.isArray(branchesRaw)) {
+            console.warn('[BookingPage] branches response not an array', branchesRaw);
+          }
+          console.log('[BookingPage] Branches result:', { count: branchesData.length });
+          setBranches(branchesData);
 
           // Determine if we need to show branch selector
-          const hasBranches = branchesData && branchesData.length > 1;
+          const hasBranches = branchesData.length > 1;
           let activeBranch = null;
 
-          if (branchSlug && branchesData?.length > 0) {
+          if (branchSlug && branchesData.length > 0) {
             // If branchSlug is provided in URL, select that branch
             activeBranch = branchesData.find(b => b.slug === branchSlug);
             if (activeBranch) {
               setSelectedBranch(activeBranch);
             }
-          } else if (branchesData?.length === 1) {
+          } else if (branchesData.length === 1) {
             // Single branch - auto-select it
             activeBranch = branchesData[0];
             setSelectedBranch(activeBranch);
@@ -578,12 +590,13 @@ const BookingPage = () => {
           }
 
           // Fetch sales counts per service to sort by best sellers
-          let enrichedServices = servicesData || [];
+          let enrichedServices = servicesArr;
           try {
             const txUrl = `${supabaseUrl}/rest/v1/transactions?business_id=eq.${actualBusinessId}&select=items`;
             const txRes = await fetch(txUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
             if (txRes.ok) {
-              const txData = await txRes.json();
+              const txRaw = await txRes.json();
+              const txData = Array.isArray(txRaw) ? txRaw : [];
               const salesCount = {};
               txData.forEach(tx => {
                 if (tx.items && Array.isArray(tx.items)) {
@@ -611,29 +624,35 @@ const BookingPage = () => {
               'Content-Type': 'application/json'
             }
           });
-          const therapistsData = await therapistsResponse.json();
-          console.log('[BookingPage] Therapists result:', { count: therapistsData?.length });
+          const therapistsRaw = await therapistsResponse.json();
+          const therapistsData = Array.isArray(therapistsRaw) ? therapistsRaw : [];
+          if (!Array.isArray(therapistsRaw)) {
+            console.warn('[BookingPage] therapists response not an array', therapistsRaw);
+          }
+          console.log('[BookingPage] Therapists result:', { count: therapistsData.length });
           // Filter therapists by position (massage/facial related)
-          let positionFiltered = (therapistsData || []).filter(t =>
+          let positionFiltered = therapistsData.filter(t =>
             t.position?.toLowerCase().includes('therapist') ||
             t.position?.toLowerCase().includes('specialist') ||
             t.department === 'Massage' ||
             t.department === 'Facial'
           );
           if (positionFiltered.length === 0) {
-            positionFiltered = therapistsData || [];
+            positionFiltered = therapistsData;
           }
           // Fetch service counts for therapists (POS transactions + online bookings)
           try {
             const txUrl = `${supabaseUrl}/rest/v1/transactions?business_id=eq.${actualBusinessId}&select=employee_id`;
             const txRes = await fetch(txUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
-            const txData = txRes.ok ? await txRes.json() : [];
+            const txRaw = txRes.ok ? await txRes.json() : [];
+            const txData = Array.isArray(txRaw) ? txRaw : [];
             const txCounts = {};
             txData.forEach(tx => { if (tx.employee_id) txCounts[tx.employee_id] = (txCounts[tx.employee_id] || 0) + 1; });
 
             const bookUrl = `${supabaseUrl}/rest/v1/online_bookings?business_id=eq.${actualBusinessId}&select=preferred_therapist_id`;
             const bookRes = await fetch(bookUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
-            const bookData = bookRes.ok ? await bookRes.json() : [];
+            const bookRaw = bookRes.ok ? await bookRes.json() : [];
+            const bookData = Array.isArray(bookRaw) ? bookRaw : [];
             bookData.forEach(b => { if (b.preferred_therapist_id) txCounts[b.preferred_therapist_id] = (txCounts[b.preferred_therapist_id] || 0) + 1; });
 
             positionFiltered = positionFiltered.map(t => ({
@@ -653,9 +672,10 @@ const BookingPage = () => {
             const hoursUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=eq.businessHours&select=value`;
             const hoursRes = await fetch(hoursUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
             if (hoursRes.ok) {
-              const hoursData = await hoursRes.json();
+              const hoursRaw = await hoursRes.json();
+              const hoursData = Array.isArray(hoursRaw) ? hoursRaw : [];
               console.log('[BookingPage] Business hours data:', hoursData);
-              if (hoursData?.[0]?.value) {
+              if (hoursData[0]?.value) {
                 setBusinessHours(hoursData[0].value);
               }
             } else {
@@ -668,7 +688,8 @@ const BookingPage = () => {
             const capUrl = `${supabaseUrl}/rest/v1/settings?business_id=eq.${actualBusinessId}&key=in.(bookingCapacity,bookingWindowMinutes)&select=key,value`;
             const capRes = await fetch(capUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
             if (capRes.ok) {
-              const capData = await capRes.json();
+              const capRaw = await capRes.json();
+              const capData = Array.isArray(capRaw) ? capRaw : [];
               capData.forEach(s => {
                 if (s.key === 'bookingCapacity' && s.value) setBookingCapacitySetting(parseInt(s.value) || 14);
                 if (s.key === 'bookingWindowMinutes' && s.value) setBookingWindowSetting(parseInt(s.value) || 90);
@@ -682,8 +703,9 @@ const BookingPage = () => {
             const paxUrl = `${supabaseUrl}/rest/v1/payroll_config?business_id=eq.${actualBusinessId}&key=eq.booking.maxPaxPublic&select=value`;
             const paxRes = await fetch(paxUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
             if (paxRes.ok) {
-              const paxData = await paxRes.json();
-              const raw = paxData?.[0]?.value;
+              const paxRaw = await paxRes.json();
+              const paxData = Array.isArray(paxRaw) ? paxRaw : [];
+              const raw = paxData[0]?.value;
               const n = Number(raw);
               if (Number.isFinite(n) && n > 0) setMaxPaxPublic(Math.floor(n));
             }
@@ -693,7 +715,10 @@ const BookingPage = () => {
           try {
             const bookingsUrl = `${supabaseUrl}/rest/v1/online_bookings?business_id=eq.${actualBusinessId}&status=neq.cancelled&select=preferred_date,preferred_time,branch_id`;
             const bookingsRes = await fetch(bookingsUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
-            if (bookingsRes.ok) setExistingBookings(await bookingsRes.json());
+            if (bookingsRes.ok) {
+              const bookingsRaw = await bookingsRes.json();
+              setExistingBookings(Array.isArray(bookingsRaw) ? bookingsRaw : []);
+            }
           } catch (err) { console.warn('Failed to fetch bookings:', err); }
 
           // Fetch shift schedules for therapist availability
@@ -701,9 +726,10 @@ const BookingPage = () => {
             const schedUrl = `${supabaseUrl}/rest/v1/shift_schedules?business_id=eq.${actualBusinessId}&is_active=eq.true&select=employee_id,schedule`;
             const schedRes = await fetch(schedUrl, { headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });
             if (schedRes.ok) {
-              const schedData = await schedRes.json();
-              console.log('[BookingPage] Shift schedules:', schedData?.length, schedData?.slice(0, 2));
-              setShiftSchedules(schedData || []);
+              const schedRaw = await schedRes.json();
+              const schedData = Array.isArray(schedRaw) ? schedRaw : [];
+              console.log('[BookingPage] Shift schedules:', schedData.length, schedData.slice(0, 2));
+              setShiftSchedules(schedData);
             } else {
               console.warn('[BookingPage] Shift schedules fetch status:', schedRes.status);
             }
@@ -717,7 +743,7 @@ const BookingPage = () => {
           //   2. Unbranched (branch_id is null/undefined)
           //   3. All active therapists for the business (last resort)
           if (activeBranch) {
-            setServices((servicesData || []).filter(s => !s.branch_id || s.branch_id === activeBranch.id));
+            setServices(servicesArr.filter(s => !s.branch_id || s.branch_id === activeBranch.id));
             const branched = positionFiltered.filter(t => t.branch_id === activeBranch.id);
             const unbranched = positionFiltered.filter(t => !t.branch_id);
             let resolvedTherapists;
@@ -733,7 +759,7 @@ const BookingPage = () => {
             console.log('[BookingPage] Therapist resolution', {
               branch: activeBranch.name,
               branchId: activeBranch.id,
-              totalFromDB: (therapistsData || []).length,
+              totalFromDB: therapistsData.length,
               afterPositionFilter: positionFiltered.length,
               strictBranchMatch: branched.length,
               unbranched: unbranched.length,
@@ -741,7 +767,7 @@ const BookingPage = () => {
             });
             setTherapists(resolvedTherapists);
           } else {
-            setServices(servicesData || []);
+            setServices(servicesArr);
             setTherapists([]);  // No branch = no therapists until branch selected
           }
 

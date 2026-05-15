@@ -1,7 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 
-const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
+const fallbackSpaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
 ---
 
 <Layout title="Welcome to AVA — Subscription Active" description="Your AVA Spa Central subscription is now active. Check your inbox for login details.">
@@ -25,7 +25,7 @@ const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
         <div class="flex justify-between items-start mb-6 pb-6 border-b border-border-soft">
           <div>
             <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Plan Activated</p>
-            <h3 id="planName" class="font-serif text-[1.6rem] text-emerald-deep font-semibold">—</h3>
+            <h3 id="planName" class="font-serif text-[1.6rem] text-emerald-deep font-semibold capitalize">—</h3>
           </div>
           <div class="text-right">
             <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Amount Paid</p>
@@ -39,7 +39,7 @@ const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
             <p id="businessName" class="text-ink font-semibold">—</p>
           </div>
           <div>
-            <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Account Email</p>
+            <p class="text-[0.72rem] uppercase tracking-wider text-muted font-semibold mb-1">Owner Email</p>
             <p id="accountEmail" class="text-ink font-semibold break-all">—</p>
           </div>
           <div>
@@ -51,10 +51,58 @@ const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
             <p id="nextBilling" class="text-ink font-semibold">—</p>
           </div>
         </div>
+      </div>
 
-        <hr class="border-border-soft mb-6"/>
+      <!-- YOUR LINKS -->
+      <div class="max-w-[680px] mx-auto bg-emerald-deep text-white rounded-2xl p-8 md:p-10 shadow-lg-spa mb-8 relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-48 h-48 rounded-full" style="background: radial-gradient(circle, rgba(201,154,58,.16) 0%, transparent 60%); transform: translate(40%, -40%);"></div>
+        <div class="relative z-[1]">
+          <span class="eyebrow !text-gold-soft mb-2 block">Your Spa is Live</span>
+          <h3 class="font-serif text-[1.5rem] !text-white font-semibold mb-6">Three links you need to keep.</h3>
 
-        <h4 class="text-[0.88rem] font-semibold text-ink mb-4">Install the AVA app on your device</h4>
+          <!-- Booking link -->
+          <div class="mb-5">
+            <p class="text-[0.72rem] uppercase tracking-wider !text-gold-soft font-bold mb-2">1 · Customer Booking Page</p>
+            <p class="text-[0.85rem] !text-white/70 mb-2 leading-relaxed">Share this with your customers — they can book appointments online here:</p>
+            <div class="flex items-stretch gap-2">
+              <code id="bookingUrl" class="flex-1 bg-black/30 !text-gold-soft px-3 py-2.5 rounded-lg font-mono text-[0.82rem] break-all">—</code>
+              <button type="button" id="copyBookingBtn" class="px-3 bg-white/10 hover:bg-white/20 !text-white rounded-lg text-[0.78rem] font-semibold transition-colors">Copy</button>
+            </div>
+          </div>
+
+          <!-- POS / Login link -->
+          <div class="mb-5">
+            <p class="text-[0.72rem] uppercase tracking-wider !text-gold-soft font-bold mb-2">2 · Staff POS Login</p>
+            <p class="text-[0.85rem] !text-white/70 mb-2 leading-relaxed">You and your team log in here to manage bookings, POS, payroll, etc.</p>
+            <div class="flex items-stretch gap-2">
+              <code id="loginUrl" class="flex-1 bg-black/30 !text-gold-soft px-3 py-2.5 rounded-lg font-mono text-[0.82rem] break-all">—</code>
+              <button type="button" id="copyLoginBtn" class="px-3 bg-white/10 hover:bg-white/20 !text-white rounded-lg text-[0.78rem] font-semibold transition-colors">Copy</button>
+            </div>
+          </div>
+
+          <!-- Install link -->
+          <div class="mb-2">
+            <p class="text-[0.72rem] uppercase tracking-wider !text-gold-soft font-bold mb-2">3 · Install the App</p>
+            <p class="text-[0.85rem] !text-white/70 mb-2 leading-relaxed">Open this on each device that needs offline access (phone, tablet, desktop).</p>
+            <div class="flex items-stretch gap-2">
+              <code id="installUrl" class="flex-1 bg-black/30 !text-gold-soft px-3 py-2.5 rounded-lg font-mono text-[0.82rem] break-all">—</code>
+              <button type="button" id="copyInstallBtn" class="px-3 bg-white/10 hover:bg-white/20 !text-white rounded-lg text-[0.78rem] font-semibold transition-colors">Copy</button>
+            </div>
+          </div>
+
+          <div class="mt-6 p-4 bg-white/5 border border-white/10 rounded-xl">
+            <p class="text-[0.82rem] !text-gold-soft font-semibold mb-1">Login credentials</p>
+            <p class="text-[0.84rem] !text-white/85 leading-relaxed">
+              Email: <strong id="credsEmail" class="!text-white">—</strong><br/>
+              Password: <span class="!text-white/85">the one you set during checkout</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- INSTALL STEPS -->
+      <div class="max-w-[680px] mx-auto bg-white border border-border-soft rounded-2xl p-8 md:p-10 shadow-md-spa mb-8">
+        <h4 class="text-[0.92rem] font-semibold text-ink mb-4">How to install the AVA app</h4>
         <ul class="list-none flex flex-col gap-3 m-0 p-0">
           <li class="flex items-start gap-3">
             <span class="flex-shrink-0 w-6 h-6 bg-emerald-brand/10 text-emerald-brand rounded-full flex items-center justify-center text-[0.78rem] font-bold">1</span>
@@ -74,7 +122,7 @@ const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
       <!-- ACTIONS -->
       <div class="max-w-[680px] mx-auto flex flex-col sm:flex-row gap-3 justify-center">
         <a id="dashboardLink" href="#" class="btn btn-primary px-8">Install AVA App →</a>
-        <a href="/" class="btn btn-secondary px-8">Back to Home</a>
+        <a id="bookingPreviewLink" href="#" class="btn btn-secondary px-8">Preview Booking Page</a>
       </div>
 
       <p class="text-center text-[0.82rem] text-muted mt-8">May tanong? Mag-email sa <a href="mailto:support@avaspacentral.com" class="text-emerald-brand hover:underline">support@avaspacentral.com</a></p>
@@ -83,47 +131,79 @@ const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
 
 </Layout>
 
-<script is:inline define:vars={{ spaAppUrl }}>
-  const raw = sessionStorage.getItem('ava_checkout');
+<script is:inline define:vars={{ fallbackSpaAppUrl }}>
+  // Two sources of truth for what to display:
+  //   1. ava_checkout_result — written by /checkout/building.astro after
+  //      the server finished provisioning. Has real per-tenant URLs.
+  //   2. ava_checkout — the labels stashed at step 1. Fallback if the
+  //      result wasn't captured (e.g. user navigated directly).
+  const resultRaw = sessionStorage.getItem('ava_checkout_result');
+  const stashRaw  = sessionStorage.getItem('ava_checkout');
   const method = sessionStorage.getItem('ava_checkout_method');
 
-  if (!raw) {
-    // No checkout data — user probably navigated here directly.
+  const result = resultRaw ? JSON.parse(resultRaw) : null;
+  const stash  = stashRaw  ? JSON.parse(stashRaw)  : null;
+
+  if (!result && !stash) {
     document.getElementById('planName').textContent = '—';
   } else {
-    const data = JSON.parse(raw);
+    const planName       = result?.planTier      || stash?.planName     || '—';
+    const planPrice      = stash?.planPrice      || (result?.amountPhp ? `₱${result.amountPhp.toLocaleString('en-PH')}` : '—');
+    const businessName   = result?.businessName  || stash?.businessName || '—';
+    const email          = result?.email         || stash?.email        || '—';
+    const ref            = 'AVA-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
 
-    // Generate a pseudo order ref. Real one would come from NextPay's payment ID.
-    const ref = 'AVA-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-
-    // Next billing = 30 days from now.
-    const next = new Date();
-    next.setDate(next.getDate() + 30);
-    const nextStr = next.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const nextBillingAt  = result?.nextBillingAt ? new Date(result.nextBillingAt) : (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d; })();
+    const nextStr = nextBillingAt.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 
     document.getElementById('orderRef').textContent = ref;
-    document.getElementById('planName').textContent = data.planName;
-    document.getElementById('amountPaid').textContent = data.planPrice;
-    document.getElementById('businessName').textContent = data.customer.businessName || '—';
-    document.getElementById('accountEmail').textContent = data.customer.email || '—';
-    document.getElementById('emailInline').textContent = data.customer.email || '—';
-    document.getElementById('paymentMethod').textContent = (method || 'gcash').replace('otc', 'Over-the-Counter');
+    document.getElementById('planName').textContent = planName;
+    document.getElementById('amountPaid').textContent = planPrice;
+    document.getElementById('businessName').textContent = businessName;
+    document.getElementById('accountEmail').textContent = email;
+    document.getElementById('emailInline').textContent = email;
+    document.getElementById('credsEmail').textContent = email;
+    document.getElementById('paymentMethod').textContent = (method || result?.paymentMethod || 'gcash').replace('otc', 'Over-the-Counter');
     document.getElementById('nextBilling').textContent = nextStr;
 
-    // Install URL — points to the spa PWA's /install page which handles the
-    // install prompt (and iOS Add-to-Home-Screen fallback). Base URL comes
-    // from PUBLIC_SPA_APP_URL (Netlify env var); defaults to the local
-    // dev server.
+    const stripSlash = (u) => (u && u.endsWith('/')) ? u.slice(0, -1) : (u || '');
+    const baseSpa = stripSlash(fallbackSpaAppUrl);
     const params = new URLSearchParams();
-    if (data.customer.email) params.set('email', data.customer.email);
-    if (data.customer.businessName) params.set('business', data.customer.businessName);
+    if (email && email !== '—') params.set('email', email);
+    if (businessName && businessName !== '—') params.set('business', businessName);
     const qs = params.toString();
+
+    const bookingUrl = result?.bookingUrl  || (baseSpa + '/book/your-business-slug');
+    const loginUrl   = result?.loginUrl    || (baseSpa + '/login');
+    const installUrl = result?.installUrl  || (baseSpa + '/install' + (qs ? '?' + qs : ''));
+
+    document.getElementById('bookingUrl').textContent = bookingUrl;
+    document.getElementById('loginUrl').textContent   = loginUrl;
+    document.getElementById('installUrl').textContent = installUrl;
+
     const dashboardLink = document.getElementById('dashboardLink');
-    dashboardLink.href = spaAppUrl.replace(/\/$/, '') + '/install' + (qs ? '?' + qs : '');
+    dashboardLink.href = installUrl;
     dashboardLink.target = '_blank';
     dashboardLink.rel = 'noopener noreferrer';
 
-    // Clear the checkout session data — the order is complete.
+    const bookingPreviewLink = document.getElementById('bookingPreviewLink');
+    bookingPreviewLink.href = bookingUrl;
+    bookingPreviewLink.target = '_blank';
+    bookingPreviewLink.rel = 'noopener noreferrer';
+
+    const copy = (text, btn) => {
+      navigator.clipboard?.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      }).catch(() => { btn.textContent = 'Press Ctrl+C'; });
+    };
+    document.getElementById('copyBookingBtn').addEventListener('click', (e) => copy(bookingUrl, e.currentTarget));
+    document.getElementById('copyLoginBtn').addEventListener('click',   (e) => copy(loginUrl,   e.currentTarget));
+    document.getElementById('copyInstallBtn').addEventListener('click', (e) => copy(installUrl, e.currentTarget));
+
+    // Clear the checkout-only session data — the order is complete. Keep
+    // ava_checkout_result around so a refresh on this page still works.
     sessionStorage.removeItem('ava_checkout');
     sessionStorage.removeItem('ava_checkout_method');
   }

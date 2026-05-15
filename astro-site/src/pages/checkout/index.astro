@@ -206,31 +206,78 @@ const plans = {
     </li>
   `).join('');
 
-  // Form submit
+  // Form submit — POSTs directly to /api/create-checkout-session so the
+  // password never lands in sessionStorage. The server stores it briefly
+  // in checkout_sessions (service-role only, ~30 min TTL) and returns a
+  // token the browser uses for the remaining steps.
   const form = document.getElementById('checkoutForm');
   const passwordError = document.getElementById('passwordError');
-  form.addEventListener('submit', (e) => {
+  const submitBtn = form.querySelector('button[type="submit"]');
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form));
+
     if (data.password !== data.passwordConfirm) {
       passwordError.classList.remove('hidden');
       return;
     }
     passwordError.classList.add('hidden');
 
-    // Save customer + plan to sessionStorage for the next step
-    const { password, passwordConfirm, terms, ...safeData } = data;
-    sessionStorage.setItem('ava_checkout', JSON.stringify({
-      plan: plan.slug,
-      planName: plan.name,
-      planPrice: plan.promo,
-      customer: safeData,
-      // NOTE: storing password in sessionStorage is a stopgap for the frontend prototype.
-      // In production this submits directly to a server endpoint that hashes + persists it,
-      // never round-trips through the browser session.
-      passwordPending: password,
-    }));
+    const planPriceNumeric = parseInt(plan.promo.replace(/[^0-9]/g, ''), 10) || 0;
 
-    window.location.href = '/checkout/payment';
+    const payload = {
+      email: String(data.email || '').trim().toLowerCase(),
+      password: String(data.password || ''),
+      businessName: String(data.businessName || '').trim(),
+      businessAddress: String(data.address || '').trim(),
+      businessPhone: String(data.phone || '').trim(),
+      branchesCount: Math.max(1, parseInt(String(data.branches || '1'), 10) || 1),
+      planTier: plan.slug,
+      amountPhp: planPriceNumeric,
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Setting up…';
+
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        passwordError.textContent = result?.detail
+          ? `Sign-up error: ${result.detail}`
+          : 'Could not start checkout. Please try again.';
+        passwordError.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Continue to Payment →';
+        return;
+      }
+
+      // Only non-secret state is stashed for the UI on later pages. The
+      // server holds the password; this stash exists so a refresh on
+      // /checkout/payment doesn't lose plan/business labels.
+      sessionStorage.setItem('ava_checkout', JSON.stringify({
+        token: result.token,
+        plan: plan.slug,
+        planName: plan.name,
+        planPrice: plan.promo,
+        businessName: payload.businessName,
+        email: payload.email,
+        devMode: !!result.devMode,
+      }));
+
+      window.location.href = result.paymentUrl
+        || `/checkout/payment?session=${encodeURIComponent(result.token)}`;
+    } catch (err) {
+      passwordError.textContent = 'Network error. Please try again.';
+      passwordError.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Continue to Payment →';
+    }
   });
 </script>

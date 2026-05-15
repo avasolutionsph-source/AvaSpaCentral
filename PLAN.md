@@ -18,6 +18,18 @@ ay snapshot — verify before editing.
 Goal: customer can pay, get a real account, log into the PWA, at hindi
 ma-leak ang data sa ibang tenants.
 
+> **Status update — 2026-05-15.** Items S1-02 (real provisioning), S1-03
+> (no plaintext password in browser), S1-05 (subscription schema +
+> plan_tier), and S1-09 (env-var docs) are now implemented end-to-end via
+> a new Netlify-Functions-based checkout flow (`create-checkout-session`,
+> `nextpay-webhook`, `check-provisioning-status`, `provisionAccount`).
+> The booking-slug generator (slugify + uniqueness retry) gives each
+> tenant a unique `/book/<slug>` URL on first signup. NextPay (S1-01)
+> currently runs in **dev mode** — the checkout flow simulates payment
+> via a button on `/checkout/payment` when `NEXTPAY_CLIENT_SECRET` is
+> unset; flip a single env var to activate real billing. Cross-tenant
+> Edge Function fixes (S1-07, S1-08) are still pending.
+
 ### S1-01. Real NextPay payment on marketing-site checkout
 **Status:** stub (`setTimeout` simulation)
 **File:** [astro-site/src/pages/checkout/payment.astro](./astro-site/src/pages/checkout/payment.astro)

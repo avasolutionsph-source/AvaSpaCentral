@@ -157,22 +157,43 @@ const methods = [
 </Layout>
 
 <script is:inline>
+  // Two ways to arrive here:
+  //   1. Step 1 (index.astro) called /api/create-checkout-session and the
+  //      server's paymentUrl led here with ?session=<token>. ava_checkout in
+  //      sessionStorage has the same token + UI labels.
+  //   2. Step 1 sessionStorage exists but the URL is bare (defensive — older
+  //      tabs, manual nav). Fall back to the stashed token.
+  const params = new URLSearchParams(window.location.search);
+  const tokenFromUrl = params.get('session');
   const raw = sessionStorage.getItem('ava_checkout');
-  if (!raw) {
+  const stash = raw ? JSON.parse(raw) : null;
+  const token = tokenFromUrl || stash?.token;
+
+  if (!token) {
     window.location.href = '/checkout';
   } else {
-    const data = JSON.parse(raw);
-    document.getElementById('planName').textContent = data.planName;
-    document.getElementById('planPrice').textContent = data.planPrice;
-    document.getElementById('totalAmount').textContent = data.planPrice;
-    document.getElementById('payAmount').textContent = data.planPrice;
-    document.getElementById('customerBusiness').textContent = data.customer.businessName || '—';
-    document.getElementById('customerEmail').textContent = data.customer.email || '—';
+    const planName = stash?.planName || '—';
+    const planPrice = stash?.planPrice || '—';
+    const businessName = stash?.businessName || '—';
+    const email = stash?.email || '—';
+    const devMode = !!stash?.devMode;
+
+    document.getElementById('planName').textContent = planName;
+    document.getElementById('planPrice').textContent = planPrice;
+    document.getElementById('totalAmount').textContent = planPrice;
+    document.getElementById('payAmount').textContent = planPrice;
+    document.getElementById('customerBusiness').textContent = businessName;
+    document.getElementById('customerEmail').textContent = email;
 
     const form = document.getElementById('paymentForm');
     const payBtn = document.getElementById('payBtn');
     const payBtnLabel = document.getElementById('payBtnLabel');
     const payBtnSpinner = document.getElementById('payBtnSpinner');
+
+    if (devMode) {
+      const label = document.getElementById('payBtnLabel');
+      label.innerHTML = 'Simulate Payment <span id="payAmount">' + planPrice + '</span> → (Dev Mode)';
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -182,21 +203,42 @@ const methods = [
       payBtnLabel.classList.add('hidden');
       payBtnSpinner.classList.remove('hidden');
 
-      // === Real flow would happen here ===
-      // 1. POST to /api/checkout/create-payment with { plan, customer, method }
-      // 2. Server creates NextPay payment link via NextPay API
-      // 3. Server returns { paymentUrl }
-      // 4. window.location.href = paymentUrl (redirect to NextPay hosted page)
-      // 5. After NextPay payment, user returns to /checkout/success
-      // 6. NextPay webhook triggers Supabase account provisioning
-      // ====================================
+      sessionStorage.setItem('ava_checkout_method', String(method || ''));
 
-      // Frontend stub: simulate brief payment processing, then go to the
-      // building/provisioning page (which runs the post-payment animation
-      // and opens the spa software).
-      sessionStorage.setItem('ava_checkout_method', method);
-      await new Promise((r) => setTimeout(r, 800));
-      window.location.href = '/checkout/building';
+      if (devMode) {
+        // Dev-mode shortcut: POST straight to the webhook endpoint with the
+        // session token. In production (real NextPay configured), the form
+        // would redirect to the hosted NextPay page instead.
+        try {
+          const res = await fetch('/api/nextpay-webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, method }),
+          });
+          const result = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            payBtnLabel.classList.remove('hidden');
+            payBtnSpinner.classList.add('hidden');
+            payBtn.disabled = false;
+            alert('Payment simulation failed: ' + (result?.detail || result?.error || 'unknown error'));
+            return;
+          }
+        } catch (err) {
+          payBtnLabel.classList.remove('hidden');
+          payBtnSpinner.classList.add('hidden');
+          payBtn.disabled = false;
+          alert('Network error during payment simulation. Please try again.');
+          return;
+        }
+      } else {
+        // Real NextPay path goes through hosted page. The webhook will fire
+        // server-side and the building page will pick up the result via
+        // polling. (When we wire real NextPay, replace the line below with
+        // a redirect to the hosted-page URL returned from the server.)
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      window.location.href = `/checkout/building?session=${encodeURIComponent(token)}`;
     });
   }
 </script>

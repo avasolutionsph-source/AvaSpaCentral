@@ -10,6 +10,35 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Serverless functions live next to the Astro pages so the deploy bundles
+# everything together. Functions handle checkout signup, provisioning
+# status polling, and the NextPay webhook (real + dev-mode).
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["@supabase/supabase-js"]
+
+# Friendly /api/* paths in front of the raw /.netlify/functions/* URLs.
+# The marketing-site frontend uses these so we can later swap providers
+# without rewriting page code.
+[[redirects]]
+  from = "/api/create-checkout-session"
+  to   = "/.netlify/functions/create-checkout-session"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/check-provisioning-status"
+  to   = "/.netlify/functions/check-provisioning-status"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/nextpay-webhook"
+  to   = "/.netlify/functions/nextpay-webhook"
+  status = 200
+  force = true
+
 # SPA-style fallback isn't needed (Astro is static), but redirect bare /index
 # style paths and trailing slashes for cleanliness.
 [[redirects]]

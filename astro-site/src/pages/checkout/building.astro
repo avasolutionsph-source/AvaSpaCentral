@@ -110,30 +110,24 @@ const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
 
 </Layout>
 
-<script is:inline define:vars={{ spaAppUrl }}>
-  // Build URL for the spa PWA's install page. Base URL comes from the
-  // PUBLIC_SPA_APP_URL env var (set in Netlify site settings); defaults to
-  // the local Vite dev server when unset. The /install route handles the
-  // PWA install prompt (with iOS Add-to-Home-Screen fallback) so the
-  // customer ends up with the app installed on their device.
-  function buildSpaUrl() {
-    const raw = sessionStorage.getItem('ava_checkout');
-    const data = raw ? JSON.parse(raw) : null;
-    const params = new URLSearchParams();
-    if (data?.customer?.email) params.set('email', data.customer.email);
-    if (data?.customer?.businessName) params.set('business', data.customer.businessName);
-    const qs = params.toString();
-    return spaAppUrl.replace(/\/$/, '') + '/install' + (qs ? '?' + qs : '');
-  }
+<script is:inline>
+  // Poll /api/check-provisioning-status until the server reports the
+  // tenant has been fully created (auth user + business + branches +
+  // subscription). The on-screen steps tick forward as the status
+  // transitions: pending -> paid -> provisioned. On 'failed' we surface
+  // the error inline instead of redirecting blindly.
 
-  const steps = [
-    { delay: 600,  status: 'Confirming your payment with NextPay…' },
-    { delay: 1400, status: 'Creating your AVA account…' },
-    { delay: 1600, status: 'Setting up your spa business profile…' },
-    { delay: 1300, status: 'Configuring branches and team access…' },
-    { delay: 1500, status: 'Building your dashboard…' },
-    { delay: 1100, status: 'Launching your spa software…' },
-  ];
+  // Token resolution: URL query is authoritative (refresh-safe) and the
+  // sessionStorage stash is a fallback for older flows that don't pass
+  // it on the navigation. No token at all → back to step 1.
+  const tokenFromUrl = new URLSearchParams(window.location.search).get('session');
+  const raw = sessionStorage.getItem('ava_checkout');
+  const stash = raw ? JSON.parse(raw) : null;
+  const token = tokenFromUrl || stash?.token;
+
+  if (!token) {
+    window.location.href = '/checkout';
+  }
 
   const statusText = document.getElementById('statusText');
   const progressBar = document.getElementById('progressBar');
@@ -141,6 +135,18 @@ const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
   const stepItems = document.querySelectorAll('.step-item');
   const readyPanel = document.getElementById('readyPanel');
   const openDashboardBtn = document.getElementById('openDashboardBtn');
+
+  // Each step maps to a phase of the server's lifecycle. We bring the
+  // step-by-step animation forward as status transitions arrive so the
+  // user gets a smooth fill rather than a sudden 0 -> 100 jump.
+  const PHASES = [
+    { idx: 0, label: 'Payment confirmed',                       statuses: ['paid', 'provisioned'] },
+    { idx: 1, label: 'Creating your AVA account',               statuses: ['provisioned'] },
+    { idx: 2, label: 'Setting up your spa business profile',    statuses: ['provisioned'] },
+    { idx: 3, label: 'Configuring branches and team access',    statuses: ['provisioned'] },
+    { idx: 4, label: 'Building your dashboard',                 statuses: ['provisioned'] },
+    { idx: 5, label: 'Preparing your installable app',          statuses: ['provisioned'] },
+  ];
 
   function setStepState(idx, state) {
     const item = stepItems[idx];
@@ -170,59 +176,122 @@ const spaAppUrl = import.meta.env.PUBLIC_SPA_APP_URL || 'http://localhost:3000';
     }
   }
 
-  async function runProvisioning() {
-    // No checkout data? Send back to start.
-    if (!sessionStorage.getItem('ava_checkout')) {
-      window.location.href = '/checkout';
-      return;
-    }
-
-    // === Phase 2 integration point ===
-    // Replace the simulated awaits below with real Supabase calls:
-    //   1. await supabase.auth.signUp({ email, password })
-    //   2. await supabase.from('businesses').insert({ name, address, ... })
-    //   3. await supabase.from('users').insert({ auth_id, business_id, role: 'Owner', ... })
-    //   4. await supabase.from('branches').insert({ business_id, ... })  // for each branch
-    // Each await fulfills one "step" — drive the UI from real promise resolution
-    // instead of the static delays here.
-    // ===================================
-
-    let totalDelay = steps.reduce((s, x) => s + x.delay, 0);
-    let elapsed = 0;
-
-    for (let i = 0; i < steps.length; i++) {
-      setStepState(i, 'active');
-      statusText.textContent = steps[i].status;
-
-      await new Promise((r) => setTimeout(r, steps[i].delay));
-
-      setStepState(i, 'done');
-      elapsed += steps[i].delay;
-      const pct = Math.round((elapsed / totalDelay) * 100);
-      progressBar.style.width = pct + '%';
-      progressLabel.textContent = pct + '%';
-    }
-
-    // All done — open spa software + show ready panel.
-    statusText.textContent = 'Tapos na! Opening your spa software…';
-    const spaUrl = buildSpaUrl();
-
-    // Try auto-open in new tab. Most browsers allow this since user submitted
-    // a form ~10s ago and the tab is from a top-level page.
-    const opened = window.open(spaUrl, '_blank', 'noopener,noreferrer');
-
-    // Show ready panel as fallback if popup blocked.
-    readyPanel.classList.remove('hidden');
-    openDashboardBtn.addEventListener('click', () => {
-      window.open(spaUrl, '_blank', 'noopener,noreferrer');
-    });
-
-    // Navigate to the success page in this tab so the user has a confirmation
-    // record. Wait a beat so they see the "100%" finish.
-    setTimeout(() => {
-      window.location.href = '/checkout/success';
-    }, opened ? 1500 : 4000);
+  function setProgress(pct) {
+    progressBar.style.width = pct + '%';
+    progressLabel.textContent = pct + '%';
   }
 
-  runProvisioning();
+  function markPhasesUpTo(idx) {
+    for (let i = 0; i <= idx; i++) setStepState(i, 'done');
+  }
+
+  async function poll() {
+    const res = await fetch(`/api/check-provisioning-status?token=${encodeURIComponent(token)}`);
+    if (!res.ok) throw new Error('status_lookup_failed');
+    return await res.json();
+  }
+
+  function failWith(message) {
+    statusText.textContent = message;
+    statusText.classList.add('text-red-600');
+  }
+
+  let activeStep = 0;
+  let stopped = false;
+
+  // Tick the next "in-flight" step's spinner so users see motion while the
+  // server actually does the work. The forward-progress is gated by the
+  // server's status, but we don't want to look frozen between transitions.
+  setStepState(0, 'active');
+  setProgress(8);
+
+  const tickInterval = setInterval(() => {
+    if (stopped) return;
+    if (activeStep < 5) {
+      setStepState(activeStep, 'active');
+    }
+  }, 700);
+
+  async function run() {
+    const start = Date.now();
+    const TIMEOUT_MS = 90_000;
+
+    while (!stopped) {
+      let data;
+      try {
+        data = await poll();
+      } catch (err) {
+        if (Date.now() - start > TIMEOUT_MS) {
+          failWith('Provisioning is taking longer than expected. Please refresh in a moment.');
+          stopped = true;
+          clearInterval(tickInterval);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+
+      if (data.status === 'failed' || data.status === 'expired') {
+        clearInterval(tickInterval);
+        stopped = true;
+        failWith(
+          data.failureReason
+            ? `Couldn't finish your account: ${data.failureReason}`
+            : 'Couldn\'t finish your account. Please contact support@avaspacentral.com.',
+        );
+        return;
+      }
+
+      if (data.status === 'paid' && activeStep < 1) {
+        setStepState(0, 'done');
+        setStepState(1, 'active');
+        activeStep = 1;
+        setProgress(30);
+      }
+
+      if (data.status === 'provisioned') {
+        clearInterval(tickInterval);
+        stopped = true;
+        markPhasesUpTo(5);
+        setProgress(100);
+        statusText.textContent = 'Tapos na! Redirecting to your welcome page…';
+
+        // Stash the resolved URLs so /checkout/success can render them
+        // without needing to re-poll.
+        sessionStorage.setItem('ava_checkout_result', JSON.stringify({
+          bookingUrl: data.bookingUrl,
+          bookingSlug: data.bookingSlug,
+          installUrl: data.installUrl,
+          loginUrl: data.loginUrl,
+          email: data.email,
+          businessName: data.businessName,
+          planTier: data.planTier,
+          amountPhp: data.amountPhp,
+          paymentMethod: data.paymentMethod,
+          nextBillingAt: data.nextBillingAt,
+        }));
+
+        readyPanel.classList.remove('hidden');
+        openDashboardBtn.addEventListener('click', () => {
+          if (data.installUrl) window.open(data.installUrl, '_blank', 'noopener,noreferrer');
+        });
+
+        setTimeout(() => {
+          window.location.href = `/checkout/success?session=${encodeURIComponent(token)}`;
+        }, 1500);
+        return;
+      }
+
+      // Still pending or paid-but-not-yet-provisioned. Slow poll.
+      if (Date.now() - start > TIMEOUT_MS) {
+        clearInterval(tickInterval);
+        stopped = true;
+        failWith('Provisioning is taking longer than expected. Please refresh in a moment.');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+
+  run();
 </script>

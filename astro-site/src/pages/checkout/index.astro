@@ -110,7 +110,8 @@ const plans = {
                 <input type="text" name="address" required placeholder="City, Province" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors"/>
               </label>
               <label class="flex flex-col gap-2 text-[0.78rem] font-semibold text-ink">Number of Branches
-                <input type="number" name="branches" required min="1" value="1" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors w-32"/>
+                <input id="branchesInput" type="number" name="branches" required min="1" value="1" class="bg-ivory border border-border-soft rounded-lg px-4 py-3 text-[0.95rem] font-normal text-ink focus:outline-none focus:border-emerald-brand transition-colors w-32"/>
+                <span id="branchesHint" class="text-[0.78rem] font-normal text-muted"></span>
               </label>
             </div>
           </div>
@@ -194,6 +195,25 @@ const plans = {
   document.getElementById('subtotal').textContent = plan.promo;
   document.getElementById('total').textContent = plan.promo;
 
+  // Plan-tier branch cap. Must match PLAN_BRANCH_CAPS in
+  // netlify/functions/create-checkout-session.ts and PLAN_LIMITS in the
+  // spa-app's AppContext — change all three together.
+  const PLAN_BRANCH_CAPS = { starter: 1, advance: 3, enterprise: 50 };
+  const branchCap = PLAN_BRANCH_CAPS[plan.slug] ?? 50;
+  const branchesInput = document.getElementById('branchesInput');
+  const branchesHint = document.getElementById('branchesHint');
+  branchesInput.max = String(branchCap);
+  if (parseInt(branchesInput.value, 10) > branchCap) branchesInput.value = String(branchCap);
+  branchesHint.textContent =
+    plan.slug === 'starter'    ? '1 branch only on Starter'
+  : plan.slug === 'advance'    ? 'Up to 3 branches on Advance'
+                               : 'Up to 50 branches on Enterprise';
+  // Re-clamp on every keystroke so the user can't type a higher number.
+  branchesInput.addEventListener('input', () => {
+    const n = parseInt(branchesInput.value, 10);
+    if (Number.isFinite(n) && n > branchCap) branchesInput.value = String(branchCap);
+  });
+
   const featsList = document.getElementById('planFeats');
   featsList.innerHTML = plan.feats.map(f => `
     <li class="flex items-start gap-2.5 text-[0.88rem] !text-white/85">
@@ -235,7 +255,7 @@ const plans = {
       businessName: String(data.businessName || '').trim(),
       businessAddress: String(data.address || '').trim(),
       businessPhone: String(data.phone || '').trim(),
-      branchesCount: Math.max(1, parseInt(String(data.branches || '1'), 10) || 1),
+      branchesCount: Math.min(branchCap, Math.max(1, parseInt(String(data.branches || '1'), 10) || 1)),
       planTier: plan.slug,
       amountPhp: planPriceNumeric,
     };

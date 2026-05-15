@@ -18,6 +18,16 @@ import type { CheckoutSessionRow, PlanTier, ProvisionResult } from './types';
 const DEFAULT_BRANCH_NAME = 'Main Branch';
 const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
+// Plan-tier branch cap mirroring create-checkout-session.ts. Defence-in-
+// depth: if a session row somehow ended up with branches_count > cap (e.g.
+// a row inserted before this cap existed, or via direct SQL), provisioning
+// will silently clamp instead of creating over-limit branches.
+const PLAN_BRANCH_CAPS: Record<PlanTier, number> = {
+  starter: 1,
+  advance: 3,
+  enterprise: 50,
+};
+
 interface ProvisionInput {
   session: CheckoutSessionRow;
   spaAppBaseUrl: string;
@@ -58,9 +68,17 @@ export async function provisionAccount({ session, spaAppBaseUrl }: ProvisionInpu
     });
 
     // Step 4: branches
+    // Clamp the requested branch count to the plan cap before we hit the
+    // branches table. The checkout API already validates this, but a row
+    // inserted directly (or before the cap existed) could still ask for
+    // more than the plan allows — clamp here so provisioning never creates
+    // an over-limit tenant.
+    const planCap = PLAN_BRANCH_CAPS[session.plan_tier] ?? 1;
+    const requested = Math.max(1, session.branches_count ?? 1);
+    const branchCount = Math.min(planCap, requested);
     await insertBranches({
       businessId: business.id,
-      count: Math.max(1, session.branches_count ?? 1),
+      count: branchCount,
       city: extractCity(session.business_address),
     });
 

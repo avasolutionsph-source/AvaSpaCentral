@@ -23,6 +23,16 @@ const PLAN_PRICES_PHP: Record<PlanTier, number> = {
 
 const PLAN_TIERS: PlanTier[] = ['starter', 'advance', 'enterprise'];
 
+// Maximum branches a tenant is allowed to provision per plan tier. Mirrors
+// the limits enforced in the spa-app (AppContext.PLAN_LIMITS) — keep in
+// sync. Enterprise uses a soft cap of 50 (the existing column constraint),
+// not Infinity, because branches_count is an INTEGER column.
+const PLAN_BRANCH_CAPS: Record<PlanTier, number> = {
+  starter: 1,
+  advance: 3,
+  enterprise: 50,
+};
+
 export const handler: Handler = async (event) => {
   // Wrap the whole handler in a try/catch + named-stage tracking so any
   // failure (missing env var, schema drift, network blip) returns a JSON
@@ -164,6 +174,15 @@ function validate(p: Partial<CheckoutFormPayload>): string | null {
   const branches = p.branchesCount ?? 1;
   if (!Number.isInteger(branches) || branches < 1 || branches > 50) {
     return 'branches_count_invalid';
+  }
+  // Plan-tier branch cap. Without this, a Starter buyer who enters "2" in
+  // the branches input ends up with 2 provisioned branches even though
+  // Starter is 1-branch only — exactly the legacy state we hit with the
+  // `dododo` tenant. Reject at the server boundary so a tampered form or a
+  // stale client can't slip through.
+  const cap = PLAN_BRANCH_CAPS[p.planTier];
+  if (branches > cap) {
+    return `branches_exceeds_plan_cap_${p.planTier}_max_${cap}`;
   }
   return null;
 }

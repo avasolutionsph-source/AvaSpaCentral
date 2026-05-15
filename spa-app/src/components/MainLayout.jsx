@@ -10,6 +10,7 @@ import NotificationPermissionBanner from './NotificationPermissionBanner';
 import NotificationService from '../services/notifications/NotificationService';
 import NotificationSoundManager from '../services/notifications/NotificationSoundManager';
 import PahatidModal from './PahatidModal';
+import PlanLock, { usePlanGate } from './PlanLock';
 import {
   getPreferredOrientation,
   setPreferredOrientation,
@@ -17,6 +18,9 @@ import {
 
 const MainLayout = () => {
   const { user, logout, hasPermission, hasManagementAccess, selectedBranch, selectBranch, canSeeAllBranches } = useApp();
+  // Pre-compute the advance-tier gate once so the sidebar render loop can
+  // ask "is this item locked?" without calling a hook inside the map.
+  const advanceGate = usePlanGate('advance');
   // Branch Owner and Manager are locked to a single branch — they shouldn't
   // see a switch affordance that would clear their branch and send them to
   // the picker.
@@ -388,7 +392,10 @@ const MainLayout = () => {
       label: 'Personal',
       items: [
         { path: '/rider-bookings', label: 'My Deliveries', icon: 'pos', page: 'rider-bookings' },
-        { path: '/my-portal', label: 'My Portal', icon: 'portal', page: 'my-schedule' },
+        // My Portal is a per-staff personal view — only meaningful on
+        // Advance+ where multi-user accounts exist. On Starter the nav
+        // entry is dimmed and clicks surface an upgrade toast.
+        { path: '/my-portal', label: 'My Portal', icon: 'portal', page: 'my-schedule', requiresTier: 'advance' },
       ],
       hasDivider: true
     },
@@ -575,21 +582,30 @@ const MainLayout = () => {
           <div className="nav-items-flat" role="list">
             {filteredGroups.map((group, groupIndex) => (
               <React.Fragment key={group.label}>
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={({ isActive }) =>
-                      `nav-item ${isActive ? 'active' : ''}`
-                    }
-                    role="listitem"
-                    title={item.label}
-                  >
-                    <span className="nav-icon" aria-hidden="true">{getIcon(item.icon)}</span>
-                    {sidebarOpen && <span className="nav-label">{item.label}</span>}
-                    {!sidebarOpen && <span className="visually-hidden">{item.label}</span>}
-                  </NavLink>
-                ))}
+                {group.items.map((item) => {
+                  // Plan-tier gate: items with requiresTier === 'advance'
+                  // are dimmed + click-intercepted on Starter. We don't
+                  // hide them so the Owner can see what's unlocked at the
+                  // next tier and click through to be reminded.
+                  const itemLocked = item.requiresTier === 'advance' && advanceGate.locked;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      className={({ isActive }) =>
+                        `nav-item ${isActive ? 'active' : ''} ${itemLocked ? 'is-plan-locked' : ''}`
+                      }
+                      role="listitem"
+                      title={itemLocked ? advanceGate.message : item.label}
+                      onClick={itemLocked ? advanceGate.blockIfLocked : undefined}
+                      style={itemLocked ? { opacity: 0.5 } : undefined}
+                    >
+                      <span className="nav-icon" aria-hidden="true">{itemLocked ? '🔒' : getIcon(item.icon)}</span>
+                      {sidebarOpen && <span className="nav-label">{item.label}</span>}
+                      {!sidebarOpen && <span className="visually-hidden">{item.label}</span>}
+                    </NavLink>
+                  );
+                })}
                 {group.hasDivider && groupIndex < filteredGroups.length - 1 && (
                   <div className="nav-divider" aria-hidden="true"></div>
                 )}
@@ -720,18 +736,20 @@ const MainLayout = () => {
               )}
             </div>
 
-            {/* Pahatid (request transport) — universally available to every
-                logged-in role. Compact icon next to the bell. */}
-            <button
-              type="button"
-              className="notification-bell"
-              onClick={() => setShowPahatid(true)}
-              aria-label="Request Pahatid (drop-off)"
-              title="Request Pahatid — notify a rider for a drop-off"
-              style={{ marginRight: 4 }}
-            >
-              <span aria-hidden="true" style={{ fontSize: '1.05rem' }}>🚖</span>
-            </button>
+            {/* Pahatid (request transport) — Advance+ only; PlanLock dims
+                and intercepts the click on Starter. */}
+            <PlanLock requiredTier="advance" inline>
+              <button
+                type="button"
+                className="notification-bell"
+                onClick={() => setShowPahatid(true)}
+                aria-label="Request Pahatid (drop-off)"
+                title="Request Pahatid — notify a rider for a drop-off"
+                style={{ marginRight: 4 }}
+              >
+                <span aria-hidden="true" style={{ fontSize: '1.05rem' }}>🚖</span>
+              </button>
+            </PlanLock>
 
             {/* Notification Bell */}
             <div className="notification-container" ref={notificationRef}>
@@ -1085,7 +1103,8 @@ const MainLayout = () => {
             }
 
             if (hasPermission('my-schedule')) {
-              bottomItems.push({ path: '/my-portal', label: 'Portal', icon: (
+              // Mirror the sidebar gate — My Portal is Advance+ only.
+              bottomItems.push({ path: '/my-portal', label: 'Portal', requiresTier: 'advance', icon: (
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                   <circle cx="12" cy="7" r="4"></circle>
@@ -1112,17 +1131,25 @@ const MainLayout = () => {
                   <span className="bottom-nav-icon">{item.icon}</span>
                   <span className="bottom-nav-label">{item.label}</span>
                 </button>
-              ) : (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => sidebarOpen && setSidebarOpen(false)}
-                >
-                  <span className="bottom-nav-icon">{item.icon}</span>
-                  <span className="bottom-nav-label">{item.label}</span>
-                </NavLink>
-              )
+              ) : (() => {
+                const itemLocked = item.requiresTier === 'advance' && advanceGate.locked;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''} ${itemLocked ? 'is-plan-locked' : ''}`}
+                    onClick={(e) => {
+                      if (itemLocked) { advanceGate.blockIfLocked(e); return; }
+                      if (sidebarOpen) setSidebarOpen(false);
+                    }}
+                    title={itemLocked ? advanceGate.message : item.label}
+                    style={itemLocked ? { opacity: 0.5 } : undefined}
+                  >
+                    <span className="bottom-nav-icon">{itemLocked ? '🔒' : item.icon}</span>
+                    <span className="bottom-nav-label">{item.label}</span>
+                  </NavLink>
+                );
+              })()
             ));
           })()}
         </nav>

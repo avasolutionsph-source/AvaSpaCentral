@@ -36,18 +36,27 @@ const PageHeader = memo(function PageHeader({
       icon,
       disabled = false,
       variant = 'primary',
-      className: actionClassName = ''
+      className: actionClassName = '',
+      // Plan-tier gate. When `locked` is true the button still renders
+      // (the user can see the feature exists) but is dimmed, a 🔒 prefix
+      // appears, and the click still fires onClick — the consumer is
+      // expected to use that handler to surface an upgrade-prompt toast.
+      locked = false,
+      lockTitle,
     } = actionConfig;
 
     return (
       <button
         key={index}
         type="button"
-        className={`btn btn-${variant} ${actionClassName}`.trim()}
+        className={`btn btn-${variant} ${actionClassName} ${locked ? 'is-plan-locked' : ''}`.trim()}
         onClick={onClick}
         disabled={disabled}
+        title={locked ? (lockTitle || 'Upgrade plan to unlock') : undefined}
+        style={locked ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
       >
-        {icon && <span className="btn-icon">{icon}</span>}
+        {locked && <span className="btn-icon" aria-hidden="true">🔒</span>}
+        {!locked && icon && <span className="btn-icon">{icon}</span>}
         {label}
       </button>
     );

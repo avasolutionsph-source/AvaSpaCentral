@@ -812,7 +812,12 @@ const EmployeeAccounts = ({ embedded = false, onDataChange, onOpenCreateRef }) =
         <PageHeader
           title="Employee Accounts"
           description="Create and manage employee login accounts"
-          action={{ label: '+ Create Account', onClick: guardedOpenCreate }}
+          action={{
+            label: '+ Create Account',
+            onClick: guardedOpenCreate,
+            locked: planLimits.userAccounts <= 1,
+            lockTitle: `${planTier ? planTier[0].toUpperCase() + planTier.slice(1) : 'Your'} plan is Owner-only — upgrade to Advance for multi-user`,
+          }}
         />
       )}
 

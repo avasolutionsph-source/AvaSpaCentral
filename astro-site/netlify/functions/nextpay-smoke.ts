@@ -1,132 +1,119 @@
 // GET /api/nextpay-smoke?key=<NEXTPAY_SMOKE_KEY>
 //
-// Runs the same two checks as scripts/nextpay-smoke.mjs but from the
-// deployed Netlify Function runtime. Purpose: confirm that the
-// NEXTPAY_CLIENT_KEY / NEXTPAY_CLIENT_SECRET set on Netlify are valid
-// and that our HMAC scheme is accepted by NextPay sandbox.
+// v2 smoke test. Probes Basic Auth against multiple candidate staging
+// hosts using NEXTPAY_V2_CLIENT_ID / NEXTPAY_V2_CLIENT_SECRET. Reports
+// which host(s) accept the credentials so we know where to point the
+// real integration.
 //
-// Gated behind NEXTPAY_SMOKE_KEY so randoms can't trigger it. After
-// you've verified the deployment, you can unset NEXTPAY_SMOKE_KEY on
-// Netlify to disable this endpoint entirely (it will return 503).
+// The v2 API (per the UAT plan) uses:
+//   Authorization: Basic <base64(client_id:client_secret)>
+//   X-Idempotency-Key: <uuid>     (for write requests)
+//
+// This is different from the legacy v1 API which uses HMAC-SHA256
+// signatures over the request body. The legacy `client-id` + HMAC scheme
+// only worked against /v2/disbursements (which is the v1 disbursement
+// endpoint mounted under the same path prefix); the real v2 surface
+// (payment-intents, merchants, accounts) needs Basic Auth.
 //
 // Endpoint: GET /api/nextpay-smoke?key=<value>
 //   - key   : must match the NEXTPAY_SMOKE_KEY env var (else 401)
-//   - 200   : both tests passed
-//   - 502   : NextPay sandbox rejected the request (see body for detail)
-//   - 503   : NEXTPAY_SMOKE_KEY not set on this site (endpoint disabled)
+//   - 200   : at least one host accepted the v2 credentials
+//   - 502   : all hosts rejected — bad creds or wrong staging URL
+//   - 503   : env vars not set on this site
 
 import type { Handler } from '@netlify/functions';
-import { createHmac } from 'node:crypto';
 import { jsonResponse, methodNotAllowed, preflightResponse } from './_shared/http';
 
-const SANDBOX_BASE = 'https://api-sandbox.nextpay.world';
+// Candidate hosts to probe. Listed in best-guess order. NextPay's docs do
+// not publish a single canonical staging hostname, so we test each.
+const CANDIDATE_HOSTS = [
+  'https://api.staging.nextpay.world',
+  'https://api-staging.nextpay.world',
+  'https://staging.api.nextpay.world',
+  'https://api-sandbox.nextpay.world',
+  'https://api.sandbox.nextpay.world',
+];
+
+// In-scope v2 read endpoint that any authenticated workspace should be
+// able to call. Per UAT-104: GET /v2/merchants returns a paginated list.
+// We add page=1&page_size=1 to keep payloads small.
+const PROBE_PATH = '/v2/merchants?page=1&page_size=1';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return preflightResponse();
   if (event.httpMethod !== 'GET') return methodNotAllowed(['GET', 'OPTIONS']);
 
-  const expected = process.env.NEXTPAY_SMOKE_KEY;
-  if (!expected) {
+  const smokeKey = process.env.NEXTPAY_SMOKE_KEY;
+  if (!smokeKey) {
     return jsonResponse(503, {
       error: 'smoke_disabled',
       detail: 'NEXTPAY_SMOKE_KEY env var is not set. This endpoint is disabled.',
     });
   }
   const provided = event.queryStringParameters?.key ?? '';
-  if (provided !== expected) {
+  if (provided !== smokeKey) {
     return jsonResponse(401, { error: 'invalid_key' });
   }
 
-  const clientKey = process.env.NEXTPAY_CLIENT_KEY;
-  const clientSecret = process.env.NEXTPAY_CLIENT_SECRET;
-  if (!clientKey || !clientSecret) {
+  const clientId = process.env.NEXTPAY_V2_CLIENT_ID;
+  const clientSecret = process.env.NEXTPAY_V2_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
     return jsonResponse(503, {
-      error: 'nextpay_not_configured',
-      detail: 'Set NEXTPAY_CLIENT_KEY and NEXTPAY_CLIENT_SECRET on Netlify env, then redeploy.',
+      error: 'v2_creds_not_set',
+      detail: 'Set NEXTPAY_V2_CLIENT_ID (pk_test_...) and NEXTPAY_V2_CLIENT_SECRET (sk_test_...) on Netlify, then redeploy.',
+      hint: 'These are the credentials from the "[SANDBOX] Ava Data Solutions" 1Password entry, used with HTTP Basic Auth (not the legacy ck_sandbox_ / HMAC scheme).',
     });
   }
 
-  const results: Record<string, unknown> = {
-    baseUrl: SANDBOX_BASE,
-    clientIdPreview: `${clientKey.slice(0, 16)}...${clientKey.slice(-4)}`,
-  };
+  const basicAuth = 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-  // --- Test 1: unsigned GET -------------------------------------------------
-  try {
-    const res = await fetch(`${SANDBOX_BASE}/v2/disbursements`, {
-      headers: { 'client-id': clientKey, Accept: 'application/json' },
-    });
-    const text = await res.text();
-    results.test1_unsigned_get = {
-      status: res.status,
-      ok: res.ok,
-      bodyPreview: text.slice(0, 400),
-    };
-  } catch (err) {
-    results.test1_unsigned_get = { error: (err as Error).message };
-  }
+  const probes: Array<{
+    host: string;
+    url: string;
+    status: number | null;
+    ok: boolean;
+    bodyPreview: string;
+    contentType: string | null;
+    error?: string;
+  }> = [];
 
-  // --- Test 2: signed POST --------------------------------------------------
-  const body = {
-    name: `Smoke test ${new Date().toISOString()}`,
-    private_notes: 'Auth-only smoke test. Do not execute.',
-    require_authorization: true,
-    recipients: [
-      {
-        amount: 1,
-        currency: 'PHP',
-        first_name: 'Smoke',
-        last_name: 'Test',
-        email: 'smoke@example.com',
-        destination: {
-          bank: 6,
-          account_name: 'Smoke Test',
-          account_number: '0000000000',
-          method: 'instapay',
+  for (const host of CANDIDATE_HOSTS) {
+    const url = `${host}${PROBE_PATH}`;
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Authorization: basicAuth,
+          Accept: 'application/json',
         },
-      },
-    ],
-    nonce: Date.now(),
-  };
-  const bodyStr = JSON.stringify(body);
-  const signature = createHmac('sha256', clientSecret).update(bodyStr).digest('hex');
-
-  try {
-    const res = await fetch(`${SANDBOX_BASE}/v2/disbursements`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'client-id': clientKey,
-        signature,
-      },
-      body: bodyStr,
-    });
-    const text = await res.text();
-    const lower = text.toLowerCase();
-    const signatureRejected = res.status === 401 && lower.includes('signature');
-    const clientRejected = (res.status === 401 || res.status === 403) && !signatureRejected;
-    results.test2_signed_post = {
-      status: res.status,
-      ok: res.ok,
-      bodyPreview: text.slice(0, 600),
-      signatureRejected,
-      clientRejected,
-      // A non-auth 4xx (e.g., validation error on bank code) still means
-      // the signature + client-id passed. That counts as auth-layer pass.
-      authLayerPassed: res.ok || (res.status >= 400 && res.status < 500 && !signatureRejected && !clientRejected),
-    };
-  } catch (err) {
-    results.test2_signed_post = { error: (err as Error).message };
+      });
+      const text = await res.text();
+      probes.push({
+        host,
+        url,
+        status: res.status,
+        ok: res.ok,
+        bodyPreview: text.slice(0, 400),
+        contentType: res.headers.get('content-type'),
+      });
+    } catch (err) {
+      probes.push({
+        host,
+        url,
+        status: null,
+        ok: false,
+        bodyPreview: '',
+        contentType: null,
+        error: (err as Error).message,
+      });
+    }
   }
 
-  const t1 = (results.test1_unsigned_get as any)?.ok === true;
-  const t2 = (results.test2_signed_post as any)?.authLayerPassed === true;
+  const accepted = probes.find((p) => p.ok);
   const summary = {
-    clientIdAccepted: t1,
-    hmacAccepted: t2,
-    overall: t1 && t2 ? 'PASS' : 'FAIL',
+    clientIdPreview: `${clientId.slice(0, 12)}...${clientId.slice(-4)}`,
+    workingHost: accepted?.host ?? null,
+    overall: accepted ? 'PASS' : 'FAIL',
   };
 
-  return jsonResponse(t1 && t2 ? 200 : 502, { summary, results });
+  return jsonResponse(accepted ? 200 : 502, { summary, probes });
 };
